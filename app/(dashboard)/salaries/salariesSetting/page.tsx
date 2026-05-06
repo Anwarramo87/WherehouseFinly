@@ -45,20 +45,23 @@ const getTabFromQuery = (tabParam: string | null): FinancialTabKey => {
 };
 
 
-// تعديل الواجهة لتشمل الثوابت الجديدة
+// Payload must match UpsertSalaryDto — canonical field names only
 type SalaryPayload = {
-  profession: string;
+  profession?: string;
   baseSalary: number;
-  extraEffort: number;           // جهد إضافي
-  responsibilityAllowance: number; // تعويض مسؤولية
+  lumpSumSalary: number;
+  livingAllowance: number;
   transportAllowance: number;
-  insurances: number;            // تأمينات
-  productionIncentive: number;   // تعويض حوافز إنتاجية
+  insuranceAmount: number;        // canonical (NOT insurances)
+  responsibilityAllowance: number;
+  extraEffortAllowance: number;   // canonical (NOT extraEffort)
+  productionIncentive: number;
 };
 
-type SalaryWithFixedExtras = Salary & {
-  extraEffort?: unknown;
-  insurances?: unknown;
+// Helper to safely read Salary fields regardless of deprecated aliases
+type SalaryWithAliases = Salary & {
+  extraEffort?: unknown;        // @deprecated
+  insurances?: unknown;         // @deprecated
 };
 
 const SkeletonRows = () => (
@@ -145,8 +148,21 @@ export default function SalariesPage() {
 
   const handleSave = (employeeId: string, payload: SalaryPayload) => {
     if (!employeeId) return toast.error("يرجى إدخال كود الموظف");
-    // يتم تحديث بيانات الراتب هنا (يجب أن يكون الباك إند متوافقاً مع الحقول الجديدة)
-    updateSalary.mutate({ employeeId, data: { employeeId, ...payload } });
+    updateSalary.mutate({
+      employeeId,
+      data: {
+        employeeId,
+        profession:             payload.profession ?? "",
+        baseSalary:             payload.baseSalary,
+        lumpSumSalary:          payload.lumpSumSalary,
+        livingAllowance:        payload.livingAllowance,
+        transportAllowance:     payload.transportAllowance,
+        insuranceAmount:        payload.insuranceAmount,
+        responsibilityAllowance: payload.responsibilityAllowance,
+        extraEffortAllowance:    payload.extraEffortAllowance,
+        productionIncentive:     payload.productionIncentive,
+      },
+    });
     setIsModalOpen(false);
   };
 
@@ -244,26 +260,30 @@ export default function SalariesPage() {
                         <tr><td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
                       ) : (
                         allIds.map((id: string) => {
-                          const s = (salaryMap.get(id) ?? null) as SalaryWithFixedExtras | null;
+                          const s = (salaryMap.get(id) ?? null) as SalaryWithAliases | null;
                           const emp = employeeMap.get(id) ?? null;
 
-                          // قيم افتراضية في حال لم يتم ضبط الراتب بعد
-                          let base = toNumber(emp?.hourlyRate); // مؤقتاً نستخدم hourlyRate كبديل لغياب الراتب
-                          let extraEffort = 0;
+                          // Defaults when no salary record exists yet
+                          let base          = toNumber(emp?.hourlyRate);
+                          let extraEffort   = 0;
                           let respAllowance = 0;
                           let prodIncentive = 0;
-                          let insurances = 0;
+                          let transport     = 0;
+                          let insurance     = 0;
 
                           if (s) {
-                            base = toNumber(s.baseSalary);
-                            extraEffort = toNumber(s.extraEffort);
+                            base          = toNumber(s.baseSalary);
+                            // Prefer canonical field; fall back to deprecated alias
+                            extraEffort   = toNumber(s.extraEffortAllowance ?? s.extraEffort);
                             respAllowance = toNumber(s.responsibilityAllowance);
                             prodIncentive = toNumber(s.productionIncentive);
-                            insurances = toNumber(s.insurances);
+                            transport     = toNumber(s.transportAllowance);
+                            // Prefer canonical field; fall back to deprecated alias
+                            insurance     = toNumber(s.insuranceAmount ?? s.insurances);
                           }
 
-                          // المعادلة: الأساسي + جهد إضافي + مسؤولية + إنتاج - تأمينات
-                          const monthlyFixedTotal = base + extraEffort + respAllowance + prodIncentive - insurances;
+                          // الإجمالي: أساسي + جهد + مسؤولية + إنتاج + نقل − تأمينات
+                          const monthlyFixedTotal = base + extraEffort + respAllowance + prodIncentive + transport - insurance;
                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? "موظف غير معروف");
 
                           return (
@@ -296,7 +316,7 @@ export default function SalariesPage() {
                               
                               {/* 6. التأمينات (بالأحمر كخصم) */}
                               <td className="p-4 text-center font-mono font-black text-rose-500">
-                                {insurances > 0 ? insurances.toLocaleString() : "—"}
+                                {insurance > 0 ? insurance.toLocaleString() : "—"}
                               </td>
 
                               {/* 7. الإجمالي الثابت */}

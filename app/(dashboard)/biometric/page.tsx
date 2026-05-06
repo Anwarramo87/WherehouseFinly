@@ -212,8 +212,8 @@ export default function BiometricPage() {
   const currentUser = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
 
-  const [storedKey, setStoredKey] = useState<StoredBiometricKey | null>(null);
-  const [employeeId, setEmployeeId] = useState("");
+  const [storedKey, setStoredKey] = useState<StoredBiometricKey | null>(() => readStoredKey());
+  const [employeeId, setEmployeeId] = useState(() => currentUser?.employeeId || "");
   const [latestAttendance, setLatestAttendance] =
     useState<BiometricAttendanceResult | null>(null);
   const [isHydratingProfile, setIsHydratingProfile] = useState(false);
@@ -224,16 +224,6 @@ export default function BiometricPage() {
     () => (currentUser?.username || currentUser?.email || "").trim(),
     [currentUser?.email, currentUser?.username],
   );
-
-  useEffect(() => {
-    setStoredKey(readStoredKey());
-  }, []);
-
-  useEffect(() => {
-    if (currentUser?.employeeId && !employeeId) {
-      setEmployeeId(currentUser.employeeId);
-    }
-  }, [currentUser?.employeeId, employeeId]);
 
   useEffect(() => {
     let active = true;

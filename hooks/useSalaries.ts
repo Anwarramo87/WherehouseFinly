@@ -1,93 +1,3 @@
-// import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-// import apiClient from "@/lib/api-client";
-// import { toast } from "react-hot-toast";
-// import { Salary, SalaryInput } from "@/types/salary";
-
-// // Hook that provides salaries list + helpers for single salary + mutations
-// export const useSalaries = () => {
-//   const queryClient = useQueryClient();
-
-//   const salariesQuery = useQuery<Salary[]>({
-//     queryKey: ["salaries"],
-//     queryFn: async () => {
-//       const res = await apiClient.get("/salary");
-//       // backend might return array directly or wrap it
-//       const data = res.data?.salaries ?? res.data;
-//       return Array.isArray(data) ? data : [];
-//     },
-//   });
-
-//   // convenience hook for a single employee salary
-//   const useEmployeeSalary = (employeeId?: string) =>
-//     useQuery<Salary | null>({
-//       queryKey: ["salary", employeeId],
-//       enabled: !!employeeId,
-//       queryFn: async () => {
-//         try {
-//           const res = await apiClient.get(`/salary/${employeeId}`);
-//           return res.data ?? null;
-//         } catch (err: any) {
-//           const status = err?.response?.status;
-//           // If not found or bad request because salary record doesn't exist, return null silently
-//           if (status === 404 || status === 400) {
-//             return null;
-//           }
-//           // rethrow other errors (connection, 500, etc.) so react-query handles retries and error states
-//           throw err;
-//         }
-//       },
-//     });
-
-//   const updateSalary = useMutation({
-//     mutationFn: async ({ employeeId, data }: { employeeId: string; data: SalaryInput }) => {
-//       // ensure numeric fields are numbers
-//       const payload = {
-//         ...data,
-//         baseSalary: Number(data.baseSalary),
-//         responsibilityAllowance: Number(data.responsibilityAllowance),
-//         productionIncentive: Number(data.productionIncentive),
-//         transportAllowance: Number(data.transportAllowance),
-//       };
-//       return await apiClient.put(`/salary/${employeeId}`, payload);
-//     },
-//     onSuccess: (_data, variables) => {
-//       queryClient.invalidateQueries({ queryKey: ["salaries"] });
-//       if (variables?.employeeId) queryClient.invalidateQueries({ queryKey: ["salary", variables.employeeId] });
-//       toast.success("تم حفظ مكونات الراتب بنجاح");
-//     },
-//     onError: (error: any) => {
-//       const msg = error?.response?.data?.message || "فشل حفظ الراتب";
-//       toast.error(msg);
-//     },
-//   });
-
-//   const deleteSalary = useMutation({
-//     mutationFn: async (employeeId: string) => {
-//       return await apiClient.delete(`/salary/${employeeId}`);
-//     },
-//     onSuccess: (_data, employeeId) => {
-//       queryClient.invalidateQueries({ queryKey: ["salaries"] });
-//       if (employeeId) queryClient.invalidateQueries({ queryKey: ["salary", employeeId] });
-//       toast.success("تم حذف بيانات الراتب");
-//     },
-//     onError: (error: any) => {
-//       toast.error(error?.response?.data?.message || "فشل حذف الراتب");
-//     },
-//   });
-
-//   return {
-//     // list query props
-//     ...salariesQuery,
-//     // helpers
-//     useEmployeeSalary,
-//     updateSalary,
-//     deleteSalary,
-//   };
-// };
-
-// export default useSalaries;
-
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
@@ -113,7 +23,16 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-// Hook that provides salaries list + helpers for single salary + mutations
+/**
+ * Hook that provides salaries list + helpers for single salary + mutations.
+ *
+ * The `updateSalary` mutation sends the CANONICAL field names that match
+ * `UpsertSalaryDto` on the backend:
+ *   - extraEffortAllowance  (NOT the deprecated `extraEffort`)
+ *   - insuranceAmount        (NOT the deprecated `insurances`)
+ *   - lumpSumSalary + livingAllowance are now included so the backend can
+ *     correctly store the user's intended salary split.
+ */
 export const useSalaries = () => {
   const queryClient = useQueryClient();
 
@@ -128,6 +47,7 @@ export const useSalaries = () => {
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
+  /** Convenience hook for a single employee's salary record. */
   const useEmployeeSalary = (employeeId?: string) =>
     useQuery<Salary | null>({
       queryKey: ["salary", employeeId],
@@ -138,42 +58,64 @@ export const useSalaries = () => {
           return res.data ?? null;
         } catch (error: unknown) {
           const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+          // 404/400 means no salary record yet — return null silently
           if (status === 404 || status === 400) {
             return null;
           }
           throw error;
         }
       },
-      retry: false, // لضمان عدم تكرار الطلب الفاشل في حال عدم وجود سجل
+      retry: false,
       staleTime: QUERY_STALE_TIME.STANDARD,
       gcTime: QUERY_GC_TIME.RELAXED,
     });
 
   const updateSalary = useMutation({
     mutationFn: async ({ employeeId, data }: { employeeId: string; data: SalaryInput }) => {
-      // Include all numeric salary components the modal may send (including computed extras)
-      // `data` is a SalaryInput but form inputs may come as strings; coerce safely.
-      const safe = data as Partial<SalaryInput>;
-      const payload = {
-        profession: safe.profession ?? "",
-        baseSalary: Number(safe.baseSalary ?? 0),
-        responsibilityAllowance: Number(safe.responsibilityAllowance ?? 0),
-        productionIncentive: Number(safe.productionIncentive ?? 0),
-        transportAllowance: Number(safe.transportAllowance ?? 0),
-        extraEffort: Number(safe.extraEffort ?? 0),
-        insurances: Number(safe.insurances ?? 0),
+      // Build a clean payload that strictly matches UpsertSalaryDto.
+      // Use canonical field names; coerce all numeric values safely.
+      const payload: Record<string, unknown> = {
+        baseSalary: Number(data.baseSalary ?? 0),
       };
 
-      console.log(`📤 [Put] Sending cleaned payload to /salary/${employeeId}`, payload);
+      // Optional fields — only include when provided to avoid sending 0 noise
+      if (data.profession !== undefined && data.profession !== "") {
+        payload.profession = data.profession;
+      }
+      if ((data.lumpSumSalary ?? 0) > 0) {
+        payload.lumpSumSalary = Number(data.lumpSumSalary);
+      }
+      if ((data.livingAllowance ?? 0) > 0) {
+        payload.livingAllowance = Number(data.livingAllowance);
+      }
+      if ((data.responsibilityAllowance ?? 0) > 0) {
+        payload.responsibilityAllowance = Number(data.responsibilityAllowance);
+      }
+      // Canonical: extraEffortAllowance (NOT extraEffort)
+      if ((data.extraEffortAllowance ?? 0) > 0) {
+        payload.extraEffortAllowance = Number(data.extraEffortAllowance);
+      }
+      if ((data.productionIncentive ?? 0) > 0) {
+        payload.productionIncentive = Number(data.productionIncentive);
+      }
+      // Canonical: insuranceAmount (NOT insurances)
+      if ((data.insuranceAmount ?? 0) > 0) {
+        payload.insuranceAmount = Number(data.insuranceAmount);
+      }
+      if ((data.transportAllowance ?? 0) > 0) {
+        payload.transportAllowance = Number(data.transportAllowance);
+      }
 
+      console.log(`📤 [PUT] /salary/${employeeId}`, payload);
       return await apiClient.put(`/salary/${employeeId}`, payload);
     },
     onSuccess: (_data, variables) => {
+      // Only runs on HTTP 2xx — TanStack Query guarantees this
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
       if (variables?.employeeId) {
         queryClient.invalidateQueries({ queryKey: ["salary", variables.employeeId] });
       }
-      toast.success("تم حفظ مكونات الراتب بنجاح");
+      toast.success("تم حفظ مكونات الراتب بنجاح ✓");
     },
     onError: (error: unknown) => {
       const msg = getErrorMessage(error, "فشل حفظ الراتب");

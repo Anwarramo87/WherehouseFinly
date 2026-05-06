@@ -2,200 +2,238 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Clock, ChevronLeft, Search, Edit2, Timer, AlertCircle } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees"; 
-import type { TimeRecord, TimeRecordPayload } from "@/components/EditTimeRecordModal";
+import { Clock, ChevronLeft, Search, Edit2, CalendarDays } from "lucide-react";
+import { useEmployees } from "@/hooks/useEmployees";
+import { usePayrollInputs, UpsertPayrollInputPayload } from "@/hooks/usePayrollInputs";
 
-const EditTimeRecordModal = dynamic(() => import("@/components/EditTimeRecordModal"), { loading: () => null });
+const EditAttendanceTotalsModal = dynamic(() => import("@/components/EditAttendanceTotalsModal"), { loading: () => null });
 
 export default function TimeTablePage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
-  
-  // داتا وهمية لسجلات الدوام
-  const [records, setRecords] = useState<TimeRecord[]>([
-    { id: "1", employeeId: "EMP001", name: "أحمد محمد", baseSalary: 600000, attendedDays: 26, absentDays: 0, delayMinutes: 0, overtimeHours: 12 },
-    { id: "2", employeeId: "EMP015", name: "سالم العلي", baseSalary: 450000, attendedDays: 24, absentDays: 2, delayMinutes: 120, overtimeHours: 0 },
-    { id: "3", employeeId: "EMP033", name: "خالد سعيد", baseSalary: 500000, attendedDays: 25, absentDays: 1, delayMinutes: 45, overtimeHours: 5 },
-  ]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<TimeRecord | null>(null);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const handleSaveRecord = (data: TimeRecordPayload) => {
-    if (selectedRecord) {
-      setRecords(records.map(r => r.id === selectedRecord.id ? { ...r, ...data } : r));
-    } else {
-      const emp = employees.find(e => e.employeeId === data.employeeId);
-      const newRecord = {
-        id: Date.now().toString(),
-        name: emp?.name || "موظف غير معروف",
-        baseSalary: 500000, // يمكن جلبها من البيانات الفعلية
-        ...data
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+
+  const { periodStart, periodEnd } = useMemo(() => {
+    if (!selectedMonth) return { periodStart: undefined, periodEnd: undefined };
+    const [year, month] = selectedMonth.split('-');
+    const startDate = `${year}-${month}-01`;
+    const endDay = new Date(Number(year), Number(month), 0).getDate();
+    const endDate = `${year}-${month}-${String(endDay).padStart(2, '0')}`;
+    return { periodStart: startDate, periodEnd: endDate };
+  }, [selectedMonth]);
+
+  const { data: payrollInputs = [], upsertPayrollInput } = usePayrollInputs(periodStart, periodEnd);
+
+  const recordsWithNames = useMemo(() => {
+    return employees.map((emp) => {
+      const input = payrollInputs.find((pi) => pi.employeeId === emp.employeeId);
+      return {
+        ...emp,
+        payrollInput: input || null,
+        totalAbsencesLeaves: (input?.absenceDays || 0) + (input?.sickLeaveDays || 0) + (input?.unpaidLeaveDays || 0) + (input?.adminLeaveDays || 0),
+        totalDelayMinutes: (input?.lateMinutes || 0) + (input?.earlyLeaveMinutes || 0),
+        totalOvertimeMinutes: (input?.overtimeRegularMinutes || 0),
+        totalOvertimeDays: (input?.overtimeWeekendDays || 0),
       };
-      setRecords([newRecord, ...records]);
-    }
-    setIsModalOpen(false);
-    setSelectedRecord(null);
-  };
+    });
+  }, [employees, payrollInputs]);
 
   const filteredRecords = useMemo(() => {
-    if (!searchTerm) return records;
-    return records.filter(r => 
+    if (!searchTerm) return recordsWithNames;
+    return recordsWithNames.filter(r =>
       r.name.includes(searchTerm) || r.employeeId.includes(searchTerm)
     );
-  }, [records, searchTerm]);
+  }, [recordsWithNames, searchTerm]);
 
-  // إحصائيات سريعة
-  const totalOvertime = records.reduce((sum, r) => sum + r.overtimeHours, 0);
-  const totalDelays = records.reduce((sum, r) => sum + r.delayMinutes, 0);
+  const handleOpenEditModal = (employeeId: string) => {
+    setSelectedEmployeeId(employeeId);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveRecord = (data: any) => {
+    if (!periodStart || !periodEnd) return;
+
+    const payload: UpsertPayrollInputPayload = {
+      ...data,
+      periodStart,
+      periodEnd,
+    };
+
+    upsertPayrollInput.mutate(payload, {
+      onSuccess: () => {
+        setIsModalOpen(false);
+      }
+    });
+  };
+
+  const selectedInputData = useMemo(() => {
+    if (!selectedEmployeeId) return null;
+    return payrollInputs.find(pi => pi.employeeId === selectedEmployeeId) || null;
+  }, [selectedEmployeeId, payrollInputs]);
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
-        
-        {/* نقشة الفايبر */}
-        <div 
-          className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }}
-        />
 
-        <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-          
-          <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
-            <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-            <span className="hover:text-[#263544] cursor-pointer transition-colors relative z-10">المركز المالي</span>
-            <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
-            <span className="text-[#263544] relative z-10">سجل الدوام والعمليات</span>
-          </nav>
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }}
+      />
 
-          <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#263544]/10 pb-6 relative">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 group">
-                  <Clock size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
-                </div>
-                <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">سجل الدوام والعمليات</h1>
+      <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
+
+        <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
+          <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
+          <span className="hover:text-[#263544] cursor-pointer transition-colors relative z-10">المركز المالي</span>
+          <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
+          <span className="text-[#263544] relative z-10">سجل الدوام والعمليات</span>
+        </nav>
+
+        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#263544]/10 pb-6 relative">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 group">
+                <Clock size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
               </div>
-              <p className="text-slate-600 text-sm font-bold pr-14 mt-1">
-                متابعة الحضور، الغياب، العمل الإضافي، والتأخيرات وتأثيرها المالي.
-              </p>
+              <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">سجل الدوام والعمليات</h1>
             </div>
-            
-            <div className="flex flex-wrap items-center justify-end gap-5 w-full md:w-auto">
-              
-              <div className="flex gap-4">
-                <div className="bg-white/60 backdrop-blur-md border border-emerald-500/20 px-4 py-2 rounded-2xl shadow-sm flex items-center gap-3">
-                  <Timer className="text-emerald-500" size={20} />
-                  <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase">إجمالي الإضافي</p>
-                    <p className="font-mono font-black text-emerald-600 leading-tight">{totalOvertime} ساعة</p>
-                  </div>
-                </div>
-                <div className="bg-white/60 backdrop-blur-md border border-rose-500/20 px-4 py-2 rounded-2xl shadow-sm flex items-center gap-3">
-                  <AlertCircle className="text-rose-500" size={20} />
-                  <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase">إجمالي التأخير</p>
-                    <p className="font-mono font-black text-rose-600 leading-tight">{totalDelays} دقيقة</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 w-full md:w-56 transition-all">
-                <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-                <Search size={18} className="text-[#C89355] ml-2 shrink-0 relative z-10" />
-                <input type="text" placeholder="بحث..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-transparent text-sm font-bold text-[#263544] outline-none w-full relative z-10 placeholder:text-slate-400" />
-              </div>
-            </div>
-          </header>
-
-          <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
-            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover:border-[#C89355]/50" />
-            <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-              <table className="w-full text-right min-w-250">
-                <thead className="bg-white/40 border-b border-white/80">
-                  <tr>
-                    <th className="p-5 text-[#263544] font-black text-xs uppercase text-right pr-6">الموظف</th>
-                    <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">أيام الدوام</th>
-                    <th className="p-5 text-rose-600 font-black text-xs uppercase text-center">أيام الغياب</th>
-                    <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">التأخير</th>
-                    <th className="p-5 text-emerald-600 font-black text-xs uppercase text-center">العمل الإضافي</th>
-                    <th className="p-5 text-[#1a2530] font-black text-xs uppercase text-center bg-[#C89355]/10">صافي الأجر المتوقع</th>
-                    <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">إدارة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/40">
-                  {filteredRecords.length === 0 ? (
-                    <tr><td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
-                  ) : (
-                    filteredRecords.map((item) => {
-                      // عمليات حسابية تقريبية للتأثير المالي
-                      const dailyRate = item.baseSalary / 26;
-                      const minuteRate = dailyRate / (8 * 60);
-                      const hourRate = dailyRate / 8;
-                      
-                      const deductions = (item.absentDays * dailyRate) + (item.delayMinutes * minuteRate);
-                      const additions = item.overtimeHours * hourRate * 1.5; // الإضافي بمرة ونصف
-                      const expectedNet = item.baseSalary - deductions + additions;
-
-                      return (
-                        <tr key={item.id} className="hover:bg-white/80 transition-all duration-300 group/row">
-                          <td className="p-4 text-right pr-6">
-                            <div className="font-black text-slate-800 text-base">{item.name}</div>
-                            <div className="font-mono font-bold text-[10px] text-slate-500 mt-0.5">{item.employeeId}</div>
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className="font-mono font-black text-[#263544]">{item.attendedDays}</span>
-                            <span className="text-[10px] font-bold text-slate-400 mr-1">يوم</span>
-                          </td>
-                          <td className="p-4 text-center">
-                            {item.absentDays > 0 ? (
-                              <span className="font-mono font-black text-rose-600 bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">{item.absentDays} يوم</span>
-                            ) : (
-                              <span className="font-mono font-bold text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-center">
-                            {item.delayMinutes > 0 ? (
-                              <span className="font-mono font-black text-orange-600">{item.delayMinutes} دقيقة</span>
-                            ) : (
-                              <span className="font-mono font-bold text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-center">
-                            {item.overtimeHours > 0 ? (
-                              <span className="font-mono font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">+{item.overtimeHours} ساعة</span>
-                            ) : (
-                              <span className="font-mono font-bold text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="p-4 font-black text-center text-[#1a2530] bg-[#C89355]/5 border-x border-[#C89355]/10">
-                            {Math.round(expectedNet).toLocaleString()} <span className="text-[9px] text-[#C89355]">ل.س</span>
-                          </td>
-                          <td className="p-4 text-center">
-                            <button onClick={() => { setSelectedRecord(item); setIsModalOpen(true); }} className="text-[#C89355] hover:bg-[#1a2530] p-2.5 rounded-xl transition-all hover:scale-110 shadow-sm border border-transparent hover:border-[#C89355]/30">
-                              <Edit2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <p className="text-sm font-bold text-slate-500 max-w-xl leading-relaxed">
+              إدارة ومتابعة الغيابات والإجازات وساعات العمل الإضافي للموظفين. يتم تجميع البيانات شهرياً.
+            </p>
           </div>
 
-          {isModalOpen && (
-            <EditTimeRecordModal 
-              isOpen={isModalOpen} 
-              onClose={() => { setIsModalOpen(false); setSelectedRecord(null); }} 
-              onSave={handleSaveRecord} 
-              employees={Array.isArray(employees) ? employees : []}
-              initialData={selectedRecord}
-            />
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all group w-full sm:w-auto">
+              <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
+              <CalendarDays size={18} className="text-[#C89355] ml-2 shrink-0 relative z-10" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-sm font-bold text-[#263544] outline-none w-full relative z-10 font-mono"
+              />
+            </div>
 
+            <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full sm:w-64 transition-all">
+              <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
+              <Search size={18} className="text-slate-400 ml-2 relative z-10" />
+              <input
+                type="text"
+                placeholder="بحث عن موظف..."
+                className="bg-transparent border-none outline-none w-full text-sm font-bold placeholder:text-slate-400 text-[#263544] relative z-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+        </header>
+
+        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
+          <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover:border-[#C89355]/50" />
+
+          <div className="overflow-x-auto relative z-10">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="bg-gradient-to-l from-[#1a2530] to-[#263544] text-white">
+                  <th className="px-6 py-5 text-sm font-black w-16">#</th>
+                  <th className="px-6 py-5 text-sm font-black">الموظف</th>
+                  <th className="px-6 py-5 text-sm font-black text-center">أيام الغياب والإجازات</th>
+                  <th className="px-6 py-5 text-sm font-black text-center">إجمالي التأخير (دقائق)</th>
+                  <th className="px-6 py-5 text-sm font-black text-center">إجمالي الإضافي</th>
+                  <th className="px-6 py-5 text-sm font-black text-center w-24">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRecords.length > 0 ? (
+                  filteredRecords.map((record, index) => (
+                    <tr
+                      key={record.employeeId}
+                      className="hover:bg-[#C89355]/5 transition-colors group/row"
+                    >
+                      <td className="px-6 py-4 text-sm font-bold text-slate-400">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#1a2530]">{record.name}</span>
+                          <span className="text-xs text-slate-500 font-mono">{record.employeeId}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold ${record.totalAbsencesLeaves > 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                          {record.totalAbsencesLeaves} يوم
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold ${record.totalDelayMinutes > 0 ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                          {record.totalDelayMinutes} دقيقة
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          {record.totalOvertimeDays > 0 && (
+                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                              {record.totalOvertimeDays} أيام عطلة
+                            </span>
+                          )}
+                          {record.totalOvertimeMinutes > 0 && (
+                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700 border border-teal-200">
+                              {record.totalOvertimeMinutes} دقيقة عادي
+                            </span>
+                          )}
+                          {record.totalOvertimeDays === 0 && record.totalOvertimeMinutes === 0 && (
+                            <span className="text-slate-400 text-sm font-bold">-</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => handleOpenEditModal(record.employeeId)}
+                            className="p-2 text-[#C89355] hover:bg-[#C89355]/10 rounded-xl transition-all hover:scale-110 active:scale-95"
+                            title="تعديل المجاميع"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="p-4 bg-slate-50 rounded-full">
+                          <Search className="text-slate-300" size={32} />
+                        </div>
+                        <span className="text-slate-400 font-bold">لم يتم العثور على أي موظف</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
+
+      {isModalOpen && (
+        <EditAttendanceTotalsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSaveRecord}
+          isPending={upsertPayrollInput.isPending}
+          employees={employees}
+          initialData={selectedInputData}
+          selectedEmployeeId={selectedEmployeeId}
+        />
+      )}
     </div>
   );
 }

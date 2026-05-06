@@ -1,14 +1,58 @@
+/**
+ * Canonical Salary record — matches the backend `employeeSalary` Prisma model
+ * and `UpsertSalaryDto` field names.
+ */
 export interface Salary {
   id: string;
   employeeId: string; // e.g. EMP001
-  profession: string;
+
+  /** المهنة / الوظيفة */
+  profession?: string;
+
+  /** الراتب الأساسي الكلي */
   baseSalary: number;
+
+  /** الراتب المقطوع */
+  lumpSumSalary?: number;
+
+  /** بدل غلاء معيشة */
+  livingAllowance?: number;
+
+  /** تعويض مسؤولية (50% من الفرق) — Canonical */
   responsibilityAllowance: number;
+
+  /** تعويض جهد إضافي (30% من الفرق) — Canonical */
+  extraEffortAllowance?: number;
+
+  /** حوافز إنتاجية (20% من الفرق) */
   productionIncentive: number;
+
+  /** بدل النقل */
   transportAllowance: number;
+
+  /** التأمينات (خصم) — Canonical */
+  insuranceAmount?: number;
+
+  // --------------- Deprecated aliases kept for backward compatibility ---------------
+  /** @deprecated Use extraEffortAllowance */
   extraEffort?: number;
+  /** @deprecated Use insuranceAmount */
   insurances?: number;
 }
 
-export type SalaryInput = Omit<Salary, "id">;
-
+/**
+ * The input type sent to `PUT /api/salary/:employeeId`.
+ * Uses canonical DTO field names.
+ */
+export interface SalaryInput {
+  employeeId: string;
+  profession?: string;
+  baseSalary: number;
+  lumpSumSalary?: number;
+  livingAllowance?: number;
+  responsibilityAllowance?: number;
+  extraEffortAllowance?: number;
+  productionIncentive?: number;
+  insuranceAmount?: number;
+  transportAllowance?: number;
+}
