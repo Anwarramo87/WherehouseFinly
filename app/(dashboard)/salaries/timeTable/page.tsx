@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Clock, ChevronLeft, Search, Edit2, CalendarDays } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { usePayrollInputs, UpsertPayrollInputPayload } from "@/hooks/usePayrollInputs";
+import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
 
 const EditAttendanceTotalsModal = dynamic(() => import("@/components/EditAttendanceTotalsModal"), { loading: () => null });
 
@@ -55,13 +56,14 @@ export default function TimeTablePage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveRecord = (data: any) => {
+  const handleSaveRecord = (data: EditTotalsPayload) => {
     if (!periodStart || !periodEnd) return;
 
     const payload: UpsertPayrollInputPayload = {
       ...data,
       periodStart,
       periodEnd,
+      deathLeaveDays: 0, // Add missing field with default value
     };
 
     upsertPayrollInput.mutate(payload, {
@@ -138,7 +140,7 @@ export default function TimeTablePage() {
           <div className="overflow-x-auto relative z-10">
             <table className="w-full text-right border-collapse">
               <thead>
-                <tr className="bg-gradient-to-l from-[#1a2530] to-[#263544] text-white">
+                <tr className="bg-linear-to-l from-[#1a2530] to-[#263544] text-white">
                   <th className="px-6 py-5 text-sm font-black w-16">#</th>
                   <th className="px-6 py-5 text-sm font-black">الموظف</th>
                   <th className="px-6 py-5 text-sm font-black text-center">أيام الغياب والإجازات</th>

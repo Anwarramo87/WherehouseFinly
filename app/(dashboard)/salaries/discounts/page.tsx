@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, Users } from "lucide-react";
+import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 
@@ -14,12 +14,15 @@ export default function DiscountsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Default to current month (YYYY-MM)
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
+
+  // حالة تتبع الصفوف المفتوحة (المنسدلة)
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Helper to attach employee names to the records
   const recordsWithNames = useMemo(() => {
@@ -51,17 +54,30 @@ export default function DiscountsPage() {
     return filteredDiscounts.reduce((sum, item) => sum + (item.amount || 0), 0);
   }, [filteredDiscounts]);
 
-  const employeeSummary = useMemo(() => {
-    const summary: Record<string, { name: string; total: number }> = {};
+  // تجميع السجلات حسب الموظف
+  const groupedDiscounts = useMemo(() => {
+    const groups: Record<string, { employeeId: string; name: string; totalAmount: number; records: typeof recordsWithNames }> = {};
+
     filteredDiscounts.forEach(d => {
-      if (!summary[d.employeeId]) {
-        summary[d.employeeId] = { name: d.name, total: 0 };
+      if (!groups[d.employeeId]) {
+        groups[d.employeeId] = {
+          employeeId: d.employeeId,
+          name: d.name,
+          totalAmount: 0,
+          records: [],
+        };
       }
-      summary[d.employeeId].total += d.amount || 0;
+      groups[d.employeeId].totalAmount += d.amount || 0;
+      groups[d.employeeId].records.push(d);
     });
-    // Convert to array and sort by total descending
-    return Object.values(summary).sort((a, b) => b.total - a.total);
+
+    // تحويل الكائن إلى مصفوفة وترتيبها تنازلياً حسب قيمة الخصم
+    return Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
   }, [filteredDiscounts]);
+
+  const toggleRow = (empId: string) => {
+    setExpandedRows(prev => ({ ...prev, [empId]: !prev[empId] }));
+  };
 
   const handleOpenAddModal = () => {
     setEditingDiscount(null);
@@ -129,7 +145,7 @@ export default function DiscountsPage() {
 
           <div className="flex flex-col md:flex-row items-center gap-5 w-full lg:w-auto">
             {/* بطاقة المجموع النهائي - Denim Stitch Theme */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] px-6 py-3.5 rounded-2xl border border-[#C89355]/40 shadow-[0_15px_30px_rgba(38,53,68,0.3)] flex items-center gap-4 w-full md:w-auto group">
+            <div className="relative overflow-hidden bg-linear-to-br from-[#1a2530] to-[#263544] px-6 py-3.5 rounded-2xl border border-[#C89355]/40 shadow-[0_15px_30px_rgba(38,53,68,0.3)] flex items-center gap-4 w-full md:w-auto group">
               <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none group-hover:border-[#C89355]/50 transition-colors" />
               <div className="p-2 bg-[#C89355]/10 rounded-xl relative z-10">
                 <Coins size={24} className="text-[#C89355]" />
@@ -143,7 +159,7 @@ export default function DiscountsPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-              
+
               {/* Month Filter */}
               <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all group w-full sm:w-auto">
                 <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
@@ -169,7 +185,7 @@ export default function DiscountsPage() {
 
               <button
                 onClick={handleOpenAddModal}
-                className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group flex-shrink-0"
+                className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group shrink-0"
               >
                 <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
                 <Plus size={18} className="group-hover:animate-spin relative z-10" />
@@ -179,80 +195,116 @@ export default function DiscountsPage() {
           </div>
         </header>
 
-        {/* ملخص الخصومات لكل موظف - Summary by Employee */}
-        {employeeSummary.length > 0 && (
-          <section className="mb-10 relative overflow-hidden bg-[#1a2530] rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/50 group">
-            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/20 pointer-events-none transition-colors group-hover:border-[#C89355]/40" />
-            <div className="relative z-10 p-6 md:p-8">
-              <div className="flex items-center gap-3 mb-6 border-b border-white/10 pb-4">
-                <div className="p-2.5 bg-[#C89355]/10 rounded-xl">
-                  <Users size={22} className="text-[#C89355]" />
-                </div>
-                <h2 className="text-xl font-black text-white tracking-wide">ملخص الخصومات لكل موظف <span className="text-[#C89355] text-sm">({selectedMonth || "الكل"})</span></h2>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {employeeSummary.map((emp, idx) => (
-                  <div key={idx} className="bg-[#263544]/50 border border-white/5 hover:border-[#C89355]/30 rounded-2xl p-4 flex flex-col transition-all hover:bg-[#263544] hover:-translate-y-1">
-                    <span className="text-sm font-bold text-slate-300 mb-2 truncate">{emp.name}</span>
-                    <span className="text-xl font-mono font-black text-[#C89355] mt-auto">
-                      {emp.total.toLocaleString()} <span className="text-xs text-white/50">ل.س</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* الجدول */}
+        {/* الجدول المجمع */}
         <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover:border-[#C89355]/50" />
           <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-            <table className="w-full text-right min-w-[800px]">
+            <table className="w-full text-right min-w-175">
               <thead className="bg-white/40 border-b border-white/80">
                 <tr>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center w-24">الكود</th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-right">الموظف</th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">نوع الإجراء</th>
-                  <th className="p-5 text-rose-600 font-black text-xs uppercase text-center">القيمة المخصومة</th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">التاريخ</th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-right">ملاحظات</th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">إدارة</th>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center w-28">الكود</th>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">الموظف / المستهدف</th>
+                  <th className="p-5 text-rose-600 font-black text-xs uppercase text-center">إجمالي الاقتطاعات</th>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">عدد السجلات</th>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center w-24">التفاصيل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/40">
-                {filteredDiscounts.length === 0 ? (
-                  <tr><td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات خصومات مسجلة.</td></tr>
+                {groupedDiscounts.length === 0 ? (
+                  <tr><td colSpan={5} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات خصومات أو سلف مسجلة.</td></tr>
                 ) : (
-                  filteredDiscounts.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/80 transition-all duration-300 group/row">
-                      <td className="p-4 font-mono font-bold text-center text-sm text-slate-500">{item.employeeId}</td>
-                      <td className="p-4 text-right font-black text-[#263544]">{item.name}</td>
-                      <td className="p-4 text-center">
-                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black border ${
-                          item.backendModel === 'advance' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          {item.type}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center font-mono font-black text-rose-600 bg-rose-50/50 rounded-xl">
-                        {item.amount.toLocaleString()} <span className="text-[10px] text-rose-400">ل.س</span>
-                      </td>
-                      <td className="p-4 text-center font-mono font-bold text-sm text-[#263544]/70">{new Date(item.date).toLocaleDateString("ar-EG")}</td>
-                      <td className="p-4 text-right text-xs font-bold text-slate-500 truncate max-w-50">{item.notes || "—"}</td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => handleOpenEditModal(item as DiscountRecord)} className="text-[#C89355] hover:bg-[#C89355]/10 p-2.5 rounded-xl transition-all hover:scale-110 border border-transparent hover:border-[#C89355]/30" title="تعديل">
-                            <Edit3 size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(item.id, (item as DiscountRecord).backendModel)} className="text-rose-400 hover:bg-rose-50 hover:text-rose-600 p-2.5 rounded-xl transition-all hover:scale-110 border border-transparent hover:border-rose-200" title="إلغاء الخصم">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  groupedDiscounts.map((group) => {
+                    const isExpanded = expandedRows[group.employeeId];
+                    const isGlobal = group.employeeId === "ALL";
+
+                    return (
+                      <React.Fragment key={group.employeeId}>
+                        {/* الصف الرئيسي (الملخص) */}
+                        <tr
+                          onClick={() => toggleRow(group.employeeId)}
+                          className={`cursor-pointer transition-all duration-300 group/row border-b border-white/40 last:border-0 ${isExpanded ? "bg-white/80" : "hover:bg-white/80"
+                            }`}
+                        >
+                          <td className="p-5 font-mono font-bold text-center text-sm text-slate-500">
+                            {isGlobal ? <span className="text-[#C89355] text-xs">GLOBAL</span> : group.employeeId}
+                          </td>
+                          <td className="p-5 text-center font-black text-[#263544]">
+                            <div className="flex items-center justify-center gap-2">
+                              {isGlobal && <Users size={16} className="text-[#C89355]" />}
+                              <span>{group.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-5 text-center">
+                            <span className="inline-block px-4 py-1.5 rounded-xl font-mono font-black text-rose-700 bg-rose-100/50 border border-rose-200 shadow-sm">
+                              {group.totalAmount.toLocaleString()} <span className="text-[10px] text-rose-600">ل.س</span>
+                            </span>
+                          </td>
+                          <td className="p-5 text-center font-bold text-sm text-[#263544]/70">
+                            <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{group.records.length} إجراء</span>
+                          </td>
+                          <td className="p-5 text-center">
+                            <button className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-[#263544] text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* الصف المنسدل (التفاصيل) */}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={5} className="p-0 border-b border-slate-200/50">
+                              <div className="bg-slate-50/80 p-6 shadow-inner border-y border-slate-200/40">
+                                <table className="w-full text-right text-sm border border-slate-200/50 rounded-xl overflow-hidden bg-white/50">
+                                  <thead className="text-[#263544] bg-slate-100/80 border-b border-slate-200/60">
+                                    <tr>
+                                      <th className="py-3 px-4 font-bold">نوع الإجراء</th>
+                                      <th className="py-3 px-4 font-bold text-rose-600 text-center">القيمة</th>
+                                      <th className="py-3 px-4 font-bold text-center">التاريخ</th>
+                                      <th className="py-3 px-4 font-bold">ملاحظات</th>
+                                      <th className="py-3 px-4 font-bold text-center">إدارة</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100/80">
+                                    {group.records.map((record) => (
+                                      <tr key={record.id} className="hover:bg-white transition-colors">
+                                        <td className="py-3 px-4">
+                                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black border ${record.backendModel === 'advance' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                            }`}>
+                                            {record.type}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-4 font-mono font-black text-rose-600 text-center">{record.amount.toLocaleString()}</td>
+                                        <td className="py-3 px-4 font-mono text-slate-500 text-center">{new Date(record.date).toLocaleDateString("ar-EG")}</td>
+                                        <td className="py-3 px-4 text-xs font-medium text-slate-500 max-w-50 truncate">{record.notes || "—"}</td>
+                                        <td className="py-3 px-4 text-center">
+                                          <div className="flex items-center justify-center gap-2">
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleOpenEditModal(record as DiscountRecord); }}
+                                              className="text-[#C89355] hover:bg-[#C89355]/10 p-2 rounded-lg transition-all"
+                                              title="تعديل"
+                                            >
+                                              <Edit3 size={16} />
+                                            </button>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleDelete(record.id, (record as DiscountRecord).backendModel); }}
+                                              className="text-rose-400 hover:bg-rose-100 hover:text-rose-600 p-2 rounded-lg transition-all"
+                                              title="حذف"
+                                            >
+                                              <Trash2 size={16} />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>

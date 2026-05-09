@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   X, Loader2, Save, Coins, Zap, Shield, Search,
-  Wallet, Calculator, Truck, Lock
+  Wallet, Truck, Lock
 } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import type { Salary } from "@/types/salary";
@@ -36,7 +36,7 @@ export type SalaryPayload = {
   livingAllowance: number;
   transportAllowance: number;
   insuranceAmount: number;
-  // Computed by backend / calculate-allowances endpoint:
+  // Hardcoded to 0 - these are now managed in Rewards/Bonuses module:
   responsibilityAllowance: number;
   extraEffortAllowance: number;
   productionIncentive: number;
@@ -61,12 +61,6 @@ const toNum = (val: unknown): number => {
   return Number(val || 0);
 };
 
-const fmt = (val?: string | number) => {
-  if (val === undefined || val === null || val === "") return "—";
-  const n = Number(val);
-  return isFinite(n) ? Math.round(n).toLocaleString() : "—";
-};
-
 // ─── Component ─────────────────────────────────────────────────────────────────
 export default function ManageSalaryModal({
   isOpen, onClose, onSave, isPending,
@@ -82,19 +76,9 @@ export default function ManageSalaryModal({
   const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Computed allowances state (from calculate-allowances endpoint)
-  const [isComputing, setIsComputing] = useState(false);
-  const [computed, setComputed] = useState<{
-    difference?: number;
-    responsibilityAllowance?: number;
-    extraEffortAllowance?: number;
-    productionIncentive?: number;
-    verificationMessage?: string;
-  }>({});
-
   // ─── React Hook Form ─────────────────────────────────────────────────────────
   const {
-    control, register, handleSubmit, watch, setValue, setError,
+    control, register, handleSubmit, watch, setValue,
     formState: { errors },
   } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
@@ -178,106 +162,37 @@ export default function ManageSalaryModal({
     if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
   };
 
-  const runCalculation = async (values: SalaryFormValues, saveAfter = false) => {
-    const salaryVal = Number(values.baseSalary ?? 0);
-    const lumpVal   = Number(values.lumpSumSalary ?? 0);
-    const livingVal = Number(values.livingAllowance ?? 0);
-
-    if (lumpVal + livingVal > salaryVal) {
-      setError("lumpSumSalary", { message: "مجموع الراتب المقطوع وبدل المعيشة يتجاوز الراتب الكلي" });
-      return;
-    }
-
-    try {
-      setIsComputing(true);
-      const resp = await fetch("/api/salary/calculate-allowances", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ salary: salaryVal, lumpSumSalary: lumpVal, livingAllowance: livingVal }),
-      });
-      const json = await resp.json();
-      if (!resp.ok) {
-        throw new Error(json?.error?.message || json?.message || "خطأ في حساب البدلات");
-      }
-
-      const respAllowance  = Number(json.responsibilityRounded ?? json.responsibilityAllowance ?? 0);
-      const extraEffort    = Number(json.extraEffortRounded    ?? json.extraEffortAllowance    ?? 0);
-      const production     = Number(json.productionRounded     ?? json.productionIncentives    ?? 0);
-      const difference     = Number(json.differenceRounded     ?? json.difference              ?? 0);
-
-      setComputed({
-        difference,
-        responsibilityAllowance: respAllowance,
-        extraEffortAllowance:    extraEffort,
-        productionIncentive:     production,
-        verificationMessage:     json.verification?.message,
-      });
-
-      // Optimistic cache update
-      try {
-        if (prevSalariesRef.current === undefined)
-          prevSalariesRef.current = queryClient.getQueryData<Salary[]>(["salaries"]);
-
-        const empId = values.employeeId;
-        const tempSalary: Salary = {
-          id: `temp-${empId}`,
-          employeeId: empId,
-          baseSalary: Math.round(salaryVal),
-          lumpSumSalary: Math.round(lumpVal),
-          livingAllowance: Math.round(livingVal),
-          responsibilityAllowance: respAllowance,
-          extraEffortAllowance: extraEffort,
-          productionIncentive: production,
-          transportAllowance: Number(values.transportAllowance ?? 0),
-          insuranceAmount: Number(values.insuranceAmount ?? 0),
-        };
-        queryClient.setQueryData<Salary[] | undefined>(["salaries"], (old) => {
-          const list = Array.isArray(old) ? [...old] : [];
-          const idx  = list.findIndex(s => s?.employeeId === empId);
-          if (idx >= 0) list[idx] = { ...list[idx], ...tempSalary } as Salary;
-          else list.push(tempSalary);
-          return list;
-        });
-      } catch { /* cache update is best-effort */ }
-
-      if (saveAfter) {
-        const payload: SalaryPayload = {
-          profession:             initialData?.profession ?? "",
-          baseSalary:             Math.round(salaryVal),
-          lumpSumSalary:          Math.round(lumpVal),
-          livingAllowance:        Math.round(livingVal),
-          transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
-          insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
-          responsibilityAllowance: respAllowance,
-          extraEffortAllowance:    extraEffort,
-          productionIncentive:     production,
-        };
-        savedRef.current = true;
-        onSave(values.employeeId, payload);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "فشل في حساب الراتب";
-      setError("baseSalary", { message: msg });
-    } finally {
-      setIsComputing(false);
-    }
+  const onSubmit = (values: SalaryFormValues) => {
+    const payload: SalaryPayload = {
+      profession:             initialData?.profession ?? "",
+      baseSalary:             Math.round(Number(values.baseSalary ?? 0)),
+      lumpSumSalary:          Math.round(Number(values.lumpSumSalary ?? 0)),
+      livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
+      transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
+      insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
+      // Hardcoded to 0 - managed in Rewards/Bonuses module:
+      responsibilityAllowance: 0,
+      extraEffortAllowance:    0,
+      productionIncentive:     0,
+    };
+    savedRef.current = true;
+    onSave(values.employeeId, payload);
   };
 
-  const onSubmit = (values: SalaryFormValues) => runCalculation(values, true);
-
-  // Live total display (uses computed when available)
+  // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
   // eslint-disable-next-line react-hooks/incompatible-library
   const baseSalary = watch("baseSalary");
+  const lumpSumSalary = watch("lumpSumSalary");
+  const livingAllowance = watch("livingAllowance");
   const transportAllowance = watch("transportAllowance");
   const insuranceAmount = watch("insuranceAmount");
   
   const netTotal =
     Number(baseSalary || 0) +
-    (computed.responsibilityAllowance ?? 0) +
-    (computed.extraEffortAllowance    ?? 0) +
-    (computed.productionIncentive     ?? 0) +
+    Number(lumpSumSalary || 0) +
+    Number(livingAllowance || 0) +
     Number(transportAllowance || 0) -
-    Number(insuranceAmount    || 0);
+    Number(insuranceAmount || 0);
 
   // ─── Shared input class ───────────────────────────────────────────────────────
   const inputCls = (hasErr?: boolean) =>
@@ -286,7 +201,7 @@ export default function ManageSalaryModal({
   // ─── Render ───────────────────────────────────────────────────────────────────
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
+      className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
@@ -445,31 +360,11 @@ export default function ManageSalaryModal({
               </div>
             </div>
 
-            {/* ── Computed Allowances Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "الفرق المحسوب", value: computed.difference, color: "text-[#C89355]" },
-                { label: "جهد إضافي (30%)", value: computed.extraEffortAllowance, color: "text-white" },
-                { label: "مسؤولية (50%)", value: computed.responsibilityAllowance, color: "text-white" },
-                { label: "إنتاجية (20%)", value: computed.productionIncentive, color: "text-white" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="p-4 bg-[#0f1720] rounded-2xl border border-[#263544] text-center">
-                  <div className="text-[10px] text-slate-400 font-bold mb-1">{label}</div>
-                  <div className={`text-xl font-mono font-black ${color}`}>{fmt(value)}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* verification message */}
-            {computed.verificationMessage && (
-              <p className="text-xs text-emerald-400 font-bold text-center">{computed.verificationMessage}</p>
-            )}
-
             {/* ── Net Total Bar ── */}
             <div className="bg-[#1a2530] border border-[#263544] p-5 rounded-2xl flex justify-between items-center shadow-inner">
               <div>
                 <span className="text-xs font-black text-slate-400">الإجمالي الثابت</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + البدلات + نقل − تأمينات</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + المقطوع + المعيشة + نقل − تأمينات</p>
               </div>
               <span className="text-2xl font-mono font-black text-[#C89355]">
                 {netTotal > 0 ? netTotal.toLocaleString() : "—"} <span className="text-xs text-slate-500">ل.س</span>
@@ -489,33 +384,17 @@ export default function ManageSalaryModal({
             إلغاء التعديل
           </button>
 
-          <div className="flex items-center gap-3">
-            {/* Calculate only */}
-            <button
-              type="button"
-              onClick={handleSubmit((v) => runCalculation(v, false))}
-              disabled={isComputing}
-              className="px-6 py-3 rounded-2xl font-bold bg-[#263544] text-[#C89355] hover:bg-[#2e3a41] disabled:opacity-50 transition-all flex items-center gap-2"
-            >
-              {isComputing
-                ? <><Loader2 className="animate-spin" size={16} /> جاري الحساب...</>
-                : <><Calculator size={16} /> حساب البدلات</>
-              }
-            </button>
-
-            {/* Save */}
-            <button
-              type="submit"
-              form="salaryForm"
-              disabled={isPending || isComputing}
-              className="bg-[#C89355] text-[#101720] px-10 py-3.5 rounded-2xl font-black flex items-center gap-3 hover:bg-[#d0b468] active:scale-95 transition-all shadow-[0_0_20px_rgba(200,147,85,0.3)] disabled:opacity-50"
-            >
-              {isPending
-                ? <><Loader2 className="animate-spin" size={20} /> جاري الحفظ...</>
-                : <><Save size={20} /> حفظ بيانات الراتب</>
-              }
-            </button>
-          </div>
+          <button
+            type="submit"
+            form="salaryForm"
+            disabled={isPending}
+            className="bg-[#C89355] text-[#101720] px-10 py-3.5 rounded-2xl font-black flex items-center gap-3 hover:bg-[#d0b468] active:scale-95 transition-all shadow-[0_0_20px_rgba(200,147,85,0.3)] disabled:opacity-50"
+          >
+            {isPending
+              ? <><Loader2 className="animate-spin" size={20} /> جاري الحفظ...</>
+              : <><Save size={20} /> حفظ بيانات الراتب</>
+            }
+          </button>
         </div>
 
       </div>
