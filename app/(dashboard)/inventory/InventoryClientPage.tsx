@@ -365,14 +365,6 @@ export default function InventoryPage() {
     });
   };
 
-  const SkeletonTable = () => (
-    <div className="space-y-3 p-6 bg-white/50 rounded-3xl">
-      {Array.from({ length: 7 }).map((_, idx) => (
-        <div key={idx} className="h-12 rounded-xl bg-slate-200/50 animate-pulse" />
-      ))}
-    </div>
-  );
-
   return (
     /* الحاوية الرئيسية: تأثير زجاجي مع درازة خارجية متطابقة مع باقي النظام */
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-[40px] rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">

@@ -106,6 +106,7 @@ export default function DashboardPage() {
   // ✅ تم حذف المتغير attendanceStats لتنظيف الكود
   const { employeesStats, kpis, isLoading } = useDashboard();
   const router = useRouter();
+  const isSkeleton = isLoading;
   
   // Modal state management
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -191,17 +192,6 @@ export default function DashboardPage() {
 
   const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
 
-  if (isLoading) {
-    return (
-      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
-          <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
-          <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">جاري معالجة بيانات المصنع...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
@@ -231,7 +221,7 @@ export default function DashboardPage() {
             {stats.map((stat, index) => (
               <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); }}}>
                 <div className={`absolute inset-1.5 rounded-[1.7rem] border border-dashed pointer-events-none transition-colors duration-500 z-0 ${stat.clickable ? 'border-[#C89355]/30 group-hover:border-[#C89355]/60' : 'border-[#C89355]/20'}`} />
-                {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
+                {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
                 <div className="flex items-center justify-between mb-4 relative z-10">
                   <p className="text-[#263544]/80 text-sm font-black group-hover:text-[#263544] transition-colors">{stat.title}</p>
                   <div className={`p-3 bg-white/80 backdrop-blur-md rounded-2xl transition-all duration-500 border border-white shadow-sm ${stat.clickable ? 'group-hover:bg-[#1a2530] group-hover:border-[#C89355]/40 group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)]' : ''}`}>
@@ -239,7 +229,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <h3 className={`text-4xl font-black text-[#263544] tracking-tight mb-2 origin-right transition-transform duration-500 drop-shadow-md relative z-10 ${stat.clickable ? 'group-hover:scale-105' : ''}`}>
-                  {stat.value}
+                  {isSkeleton ? (
+                    <span className="inline-block h-9 w-24 bg-[#e7e0d5] animate-pulse rounded-lg" />
+                  ) : (
+                    stat.value
+                  )}
                 </h3>
                 <p className="text-[11px] font-bold text-slate-500 bg-white/70 backdrop-blur-md inline-block px-3 py-1.5 rounded-lg border border-white shadow-sm relative z-10">
                   {stat.subValue}
@@ -251,7 +245,7 @@ export default function DashboardPage() {
           {/* Middle Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
             {/* Monthly Advances */}
-            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-[400px] hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
               <div className="flex items-center gap-3 mb-8 relative z-10">
                 <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-sm">
@@ -283,7 +277,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent Penalties */}
-            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-[400px] hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
               <div className="flex items-center gap-3 mb-8 relative z-10">
                 <div className="p-2.5 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm">
@@ -327,7 +321,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
-                  <div className="absolute inset-1.5 rounded-[1.5rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
+                  <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
@@ -361,7 +355,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-emerald-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
@@ -407,7 +401,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-rose-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white shadow-sm flex items-center justify-center">
@@ -456,7 +450,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm" />
@@ -472,7 +466,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2 pr-15 sm:pr-0 pl-1 w-full sm:w-auto">
-              <span className="text-xs text-amber-800 font-black bg-gradient-to-r from-amber-100 to-amber-50 px-3 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-2 border border-amber-200 shadow-sm w-fit mr-auto sm:mr-0">
+              <span className="text-xs text-amber-800 font-black bg-linear-to-r from-amber-100 to-amber-50 px-3 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-2 border border-amber-200 shadow-sm w-fit mr-auto sm:mr-0">
                 <Clock size={14} className="text-amber-600 group-hover:animate-spin-slow" /> تأخر {employee.minutesLate} دقيقة
               </span>
               <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] text-slate-600 font-bold bg-white/60 px-2 py-1 rounded-md border border-slate-100 w-fit mr-auto sm:mr-0">
@@ -500,7 +494,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-white border border-blue-200 shadow-inner flex items-center justify-center text-blue-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-100 to-white border border-blue-200 shadow-inner flex items-center justify-center text-blue-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-full object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-sm" />
@@ -516,7 +510,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2 pr-15 sm:pr-0 pl-1 w-full sm:w-auto">
-              <span className="text-xs text-blue-800 font-black bg-gradient-to-r from-blue-100 to-blue-50 px-3 py-1.5 rounded-lg flex items-center justify-between sm:justify-start gap-3 border border-blue-200 shadow-sm w-full sm:w-auto">
+              <span className="text-xs text-blue-800 font-black bg-linear-to-r from-blue-100 to-blue-50 px-3 py-1.5 rounded-lg flex items-center justify-between sm:justify-start gap-3 border border-blue-200 shadow-sm w-full sm:w-auto">
                 <span className="flex items-center gap-1.5">
                   <Timer size={14} className="text-blue-600 group-hover:animate-pulse" /> {employee.overtimeMinutes} دقيقة <span className="text-[10px] text-blue-600/70 hidden sm:inline">({employee.overtimeHours.toFixed(1)} س)</span>
                 </span>

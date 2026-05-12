@@ -65,7 +65,6 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
     }
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const currentType = watch("type");
 
   useEffect(() => {
