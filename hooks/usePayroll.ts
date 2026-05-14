@@ -69,6 +69,8 @@ export const usePayroll = (params?: { page?: number; limit?: number; status?: st
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
         gracePeriodMinutes: input.gracePeriodMinutes !== undefined ? Number(input.gracePeriodMinutes) : undefined,
+        includeAttendanceDeductions: input.includeAttendanceDeductions ?? true,
+        includeTransportationDeductions: input.includeTransportationDeductions ?? true,
       };
       return await apiClient.post("/payroll/calculate", payload);
     },

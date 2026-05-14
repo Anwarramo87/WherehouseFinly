@@ -10,9 +10,9 @@ import { DEFAULT_API_URL, normalizeApiUrl } from "@/lib/api-url";
 const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL, DEFAULT_API_URL);
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 // في dev نعطي وقت كافي للباك المحلي، في production نعطي وقت أطول
-const SESSION_CHECK_TIMEOUT_MS = IS_DEVELOPMENT ? 3_000 : 5_000;
+const SESSION_CHECK_TIMEOUT_MS = IS_DEVELOPMENT ? 1_500 : 5_000;
 // نزيد الـ cache بشكل كبير — المستخدم المسجل ما يحتاج نتحقق منه كل 10 ثواني
-const SESSION_SUCCESS_CACHE_TTL_MS = 5 * 60 * 1_000; // 5 دقائق
+const SESSION_SUCCESS_CACHE_TTL_MS = 10 * 60 * 1_000; // 10 دقائق
 const SESSION_FAILURE_CACHE_TTL_MS = 3_000;
 const SESSION_RATE_LIMIT_CACHE_TTL_MS = 15_000;
 const SESSION_CACHE_MAX_ENTRIES = 128;

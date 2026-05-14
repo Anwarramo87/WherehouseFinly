@@ -85,7 +85,7 @@ export default function AddRewardModal({ isOpen, onClose, onSave, isPending, emp
 
   return createPortal(
     <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(16,185,129,0.15)] w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline outline-dashed outline-1 outline-[#C89355]/30 outline-offset-[-8px]">
+      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(16,185,129,0.15)] w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
         
         {/* الترويسة */}
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
@@ -174,7 +174,7 @@ export default function AddRewardModal({ isOpen, onClose, onSave, isPending, emp
                 <input 
                   type="date" 
                   required 
-                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 [color-scheme:dark]"
+                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 scheme-dark"
                   value={form.date}
                   onChange={(e) => setForm(p => ({ ...p, date: e.target.value }))}
                 />

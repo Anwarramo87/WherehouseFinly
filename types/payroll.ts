@@ -31,6 +31,10 @@ export interface CalculatePayrollInput {
   periodStart: string;
   periodEnd: string;
   gracePeriodMinutes?: number | string;
+  // خصومات الدوام (ستُحسب من سجلات الحضور)
+  includeAttendanceDeductions?: boolean;
+  // خصومات النقل (ستُحسب من تكاليف الحافلات)
+  includeTransportationDeductions?: boolean;
 }
 
 export interface PayrollReportTotals {

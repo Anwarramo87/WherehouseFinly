@@ -11,7 +11,7 @@ type EmployeeWithExtendedFields = Employee & {
   age?: number | string;
   gender?: string;
   jobTitle?: string;
-  monthlySalary?: number | string;
+  baseSalary?: number | string;
   livingAllowance?: number | string;
 };
 
@@ -32,7 +32,7 @@ export type AddEmployeeFormData = {
   gender: string;
   jobTitle: string;
   department: string;
-  monthlySalary: string;
+  baseSalary: string;
   livingAllowance: string;
   scheduledStart: string;
   scheduledEnd: string;
@@ -60,7 +60,7 @@ const defaultFormState = {
   gender: "male",
   jobTitle: "",
   department: "قسم القص", 
-  monthlySalary: "",
+  baseSalary: "",
   livingAllowance: "0",
   scheduledStart: "08:00",
   scheduledEnd: "16:00",
@@ -97,7 +97,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         gender: initialData.gender || "male",
         jobTitle: initialData.jobTitle || "",
         department: initialData.department || "قسم القص",
-        monthlySalary: asText(initialData.monthlySalary || initialData.hourlyRate),
+        baseSalary: asText(initialData.baseSalary),
         livingAllowance: asText(initialData.livingAllowance ?? "0"),
         scheduledStart: initialData.scheduledStart || "08:00",
         scheduledEnd: initialData.scheduledEnd || "16:00",
@@ -316,8 +316,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                   <input 
                     type="text" required={step === 2} inputMode="decimal" placeholder="مثال: 500000"
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-black shadow-inner pr-11 placeholder:text-slate-600"
-                    value={formData.monthlySalary}
-                    onChange={(e) => setFormData({...formData, monthlySalary: e.target.value})}
+                    value={formData.baseSalary}
+                    onChange={(e) => setFormData({...formData, baseSalary: e.target.value})}
                   />
                   <Coins className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>

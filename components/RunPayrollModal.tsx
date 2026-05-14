@@ -34,6 +34,8 @@ const createDefaultForm = (): CalculatePayrollInput => {
     periodStart: range.periodStart,
     periodEnd: range.periodEnd,
     gracePeriodMinutes: 15,
+    includeAttendanceDeductions: true,
+    includeTransportationDeductions: true,
   };
 };
 
@@ -97,6 +99,34 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending }: R
               onChange={(e) => setForm((p) => ({ ...p, gracePeriodMinutes: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             />
+          </div>
+
+          {/* خصومات الدوام */}
+          <div className="md:col-span-2 flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
+            <input
+              type="checkbox"
+              id="attendanceDeductions"
+              checked={form.includeAttendanceDeductions ?? true}
+              onChange={(e) => setForm((p) => ({ ...p, includeAttendanceDeductions: e.target.checked }))}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <label htmlFor="attendanceDeductions" className="text-sm font-bold text-slate-700 cursor-pointer">
+              تضمين خصومات الدوام (الغياب والتأخير)
+            </label>
+          </div>
+
+          {/* خصومات النقل */}
+          <div className="md:col-span-2 flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+            <input
+              type="checkbox"
+              id="transportationDeductions"
+              checked={form.includeTransportationDeductions ?? true}
+              onChange={(e) => setForm((p) => ({ ...p, includeTransportationDeductions: e.target.checked }))}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <label htmlFor="transportationDeductions" className="text-sm font-bold text-slate-700 cursor-pointer">
+              تضمين خصومات النقل (تكاليف الحافلات)
+            </label>
           </div>
 
           <div className="md:col-span-2 pt-4 border-t border-slate-100 flex justify-end gap-3">

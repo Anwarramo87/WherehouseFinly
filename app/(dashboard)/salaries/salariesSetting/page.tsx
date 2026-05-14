@@ -82,7 +82,8 @@ export default function SalariesPage() {
   const activeTab = getTabFromQuery(requestedTab);
 
   const { data: salaries = [], isLoading, isError, error, updateSalary, deleteSalary } = useSalaries();
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees({ limit: 200, status: "active" });
+  // نجلب جميع الموظفين (حتى غير النشطين مؤقتاً إذا كان اسمهم يظهر بشكل خاطئ) لكي تظهر الأسماء بوضوح 
+  const { data: employees = [], isLoading: employeesLoading } = useEmployees({ limit: 500 });
   const { data: advances = [] } = useAdvances();
 
   const period = useMemo(() => getLocalMonth(), []);

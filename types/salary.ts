@@ -6,7 +6,8 @@ export interface Salary {
   responsibilityAllowance: number;
   productionIncentive: number;
   transportAllowance: number;
-  extraEffort?: number;
+  extraEffortAllowance?: number; // اسم Backend الرسمي
+  extraEffort?: number; // للتوافقية مع الكود القديم
   insurances?: number;
 }
 

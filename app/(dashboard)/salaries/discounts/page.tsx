@@ -11,7 +11,7 @@ import type { DiscountPayload } from "@/components/AddDiscountModal";
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 
 export default function DiscountsPage() {
-  const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 500 });
 
   type DiscountRecord = DiscountPayload & {
     id: string;

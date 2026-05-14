@@ -138,6 +138,7 @@ export type UseEmployeesOptions = {
   search?: string;
   page?: number;
   limit?: number;
+  fetchAll?: boolean;
 };
 
 type ApiErrorBody = {
@@ -205,6 +206,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
   const queryClient = useQueryClient();
 
   const safeLimit = Math.min(Math.max(options?.limit ?? 200, 1), 200);
+  const fetchAll = options?.fetchAll ?? true;
 
   const shouldExcludeTerminated = !options?.status && options?.includeTerminated !== true;
 
@@ -218,6 +220,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       options?.search || "no-search",
       options?.page || 1,
       safeLimit,
+      fetchAll ? "fetch-all" : "first-page-only",
     ],
     queryFn: async () => {
       const requestEmployees = async (page?: number) => {
@@ -255,7 +258,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
       const pagination = response.data?.pagination;
 
-      if (!options?.page && pagination?.pages && pagination.pages > firstPage) {
+      if (fetchAll && !options?.page && pagination?.pages && pagination.pages > firstPage) {
         for (let page = firstPage + 1; page <= pagination.pages; page += 1) {
           const pageResponse = await requestEmployees(page);
           const pageEmployees: Employee[] = resolveEmployees(pageResponse.data);

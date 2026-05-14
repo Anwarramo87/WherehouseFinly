@@ -30,13 +30,13 @@ const toNumber = (value: unknown) => {
 const buildFallbackEmail = (employeeId: string) => `${employeeId.toLowerCase()}@factory.local`;
 
 type EmployeeRow = Employee & {
-  monthlySalary?: number | string;
+  baseSalary?: number | string;
   jobTitle?: string;
 };
 
-const resolveDisplayedMonthlySalary = (employee: EmployeeRow) => {
-  if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
-    const parsed = toNumber(employee.monthlySalary);
+const resolveDisplayedBaseSalary = (employee: EmployeeRow) => {
+  if (employee.baseSalary !== undefined && employee.baseSalary !== null && employee.baseSalary !== "") {
+    const parsed = toNumber(employee.baseSalary);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
@@ -99,7 +99,7 @@ export default function EmployeesPage() {
       roleId: formData.roleId,
       scheduledStart: formData.scheduledStart,
       scheduledEnd: formData.scheduledEnd,
-      hourlyRate: toNumber(formData.monthlySalary),
+      hourlyRate: toNumber(formData.baseSalary),
       email: selectedEmployee?.email || buildFallbackEmail(normalizedEmployeeId),
     };
 
@@ -245,7 +245,7 @@ export default function EmployeesPage() {
                           {emp.department} <span className="text-[#C89355] mx-1">/</span> {row.jobTitle || 'موظف'}
                         </td>
                         <td className="p-4 text-center font-mono font-black text-[#263544] text-sm">
-                          {resolveDisplayedMonthlySalary(row).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
+                          {resolveDisplayedBaseSalary(row).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
                         </td>
                         <td className="p-4 text-center font-mono font-bold text-slate-600 text-sm dir-ltr">
                           {emp.mobile || '—'}

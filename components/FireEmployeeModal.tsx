@@ -6,7 +6,7 @@ import { X, UserMinus, ChevronLeft, ChevronRight, AlertTriangle, Calendar, FileT
 import type { Employee } from "@/types/employee";
 
 type EmployeeWithCompensation = Employee & {
-  monthlySalary?: number | string;
+  baseSalary?: number | string;
 };
 
 export type FireEmployeePayload = {
@@ -79,11 +79,11 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
     return 0;
   };
 
-  const monthlySalary =
-    toNumber(employeeWithCompensation.monthlySalary) ||
+  const baseSalary =
+    toNumber(employeeWithCompensation.baseSalary) ||
     Math.round(toNumber(employee.hourlyRate) * 8 * 30);
   const daysWorkedThisMonth = new Date(fireDate).getDate();
-  const dueSalary = Math.round((monthlySalary / 30) * daysWorkedThisMonth);
+  const dueSalary = Math.round((baseSalary / 30) * daysWorkedThisMonth);
   const totalDues = dueSalary + (Number(bonus) || 0);
 
   const handleNext = (e: React.FormEvent) => {

@@ -41,9 +41,27 @@ export const useAuthStore = create<AuthState>()(
         clearAuthSession();
       },
       hasAnyRole: (roles) => {
-        const currentRole = get().user?.role;
-        if (!currentRole) return false;
-        return roles.includes(currentRole);
+        const user = get().user;
+        if (!user) return false;
+
+        const allowed = roles.map((r) => String(r).trim().toLowerCase());
+
+        // Check single `role` string first
+        if (user.role && String(user.role).trim().length > 0) {
+          const current = String(user.role).trim().toLowerCase();
+          if (allowed.includes(current)) return true;
+        }
+
+        // Support `roles` array on the user payload
+        const userRoles = (user as any).roles;
+        if (Array.isArray(userRoles) && userRoles.length > 0) {
+          for (const r of userRoles) {
+            if (!r) continue;
+            if (allowed.includes(String(r).trim().toLowerCase())) return true;
+          }
+        }
+
+        return false;
       },
     }),
     {

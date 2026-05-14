@@ -10,7 +10,7 @@ import type { RewardPayload } from "@/components/AddRewardModal";
 const AddRewardModal = dynamic(() => import("@/components/AddRewardModal"), { loading: () => null });
 
 export default function RewardsPage() {
-  const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 500 });
 
   type RewardRecord = RewardPayload & {
     id: string;

@@ -5,6 +5,11 @@
   "scripts": {
     "dev": "next dev --turbo",
     "dev:webpack": "next dev",
+    "dev:local": "node scripts/switch-backend.js local && npm run dev",
+    "dev:remote": "node scripts/switch-backend.js remote && npm run dev",
+    "backend:local": "node scripts/switch-backend.js local",
+    "backend:remote": "node scripts/switch-backend.js remote",
+    "backend:status": "node scripts/switch-backend.js --status",
     "build": "next build",
     "analyze": "cross-env PORT=4010 next experimental-analyze",
     "start": "next start",

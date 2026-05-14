@@ -9,7 +9,7 @@ import type { TimeRecord, TimeRecordPayload } from "@/components/EditTimeRecordM
 const EditTimeRecordModal = dynamic(() => import("@/components/EditTimeRecordModal"), { loading: () => null });
 
 export default function TimeTablePage() {
-  const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 500 });
   
   // داتا وهمية لسجلات الدوام
   const [records, setRecords] = useState<TimeRecord[]>([

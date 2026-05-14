@@ -135,7 +135,14 @@ export const useSalaries = () => {
       queryFn: async () => {
         try {
           const res = await apiClient.get(`/salary/${employeeId}`);
-          return res.data ?? null;
+          const data = res.data ?? null;
+
+          // تحويل extraEffortAllowance -> extraEffort للتوافقية
+          if (data && data.extraEffortAllowance !== undefined && data.extraEffort === undefined) {
+            data.extraEffort = data.extraEffortAllowance;
+          }
+
+          return data;
         } catch (error: unknown) {
           const status = axios.isAxiosError(error) ? error.response?.status : undefined;
           if (status === 404 || status === 400) {
@@ -144,7 +151,7 @@ export const useSalaries = () => {
           throw error;
         }
       },
-      retry: false, // لضمان عدم تكرار الطلب الفاشل في حال عدم وجود سجل
+      retry: false,
       staleTime: QUERY_STALE_TIME.STANDARD,
       gcTime: QUERY_GC_TIME.RELAXED,
     });
@@ -160,8 +167,8 @@ export const useSalaries = () => {
         responsibilityAllowance: Number(safe.responsibilityAllowance ?? 0),
         productionIncentive: Number(safe.productionIncentive ?? 0),
         transportAllowance: Number(safe.transportAllowance ?? 0),
-        extraEffort: Number(safe.extraEffort ?? 0),
-        insurances: Number(safe.insurances ?? 0),
+        extraEffortAllowance: Number(safe.extraEffortAllowance ?? safe.extraEffort ?? 0),
+        insuranceAmount: Number(safe.insurances ?? 0),
       };
 
       console.log(`📤 [Put] Sending cleaned payload to /salary/${employeeId}`, payload);
