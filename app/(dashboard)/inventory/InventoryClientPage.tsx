@@ -115,13 +115,19 @@ export default function InventoryPage() {
     [items],
   );
 
-  const SkeletonTable = () => (
-    <div className="space-y-3 p-6 bg-white/50 rounded-3xl">
-      {Array.from({ length: 7 }).map((_, idx) => (
-        <div key={idx} className="h-12 rounded-xl bg-slate-200/50 animate-pulse" />
-      ))}
-    </div>
-  );
+  const SkeletonTable = useMemo(() => {
+    const Component = () => (
+      <div className="space-y-3 p-6 bg-white/50 rounded-3xl">
+        {Array.from({ length: 7 }).map((_, idx) => (
+          <div key={idx} className="h-12 rounded-xl bg-slate-200/50 animate-pulse" />
+        ))}
+      </div>
+    );
+    Component.displayName = 'SkeletonTable';
+    return Component;
+  }, []);
+
+
 
   const statusBadge = (item: InventoryItem) => {
     if (item.quantity <= item.minStockLevel) {
@@ -134,17 +140,20 @@ export default function InventoryPage() {
   const pending = isBulkPending || createItem.isPending || updateItem.isPending || adjustStock.isPending;
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(MOVEMENT_HISTORY_STORAGE_KEY);
-      if (!raw) return;
+    const loadHistory = () => {
+      try {
+        const raw = localStorage.getItem(MOVEMENT_HISTORY_STORAGE_KEY);
+        if (!raw) return;
 
-      const parsed = JSON.parse(raw) as MovementLogEntry[];
-      if (!Array.isArray(parsed)) return;
+        const parsed = JSON.parse(raw) as MovementLogEntry[];
+        if (!Array.isArray(parsed)) return;
 
-      setMovementHistory(parsed.slice(0, 25));
-    } catch {
-      localStorage.removeItem(MOVEMENT_HISTORY_STORAGE_KEY);
-    }
+        setMovementHistory(parsed.slice(0, 25));
+      } catch {
+        localStorage.removeItem(MOVEMENT_HISTORY_STORAGE_KEY);
+      }
+    };
+    loadHistory();
   }, []);
 
   useEffect(() => {

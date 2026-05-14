@@ -9,6 +9,7 @@ export const queryKeys = {
 		list: (date?: string) => [...queryKeys.attendance.all, "list", date ?? null] as const,
 		stats: (startDate?: string, endDate?: string) =>
 			[...queryKeys.attendance.all, "stats", startDate ?? null, endDate ?? null] as const,
+		alerts: (date?: string) => [...queryKeys.attendance.all, "alerts", date ?? null] as const,
 	},
 	inventory: {
 		all: ["inventory"] as const,

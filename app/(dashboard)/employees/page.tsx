@@ -30,13 +30,13 @@ const toNumber = (value: unknown) => {
 const buildFallbackEmail = (employeeId: string) => `${employeeId.toLowerCase()}@factory.local`;
 
 type EmployeeRow = Employee & {
-  baseSalary?: number | string;
+  monthlySalary?: number | string;
   jobTitle?: string;
 };
 
-const resolveDisplayedBaseSalary = (employee: EmployeeRow) => {
-  if (employee.baseSalary !== undefined && employee.baseSalary !== null && employee.baseSalary !== "") {
-    const parsed = toNumber(employee.baseSalary);
+const resolveDisplayedMonthlySalary = (employee: EmployeeRow) => {
+  if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
+    const parsed = toNumber(employee.monthlySalary);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
@@ -95,11 +95,16 @@ export default function EmployeesPage() {
       employeeId: normalizedEmployeeId,
       name: formData.name.trim(),
       mobile: formData.mobile.trim(),
+      birthDate: formData.birthDate,
+      gender: formData.gender,
       department: formData.department,
+      profession: formData.jobTitle,
+      jobTitle: formData.jobTitle,
       roleId: formData.roleId,
       scheduledStart: formData.scheduledStart,
       scheduledEnd: formData.scheduledEnd,
-      hourlyRate: toNumber(formData.baseSalary),
+      monthlySalary: toNumber(formData.monthlySalary),
+      hourlyRate: toNumber(formData.monthlySalary),
       email: selectedEmployee?.email || buildFallbackEmail(normalizedEmployeeId),
     };
 
@@ -245,7 +250,7 @@ export default function EmployeesPage() {
                           {emp.department} <span className="text-[#C89355] mx-1">/</span> {row.jobTitle || 'موظف'}
                         </td>
                         <td className="p-4 text-center font-mono font-black text-[#263544] text-sm">
-                          {resolveDisplayedBaseSalary(row).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
+                          {resolveDisplayedMonthlySalary(row).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
                         </td>
                         <td className="p-4 text-center font-mono font-bold text-slate-600 text-sm dir-ltr">
                           {emp.mobile || '—'}

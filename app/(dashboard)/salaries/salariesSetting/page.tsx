@@ -1,4 +1,4 @@
-  
+
 
 "use client";
 
@@ -45,20 +45,23 @@ const getTabFromQuery = (tabParam: string | null): FinancialTabKey => {
 };
 
 
-// تعديل الواجهة لتشمل الثوابت الجديدة
+// Payload must match UpsertSalaryDto — canonical field names only
 type SalaryPayload = {
-  profession: string;
+  profession?: string;
   baseSalary: number;
-  extraEffort: number;           // جهد إضافي
-  responsibilityAllowance: number; // تعويض مسؤولية
+  lumpSumSalary: number;
+  livingAllowance: number;
   transportAllowance: number;
-  insurances: number;            // تأمينات
-  productionIncentive: number;   // تعويض حوافز إنتاجية
+  insuranceAmount: number;        // canonical (NOT insurances)
+  responsibilityAllowance: number;
+  extraEffortAllowance: number;   // canonical (NOT extraEffort)
+  productionIncentive: number;
 };
 
-type SalaryWithFixedExtras = Salary & {
-  extraEffort?: unknown;
-  insurances?: unknown;
+// Helper to safely read Salary fields regardless of deprecated aliases
+type SalaryWithAliases = Salary & {
+  extraEffort?: unknown;        // @deprecated
+  insurances?: unknown;         // @deprecated
 };
 
 const SkeletonRows = () => (
@@ -104,7 +107,7 @@ export default function SalariesPage() {
   const [preselectedEmployeeId, setPreselectedEmployeeId] = useState<string | undefined>(undefined);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
-  
+
 
   const openFor = (salary: Salary | null = null, preselectId?: string) => {
     setSelected(salary);
@@ -146,8 +149,21 @@ export default function SalariesPage() {
 
   const handleSave = (employeeId: string, payload: SalaryPayload) => {
     if (!employeeId) return toast.error("يرجى إدخال كود الموظف");
-    // يتم تحديث بيانات الراتب هنا (يجب أن يكون الباك إند متوافقاً مع الحقول الجديدة)
-    updateSalary.mutate({ employeeId, data: { employeeId, ...payload } });
+    updateSalary.mutate({
+      employeeId,
+      data: {
+        employeeId,
+        profession: payload.profession ?? "",
+        baseSalary: payload.baseSalary,
+        lumpSumSalary: payload.lumpSumSalary,
+        livingAllowance: payload.livingAllowance,
+        transportAllowance: payload.transportAllowance,
+        insuranceAmount: payload.insuranceAmount,
+        responsibilityAllowance: payload.responsibilityAllowance,
+        extraEffortAllowance: payload.extraEffortAllowance,
+        productionIncentive: payload.productionIncentive,
+      },
+    });
     setIsModalOpen(false);
   };
 
@@ -168,12 +184,12 @@ export default function SalariesPage() {
   return (
     <>
       <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
-        
+
         {/* نقشة الفايبر */}
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }} />
 
         <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-          
+
           <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
             <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
             <span className="hover:text-[#263544] cursor-pointer relative z-10">المركز المالي</span>
@@ -232,9 +248,9 @@ export default function SalariesPage() {
                       <tr>
                         <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الموظف (الاسم والكود)</th>
                         <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الراتب الأساسي</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">جهد إضافي</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">تعويض مسؤولية</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">حوافز إنتاجية</th>
+                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الراتب المقطوع</th>
+                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">بدل المعيشة</th>
+                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">بدل النقل</th>
                         <th className="p-5 text-rose-600 font-black text-xs uppercase tracking-wider text-center">التأمينات (خصم)</th>
                         <th className="p-5 text-[#1a2530] font-black text-xs uppercase tracking-wider text-center bg-[#C89355]/10">الإجمالي الثابت</th>
                         <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">إدارة</th>
@@ -245,26 +261,27 @@ export default function SalariesPage() {
                         <tr><td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
                       ) : (
                         allIds.map((id: string) => {
-                          const s = (salaryMap.get(id) ?? null) as SalaryWithFixedExtras | null;
+                          const s = (salaryMap.get(id) ?? null) as SalaryWithAliases | null;
                           const emp = employeeMap.get(id) ?? null;
 
-                          // قيم افتراضية في حال لم يتم ضبط الراتب بعد
-                          let base = toNumber(emp?.hourlyRate); // مؤقتاً نستخدم hourlyRate كبديل لغياب الراتب
-                          let extraEffort = 0;
-                          let respAllowance = 0;
-                          let prodIncentive = 0;
-                          let insurances = 0;
+                          // Defaults when no salary record exists yet
+                          let base = toNumber(emp?.hourlyRate);
+                          let lumpSum = 0;
+                          let living = 0;
+                          let transport = 0;
+                          let insurance = 0;
 
                           if (s) {
                             base = toNumber(s.baseSalary);
-                            extraEffort = toNumber(s.extraEffort);
-                            respAllowance = toNumber(s.responsibilityAllowance);
-                            prodIncentive = toNumber(s.productionIncentive);
-                            insurances = toNumber(s.insurances);
+                            lumpSum = toNumber(s.lumpSumSalary);
+                            living = toNumber(s.livingAllowance);
+                            transport = toNumber(s.transportAllowance);
+                            // Prefer canonical field; fall back to deprecated alias
+                            insurance = toNumber(s.insuranceAmount ?? s.insurances);
                           }
 
-                          // المعادلة: الأساسي + جهد إضافي + مسؤولية + إنتاج - تأمينات
-                          const monthlyFixedTotal = base + extraEffort + respAllowance + prodIncentive - insurances;
+                          // الإجمالي الثابت: أساسي + مقطوع + معيشة + نقل − تأمينات
+                          const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? "موظف غير معروف");
 
                           return (
@@ -274,37 +291,37 @@ export default function SalariesPage() {
                                 <div className="font-black text-slate-800 group-hover/row:text-[#263544] text-base">{employeeName}</div>
                                 <div className="font-mono font-bold text-[10px] text-slate-500 mt-0.5">{id}</div>
                               </td>
-                              
+
                               {/* 2. الراتب الأساسي */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {base > 0 ? base.toLocaleString() : "—"}
                               </td>
-                              
-                              {/* 3. جهد إضافي */}
-                              <td className="p-4 text-center font-mono font-black text-[#C89355]">
-                                {extraEffort > 0 ? extraEffort.toLocaleString() : "—"}
+
+                              {/* 3. الراتب المقطوع */}
+                              <td className="p-4 text-center font-mono font-black text-[#263544]">
+                                {lumpSum > 0 ? lumpSum.toLocaleString() : "—"}
                               </td>
-                              
-                              {/* 4. تعويض مسؤولية */}
-                              <td className="p-4 text-center font-mono font-black text-[#C89355]">
-                                {respAllowance > 0 ? respAllowance.toLocaleString() : "—"}
+
+                              {/* 4. بدل المعيشة */}
+                              <td className="p-4 text-center font-mono font-black text-[#263544]">
+                                {living > 0 ? living.toLocaleString() : "—"}
                               </td>
-                              
-                              {/* 5. تعويض إنتاج */}
-                              <td className="p-4 text-center font-mono font-black text-[#C89355]">
-                                {prodIncentive > 0 ? prodIncentive.toLocaleString() : "—"}
+
+                              {/* 5. بدل النقل */}
+                              <td className="p-4 text-center font-mono font-black text-[#263544]">
+                                {transport > 0 ? transport.toLocaleString() : "—"}
                               </td>
-                              
+
                               {/* 6. التأمينات (بالأحمر كخصم) */}
                               <td className="p-4 text-center font-mono font-black text-rose-500">
-                                {insurances > 0 ? insurances.toLocaleString() : "—"}
+                                {insurance > 0 ? insurance.toLocaleString() : "—"}
                               </td>
 
                               {/* 7. الإجمالي الثابت */}
                               <td className="p-4 font-black text-center text-[#1a2530] bg-[#C89355]/5 border-x border-[#C89355]/10">
                                 {monthlyFixedTotal > 0 ? monthlyFixedTotal.toLocaleString() : <span className="text-rose-500 text-[10px] bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">غير مضبوط</span>}
                               </td>
-                              
+
                               {/* 8. إدارة */}
                               <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2 opacity-60 group-hover/row:opacity-100 transition-opacity">
@@ -349,8 +366,8 @@ export default function SalariesPage() {
 
       {/* المودالات الخاصة بالرواتب والمكافآت */}
       {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} />}
-      {isAdvanceModalOpen && <AddAdvanceModal isOpen={isAdvanceModalOpen} onClose={() => setIsAdvanceModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => {}} />}
-      {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => {}} />}
+      {isAdvanceModalOpen && <AddAdvanceModal isOpen={isAdvanceModalOpen} onClose={() => setIsAdvanceModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => { }} />}
+      {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employees} salaries={salaries} isPending={false} onSave={() => { }} />}
     </>
   );
 }

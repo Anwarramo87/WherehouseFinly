@@ -1,8 +1,9 @@
+
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { 
-  Users, Clock, Timer, AlertTriangle, 
+import {
+  Users, Clock, Timer, AlertTriangle,
   UserCheck, Wallet, UserX, Building2, TrendingUp,
   Scissors,
   User,
@@ -12,12 +13,23 @@ import {
   Gavel,
   Briefcase,
   ArrowLeftRight,
-  X 
+  X,
+  Plus,
+  MoreVertical,
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useAdvances } from '@/hooks/useAdvances';
+import { usePenalties } from '@/hooks/usePenalties';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
+import AddDepartmentModal from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import axios from 'axios';
+import apiClient from '@/lib/api-client';
+import { toLocalDateString } from '@/lib/date-time';
 
 // ============================================================================
 // TypeScript Interfaces
@@ -45,10 +57,6 @@ interface SalaryAdvance {
   profession: string;
   amount: number;
   requestDate: string;
-  approvalDate: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  repaymentStatus: 'pending' | 'partial' | 'completed';
   remainingBalance: number;
   avatar?: string;
 }
@@ -63,9 +71,6 @@ interface EmployeePenalty {
   severity: 'minor' | 'moderate' | 'severe';
   amount: number;
   date: string;
-  issuedBy: string;
-  status: 'active' | 'waived' | 'completed';
-  notes?: string;
   avatar?: string;
 }
 
@@ -103,50 +108,173 @@ interface LateEmployeeDetail {
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
-  // ✅ تم حذف المتغير attendanceStats لتنظيف الكود
   const { employeesStats, kpis, isLoading } = useDashboard();
+  const { data: employees = [] } = useEmployees({ status: "active", limit: 500 });
+  const { data: advancesData = [] } = useAdvances();
+  const { data: penaltiesData = [] } = usePenalties();
   const router = useRouter();
-  
-  // Modal state management
+  const isSkeleton = isLoading;
+
+  // --- Modal state management ---
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalData, setModalData] = useState<
     PresentEmployee[] | AbsentEmployee[] | LateEmployeeDetail[] | OvertimeEmployee[] | null
   >(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
 
+  // --- إدارة الأقسام ---
+  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState<any>(null);
+  const [addedDepartments, setAddedDepartments] = useState<any[]>([]);
+  const [deletedDepartments, setDeletedDepartments] = useState<string[]>([]);
+  const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
+
+  // إغلاق القوائم عند الضغط خارجها
+  useEffect(() => {
+    const handleGlobalClick = () => setOpenDropdownDept(null);
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, []);
+
+  const toNumber = (value: unknown) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
+      const raw = (value as { $numberDecimal?: string }).$numberDecimal;
+      const parsed = Number(raw ?? 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/,/g, ""));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const formatTime = (timestamp?: string | null) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return "";
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  };
+
   const fetchModalData = async (type: ModalType) => {
     if (!type) return;
-
     setIsModalLoading(true);
     setModalData(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const today = toLocalDateString();
+      const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
 
-      if (type === 'present') {
-        const mockPresentData: PresentEmployee[] = [
-          { employeeId: 'EMP001', name: 'أحمد محمد علي', department: 'الخياطة', profession: 'خياط رئيسي', checkIn: '08:15', checkOut: null },
-          { employeeId: 'EMP005', name: 'فاطمة حسن الأحمد', department: 'القص', profession: 'عاملة قص', checkIn: '08:00', checkOut: '16:30' },
-        ];
-        setModalData(mockPresentData);
-      } else if (type === 'absent') {
-        const mockAbsentData: AbsentEmployee[] = [
-          { employeeId: 'EMP042', name: 'خالد عبدالله السيد', department: 'الكي', profession: 'عامل كي', scheduledStart: '08:00', lastCheckIn: '2026-04-24' },
-        ];
-        setModalData(mockAbsentData);
-      } else if (type === 'late') {
-        const mockLateData: LateEmployeeDetail[] = [
-          { employeeId: 'EMP015', name: 'محمد خالد الدين', department: 'الخياطة', profession: 'مشرف خط', scheduledStart: '08:00', checkIn: '08:23', minutesLate: 23 },
-          { employeeId: 'EMP028', name: 'سارة أحمد النجار', department: 'التعبئة', profession: 'مشرفة تعبئة', scheduledStart: '08:00', checkIn: '08:12', minutesLate: 12 },
-        ];
-        setModalData(mockLateData);
-      } else if (type === 'overtime') {
-        const mockOvertimeData: OvertimeEmployee[] = [
-          { employeeId: 'EMP012', name: 'محمد أحمد الخطيب', department: 'الخياطة', profession: 'خياط رئيسي', scheduledEnd: '16:00', actualCheckOut: '18:30', overtimeMinutes: 150, overtimeHours: 2.5, hourlyRate: 5000, overtimePay: 12500 },
-          { employeeId: 'EMP025', name: 'فاطمة حسن العلي', department: 'القص', profession: 'عاملة قص', scheduledEnd: '16:00', actualCheckOut: '17:45', overtimeMinutes: 105, overtimeHours: 1.75, hourlyRate: 4500, overtimePay: 7875 },
-          { employeeId: 'EMP033', name: 'علي محمود الشامي', department: 'الكي', profession: 'عامل كي', scheduledEnd: '16:00', actualCheckOut: '17:30', overtimeMinutes: 90, overtimeHours: 1.5, hourlyRate: 4000, overtimePay: 6000 },
-        ];
-        setModalData(mockOvertimeData);
+      if (type === 'present' || type === 'overtime') {
+        let attendanceRes;
+        try {
+          attendanceRes = await apiClient.get("/attendance", { params: { date: today, limit: 500 } });
+        } catch (err) {
+          if (axios.isAxiosError(err) && err.response?.status === 400) {
+            attendanceRes = await apiClient.get("/attendance", { params: { limit: 500 } });
+          } else {
+            throw err;
+          }
+        }
+        const records = Array.isArray(attendanceRes.data?.records) ? attendanceRes.data.records : [];
+
+        const byEmployee = new Map<string, { checkIn?: string; checkOut?: string }>();
+        for (const record of records) {
+          const employeeId = record.employeeId as string;
+          if (!employeeId) continue;
+          const entry = byEmployee.get(employeeId) || {};
+          if (record.type === "IN" && !entry.checkIn) {
+            entry.checkIn = record.timestamp;
+          }
+          if (record.type === "OUT") {
+            entry.checkOut = record.timestamp;
+          }
+          byEmployee.set(employeeId, entry);
+        }
+
+        if (type === 'present') {
+          const presentData: PresentEmployee[] = Array.from(byEmployee.entries())
+            .filter(([, entry]) => Boolean(entry.checkIn))
+            .map(([employeeId, entry]) => {
+              const employee = employeesById.get(employeeId);
+              return {
+                employeeId,
+                name: employee?.name || employeeId,
+                department: employee?.department || "",
+                profession: employee?.jobTitle || "",
+                checkIn: formatTime(entry.checkIn),
+                checkOut: entry.checkOut ? formatTime(entry.checkOut) : null,
+                avatar: undefined,
+              };
+            });
+          setModalData(presentData);
+        } else {
+          const overtimeData: OvertimeEmployee[] = Array.from(byEmployee.entries())
+            .map(([employeeId, entry]) => {
+              const employee = employeesById.get(employeeId);
+              if (!employee?.scheduledEnd || !entry.checkOut) return null;
+
+              const checkOutTime = formatTime(entry.checkOut);
+              const [scheduledH, scheduledM] = employee.scheduledEnd.split(":").map(Number);
+              const checkOutDate = new Date(entry.checkOut || "");
+              const scheduledMinutes = (scheduledH || 0) * 60 + (scheduledM || 0);
+              const actualMinutes = checkOutDate.getHours() * 60 + checkOutDate.getMinutes();
+              const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+              if (overtimeMinutes <= 0) return null;
+
+              const hourlyRate = toNumber(employee.hourlyRate);
+              const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+
+              return {
+                employeeId,
+                name: employee?.name || employeeId,
+                department: employee?.department || "",
+                profession: employee?.jobTitle || "",
+                scheduledEnd: employee.scheduledEnd,
+                actualCheckOut: checkOutTime,
+                overtimeMinutes,
+                overtimeHours,
+                hourlyRate,
+                overtimePay: Number((overtimeHours * hourlyRate).toFixed(0)),
+                avatar: undefined,
+              };
+            })
+            .filter((item): item is OvertimeEmployee => Boolean(item));
+
+          setModalData(overtimeData);
+        }
+      } else {
+        const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
+        const alerts = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
+
+        if (type === 'absent') {
+          const absentData: AbsentEmployee[] = alerts
+            .filter((alert) => alert.status === "absent")
+            .map((alert) => ({
+              employeeId: alert.employeeId,
+              name: alert.name,
+              department: alert.department,
+              profession: "",
+              scheduledStart: alert.scheduledStart,
+              avatar: undefined,
+            }));
+          setModalData(absentData);
+        } else if (type === 'late') {
+          const lateData: LateEmployeeDetail[] = alerts
+            .filter((alert) => alert.status === "late")
+            .map((alert) => ({
+              employeeId: alert.employeeId,
+              name: alert.name,
+              department: alert.department,
+              profession: "",
+              scheduledStart: alert.scheduledStart,
+              checkIn: formatTime(alert.checkIn),
+              minutesLate: alert.minutesLate,
+              avatar: undefined,
+            }));
+          setModalData(lateData);
+        }
       }
     } catch (error) {
       console.error('Error fetching modal data:', error);
@@ -167,18 +295,82 @@ export default function DashboardPage() {
     setModalData(null);
   };
 
-  // Mock data for Middle Grid
-  const monthlyAdvances: SalaryAdvance[] = [
-    { advanceId: 'ADV-001', employeeId: 'EMP008', name: 'خالد محمود السيد', department: 'الكي', profession: 'عامل كي', amount: 500000, requestDate: '2026-04-05', approvalDate: '2026-04-06', reason: 'ظروف عائلية طارئة', status: 'approved', repaymentStatus: 'pending', remainingBalance: 500000 },
-    { advanceId: 'ADV-002', employeeId: 'EMP019', name: 'سارة عبدالله النجار', department: 'التعبئة', profession: 'مشرفة تعبئة', amount: 350000, requestDate: '2026-04-10', approvalDate: '2026-04-11', reason: 'مصاريف تعليمية', status: 'approved', repaymentStatus: 'partial', remainingBalance: 175000 },
-    { advanceId: 'ADV-003', employeeId: 'EMP027', name: 'أحمد علي الحسن', department: 'الخياطة', profession: 'خياط', amount: 250000, requestDate: '2026-04-15', approvalDate: '2026-04-16', reason: 'مصاريف طبية', status: 'approved', repaymentStatus: 'pending', remainingBalance: 250000 },
-  ];
+  // --- حفظ وحذف الأقسام ---
+  const handleSaveDepartment = (data: any) => {
+    if (data.originalName) {
+      setAddedDepartments(prev => 
+        prev.map(d => d.name === data.originalName ? { ...d, name: data.name, manager: data.manager } : d)
+      );
+    } else {
+      setAddedDepartments([...addedDepartments, { name: data.name, manager: data.manager, count: 0 }]);
+    }
+    setIsAddDeptModalOpen(false);
+    setEditingDept(null);
+  };
 
-  const recentPenalties: EmployeePenalty[] = [
-    { penaltyId: 'PEN-015', employeeId: 'EMP033', name: 'أحمد علي الحسن', department: 'الخياطة', profession: 'خياط', reason: 'تأخر متكرر (3 مرات في أسبوع)', severity: 'moderate', amount: 75000, date: '2026-04-20', issuedBy: 'مدير الموارد البشرية', status: 'active', notes: 'تحذير نهائي قبل الإجراء التأديبي' },
-    { penaltyId: 'PEN-012', employeeId: 'EMP047', name: 'ليلى محمد الشامي', department: 'القص', profession: 'عاملة قص', reason: 'إهمال في العمل أدى لتلف مواد', severity: 'severe', amount: 150000, date: '2026-04-18', issuedBy: 'مدير الإنتاج', status: 'active', notes: 'خصم من الراتب على دفعتين' },
-    { penaltyId: 'PEN-008', employeeId: 'EMP021', name: 'عمر خالد الدين', department: 'الكي', profession: 'عامل كي', reason: 'مخالفة قواعد السلامة', severity: 'minor', amount: 25000, date: '2026-04-15', issuedBy: 'مشرف السلامة', status: 'active', notes: 'تحذير شفهي مع خصم رمزي' },
-  ];
+  const handleDeleteDepartment = (deptName: string, count: number) => {
+    if (count > 0) return; 
+    if (window.confirm(`هل أنت متأكد من مسح قسم ${deptName}؟`)) {
+      setDeletedDepartments([...deletedDepartments, deptName]);
+      setAddedDepartments(prev => prev.filter(d => d.name !== deptName));
+    }
+  };
+
+  const monthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
+    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
+    return (Array.isArray(advancesData) ? advancesData : [])
+      .filter((advance) => {
+        const issueDate = advance.issueDate || advance.createdAt || "";
+        return issueDate.startsWith(monthKey);
+      })
+      .map((advance) => {
+        const employee = employeesById.get(advance.employeeId);
+        return {
+          advanceId: advance.id,
+          employeeId: advance.employeeId,
+          name: employee?.name || advance.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || "",
+          amount: toNumber(advance.totalAmount),
+          requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          remainingBalance: toNumber(advance.remainingAmount),
+          avatar: undefined,
+        };
+      });
+  }, [advancesData, employees, monthKey]);
+
+  const recentPenalties = useMemo<EmployeePenalty[]>(() => {
+    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
+    return (Array.isArray(penaltiesData) ? penaltiesData : [])
+      .slice(0, 5)
+      .map((penalty) => {
+        const employee = employeesById.get(penalty.employeeId);
+        return {
+          penaltyId: penalty.id,
+          employeeId: penalty.employeeId,
+          name: employee?.name || penalty.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || "",
+          reason: penalty.reason || penalty.category,
+          severity: "moderate",
+          amount: toNumber(penalty.amount),
+          date: (penalty.issueDate || "").slice(0, 10),
+          avatar: undefined,
+        };
+      });
+  }, [penaltiesData, employees]);
+
+  const departmentSummary = useMemo(() => {
+    const apiDepts = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+    const combined = [...apiDepts, ...addedDepartments].filter(d => !deletedDepartments.includes(d.name));
+    const uniqueDepts = Array.from(new Map(combined.map(item => [item.name, item])).values());
+    return uniqueDepts;
+  }, [employeesStats, addedDepartments, deletedDepartments]);
 
   const stats = [
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
@@ -189,27 +381,14 @@ export default function DashboardPage() {
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];
 
-  const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
-
-  if (isLoading) {
-    return (
-      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
-          <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
-          <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">جاري معالجة بيانات المصنع...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
-        
+
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }} />
 
         <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-          
+
           {/* Header */}
           <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#263544]/10 pb-6 relative">
             <div>
@@ -229,9 +408,9 @@ export default function DashboardPage() {
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {stats.map((stat, index) => (
-              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); }}}>
+              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); } }}>
                 <div className={`absolute inset-1.5 rounded-[1.7rem] border border-dashed pointer-events-none transition-colors duration-500 z-0 ${stat.clickable ? 'border-[#C89355]/30 group-hover:border-[#C89355]/60' : 'border-[#C89355]/20'}`} />
-                {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
+                {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
                 <div className="flex items-center justify-between mb-4 relative z-10">
                   <p className="text-[#263544]/80 text-sm font-black group-hover:text-[#263544] transition-colors">{stat.title}</p>
                   <div className={`p-3 bg-white/80 backdrop-blur-md rounded-2xl transition-all duration-500 border border-white shadow-sm ${stat.clickable ? 'group-hover:bg-[#1a2530] group-hover:border-[#C89355]/40 group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)]' : ''}`}>
@@ -239,7 +418,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <h3 className={`text-4xl font-black text-[#263544] tracking-tight mb-2 origin-right transition-transform duration-500 drop-shadow-md relative z-10 ${stat.clickable ? 'group-hover:scale-105' : ''}`}>
-                  {stat.value}
+                  {isSkeleton ? (
+                    <span className="inline-block h-9 w-24 bg-[#e7e0d5] animate-pulse rounded-lg" />
+                  ) : (
+                    stat.value
+                  )}
                 </h3>
                 <p className="text-[11px] font-bold text-slate-500 bg-white/70 backdrop-blur-md inline-block px-3 py-1.5 rounded-lg border border-white shadow-sm relative z-10">
                   {stat.subValue}
@@ -251,7 +434,7 @@ export default function DashboardPage() {
           {/* Middle Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
             {/* Monthly Advances */}
-            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-[400px] hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
               <div className="flex items-center gap-3 mb-8 relative z-10">
                 <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-sm">
@@ -275,15 +458,14 @@ export default function DashboardPage() {
                       <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl shadow-md border border-emerald-200">
                         {advance.amount.toLocaleString()} ل.س
                       </span>
-                      <span className="text-[10px] text-slate-500 font-bold">{advance.approvalDate}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">{advance.requestDate}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
             {/* Recent Penalties */}
-            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-[400px] hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
               <div className="flex items-center gap-3 mb-8 relative z-10">
                 <div className="p-2.5 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm">
@@ -318,23 +500,76 @@ export default function DashboardPage() {
 
           {/* Bottom Grid: Department Details */}
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
-                <Building2 className="text-[#C89355]" size={22} />
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
+                  <Building2 className="text-[#C89355]" size={22} />
+                </div>
+                <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
               </div>
-              <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
+              <button
+                onClick={() => { setEditingDept(null); setIsAddDeptModalOpen(true); }}
+                className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_5px_15px_rgba(38,53,68,0.2)] transition-all active:scale-95 text-xs font-black border border-[#C89355]/40 group shrink-0"
+              >
+                <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
+                <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300 relative z-10" />
+                <span className="relative z-10 tracking-wide">إضافة قسم</span>
+              </button>
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
-                  <div className="absolute inset-1.5 rounded-[1.5rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
-                  <div className="relative z-10">
+                  <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
+                  
+                  {/* زر الثلاث نقاط (القائمة المنسدلة) */}
+                  <div className="absolute top-4 left-4 z-20">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenDropdownDept(openDropdownDept === dept.name ? null : dept.name);
+                      }}
+                      className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+
+                    {openDropdownDept === dept.name && (
+                      <div className="absolute left-0 top-full mt-1 w-32 bg-[#1a2530] border border-[#263544] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingDept({ ...dept, originalName: dept.name });
+                            setIsAddDeptModalOpen(true);
+                            setOpenDropdownDept(null);
+                          }}
+                          className="flex items-center gap-2 p-2.5 text-sm text-white hover:bg-[#263544] w-full text-right transition-colors"
+                        >
+                          <Edit2 size={14} className="text-[#C89355]" /> تعديل
+                        </button>
+                        <button 
+                          disabled={dept.count > 0}
+                          title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDepartment(dept.name, dept.count);
+                            setOpenDropdownDept(null);
+                          }}
+                          className="flex items-center gap-2 p-2.5 text-sm text-rose-500 hover:bg-rose-500/10 w-full text-right transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={14} /> مسح
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative z-10 pr-2">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
                       <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">{dept.name}</h3>
                     </div>
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
-                    <p className="text-[11px] font-bold text-slate-500">موظف</p>
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">موظف</p>
                   </div>
                 </div>
               ))}
@@ -345,7 +580,15 @@ export default function DashboardPage() {
       </div>
 
       {/* المودالات في الخارج لتغطي كامل الشاشة */}
-      
+
+      {/* مودال إضافة/تعديل قسم */}
+      <AddDepartmentModal 
+        isOpen={isAddDeptModalOpen} 
+        onClose={() => { setIsAddDeptModalOpen(false); setEditingDept(null); }} 
+        onSave={handleSaveDepartment}
+        initialData={editingDept}
+      />
+
       {/* 1. Present Employees Modal */}
       <DataDrilldownModal<PresentEmployee>
         isOpen={activeModal === 'present'}
@@ -361,7 +604,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-emerald-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
@@ -407,7 +650,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-rose-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white shadow-sm flex items-center justify-center">
@@ -456,7 +699,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-xl object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm" />
@@ -472,7 +715,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2 pr-15 sm:pr-0 pl-1 w-full sm:w-auto">
-              <span className="text-xs text-amber-800 font-black bg-gradient-to-r from-amber-100 to-amber-50 px-3 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-2 border border-amber-200 shadow-sm w-fit mr-auto sm:mr-0">
+              <span className="text-xs text-amber-800 font-black bg-linear-to-r from-amber-100 to-amber-50 px-3 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-2 border border-amber-200 shadow-sm w-fit mr-auto sm:mr-0">
                 <Clock size={14} className="text-amber-600 group-hover:animate-spin-slow" /> تأخر {employee.minutesLate} دقيقة
               </span>
               <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] text-slate-600 font-bold bg-white/60 px-2 py-1 rounded-md border border-slate-100 w-fit mr-auto sm:mr-0">
@@ -500,7 +743,7 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-white border border-blue-200 shadow-inner flex items-center justify-center text-blue-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-100 to-white border border-blue-200 shadow-inner flex items-center justify-center text-blue-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
                   {employee.avatar ? <img src={employee.avatar} alt={employee.name} className="w-full h-full rounded-full object-cover" /> : employee.name[0]}
                 </div>
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-sm" />
@@ -516,7 +759,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2 pr-15 sm:pr-0 pl-1 w-full sm:w-auto">
-              <span className="text-xs text-blue-800 font-black bg-gradient-to-r from-blue-100 to-blue-50 px-3 py-1.5 rounded-lg flex items-center justify-between sm:justify-start gap-3 border border-blue-200 shadow-sm w-full sm:w-auto">
+              <span className="text-xs text-blue-800 font-black bg-linear-to-r from-blue-100 to-blue-50 px-3 py-1.5 rounded-lg flex items-center justify-between sm:justify-start gap-3 border border-blue-200 shadow-sm w-full sm:w-auto">
                 <span className="flex items-center gap-1.5">
                   <Timer size={14} className="text-blue-600 group-hover:animate-pulse" /> {employee.overtimeMinutes} دقيقة <span className="text-[10px] text-blue-600/70 hidden sm:inline">({employee.overtimeHours.toFixed(1)} س)</span>
                 </span>

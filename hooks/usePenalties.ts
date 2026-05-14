@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 import apiClient from "@/lib/api-client";
-import type { PenaltyInput, PenaltyRecord } from "@/types/penalty";
+import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 
 type ApiErrorBody = {
@@ -26,13 +26,8 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export const usePenalties = (params?: { employeeId?: string; startDate?: string; endDate?: string }) => {
   const queryClient = useQueryClient();
 
-  const penaltiesQuery = useQuery<PenaltyRecord[]>({
-    queryKey: [
-      "penalties",
-      params?.employeeId || "all",
-      params?.startDate || "all-start",
-      params?.endDate || "all-end",
-    ],
+  const penaltiesQuery = useQuery<Penalty[]>({
+    queryKey: ["penalties", params?.employeeId || "all", params?.startDate || "no-start", params?.endDate || "no-end"],
     queryFn: async () => {
       const res = await apiClient.get("/penalties", {
         params: {
@@ -48,11 +43,11 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
   });
 
   const createPenalty = useMutation({
-    mutationFn: async (payload: PenaltyInput) => {
+    mutationFn: async (payload: Omit<Penalty, "id">) => {
       const data = {
         employeeId: payload.employeeId,
         category: payload.category,
-        amount: Number(payload.amount),
+        amount: Number(payload.amount || 0),
         reason: payload.reason,
         issueDate: payload.issueDate,
       };
@@ -60,29 +55,15 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
-      toast.success("تمت إضافة الخصم بنجاح");
+      toast.success("تمت إضافة العقوبة بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "فشل إضافة الخصم"));
-    },
-  });
-
-  const deletePenalty = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiClient.delete(`/penalties/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
-      toast.success("تم حذف الخصم بنجاح");
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "فشل حذف الخصم"));
+      toast.error(getErrorMessage(error, "فشل إضافة العقوبة"));
     },
   });
 
   return {
     ...penaltiesQuery,
     createPenalty,
-    deletePenalty,
   };
 };
