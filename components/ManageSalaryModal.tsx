@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -62,63 +62,51 @@ const toNum = (val: unknown): number => {
 };
 
 // ─── Component ─────────────────────────────────────────────────────────────────
-export default function ManageSalaryModal({
-  isOpen, onClose, onSave, isPending,
+function ManageSalaryModalContent({
+  onClose, onSave, isPending,
   initialData, employees = [], preselectedEmployeeId,
 }: Props) {
   const queryClient = useQueryClient();
   const prevSalariesRef = useRef<Salary[] | undefined>(undefined);
   const savedRef = useRef(false);
 
-  // Employee search state
-  const [searchQuery, setSearchQuery] = useState("");
+  const resolvedEmployeeId = initialData?.employeeId ?? preselectedEmployeeId ?? "";
+  const resolvedEmployee = useMemo(
+    () => employees.find((e) => e.employeeId === resolvedEmployeeId),
+    [employees, resolvedEmployeeId],
+  );
+
+  const [searchQuery, setSearchQuery] = useState(() => (
+    resolvedEmployee ? `${resolvedEmployee.employeeId} - ${resolvedEmployee.name}` : resolvedEmployeeId
+  ));
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState(() => resolvedEmployee?.name ?? "");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const initialBaseSalary = initialData?.baseSalary !== undefined && initialData?.baseSalary !== null
+    ? toNum(initialData.baseSalary) || 0
+    : resolvedEmployee && toNum(resolvedEmployee.hourlyRate) > 0
+      ? toNum(resolvedEmployee.hourlyRate)
+      : 0;
+
+  const defaultValues = {
+    employeeId: resolvedEmployeeId,
+    baseSalary: initialBaseSalary,
+    lumpSumSalary: toNum(initialData?.lumpSumSalary) || 0,
+    livingAllowance: toNum(initialData?.livingAllowance) || 0,
+    transportAllowance: toNum(initialData?.transportAllowance) || 0,
+    insuranceAmount: toNum(initialData?.insuranceAmount) || 0,
+  };
 
   // ─── React Hook Form ─────────────────────────────────────────────────────────
   const {
-    control, register, handleSubmit, watch, setValue,
+    control, register, handleSubmit, setValue,
     formState: { errors },
   } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
     mode: "onChange",
-    defaultValues: {
-      employeeId:        initialData?.employeeId ?? preselectedEmployeeId ?? "",
-      baseSalary:        toNum(initialData?.baseSalary) || 0,
-      lumpSumSalary:     toNum(initialData?.lumpSumSalary) || 0,
-      livingAllowance:   toNum(initialData?.livingAllowance) || 0,
-      transportAllowance: toNum(initialData?.transportAllowance) || 0,
-      insuranceAmount:   toNum(initialData?.insuranceAmount) || 0,
-    },
+    defaultValues,
   });
-
-
-
-  // ─── Init search label ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (initialData?.employeeId) {
-      const emp = employees.find(e => e.employeeId === initialData.employeeId);
-      setSearchQuery(emp ? `${emp.employeeId} - ${emp.name}` : initialData.employeeId);
-      setSelectedEmployeeName(emp?.name ?? "");
-    } else if (preselectedEmployeeId) {
-      const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
-      if (emp) {
-        setSearchQuery(`${emp.employeeId} - ${emp.name}`);
-        setSelectedEmployeeName(emp.name);
-        // Pre-fill baseSalary from hourlyRate if available
-        if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Body scroll lock
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [isOpen]);
 
   // Click-outside dropdown
   useEffect(() => {
@@ -151,8 +139,6 @@ export default function ManageSalaryModal({
     );
   }, [employees, searchQuery]);
 
-  if (!isOpen || typeof document === "undefined") return null;
-
   // ─── Handlers ─────────────────────────────────────────────────────────────────
   const handleSelectEmployee = (emp: Employee) => {
     setValue("employeeId", emp.employeeId, { shouldValidate: true });
@@ -179,12 +165,17 @@ export default function ManageSalaryModal({
     onSave(values.employeeId, payload);
   };
 
+  const onSubmitHandler = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void handleSubmit(onSubmit)(event);
+  };
+
   // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
-  const baseSalary = watch("baseSalary");
-  const lumpSumSalary = watch("lumpSumSalary");
-  const livingAllowance = watch("livingAllowance");
-  const transportAllowance = watch("transportAllowance");
-  const insuranceAmount = watch("insuranceAmount");
+  const baseSalary = useWatch({ control, name: "baseSalary" });
+  const lumpSumSalary = useWatch({ control, name: "lumpSumSalary" });
+  const livingAllowance = useWatch({ control, name: "livingAllowance" });
+  const transportAllowance = useWatch({ control, name: "transportAllowance" });
+  const insuranceAmount = useWatch({ control, name: "insuranceAmount" });
   
   const netTotal =
     Number(baseSalary || 0) +
@@ -229,7 +220,7 @@ export default function ManageSalaryModal({
 
         {/* Body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 p-8 sm:p-10">
-          <form id="salaryForm" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form id="salaryForm" onSubmit={onSubmitHandler} className="space-y-6">
 
             {/* ── Employee Search ── */}
             <div ref={dropdownRef}>
@@ -400,4 +391,20 @@ export default function ManageSalaryModal({
     </div>,
     document.body
   );
+}
+
+export default function ManageSalaryModal(props: Props) {
+  const isMounted = typeof document !== "undefined";
+
+  useEffect(() => {
+    if (props.isOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [props.isOpen]);
+
+  if (!props.isOpen || !isMounted) return null;
+
+  const modalKey = `${props.initialData?.employeeId ?? "new"}-${props.preselectedEmployeeId ?? ""}`;
+
+  return <ManageSalaryModalContent key={modalKey} {...props} />;
 }

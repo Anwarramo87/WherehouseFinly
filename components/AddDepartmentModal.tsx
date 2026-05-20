@@ -19,15 +19,16 @@ interface Props {
   initialData?: DeptFormData | null;
 }
 
-export default function AddDepartmentModal({ isOpen, onClose, onSave, initialData }: Props) {
-  const [mounted, setMounted] = useState(false);
+const buildDefaultForm = (data?: DeptFormData | null): DeptFormData => (
+  data
+    ? { ...data }
+    : { name: "", manager: "", date: new Date().toISOString().split('T')[0] }
+);
+
+function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<DeptFormData>({
-    name: "",
-    manager: "",
-    date: new Date().toISOString().split('T')[0],
-  });
+  const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
 
   const DEPARTMENTS_ENDPOINT = "/departments";
   const USE_MOCK_API = true;
@@ -42,25 +43,15 @@ export default function AddDepartmentModal({ isOpen, onClose, onSave, initialDat
   };
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      // تعبئة البيانات في حال التعديل، أو تفريغها في حال الإضافة
-      if (initialData) {
-        setForm(initialData);
-      } else {
-        setForm({ name: "", manager: "", date: new Date().toISOString().split('T')[0] });
-      }
     } else {
       document.body.style.overflow = "unset";
     }
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen, initialData]);
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,8 +72,8 @@ export default function AddDepartmentModal({ isOpen, onClose, onSave, initialDat
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10 outline outline-dashed outline-1 outline-[#C89355]/30 outline-offset-[-8px]">
+    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
+      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
         
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
           <div className="flex items-center gap-4">
@@ -130,7 +121,7 @@ export default function AddDepartmentModal({ isOpen, onClose, onSave, initialDat
               <div className="relative group">
                 <input 
                   type="date" required 
-                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 [color-scheme:dark]"
+                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 scheme-dark"
                   value={form.date} onChange={(e) => setForm({...form, date: e.target.value})}
                 />
                 <CalendarDays className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />
@@ -160,4 +151,14 @@ export default function AddDepartmentModal({ isOpen, onClose, onSave, initialDat
     </div>,
     document.body
   );
+}
+
+export default function AddDepartmentModal(props: Props) {
+  const isMounted = typeof document !== "undefined";
+
+  if (!props.isOpen || !isMounted) return null;
+
+  const modalKey = props.initialData?.originalName ?? props.initialData?.name ?? "new";
+
+  return <DepartmentModalContent key={modalKey} {...props} />;
 }
