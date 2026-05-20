@@ -278,7 +278,7 @@ export default function AttendancePage() {
                 </span>
               </div>
 
-              <div className="relative overflow-hidden bg-white/60 backdrop-blur-2xl border border-white/80 rounded-2xl p-2.5 shadow-sm hover:shadow-md transition-all group min-w-[160px]">
+              <div className="relative overflow-hidden bg-white/60 backdrop-blur-2xl border border-white/80 rounded-2xl p-2.5 shadow-sm hover:shadow-md transition-all group min-w-40">
                 <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
                 <div className="flex items-center gap-2 relative z-10 px-2">
                   <CalendarIcon size={16} className="text-[#C89355]" />
@@ -408,7 +408,7 @@ export default function AttendancePage() {
         </div>
 
         {timeModal.isOpen && timeModal.row && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101720]/60 backdrop-blur-md p-4">
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-[#101720]/60 backdrop-blur-md p-4">
             <div className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-lg overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-300 relative">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0" />
 
