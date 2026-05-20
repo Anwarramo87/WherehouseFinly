@@ -93,6 +93,38 @@ const mockDB = {
       hireDate: "2023-06-01T00:00:00Z",
       createdAt: "2023-06-01T09:00:00Z",
       updatedAt: "2026-05-12T14:00:00Z"
+    },
+    {
+      id: "507f1f77bcf86cd799439014",
+      employeeId: "EMP004",
+      name: "Anwar",
+      email: "anwar@factory.com",
+      phone: "+963933333333",
+      jobTitle: "عامل مخزن",
+      department: "الإنتاج",
+      status: "active",
+      hourlyRate: { $numberDecimal: "145.00" },
+      scheduledStart: "08:00",
+      scheduledEnd: "16:00",
+      hireDate: "2025-03-01T00:00:00Z",
+      createdAt: "2025-03-01T09:15:00Z",
+      updatedAt: "2026-05-18T10:00:00Z"
+    },
+    {
+      id: "507f1f77bcf86cd799439015",
+      employeeId: "EMP005",
+      name: "Abd",
+      email: "abd@factory.com",
+      phone: "+963944444444",
+      jobTitle: "موظف إداري",
+      department: "الإدارة",
+      status: "active",
+      hourlyRate: { $numberDecimal: "130.00" },
+      scheduledStart: "08:30",
+      scheduledEnd: "16:30",
+      hireDate: "2025-04-15T00:00:00Z",
+      createdAt: "2025-04-15T09:00:00Z",
+      updatedAt: "2026-05-18T10:00:00Z"
     }
   ],
   

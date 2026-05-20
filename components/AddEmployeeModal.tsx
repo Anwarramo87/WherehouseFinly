@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users } from "lucide-react";
+import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
 import type { Employee } from "@/types/employee";
 
@@ -25,6 +25,7 @@ const asText = (value: unknown) => {
 export type AddEmployeeFormData = {
   employeeId: string;
   name: string;
+  username: string;
   mobile: string;
   birthDate: string;
   gender: string;
@@ -48,6 +49,7 @@ interface Props {
 const defaultFormState = {
   employeeId: "",
   name: "",
+  username: "",
   mobile: "",
   birthDate: "",
   gender: "male",
@@ -79,6 +81,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
       return {
         employeeId: initialData.employeeId || "",
         name: initialData.name || "",
+        username: "",
+        password: "",
         mobile: initialData.mobile || "",
         birthDate: initialData.birthDate || "",
         gender: initialData.gender || "male",
@@ -205,6 +209,23 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">اسم المستخدم</label>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pr-11"
+                    dir="ltr"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="会自动 تعيين من كود الموظف"
+                  />
+                  <UserCircle className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                </div>
+              </div>
+
+              
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>

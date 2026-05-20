@@ -62,8 +62,28 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
     },
   });
 
+  const updatePenalty = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Omit<Penalty, "id">> }) => {
+      const payload = {
+        category: data.category,
+        amount: data.amount !== undefined ? Number(data.amount) : undefined,
+        reason: data.reason,
+        issueDate: data.issueDate,
+      };
+      return await apiClient.put(`/penalties/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
+      toast.success("تم تحديث العقوبة");
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "فشل تحديث العقوبة"));
+    },
+  });
+
   return {
     ...penaltiesQuery,
     createPenalty,
+    updatePenalty,
   };
 };

@@ -8,7 +8,7 @@ export const SALARY_CONSTANTS = {
   WORKING_DAYS_PER_MONTH: 26,
 
   // ساعات العمل اليومية (قياسي)
-  WORKING_HOURS_PER_DAY: 8,
+  WORKING_HOURS_PER_DAY: 9,
 
   // معامل الإضافي (ساعة إضافية = 1.5x الراتب)
   OVERTIME_MULTIPLIER: 1.5,

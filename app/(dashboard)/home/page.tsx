@@ -24,7 +24,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { usePenalties } from '@/hooks/usePenalties';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
-import AddDepartmentModal from "@/components/AddDepartmentModal"; 
+import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
@@ -105,6 +105,13 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
+interface DepartmentEntry {
+  name: string;
+  manager: string;
+  count: number;
+  originalName?: string;
+}
+
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
@@ -124,8 +131,8 @@ export default function DashboardPage() {
 
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [editingDept, setEditingDept] = useState<any>(null);
-  const [addedDepartments, setAddedDepartments] = useState<any[]>([]);
+  const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
+  const [addedDepartments, setAddedDepartments] = useState<DepartmentEntry[]>([]);
   const [deletedDepartments, setDeletedDepartments] = useState<string[]>([]);
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
@@ -296,7 +303,7 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = (data: any) => {
+  const handleSaveDepartment = (data: DeptFormData) => {
     if (data.originalName) {
       setAddedDepartments(prev => 
         prev.map(d => d.name === data.originalName ? { ...d, name: data.name, manager: data.manager } : d)

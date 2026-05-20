@@ -91,22 +91,24 @@ export default function EmployeesPage() {
 
   const handleSaveEmployee = async (formData: AddEmployeeFormData) => {
     const normalizedEmployeeId = formData.employeeId.trim();
-    const payload: Partial<Employee> = {
+    const payload: Partial<Employee> & { username?: string } = {
       employeeId: normalizedEmployeeId,
       name: formData.name.trim(),
-      mobile: formData.mobile.trim(),
-      birthDate: formData.birthDate,
-      gender: formData.gender,
-      department: formData.department,
-      profession: formData.jobTitle,
-      jobTitle: formData.jobTitle,
-      roleId: formData.roleId,
-      scheduledStart: formData.scheduledStart,
-      scheduledEnd: formData.scheduledEnd,
-      monthlySalary: toNumber(formData.monthlySalary),
+      mobile: formData.mobile.trim() || undefined,
+      dateOfBirth: formData.birthDate || undefined,
+      gender: formData.gender || undefined,
+      department: formData.department || undefined,
+      profession: formData.jobTitle || undefined,
+      jobTitle: formData.jobTitle || undefined,
+      roleId: formData.roleId || undefined,
+      scheduledStart: formData.scheduledStart || undefined,
+      scheduledEnd: formData.scheduledEnd || undefined,
       hourlyRate: toNumber(formData.monthlySalary),
-      email: selectedEmployee?.email || buildFallbackEmail(normalizedEmployeeId),
     };
+
+    if (!selectedEmployee) {
+      payload.username = formData.username.trim() || normalizedEmployeeId;
+    }
 
     try {
       if (selectedEmployee) {
