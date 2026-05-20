@@ -142,6 +142,7 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                   <input 
                     type="date" required 
                     className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
+                    className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     value={form.startDate} 
                     onChange={(e) => setForm({...form, startDate: e.target.value})}
                   />
@@ -156,6 +157,7 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                   <input 
                     type="date" required 
                     min={form.startDate} // لا يمكن اختيار تاريخ قبل تاريخ البداية
+                    className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     value={form.endDate} 
                     onChange={(e) => setForm({...form, endDate: e.target.value})}
@@ -190,6 +192,7 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                 <textarea 
                   required
                   placeholder="يرجى كتابة سبب الإجازة هنا..."
+                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-25 resize-none"
                   className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-25 resize-none"
                   value={form.customReason} 
                   onChange={(e) => setForm({...form, customReason: e.target.value})}
@@ -232,4 +235,14 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
     </div>,
     document.body
   );
+}
+
+export default function LeaveRequestModal(props: Props) {
+  const isMounted = typeof document !== "undefined";
+
+  if (!props.isOpen || !isMounted) return null;
+
+  const modalKey = `leave-${props.employees.length}`;
+
+  return <LeaveRequestModalContent key={modalKey} {...props} />;
 }

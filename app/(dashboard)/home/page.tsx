@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import {
-  Users, Clock, Timer, AlertTriangle,
+import { 
+  Users, Clock, Timer, AlertTriangle, 
   UserCheck, Wallet, UserX, Building2, TrendingUp,
   Scissors,
   User,
@@ -12,23 +12,13 @@ import {
   Gavel,
   Briefcase,
   ArrowLeftRight,
-  X,
-  Plus,
-  MoreVertical,
-  Edit2,
-  Trash2
+  X 
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
-import { useEmployees } from '@/hooks/useEmployees';
-import { useAdvances } from '@/hooks/useAdvances';
-import { usePenalties } from '@/hooks/usePenalties';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useEffect } from 'react';
-import axios from 'axios';
-import apiClient from '@/lib/api-client';
-import { toLocalDateString } from '@/lib/date-time';
+import { useState } from 'react';
 
 // ============================================================================
 // TypeScript Interfaces
@@ -73,6 +63,10 @@ interface SalaryAdvance {
   profession: string;
   amount: number;
   requestDate: string;
+  approvalDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  repaymentStatus: 'pending' | 'partial' | 'completed';
   remainingBalance: number;
   avatar?: string;
 }
@@ -87,6 +81,9 @@ interface EmployeePenalty {
   severity: 'minor' | 'moderate' | 'severe';
   amount: number;
   date: string;
+  issuedBy: string;
+  status: 'active' | 'waived' | 'completed';
+  notes?: string;
   avatar?: string;
 }
 
@@ -124,14 +121,12 @@ interface LateEmployeeDetail {
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
+  // ✅ تم حذف المتغير attendanceStats لتنظيف الكود
   const { employeesStats, kpis, isLoading } = useDashboard();
-  const { data: employees = [] } = useEmployees({ status: "active", limit: 500 });
-  const { data: advancesData = [] } = useAdvances();
-  const { data: penaltiesData = [] } = usePenalties();
   const router = useRouter();
   const isSkeleton = isLoading;
-
-  // --- Modal state management ---
+  
+  // Modal state management
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalData, setModalData] = useState<
     PresentEmployee[] | AbsentEmployee[] | LateEmployeeDetail[] | OvertimeEmployee[] | null
@@ -140,8 +135,8 @@ export default function DashboardPage() {
 
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
-  const [addedDepartments, setAddedDepartments] = useState<DepartmentData[]>([]);
+  const [editingDept, setEditingDept] = useState<any>(null);
+  const [addedDepartments, setAddedDepartments] = useState<any[]>([]);
   const [deletedDepartments, setDeletedDepartments] = useState<string[]>([]);
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
@@ -154,7 +149,7 @@ export default function DashboardPage() {
 
   const toNumber = (value: unknown) => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-    if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
+    if (value && typeof value === "object" && "$numberDecimal" in (value as { $numberDecimal?: string })) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;
       const parsed = Number(raw ?? 0);
       return Number.isFinite(parsed) ? parsed : 0;
@@ -175,39 +170,12 @@ export default function DashboardPage() {
 
   const fetchModalData = async (type: ModalType) => {
     if (!type) return;
+
     setIsModalLoading(true);
     setModalData(null);
 
     try {
-      const today = toLocalDateString();
-      const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
-
-      if (type === 'present' || type === 'overtime') {
-        let attendanceRes;
-        try {
-          attendanceRes = await apiClient.get("/attendance", { params: { date: today, limit: 500 } });
-        } catch (err) {
-          if (axios.isAxiosError(err) && err.response?.status === 400) {
-            attendanceRes = await apiClient.get("/attendance", { params: { limit: 500 } });
-          } else {
-            throw err;
-          }
-        }
-        const records = Array.isArray(attendanceRes.data?.records) ? attendanceRes.data.records : [];
-
-        const byEmployee = new Map<string, { checkIn?: string; checkOut?: string }>();
-        for (const record of records) {
-          const employeeId = record.employeeId as string;
-          if (!employeeId) continue;
-          const entry = byEmployee.get(employeeId) || {};
-          if (record.type === "IN" && !entry.checkIn) {
-            entry.checkIn = record.timestamp;
-          }
-          if (record.type === "OUT") {
-            entry.checkOut = record.timestamp;
-          }
-          byEmployee.set(employeeId, entry);
-        }
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
         if (type === 'present') {
           const presentData: PresentEmployee[] = Array.from(byEmployee.entries())
@@ -400,14 +368,16 @@ export default function DashboardPage() {
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];
 
+  const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+
   return (
     <>
       <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
-
+        
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }} />
 
         <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-
+          
           {/* Header */}
           <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#263544]/10 pb-6 relative">
             <div>
@@ -427,7 +397,7 @@ export default function DashboardPage() {
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {stats.map((stat, index) => (
-              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); } }}>
+              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); }}}>
                 <div className={`absolute inset-1.5 rounded-[1.7rem] border border-dashed pointer-events-none transition-colors duration-500 z-0 ${stat.clickable ? 'border-[#C89355]/30 group-hover:border-[#C89355]/60' : 'border-[#C89355]/20'}`} />
                 {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
                 <div className="flex items-center justify-between mb-4 relative z-10">
@@ -477,12 +447,13 @@ export default function DashboardPage() {
                       <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl shadow-md border border-emerald-200">
                         {advance.amount.toLocaleString()} ل.س
                       </span>
-                      <span className="text-[10px] text-slate-500 font-bold">{advance.requestDate}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">{advance.approvalDate}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
             {/* Recent Penalties */}
             <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
@@ -519,23 +490,12 @@ export default function DashboardPage() {
 
           {/* Bottom Grid: Department Details */}
           <div className="mb-6">
-            <div className="flex items-center justify-between gap-3 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
-                  <Building2 className="text-[#C89355]" size={22} />
-                </div>
-                <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
+                <Building2 className="text-[#C89355]" size={22} />
               </div>
-              <button
-                onClick={() => { setEditingDept(null); setIsAddDeptModalOpen(true); }}
-                className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_5px_15px_rgba(38,53,68,0.2)] transition-all active:scale-95 text-xs font-black border border-[#C89355]/40 group shrink-0"
-              >
-                <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-                <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300 relative z-10" />
-                <span className="relative z-10 tracking-wide">إضافة قسم</span>
-              </button>
+              <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
@@ -593,7 +553,7 @@ export default function DashboardPage() {
                       <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">{dept.name}</h3>
                     </div>
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">موظف</p>
+                    <p className="text-[11px] font-bold text-slate-500">موظف</p>
                   </div>
                 </div>
               ))}
@@ -604,15 +564,7 @@ export default function DashboardPage() {
       </div>
 
       {/* المودالات في الخارج لتغطي كامل الشاشة */}
-
-      {/* مودال إضافة/تعديل قسم */}
-      <AddDepartmentModal 
-        isOpen={isAddDeptModalOpen} 
-        onClose={() => { setIsAddDeptModalOpen(false); setEditingDept(null); }} 
-        onSave={handleSaveDepartment}
-        initialData={editingDept}
-      />
-
+      
       {/* 1. Present Employees Modal */}
       <DataDrilldownModal<PresentEmployee>
         isOpen={activeModal === 'present'}

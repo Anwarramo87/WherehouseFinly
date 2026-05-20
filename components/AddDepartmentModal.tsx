@@ -19,14 +19,16 @@ interface Props {
   initialData?: DeptFormData | null;
 }
 
-export default function AddDepartmentModal({ isOpen, onClose, onSave, initialData }: Props) {
+const buildDefaultForm = (data?: DeptFormData | null): DeptFormData => (
+  data
+    ? { ...data }
+    : { name: "", manager: "", date: new Date().toISOString().split('T')[0] }
+);
+
+function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<DeptFormData>({
-    name: "",
-    manager: "",
-    date: new Date().toISOString().split('T')[0],
-  });
+  const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
 
   const DEPARTMENTS_ENDPOINT = "/departments";
   const USE_MOCK_API = true;
@@ -156,4 +158,14 @@ export default function AddDepartmentModal({ isOpen, onClose, onSave, initialDat
     </div>,
     document.body
   );
+}
+
+export default function AddDepartmentModal(props: Props) {
+  const isMounted = typeof document !== "undefined";
+
+  if (!props.isOpen || !isMounted) return null;
+
+  const modalKey = props.initialData?.originalName ?? props.initialData?.name ?? "new";
+
+  return <DepartmentModalContent key={modalKey} {...props} />;
 }
