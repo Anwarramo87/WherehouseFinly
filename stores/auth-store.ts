@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Support `roles` array on the user payload
-        const userRoles = (user as any).roles;
+  const userRoles = (user as { roles?: string[] }).roles;
         if (Array.isArray(userRoles) && userRoles.length > 0) {
           for (const r of userRoles) {
             if (!r) continue;
