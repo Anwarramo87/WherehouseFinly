@@ -379,7 +379,7 @@ export default function InventoryPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 {/* أيقونة العنوان بهوية الماركة الكحلية والنحاسية مع الدرزة */}
-                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative  outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4 group">
+                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4 group">
                   <Sparkles size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
                 </div>
                 <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">

@@ -465,8 +465,8 @@ const buildInitialFormData = (initialData: EmployeeWithExtendedFields | null | u
       jobTitle: initialData.jobTitle || initialData.profession || "",
       department: initialData.department || "قسم القص",
       monthlySalary: formattedSalary,
-      scheduledStart: initialData.scheduledStart || "08:00",
-      scheduledEnd: initialData.scheduledEnd || "16:00",
+      scheduledStart: initialData.scheduledStart || "09:00",
+      scheduledEnd: initialData.scheduledEnd || "18:00",
       roleId: initialData.roleId || "staff",
     };
   }

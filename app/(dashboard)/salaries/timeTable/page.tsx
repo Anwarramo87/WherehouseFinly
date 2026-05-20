@@ -59,11 +59,13 @@ export default function TimeTablePage() {
   const handleSaveRecord = (data: EditTotalsPayload) => {
     if (!periodStart || !periodEnd) return;
 
+    // دمج البيانات المالية القديمة (حتى لا تتصفر في الباك إند) مع تعديلات الدوام الجديدة
     const payload: UpsertPayrollInputPayload = {
-      ...data,
+      ...(selectedInputData || {}), // 👈 هذا السطر السحري يحمي السلف والعقوبات من الحذف!
+      ...data,                      // 👈 هذه تعديلات المودال (دوام، تأخير، الخ) وتطغى على القديم
       periodStart,
       periodEnd,
-      deathLeaveDays: 0, // Add missing field with default value
+      deathLeaveDays: selectedInputData?.deathLeaveDays || 0, // الحفاظ على القيمة القديمة إن وجدت
     };
 
     upsertPayrollInput.mutate(payload, {
