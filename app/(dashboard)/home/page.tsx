@@ -24,9 +24,9 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { usePenalties } from '@/hooks/usePenalties';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
-import AddDepartmentModal from "@/components/AddDepartmentModal"; 
+import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
@@ -34,6 +34,23 @@ import { toLocalDateString } from '@/lib/date-time';
 // ============================================================================
 // TypeScript Interfaces
 // ============================================================================
+
+interface DepartmentData {
+  name: string;
+  manager?: string;
+  count: number;
+  originalName?: string;
+}
+
+interface AttendanceAlert {
+  employeeId: string;
+  name: string;
+  department: string;
+  status: 'absent' | 'late' | string;
+  scheduledStart: string;
+  checkIn?: string;
+  minutesLate: number;
+}
 
 interface OvertimeEmployee {
   employeeId: string;
@@ -105,11 +122,18 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
+interface DepartmentEntry {
+  name: string;
+  manager: string;
+  count: number;
+  originalName?: string;
+}
+
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
   const { employeesStats, kpis, isLoading } = useDashboard();
-  const { data: employees = [] } = useEmployees({ status: "active", limit: 500 });
+  const { data: employees = [] } = useEmployees();
   const { data: advancesData = [] } = useAdvances();
   const { data: penaltiesData = [] } = usePenalties();
   const router = useRouter();
@@ -124,8 +148,8 @@ export default function DashboardPage() {
 
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [editingDept, setEditingDept] = useState<any>(null);
-  const [addedDepartments, setAddedDepartments] = useState<any[]>([]);
+  const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
+  const [addedDepartments, setAddedDepartments] = useState<DepartmentEntry[]>([]);
   const [deletedDepartments, setDeletedDepartments] = useState<string[]>([]);
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
@@ -165,6 +189,8 @@ export default function DashboardPage() {
     try {
       const today = toLocalDateString();
       const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       if (type === 'present' || type === 'overtime') {
         let attendanceRes;
@@ -210,8 +236,9 @@ export default function DashboardPage() {
             });
           setModalData(presentData);
         } else {
+          // التعديل الأول: تحديد نوع الإرجاع لـ map
           const overtimeData: OvertimeEmployee[] = Array.from(byEmployee.entries())
-            .map(([employeeId, entry]) => {
+            .map(([employeeId, entry]): OvertimeEmployee | null => {
               const employee = employeesById.get(employeeId);
               if (!employee?.scheduledEnd || !entry.checkOut) return null;
 
@@ -246,7 +273,9 @@ export default function DashboardPage() {
         }
       } else {
         const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
-        const alerts = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
+        
+        // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
+        const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
 
         if (type === 'absent') {
           const absentData: AbsentEmployee[] = alerts
@@ -296,7 +325,7 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = (data: any) => {
+  const handleSaveDepartment = (data: DeptFormData) => {
     if (data.originalName) {
       setAddedDepartments(prev => 
         prev.map(d => d.name === data.originalName ? { ...d, name: data.name, manager: data.manager } : d)
@@ -338,6 +367,10 @@ export default function DashboardPage() {
           profession: employee?.jobTitle || "",
           amount: toNumber(advance.totalAmount),
           requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          approvalDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          reason: "سلفة نقدية",
+          status: 'approved',
+          repaymentStatus: 'pending',
           remainingBalance: toNumber(advance.remainingAmount),
           avatar: undefined,
         };
@@ -360,12 +393,15 @@ export default function DashboardPage() {
           severity: "moderate",
           amount: toNumber(penalty.amount),
           date: (penalty.issueDate || "").slice(0, 10),
+          issuedBy: "الإدارة",
+          status: 'active',
+          notes: "",
           avatar: undefined,
         };
       });
   }, [penaltiesData, employees]);
 
-  const departmentSummary = useMemo(() => {
+  const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiDepts = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
     const combined = [...apiDepts, ...addedDepartments].filter(d => !deletedDepartments.includes(d.name));
     const uniqueDepts = Array.from(new Map(combined.map(item => [item.name, item])).values());
@@ -380,6 +416,8 @@ export default function DashboardPage() {
     { title: 'دقائق التأخير', value: kpis.totalLateMinutesToday, subValue: 'إجمالي تأخير اليوم', icon: Clock, clickable: true, onClick: () => handleCardClick('late') },
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];
+
+
 
   return (
     <>
@@ -539,7 +577,12 @@ export default function DashboardPage() {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            setEditingDept({ ...dept, originalName: dept.name });
+                            setEditingDept({ 
+                              name: dept.name, 
+                              manager: dept.manager || "", 
+                              date: new Date().toISOString().split('T')[0],
+                              originalName: dept.name 
+                            });
                             setIsAddDeptModalOpen(true);
                             setOpenDropdownDept(null);
                           }}

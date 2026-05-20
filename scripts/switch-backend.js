@@ -10,6 +10,7 @@
  *   node scripts/switch-backend.js remote   # Switch to remote/Railway backend
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const path = require('path');
 

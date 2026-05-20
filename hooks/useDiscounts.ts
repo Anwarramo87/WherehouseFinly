@@ -6,15 +6,18 @@ import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 export type DiscountRecord = {
   id: string;
   employeeId: string;
-  type: string; // 'سلفة' | 'شراء ملابس' | 'عقوبة'
+  type: string;
+  kind: "advance" | "penalty" | "assistance";
   amount: number;
   date: string;
   notes?: string;
-  backendModel: "advance" | "penalty";
+  advanceType?: string;
+  category?: string;
 };
 
 export type DiscountPayload = {
   employeeId: string;
+  kind: "advance" | "penalty" | "assistance";
   type: string;
   amount: number;
   date: string;
@@ -30,27 +33,17 @@ const normalizeError = (error: unknown): string => {
   return message;
 };
 
-// Map UI types to backend values
-const mapTypeToBackend = (type: string): { model: "advance" | "penalty"; backendTypeOrCategory: string } => {
-  switch (type) {
-    case "سلفة":
-      return { model: "advance", backendTypeOrCategory: "salary" };
-    case "شراء ملابس":
-      return { model: "advance", backendTypeOrCategory: "clothing" };
-    case "عقوبة":
-    default:
-      return { model: "penalty", backendTypeOrCategory: "عقوبة" };
+const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
+  if (record.advanceType) {
+    const advanceType = record.advanceType as string;
+    if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
+    if (advanceType === "assistance") return { type: "مساعدة", kind: "assistance" as const };
+    return { type: "سلفة", kind: "advance" as const };
   }
-};
-
-const mapBackendToType = (model: "advance" | "penalty", backendTypeOrCategory: string): string => {
-  if (model === "advance") {
-    if (backendTypeOrCategory === "clothing") return "شراء ملابس";
-    return "سلفة";
-  } else {
-    // Penalty
-    return "عقوبة";
+  if (record.category) {
+    return { type: "عقوبة", kind: "penalty" as const };
   }
+  return { type: "أخرى", kind: "advance" as const };
 };
 
 export const useDiscounts = (employeeId?: string) => {
@@ -60,148 +53,75 @@ export const useDiscounts = (employeeId?: string) => {
     queryKey: ["discounts", employeeId || "all"],
     queryFn: async () => {
       const params = employeeId ? { employeeId } : {};
-      
-      const [advancesRes, penaltiesRes] = await Promise.all([
-        apiClient.get("/advances", { params }).catch(() => ({ data: [] })),
-        apiClient.get("/penalties", { params }).catch(() => ({ data: [] }))
-      ]);
+      const res = await apiClient.get("/discounts", { params });
+      const data = res.data;
 
-      const advancesData = Array.isArray(advancesRes.data) ? advancesRes.data : advancesRes.data?.data || [];
-      const penaltiesData = Array.isArray(penaltiesRes.data) ? penaltiesRes.data : penaltiesRes.data?.data || [];
+      if (!Array.isArray(data)) {
+        return [];
+      }
 
-      const mappedAdvances: DiscountRecord[] = advancesData.map((adv: { id: string; employeeId: string; advanceType: string; totalAmount: number; issueDate?: string; notes?: string }) => ({
-        id: adv.id,
-        employeeId: adv.employeeId,
-        type: mapBackendToType("advance", adv.advanceType),
-        amount: Number(adv.totalAmount),
-        date: adv.issueDate?.split("T")[0] || new Date().toISOString().split("T")[0],
-        notes: adv.notes || "",
-        backendModel: "advance",
-      }));
-
-      const mappedPenalties: DiscountRecord[] = penaltiesData.map((pen: { id: string; employeeId: string; category: string; amount: number; issueDate?: string; reason?: string }) => ({
-        id: pen.id,
-        employeeId: pen.employeeId,
-        type: mapBackendToType("penalty", pen.category),
-        amount: Number(pen.amount),
-        date: pen.issueDate?.split("T")[0] || new Date().toISOString().split("T")[0],
-        notes: pen.reason || "",
-        backendModel: "penalty",
-      }));
-
-      const combined = [...mappedAdvances, ...mappedPenalties];
-      // Sort by date descending
-      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      return combined;
+      return data.map((record: Record<string, unknown>) => {
+        const { type, kind } = mapBackendKindToType(record);
+        return {
+          id: record.id as string,
+          employeeId: record.employeeId as string,
+          type,
+          kind,
+          amount: Number(record.amount || record.totalAmount || 0),
+          date: (record.issueDate as string || record.date as string || "").split("T")[0],
+          notes: (record.notes as string) || (record.reason as string) || "",
+          advanceType: record.advanceType as string | undefined,
+          category: record.category as string | undefined,
+        };
+      });
     },
     staleTime: QUERY_STALE_TIME.STANDARD,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
-  const createMutation = useMutation({
+  const createDiscount = useMutation({
     mutationFn: async (payload: DiscountPayload) => {
-      const { model, backendTypeOrCategory } = mapTypeToBackend(payload.type);
-      
-      if (model === "advance") {
-        return apiClient.post("/advances", {
-          employeeId: payload.employeeId,
-          advanceType: backendTypeOrCategory,
-          totalAmount: payload.amount,
-          notes: payload.notes,
-          issueDate: new Date(payload.date).toISOString(),
-        });
-      } else {
-        return apiClient.post("/penalties", {
-          employeeId: payload.employeeId,
-          category: backendTypeOrCategory,
-          amount: payload.amount,
-          reason: payload.notes,
-          issueDate: new Date(payload.date).toISOString(),
-        });
+      const body: Record<string, unknown> = {
+        employeeId: payload.employeeId,
+        kind: payload.kind,
+        amount: payload.amount,
+        date: payload.date,
+        notes: payload.notes,
+      };
+
+      if (payload.kind === "advance") {
+        body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
+      } else if (payload.kind === "penalty") {
+        body.category = payload.type;
       }
+
+      return await apiClient.post("/discounts", body);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("تم الحفظ بنجاح!");
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      toast.success("تم إضافة الخصم بنجاح");
     },
     onError: (error: unknown) => {
       toast.error(normalizeError(error));
-    }
+    },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, backendModel, payload }: { id: string; backendModel: "advance" | "penalty"; payload: DiscountPayload }) => {
-      const { model, backendTypeOrCategory } = mapTypeToBackend(payload.type);
-      
-      // If the backend model is penalty, we can simply PUT
-      if (backendModel === "penalty" && model === "penalty") {
-        return apiClient.put(`/penalties/${id}`, {
-          category: backendTypeOrCategory,
-          amount: payload.amount,
-          reason: payload.notes,
-          issueDate: new Date(payload.date).toISOString(),
-        });
-      }
-      
-      // If the backend model is advance, we cannot update totalAmount, advanceType, or issueDate via PUT
-      // due to backend restrictions. We must delete and recreate.
-      // Also, if the model changed (e.g. advance -> penalty), we must delete and recreate.
-      if (backendModel === "advance") {
-        await apiClient.delete(`/advances/${id}`);
-      } else {
-        await apiClient.delete(`/penalties/${id}`);
-      }
-      
-      // Recreate with new data
-      if (model === "advance") {
-        return apiClient.post("/advances", {
-          employeeId: payload.employeeId,
-          advanceType: backendTypeOrCategory,
-          totalAmount: payload.amount,
-          notes: payload.notes,
-          issueDate: new Date(payload.date).toISOString(),
-        });
-      } else {
-        return apiClient.post("/penalties", {
-          employeeId: payload.employeeId,
-          category: backendTypeOrCategory,
-          amount: payload.amount,
-          reason: payload.notes,
-          issueDate: new Date(payload.date).toISOString(),
-        });
-      }
+  const deleteDiscount = useMutation({
+    mutationFn: async ({ id, kind }: { id: string; kind: "advance" | "penalty" | "assistance" }) => {
+      return await apiClient.delete(`/discounts/${id}?kind=${kind}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("تم التعديل بنجاح!");
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      toast.success("تم حذف الخصم بنجاح");
     },
     onError: (error: unknown) => {
       toast.error(normalizeError(error));
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async ({ id, backendModel }: { id: string; backendModel: "advance" | "penalty" }) => {
-      if (backendModel === "advance") {
-        return apiClient.delete(`/advances/${id}`);
-      } else {
-        return apiClient.delete(`/penalties/${id}`);
-      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("تم الحذف بنجاح!");
-    },
-    onError: (error: unknown) => {
-      toast.error(normalizeError(error));
-    }
   });
 
   return {
     ...query,
-    createDiscount: createMutation,
-    updateDiscount: updateMutation,
-    deleteDiscount: deleteMutation
+    createDiscount,
+    deleteDiscount,
   };
 };

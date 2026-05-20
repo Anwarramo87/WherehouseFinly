@@ -45,13 +45,20 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // تعبئة البيانات في حال التعديل، أو تفريغها في حال الإضافة
+      if (initialData) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setForm(initialData);
+      } else {
+        setForm({ name: "", manager: "", date: new Date().toISOString().split('T')[0] });
+      }
     } else {
       document.body.style.overflow = "unset";
     }
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen, initialData]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +80,7 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
 
   return createPortal(
     <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
+      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 outline-offset-8">
         
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
           <div className="flex items-center gap-4">

@@ -11,6 +11,7 @@ export type AuthUser = {
   username?: string;
   employeeId?: string;
   role?: string;
+  roles?: string[];
   roleId?: string;
   email?: string;
 };
@@ -53,7 +54,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Support `roles` array on the user payload
-  const userRoles = (user as { roles?: string[] }).roles;
+        const userRoles = user.roles;
         if (Array.isArray(userRoles) && userRoles.length > 0) {
           for (const r of userRoles) {
             if (!r) continue;

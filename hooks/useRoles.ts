@@ -52,7 +52,7 @@ export const useRoles = () => {
   return useQuery<RoleOption[]>({
     queryKey: ["roles"],
     queryFn: async () => {
-      const response = await apiClient.get("/roles");
+      const response = await apiClient.get("/auth/roles");
       return resolveRoles(response.data);
     },
     staleTime: QUERY_STALE_TIME.RELAXED,

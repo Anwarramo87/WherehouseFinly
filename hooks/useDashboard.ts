@@ -99,6 +99,7 @@ const extractPayrollTotal = (summary: unknown) => {
     record.totalNetPayWithAdvance,
     record.netPayRounded,
     record.netPayWithAdvance,
+    record.payrolliteam,
   ];
 
   for (const candidate of candidates) {

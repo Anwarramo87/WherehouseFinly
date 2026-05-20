@@ -305,9 +305,6 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const hasAnyRole = useAuthStore((state) => state.hasAnyRole);
 
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  
-  // حالة جديدة لفتح وإغلاق القائمة في الموبايل
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const displayName = currentUser?.name || currentUser?.username || 'مدير النظام';
   const displayRole = currentUser?.role || 'مشرف عام';

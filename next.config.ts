@@ -98,6 +98,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api/telemetry/web-vitals",
+        destination: "/api/telemetry/web-vitals",
+      },
+      {
         source: "/api/:path*",
         destination: `${upstreamApiBase}/:path*`,
       },
