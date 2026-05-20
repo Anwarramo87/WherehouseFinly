@@ -180,6 +180,7 @@ export default function ManageSalaryModal({
   };
 
   // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
+  // eslint-disable-next-line react-hooks/incompatible-library
   const baseSalary = watch("baseSalary");
   const lumpSumSalary = watch("lumpSumSalary");
   const livingAllowance = watch("livingAllowance");

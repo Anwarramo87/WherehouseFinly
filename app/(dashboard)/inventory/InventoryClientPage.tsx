@@ -69,6 +69,14 @@ const escapeCsvCell = (value: string | number) => {
   return text;
 };
 
+const SkeletonTable = () => (
+  <div className="space-y-3 p-6 bg-white/50 rounded-3xl">
+    {Array.from({ length: 7 }).map((_, idx) => (
+      <div key={idx} className="h-12 rounded-xl bg-slate-200/50 animate-pulse" />
+    ))}
+  </div>
+);
+
 export default function InventoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -114,20 +122,6 @@ export default function InventoryPage() {
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [items],
   );
-
-  const SkeletonTable = useMemo(() => {
-    const Component = () => (
-      <div className="space-y-3 p-6 bg-white/50 rounded-3xl">
-        {Array.from({ length: 7 }).map((_, idx) => (
-          <div key={idx} className="h-12 rounded-xl bg-slate-200/50 animate-pulse" />
-        ))}
-      </div>
-    );
-    Component.displayName = 'SkeletonTable';
-    return Component;
-  }, []);
-
-
 
   const statusBadge = (item: InventoryItem) => {
     if (item.quantity <= item.minStockLevel) {
@@ -367,7 +361,7 @@ export default function InventoryPage() {
 
   return (
     /* الحاوية الرئيسية: تأثير زجاجي مع درازة خارجية متطابقة مع باقي النظام */
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-[40px] rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
         
         {/* نقشة الفايبر (القماش) الثابتة والشفافة */}
         <div 
@@ -385,7 +379,7 @@ export default function InventoryPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 {/* أيقونة العنوان بهوية الماركة الكحلية والنحاسية مع الدرزة */}
-                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline outline-dashed outline-1 outline-[#C89355]/50 outline-offset-[-4px] group">
+                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 group">
                   <Sparkles size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
                 </div>
                 <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">
@@ -623,7 +617,7 @@ export default function InventoryPage() {
                           <td className="p-4 text-xs text-center font-black text-[#263544]/80">{entry.location}</td>
                           <td className="p-4 text-xs text-center font-black text-[#263544]/80">{entry.source === "MANUAL" ? "يدوي" : "استيراد"}</td>
                           <td className="p-4 text-xs text-center font-mono font-bold text-slate-500">{new Date(entry.createdAt).toLocaleString("ar-EG")}</td>
-                          <td className="p-4 text-xs text-center font-bold text-slate-600 max-w-[200px] truncate" title={entry.note}>{entry.note}</td>
+                          <td className="p-4 text-xs text-center font-bold text-slate-600 max-w-50 truncate" title={entry.note}>{entry.note}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, UserMinus, ChevronLeft, ChevronRight, AlertTriangle, Calendar, FileText, Calculator, Coins, AlertOctagon } from "lucide-react";
+import { X, UserMinus, ChevronLeft, ChevronRight, AlertTriangle, Calendar, FileText, Calculator, Coins, AlertOctagon, UserX, LogOut } from "lucide-react";
 import type { Employee } from "@/types/employee";
 
 type EmployeeWithCompensation = Employee & {
   baseSalary?: number | string;
 };
 
+// تم إضافة نوع المغادرة إلى البيانات المجمعة
 export type FireEmployeePayload = {
   employeeId: string;
   fireDate: string;
@@ -17,6 +18,7 @@ export type FireEmployeePayload = {
   dueSalary: number;
   bonus: number;
   totalDues: number;
+  status: "terminated" | "resigned";
 };
 
 interface Props {
@@ -33,19 +35,15 @@ const getToday = () => {
 };
 
 export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm, isPending }: Props) {
-  // 👇 السطر المحذوف بواسطة المحرر، أعدناه هنا 👇
-  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+  
+  // التحكم بنوع المغادرة
+  const [departureType, setDepartureType] = useState<"terminated" | "resigned">("terminated");
   
   const [fireDate, setFireDate] = useState(getToday());
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [bonus, setBonus] = useState<string>("");
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,26 +54,21 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
-  if (!isOpen || !mounted || !employee) return null;
+  if (!isOpen || typeof document === "undefined" || !employee) return null;
 
   const employeeWithCompensation = employee as EmployeeWithCompensation;
 
   const toNumber = (value: unknown) => {
-    if (typeof value === "number") {
-      return Number.isFinite(value) ? value : 0;
-    }
-
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (typeof value === "string") {
       const normalized = value.replace(/,/g, "").trim();
       const parsed = Number(normalized);
       return Number.isFinite(parsed) ? parsed : 0;
     }
-
     if (value && typeof value === "object" && "$numberDecimal" in value) {
       const parsed = Number((value as { $numberDecimal?: string }).$numberDecimal || 0);
       return Number.isFinite(parsed) ? parsed : 0;
     }
-
     return 0;
   };
 
@@ -89,7 +82,7 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      alert("الرجاء كتابة سبب الإقالة");
+      alert("الرجاء كتابة سبب الإقالة / الاستقالة");
       return;
     }
     setStep(2);
@@ -103,22 +96,28 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
       notes,
       dueSalary,
       bonus: Number(bonus) || 0,
-      totalDues
+      totalDues,
+      status: departureType
     });
   };
 
+  const isResigned = departureType === "resigned";
+  const themeColor = isResigned ? "amber" : "rose";
+
   return createPortal(
     <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(225,29,72,0.15)] w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-rose-500/20 outline-dashed outline-1 outline-rose-500/30 -outline-offset-8">
+      <div className={`bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-${themeColor}-500/20 outline-dashed outline-1 outline-${themeColor}-500/30 -outline-offset-8`}>
         
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="bg-rose-500/10 p-3 rounded-2xl border border-rose-500/20 shadow-[0_0_20px_rgba(225,29,72,0.2)]">
-               <UserMinus className="text-rose-500" size={28} />
+            <div className={`bg-${themeColor}-500/10 p-3 rounded-2xl border border-${themeColor}-500/20 shadow-[0_0_20px_rgba(0,0,0,0.2)]`}>
+               {isResigned ? <LogOut className={`text-${themeColor}-500`} size={28} /> : <UserX className="text-rose-500" size={28} />}
             </div>
             <div>
-              <h2 className="text-xl font-black text-white tracking-wide">إقالة موظف وتصفية حساب</h2>
-              <p className="text-sm font-bold text-rose-400 mt-1">{employee.name} - {employee.employeeId}</p>
+              <h2 className="text-xl font-black text-white tracking-wide">
+                {isResigned ? "تسجيل استقالة وتصفية حساب" : "إقالة موظف وتصفية حساب"}
+              </h2>
+              <p className={`text-sm font-bold text-${themeColor}-400 mt-1`}>{employee.name} - {employee.employeeId}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-white bg-[#263544] p-2.5 rounded-2xl transition-all active:scale-90">
@@ -129,10 +128,31 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
         <div className="p-8 sm:p-10 relative">
           
           <form onSubmit={handleNext} className={`grid grid-cols-1 gap-6 transition-all duration-500 ${step === 1 ? 'block animate-in slide-in-from-right-10' : 'hidden'}`}>
-            <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-2xl flex items-start gap-3 mb-2">
-              <AlertOctagon size={20} className="text-rose-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-rose-200 leading-relaxed font-bold">
-                أنت على وشك إنهاء خدمة الموظف المختار. يرجى إدخال تفاصيل الإقالة بدقة ليتم حفظها في الأرشيف وحساب المستحقات النهائية.
+            
+            <div>
+              <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">نوع إنهاء الخدمة</label>
+              <div className="flex gap-4">
+                <button 
+                  type="button" 
+                  onClick={() => setDepartureType("terminated")} 
+                  className={`flex-1 py-4 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${!isResigned ? "bg-rose-500/20 text-rose-500 border-2 border-rose-500" : "bg-[#1a2530] text-slate-500 border-2 border-transparent hover:bg-[#263544]"}`}
+                >
+                  <UserX size={18}/> إقالة (قرار إدارة)
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setDepartureType("resigned")} 
+                  className={`flex-1 py-4 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${isResigned ? "bg-amber-500/20 text-amber-500 border-2 border-amber-500" : "bg-[#1a2530] text-slate-500 border-2 border-transparent hover:bg-[#263544]"}`}
+                >
+                  <LogOut size={18}/> استقالة (طوعية)
+                </button>
+              </div>
+            </div>
+
+            <div className={`bg-${themeColor}-500/5 border border-${themeColor}-500/10 p-4 rounded-2xl flex items-start gap-3 mb-2`}>
+              <AlertOctagon size={20} className={`text-${themeColor}-500 shrink-0 mt-0.5`} />
+              <p className={`text-xs text-${themeColor}-200 leading-relaxed font-bold`}>
+                أنت على وشك {isResigned ? "تسجيل استقالة" : "إنهاء خدمة"} الموظف المختار. يرجى إدخال التفاصيل بدقة ليتم حفظها في الأرشيف وحساب المستحقات النهائية.
               </p>
             </div>
 
@@ -145,9 +165,9 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
             </div>
 
             <div>
-              <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">سبب الإقالة / الاستقالة</label>
+              <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">السبب</label>
               <div className="relative group">
-                <input type="text" required placeholder="مثال: انتهاء العقد، غياب متكرر، استقالة طوعية..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-bold pr-12 placeholder:text-slate-600" value={reason} onChange={(e) => setReason(e.target.value)} />
+                <input type="text" required placeholder={isResigned ? "مثال: ظروف شخصية، سفر..." : "مثال: انتهاء العقد، غياب متكرر..."} className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-bold pr-12 placeholder:text-slate-600" value={reason} onChange={(e) => setReason(e.target.value)} />
                 <AlertTriangle className="absolute right-4 top-4 text-slate-500" size={22} />
               </div>
             </div>
@@ -155,7 +175,7 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
             <div>
               <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">ملاحظات إضافية (اختياري)</label>
               <div className="relative group">
-                <textarea rows={3} placeholder="أي تفاصيل أخرى حول أداء الموظف أو أسباب تركه..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-bold pr-12 placeholder:text-slate-600 resize-none" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <textarea rows={3} placeholder="أي تفاصيل أخرى..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-bold pr-12 placeholder:text-slate-600 resize-none" value={notes} onChange={(e) => setNotes(e.target.value)} />
                 <FileText className="absolute right-4 top-4 text-slate-500" size={22} />
               </div>
             </div>
@@ -179,16 +199,16 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
             </div>
 
             <div>
-              <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">مكافأة نهاية الخدمة (إن وُجدت)</label>
+              <label className="block text-xs font-black text-[#E7C873] mb-2 uppercase">مكافأة أو خصم إضافي</label>
               <div className="relative group">
                 <input type="number" placeholder="0" className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-mono text-lg font-bold pr-12 placeholder:text-slate-600" value={bonus} onChange={(e) => setBonus(e.target.value)} />
                 <Coins className="absolute right-4 top-4 text-slate-500" size={22} />
               </div>
             </div>
 
-            <div className="bg-rose-500/10 p-6 rounded-2xl border border-rose-500/30 text-center mt-2 shadow-inner">
-              <p className="text-xs font-black text-rose-300 mb-1 uppercase tracking-widest">إجمالي المستحقات النهائية للصرف</p>
-              <p className="text-4xl font-mono font-black text-rose-500">{totalDues.toLocaleString()} <span className="text-sm font-bold text-rose-500/50">ل.س</span></p>
+            <div className={`bg-${themeColor}-500/10 p-6 rounded-2xl border border-${themeColor}-500/30 text-center mt-2 shadow-inner`}>
+              <p className={`text-xs font-black text-${themeColor}-300 mb-1 uppercase tracking-widest`}>إجمالي المستحقات النهائية للصرف</p>
+              <p className={`text-4xl font-mono font-black text-${themeColor}-500`}>{totalDues.toLocaleString()} <span className={`text-sm font-bold text-${themeColor}-500/50`}>ل.س</span></p>
             </div>
           </div>
         </div>
@@ -203,8 +223,9 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
                المستحقات <ChevronLeft size={18}/>
             </button>
           ) : (
-            <button disabled={isPending} onClick={handleConfirm} className="bg-rose-600 text-white px-10 py-3.5 rounded-xl font-black flex items-center gap-3 hover:bg-rose-700 active:scale-95 transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] disabled:opacity-50">
-              <UserMinus size={20}/> تأكيد الإقالة نهائياً
+            <button disabled={isPending} onClick={handleConfirm} className={`bg-${themeColor}-600 text-white px-10 py-3.5 rounded-xl font-black flex items-center gap-3 hover:bg-${themeColor}-700 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,0,0,0.4)] disabled:opacity-50`}>
+              {isResigned ? <LogOut size={20}/> : <UserMinus size={20}/>} 
+              {isResigned ? "تأكيد الاستقالة نهائياً" : "تأكيد الإقالة نهائياً"}
             </button>
           )}
         </div>

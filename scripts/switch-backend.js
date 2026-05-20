@@ -9,7 +9,9 @@
  *   node scripts/switch-backend.js remote   # Switch to remote/Railway backend
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 const envLocalPath = path.join(__dirname, '..', '.env.local');
