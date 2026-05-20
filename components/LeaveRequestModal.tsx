@@ -12,7 +12,7 @@ interface Props {
   employees: Employee[];
 }
 
-export default function LeaveRequestModal({ isOpen, onClose, employees }: Props) {
+function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -32,16 +32,6 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      // تفريغ الفورم عند الفتح
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setForm({
-        employeeId: "",
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0],
-        leaveType: "إجازة مرضية",
-        customReason: "",
-        isPaid: false,
-      });
     } else {
       document.body.style.overflow = "unset";
     }
@@ -142,7 +132,6 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                   <input 
                     type="date" required 
                     className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
-                    className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     value={form.startDate} 
                     onChange={(e) => setForm({...form, startDate: e.target.value})}
                   />
@@ -157,7 +146,6 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                   <input 
                     type="date" required 
                     min={form.startDate} // لا يمكن اختيار تاريخ قبل تاريخ البداية
-                    className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     className="w-full p-3 sm:p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-2 sm:pr-12 scheme-dark text-xs sm:text-sm transition-all"
                     value={form.endDate} 
                     onChange={(e) => setForm({...form, endDate: e.target.value})}
@@ -192,7 +180,6 @@ export default function LeaveRequestModal({ isOpen, onClose, employees }: Props)
                 <textarea 
                   required
                   placeholder="يرجى كتابة سبب الإجازة هنا..."
-                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-25 resize-none"
                   className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-25 resize-none"
                   value={form.customReason} 
                   onChange={(e) => setForm({...form, customReason: e.target.value})}
