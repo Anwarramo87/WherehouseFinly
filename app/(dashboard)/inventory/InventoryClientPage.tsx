@@ -627,7 +627,6 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {/* الأزرار العائمة والمودال */}
           <button
             onClick={() => {
               setSelectedItem(null);

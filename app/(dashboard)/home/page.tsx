@@ -17,12 +17,30 @@ import {
 import { useDashboard } from '@/hooks/useDashboard';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
+import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 // ============================================================================
 // TypeScript Interfaces
 // ============================================================================
+
+interface DepartmentData {
+  name: string;
+  manager?: string;
+  count: number;
+  originalName?: string;
+}
+
+interface AttendanceAlert {
+  employeeId: string;
+  name: string;
+  department: string;
+  status: 'absent' | 'late' | string;
+  scheduledStart: string;
+  checkIn?: string;
+  minutesLate: number;
+}
 
 interface OvertimeEmployee {
   employeeId: string;
@@ -167,30 +185,91 @@ export default function DashboardPage() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      if (type === 'present') {
-        const mockPresentData: PresentEmployee[] = [
-          { employeeId: 'EMP001', name: 'أحمد محمد علي', department: 'الخياطة', profession: 'خياط رئيسي', checkIn: '08:15', checkOut: null },
-          { employeeId: 'EMP005', name: 'فاطمة حسن الأحمد', department: 'القص', profession: 'عاملة قص', checkIn: '08:00', checkOut: '16:30' },
-        ];
-        setModalData(mockPresentData);
-      } else if (type === 'absent') {
-        const mockAbsentData: AbsentEmployee[] = [
-          { employeeId: 'EMP042', name: 'خالد عبدالله السيد', department: 'الكي', profession: 'عامل كي', scheduledStart: '08:00', lastCheckIn: '2026-04-24' },
-        ];
-        setModalData(mockAbsentData);
-      } else if (type === 'late') {
-        const mockLateData: LateEmployeeDetail[] = [
-          { employeeId: 'EMP015', name: 'محمد خالد الدين', department: 'الخياطة', profession: 'مشرف خط', scheduledStart: '08:00', checkIn: '08:23', minutesLate: 23 },
-          { employeeId: 'EMP028', name: 'سارة أحمد النجار', department: 'التعبئة', profession: 'مشرفة تعبئة', scheduledStart: '08:00', checkIn: '08:12', minutesLate: 12 },
-        ];
-        setModalData(mockLateData);
-      } else if (type === 'overtime') {
-        const mockOvertimeData: OvertimeEmployee[] = [
-          { employeeId: 'EMP012', name: 'محمد أحمد الخطيب', department: 'الخياطة', profession: 'خياط رئيسي', scheduledEnd: '16:00', actualCheckOut: '18:30', overtimeMinutes: 150, overtimeHours: 2.5, hourlyRate: 5000, overtimePay: 12500 },
-          { employeeId: 'EMP025', name: 'فاطمة حسن العلي', department: 'القص', profession: 'عاملة قص', scheduledEnd: '16:00', actualCheckOut: '17:45', overtimeMinutes: 105, overtimeHours: 1.75, hourlyRate: 4500, overtimePay: 7875 },
-          { employeeId: 'EMP033', name: 'علي محمود الشامي', department: 'الكي', profession: 'عامل كي', scheduledEnd: '16:00', actualCheckOut: '17:30', overtimeMinutes: 90, overtimeHours: 1.5, hourlyRate: 4000, overtimePay: 6000 },
-        ];
-        setModalData(mockOvertimeData);
+        if (type === 'present') {
+          const presentData: PresentEmployee[] = Array.from(byEmployee.entries())
+            .filter(([, entry]) => Boolean(entry.checkIn))
+            .map(([employeeId, entry]) => {
+              const employee = employeesById.get(employeeId);
+              return {
+                employeeId,
+                name: employee?.name || employeeId,
+                department: employee?.department || "",
+                profession: employee?.jobTitle || "",
+                checkIn: formatTime(entry.checkIn),
+                checkOut: entry.checkOut ? formatTime(entry.checkOut) : null,
+                avatar: undefined,
+              };
+            });
+          setModalData(presentData);
+        } else {
+          // التعديل الأول: تحديد نوع الإرجاع لـ map
+          const overtimeData: OvertimeEmployee[] = Array.from(byEmployee.entries())
+            .map(([employeeId, entry]): OvertimeEmployee | null => {
+              const employee = employeesById.get(employeeId);
+              if (!employee?.scheduledEnd || !entry.checkOut) return null;
+
+              const checkOutTime = formatTime(entry.checkOut);
+              const [scheduledH, scheduledM] = employee.scheduledEnd.split(":").map(Number);
+              const checkOutDate = new Date(entry.checkOut || "");
+              const scheduledMinutes = (scheduledH || 0) * 60 + (scheduledM || 0);
+              const actualMinutes = checkOutDate.getHours() * 60 + checkOutDate.getMinutes();
+              const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+              if (overtimeMinutes <= 0) return null;
+
+              const hourlyRate = toNumber(employee.hourlyRate);
+              const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+
+              return {
+                employeeId,
+                name: employee?.name || employeeId,
+                department: employee?.department || "",
+                profession: employee?.jobTitle || "",
+                scheduledEnd: employee.scheduledEnd,
+                actualCheckOut: checkOutTime,
+                overtimeMinutes,
+                overtimeHours,
+                hourlyRate,
+                overtimePay: Number((overtimeHours * hourlyRate).toFixed(0)),
+                avatar: undefined,
+              };
+            })
+            .filter((item): item is OvertimeEmployee => Boolean(item));
+
+          setModalData(overtimeData);
+        }
+      } else {
+        const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
+        
+        // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
+        const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
+
+        if (type === 'absent') {
+          const absentData: AbsentEmployee[] = alerts
+            .filter((alert) => alert.status === "absent")
+            .map((alert) => ({
+              employeeId: alert.employeeId,
+              name: alert.name,
+              department: alert.department,
+              profession: "",
+              scheduledStart: alert.scheduledStart,
+              avatar: undefined,
+            }));
+          setModalData(absentData);
+        } else if (type === 'late') {
+          const lateData: LateEmployeeDetail[] = alerts
+            .filter((alert) => alert.status === "late")
+            .map((alert) => ({
+              employeeId: alert.employeeId,
+              name: alert.name,
+              department: alert.department,
+              profession: "",
+              scheduledStart: alert.scheduledStart,
+              checkIn: formatTime(alert.checkIn),
+              minutesLate: alert.minutesLate,
+              avatar: undefined,
+            }));
+          setModalData(lateData);
+        }
       }
     } catch (error) {
       console.error('Error fetching modal data:', error);
@@ -259,12 +338,82 @@ export default function DashboardPage() {
         };
       });
   }, [advancesData, employees, monthKey]);
+  // --- حفظ وحذف الأقسام ---
+  const handleSaveDepartment = (data: DeptFormData) => {
+    if (data.originalName) {
+      setAddedDepartments(prev => 
+        prev.map(d => d.name === data.originalName ? { ...d, name: data.name, manager: data.manager } : d)
+      );
+    } else {
+      setAddedDepartments([...addedDepartments, { name: data.name, manager: data.manager, count: 0 }]);
+    }
+    setIsAddDeptModalOpen(false);
+    setEditingDept(null);
+  };
 
-  const recentPenalties: EmployeePenalty[] = [
-    { penaltyId: 'PEN-015', employeeId: 'EMP033', name: 'أحمد علي الحسن', department: 'الخياطة', profession: 'خياط', reason: 'تأخر متكرر (3 مرات في أسبوع)', severity: 'moderate', amount: 75000, date: '2026-04-20', issuedBy: 'مدير الموارد البشرية', status: 'active', notes: 'تحذير نهائي قبل الإجراء التأديبي' },
-    { penaltyId: 'PEN-012', employeeId: 'EMP047', name: 'ليلى محمد الشامي', department: 'القص', profession: 'عاملة قص', reason: 'إهمال في العمل أدى لتلف مواد', severity: 'severe', amount: 150000, date: '2026-04-18', issuedBy: 'مدير الإنتاج', status: 'active', notes: 'خصم من الراتب على دفعتين' },
-    { penaltyId: 'PEN-008', employeeId: 'EMP021', name: 'عمر خالد الدين', department: 'الكي', profession: 'عامل كي', reason: 'مخالفة قواعد السلامة', severity: 'minor', amount: 25000, date: '2026-04-15', issuedBy: 'مشرف السلامة', status: 'active', notes: 'تحذير شفهي مع خصم رمزي' },
-  ];
+  const handleDeleteDepartment = (deptName: string, count: number) => {
+    if (count > 0) return; 
+    if (window.confirm(`هل أنت متأكد من مسح قسم ${deptName}؟`)) {
+      setDeletedDepartments([...deletedDepartments, deptName]);
+      setAddedDepartments(prev => prev.filter(d => d.name !== deptName));
+    }
+  };
+
+  const monthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
+    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
+    return (Array.isArray(advancesData) ? advancesData : [])
+      .filter((advance) => {
+        const issueDate = advance.issueDate || advance.createdAt || "";
+        return issueDate.startsWith(monthKey);
+      })
+      .map((advance) => {
+        const employee = employeesById.get(advance.employeeId);
+        return {
+          advanceId: advance.id,
+          employeeId: advance.employeeId,
+          name: employee?.name || advance.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || "",
+          amount: toNumber(advance.totalAmount),
+          requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          remainingBalance: toNumber(advance.remainingAmount),
+          avatar: undefined,
+        };
+      });
+  }, [advancesData, employees, monthKey]);
+
+  const recentPenalties = useMemo<EmployeePenalty[]>(() => {
+    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
+    return (Array.isArray(penaltiesData) ? penaltiesData : [])
+      .slice(0, 5)
+      .map((penalty) => {
+        const employee = employeesById.get(penalty.employeeId);
+        return {
+          penaltyId: penalty.id,
+          employeeId: penalty.employeeId,
+          name: employee?.name || penalty.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || "",
+          reason: penalty.reason || penalty.category,
+          severity: "moderate",
+          amount: toNumber(penalty.amount),
+          date: (penalty.issueDate || "").slice(0, 10),
+          avatar: undefined,
+        };
+      });
+  }, [penaltiesData, employees]);
+
+  const departmentSummary = useMemo<DepartmentData[]>(() => {
+    const apiDepts = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+    const combined = [...apiDepts, ...addedDepartments].filter(d => !deletedDepartments.includes(d.name));
+    const uniqueDepts = Array.from(new Map(combined.map(item => [item.name, item])).values());
+    return uniqueDepts;
+  }, [employeesStats, addedDepartments, deletedDepartments]);
 
   const stats = [
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
@@ -407,7 +556,54 @@ export default function DashboardPage() {
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
                   <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
-                  <div className="relative z-10">
+                  
+                  {/* زر الثلاث نقاط (القائمة المنسدلة) */}
+                  <div className="absolute top-4 left-4 z-20">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenDropdownDept(openDropdownDept === dept.name ? null : dept.name);
+                      }}
+                      className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+
+                    {openDropdownDept === dept.name && (
+                      <div className="absolute left-0 top-full mt-1 w-32 bg-[#1a2530] border border-[#263544] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingDept({ 
+                              name: dept.name, 
+                              manager: dept.manager || "", 
+                              date: new Date().toISOString().split('T')[0],
+                              originalName: dept.name 
+                            });
+                            setIsAddDeptModalOpen(true);
+                            setOpenDropdownDept(null);
+                          }}
+                          className="flex items-center gap-2 p-2.5 text-sm text-white hover:bg-[#263544] w-full text-right transition-colors"
+                        >
+                          <Edit2 size={14} className="text-[#C89355]" /> تعديل
+                        </button>
+                        <button 
+                          disabled={dept.count > 0}
+                          title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDepartment(dept.name, dept.count);
+                            setOpenDropdownDept(null);
+                          }}
+                          className="flex items-center gap-2 p-2.5 text-sm text-rose-500 hover:bg-rose-500/10 w-full text-right transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={14} /> مسح
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative z-10 pr-2">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
                       <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">{dept.name}</h3>

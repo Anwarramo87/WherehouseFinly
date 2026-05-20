@@ -379,11 +379,11 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow) => {
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, createEmployee, updateEmployee } = useEmployees();
+  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees();
   
   // تصفية الموظفين النشطين
   const visibleEmployees = useMemo(
-    () => (employees || []).filter((emp) => emp.status !== "terminated"),
+    () => (employees || []).filter((emp) => emp.status !== "terminated" && emp.status !== "resigned"),
     [employees],
   );
   
@@ -488,16 +488,17 @@ export default function EmployeesPage() {
     }
   };
 
+  // الدالة المحدثة لاستقبال حالة الاستقالة أو الإقالة (بدون any)
   const handleConfirmFire = async (fireData: FireEmployeePayload) => {
     try {
-      const updateData: Partial<Employee> & { terminationDate?: string } = {
-        status: "terminated",
-        terminationDate: fireData.fireDate, 
-      };
-
-      await updateEmployee.mutateAsync({
+      await terminateEmployee.mutateAsync({
         id: fireData.employeeId,
-        data: updateData as Partial<Employee>,
+        data: {
+          terminationDate: new Date(fireData.fireDate).toISOString(),
+          terminationReason: fireData.reason,
+          notes: fireData.notes,
+          status: fireData.status // إرسال حالة الاستقالة أو الإقالة
+        }
       });
       setIsFireModalOpen(false);
       setEmployeeToFire(null);
@@ -643,7 +644,7 @@ export default function EmployeesPage() {
                             <button 
                               onClick={() => { setEmployeeToFire(emp); setIsFireModalOpen(true); }}
                               className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
-                              title="إقالة الموظف"
+                              title="إنهاء خدمة موظف"
                             >
                               <UserMinus size={16} />
                             </button>
@@ -677,7 +678,7 @@ export default function EmployeesPage() {
                onClose={() => { setIsFireModalOpen(false); setEmployeeToFire(null); }}
                employee={employeeToFire}
                onConfirm={handleConfirmFire}
-               isPending={updateEmployee.isPending}
+               isPending={terminateEmployee.isPending}
             />
           )}
 

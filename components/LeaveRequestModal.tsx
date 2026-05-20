@@ -12,19 +12,17 @@ interface Props {
   employees: Employee[];
 }
 
-const buildDefaultForm = () => ({
-  employeeId: "",
-  startDate: new Date().toISOString().split('T')[0],
-  endDate: new Date().toISOString().split('T')[0],
-  leaveType: "إجازة مرضية",
-  customReason: "",
-  isPaid: false,
-});
-
 function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [form, setForm] = useState(buildDefaultForm);
+  const [form, setForm] = useState({
+    employeeId: "",
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    leaveType: "إجازة مرضية",
+    customReason: "",
+    isPaid: false,
+  });
 
   const LEAVES_ENDPOINT = "/leaves";
   const USE_MOCK_API = true;
@@ -40,7 +38,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +85,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
   return createPortal(
     <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10  outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
+      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 outline-offset-8">
         
         {/* Header */}
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
