@@ -117,10 +117,30 @@ export default function AttendancePage() {
     return map;
   }, [employees]);
 
-  const rows = useMemo(() => {
+const rows = useMemo(() => {
     const dateRange = getDateRange(selectedDate, selectedDate);
-    const daily = data?.dailyRecords || [];
-    const byKey = new Map(daily.map((item) => [item.key, item]));
+    // 1. قراءة البيانات من records بدلاً من dailyRecords
+    const rawRecords = data?.records || []; 
+    
+    // 2. تجميع البصمات المبعثرة (IN / OUT) لكل موظف في اليوم
+    const byKey = new Map();
+    
+    rawRecords.forEach((record: any) => {
+      const key = `${record.employeeId}-${record.date}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, { key, checkIn: "", checkOut: "", source: record.source });
+      }
+      const entry = byKey.get(key);
+      
+      // استخراج الوقت (ساعات ودقائق) من الـ timestamp
+      const timeString = new Date(record.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      
+      if (record.type === 'IN') entry.checkIn = timeString;
+      if (record.type === 'OUT') entry.checkOut = timeString;
+      // نأخذ المصدر بناءً على آخر بصمة
+      entry.source = record.source;
+    });
+
     const employeeIds = new Set<string>();
     (employees || []).forEach((e) => {
       if (e?.employeeId && EMPLOYEE_ID_REGEX.test(e.employeeId)) employeeIds.add(e.employeeId);
@@ -149,7 +169,7 @@ export default function AttendancePage() {
       }
     }
     return tableRows.sort((a, b) => `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`));
-  }, [data?.dailyRecords, employees, selectedDate, employeeNameMap, employeeScheduleMap]);
+  }, [data?.records, employees, selectedDate, employeeNameMap, employeeScheduleMap]);
 
   const stats = useMemo(() => {
     return rows.reduce(
@@ -186,24 +206,31 @@ export default function AttendancePage() {
     setTimeModal({ isOpen: true, row, field, value: defaultValue });
   };
 
-  const handleSaveTime = () => {
+const handleSaveTime = () => {
     const { row, field, value } = timeModal;
     if (!row || !field) return;
     if (!value) { window.alert("الرجاء إدخال الوقت"); return; }
+    
     const normalizedValue = normalizeHHmm(value);
     if (!HH_MM_REGEX.test(normalizedValue)) {
       window.alert("صيغة الوقت غير صحيحة. الرجاء استخدام HH:mm");
       return;
     }
+
+    // Pass the data exactly as the hook expects it.
     markAttendance.mutate({
       employeeId: row.employeeId,
       date: row.date,
+      // If the field is checkIn, assign normalizedValue to checkIn, else undefined
       checkIn: field === "checkIn" ? normalizedValue : undefined,
+      // If the field is checkOut, assign normalizedValue to checkOut, else undefined
       checkOut: field === "checkOut" ? normalizedValue : undefined,
       source: "manual",
     });
+    
     setTimeModal({ isOpen: false, row: null, field: null, value: "" });
   };
+
 
   if (isLoading || employeesLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
