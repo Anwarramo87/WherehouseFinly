@@ -55,7 +55,7 @@ export const useRoles = () => {
       const response = await apiClient.get("/auth/roles");
       return resolveRoles(response.data);
     },
-    staleTime: QUERY_STALE_TIME.RELAXED,
+    staleTime: 10 * 60 * 1000,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 };

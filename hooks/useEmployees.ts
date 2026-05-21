@@ -71,7 +71,7 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 
   // التعديل الأول: إخفاء المستقيلين والمقالين من القائمة الرئيسية
   if (shouldExcludeTerminated) {
-    return employees.filter((employee) => employee.status !== "terminated" && employee.status !== "resigned");
+    return employees.filter((employee) => employee.status !== "terminated");
   }
 
   return employees;
@@ -211,7 +211,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
   // 5. إقالة أو استقالة موظف
   const terminateMutation = useMutation({
     // 👇 التعديل صار هون: ضفنا status للنوع المطلوب 👇
-    mutationFn: async ({ id, data }: { id: string; data: { terminationDate: string; terminationReason: string; notes?: string; status: "terminated" | "resigned" } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { terminationDate: string; terminationReason: string; notes?: string; status: "terminated" } }) => {
       return await apiClient.patch(`/employees/${id}/terminate`, data);
     },
     onSuccess: () => {

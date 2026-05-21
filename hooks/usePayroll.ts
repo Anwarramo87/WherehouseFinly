@@ -30,7 +30,7 @@ export const usePayrollSummary = (period?: { start?: string; end?: string }) => 
       const res = await apiClient.get("/payroll/summary", { params: { periodStart: period?.start, periodEnd: period?.end } });
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 };
@@ -42,7 +42,7 @@ export const usePayrollList = (params?: { page?: number; limit?: number; status?
       const res = await apiClient.get("/payroll", { params });
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 };
@@ -59,7 +59,7 @@ export const usePayroll = (params?: { page?: number; limit?: number; status?: st
         pagination: res.data?.pagination,
       };
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

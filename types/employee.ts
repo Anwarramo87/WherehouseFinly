@@ -16,7 +16,7 @@ export interface Employee {
   profession?: string;
   jobTitle?: string;
   roleId?: string;
-  status?: 'active' | 'inactive' | 'on_leave' | 'terminated' | 'resigned';
+  status?: 'active' | 'inactive' | 'terminated';
   isSettled?: boolean; // تم تصفية حقوق الموظف (للموظفين المقالين/المستقيلين)
   // الراتب يأتي من الباك إند كـ Decimal، وغالباً يصل للفرونت كـ string أو كائن
   hourlyRate?: number | string | { $numberDecimal: string };

@@ -38,7 +38,7 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
       });
       return Array.isArray(res.data) ? res.data : [];
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
