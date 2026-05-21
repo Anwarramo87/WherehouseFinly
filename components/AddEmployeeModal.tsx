@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
@@ -67,6 +67,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const [mobileError, setMobileError] = useState("");
   const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const hasInitializedRole = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -102,10 +103,14 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   });
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (!formData.roleId && roleOptions.length > 0) {
+    if (!isOpen) {
+      hasInitializedRole.current = false;
+      return;
+    }
+    if (!hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
       setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
       setRoleError("");
+      hasInitializedRole.current = true;
     }
   }, [isOpen, roleOptions, formData.roleId]);
 

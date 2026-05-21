@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, ChevronLeft, Fingerprint, PencilLine, Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck, CalendarPlus } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, Fingerprint, PencilLine, Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { useAttendance } from "@/hooks/useAttendance";
+import { useAttendance, type AttendanceRecord } from "@/hooks/useAttendance";
 import { useEmployees } from "@/hooks/useEmployees";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
 import { timeNow, toLocalDateString } from "@/lib/date-time";
@@ -125,7 +125,7 @@ const rows = useMemo(() => {
     // 2. تجميع البصمات المبعثرة (IN / OUT) لكل موظف في اليوم
     const byKey = new Map();
     
-    rawRecords.forEach((record: any) => {
+    rawRecords.forEach((record: AttendanceRecord) => {
       const key = `${record.employeeId}-${record.date}`;
       if (!byKey.has(key)) {
         byKey.set(key, { key, checkIn: "", checkOut: "", source: record.source });

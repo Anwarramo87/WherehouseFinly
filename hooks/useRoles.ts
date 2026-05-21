@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 
+// Use QUERY_STALE_TIME for consistency
+const STALE_TIME = QUERY_STALE_TIME.STANDARD;
+
 export type RoleOption = {
   id: string;
   name: string;
@@ -55,7 +58,7 @@ export const useRoles = () => {
       const response = await apiClient.get("/auth/roles");
       return resolveRoles(response.data);
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIME,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 };
