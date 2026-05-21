@@ -130,7 +130,7 @@ export default function PayrollPage() {
       const XLSX = await import("xlsx");
       const rows: Array<Record<string, string | number>> = filteredPayrollData.map((item, index) => ({
         "#": index + 1,
-        "كود الموظف": item.employeeId,
+        " اسم الظاهرالموظف": item.employeeId,
         "اسم الموظف": item.employeeName,
         "الأرباح الثابتة": Number(item.fixedEarnings.toFixed(2)),
         "الأرباح المتغيرة": Number(item.variableEarnings.toFixed(2)),

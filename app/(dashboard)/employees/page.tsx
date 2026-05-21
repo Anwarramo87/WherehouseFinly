@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees } from "@/hooks/useEmployees";
+import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
 import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
@@ -118,11 +119,25 @@ export default function EmployeesPage() {
 
   const handleSaveEmployee = async (formData: AddEmployeeFormData) => {
     const normalizedEmployeeId = formData.employeeId.trim();
-    const payload: Partial<Employee> & { username?: string } = {
+    const monthlySalary = toNumber(formData.monthlySalary);
+    const maxHourlyRate = 99999999.99;
+    const maxMonthlySalary = maxHourlyRate * 26 * 8;
+
+    if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
+      toast.error("الراتب الأساسي مطلوب ويجب أن يكون رقمًا صالحًا");
+      return;
+    }
+
+    if (monthlySalary > maxMonthlySalary) {
+      toast.error("الراتب الأساسي كبير جدًا");
+      return;
+    }
+
+    const payload: Partial<Employee> & { username?: string, dateOfBirth?: string, baseSalary?: number } = {
       employeeId: normalizedEmployeeId,
       name: formData.name.trim(),
       mobile: formData.mobile.trim() || undefined,
-      birthDate: formData.birthDate || undefined,
+      dateOfBirth: formData.birthDate || undefined,
       gender: formData.gender || undefined,
       department: formData.department || undefined,
       profession: formData.jobTitle || undefined,
@@ -130,7 +145,7 @@ export default function EmployeesPage() {
       roleId: formData.roleId || undefined,
       scheduledStart: formData.scheduledStart || undefined,
       scheduledEnd: formData.scheduledEnd || undefined,
-      hourlyRate: toNumber(formData.monthlySalary),
+      baseSalary: monthlySalary || undefined,
     };
 
     if (!selectedEmployee) {
