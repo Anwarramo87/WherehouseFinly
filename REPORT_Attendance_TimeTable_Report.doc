@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="generator" content="generated-by-copilot" />
+<title>تقرير مفصل - تدفق بيانات الحضور والدوام</title>
+<style>
+body { font-family: 'Arial', 'Tahoma', sans-serif; direction: rtl; line-height: 1.6; color: #111; }
+h1,h2,h3 { color: #1a3; }
+.section { margin-bottom: 18px; }
+.subtle { color: #555; font-size: 0.95em }
+.code { font-family: Consolas, monospace; background:#f4f4f4; padding:6px; border-radius:4px; display:block }
+</style>
+</head>
+<body>
+<h1>تقرير تفصيلي: آليات نقل البيانات بين صفحات الحضور (attendance) وسجل الدوام (timeTable)</h1>
+<p class="subtle">التاريخ: 21 مايو 2026<br/>المشروع: Factory (فرونت — مجلد <code>factory/</code>)</p>
+
+<div class="section">
+<h2>الملخّص التنفيذي</h2>
+<p>هذا التقرير يوضح كل العمليات التي يتبعها الواجهة الأمامية (front-end) لنقل وطلب بيانات الحضور والدوام، مصادر كل بيانات لكل صفحة/مكوّن، وكيفية الكتابة والتعديل على سجلات الحضور. كما يفحص هندلة الأخطاء في الفرونت ويقدّم ملاحظات عملية وتحسينات. تم أيضاً إجراء تعديل صغير لتحسين عرض أخطاء جلب بيانات المودال الشهري للموظف.</p>
+</div>
+
+<div class="section">
+<h2>الملفات الأساسية التي تم فحصها</h2>
+<ul>
+<li><code>app/(dashboard)/attendance/page.tsx</code> — صفحة عرض وتعديل سجلات الحضور</li>
+<li><code>hooks/useAttendance.ts</code> — هوك React Query المسؤول عن جلب/حفظ/تعديل سجلات الحضور</li>
+<li><code>components/EmployeeMonthlyCalendarModal.tsx</code> — مودال التقويم الشهري (تفاصيل يومية + إجازات)</li>
+<li><code>hooks/useEmployees.ts</code> — هوك جلب معلومات الموظفين</li>
+<li><code>hooks/usePayrollInputs.ts</code> — هوك جلب مجاميع الدوام الشهرية (payroll inputs)</li>
+<li><code>components/LeaveRequestModal.tsx</code> — واجهة إرسال طلبات إجازة</li>
+<li><code>lib/api-client.ts</code> — axios client مع interceptors (401 handling)</li>
+<li><code>lib/realtime/attendance-socket.ts</code> — اتصال socket.io للتحديثات الفورية</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>مخطط تدفق البيانات — من الفرونت إلى الباك وبالعكس</h2>
+
+<h3>1) صفحة الحضور (attendance/page.tsx)</h3>
+<ul>
+<li>مصادر البيانات:
+  <ul>
+    <li><strong>قائمة الموظفين:</strong> عبر <code>useEmployees</code> الذي يستدعي GET <code>/employees</code>.</li>
+    <li><strong>سجلات الحضور:</strong> عبر <code>useAttendance</code> الذي يستدعي GET <code>/attendance</code> مع params (مثل <code>employeeId</code>, <code>date</code>, <code>startDate</code>, <code>endDate</code>, <code>limit</code>).</li>
+  </ul>
+</li>
+<li>تحديثات فورية: يتم فتح socket عبر <code>getAttendanceSocket()</code> متصل بالمسار <code>${API_BASE}/realtime</code> ويستمع لحدث <code>attendanceUpdate</code>. عند وصول حدث، تُعرض رسالة وتُدعى React Query لإعادة جلب بيانات الحضور (<code>invalidateQueries/refetchQueries</code>).</li>
+<li>تعديل/حفظ زمني يدوي: عند حفظ وقت (checkIn/checkOut) تُستدعى الدالة <code>markAttendance</code> في <code>useAttendance</code>:
+  <ul>
+    <li>تفحص إن كان يوجد سجل IN/OUT لنفس الموظف لليوم: GET <code>/attendance/employee/{employeeId}/date/{date}</code>.</li>
+    <li>بناء على الوجود: إما PUT <code>/attendance/:id</code> لتعديل أو POST <code>/attendance</code> لإنشاء.</li>
+    <li>قبل الإرسال تُجرى optimistic update على cache ثم تُسترجع الحالة الأصلية عند الفشل.</li>
+  </ul>
+</li>
+<li>صيغة الـ payload: سجلات الحضور ترسل عادةً كـ JSON مع حقول: <code>{ employeeId, timestamp, date, type: 'IN'|'OUT', source?, deviceId?, location?, notes? }</code>. التاريخ/الوقت يُعبّران غالباً عبر حقل timestamp مع Zone-offset (مثلاً <code>YYYY-MM-DDTHH:mm:00+03:00</code>) مبني بواسطة الدالة المحلية <code>buildTimestampFromDateAndTime</code>.</li>
+</ul>
+
+<h3>2) صفحة سجل الدوام (timeTable/page.tsx)</h3>
+<ul>
+<li>مصادر البيانات:
+  <ul>
+    <li>قائمة الموظفين من <code>useEmployees</code> (GET <code>/employees</code>).</li>
+    <li>مدخلات الرواتب/المجاميع الشهرية من <code>usePayrollInputs(periodStart, periodEnd)</code> (GET <code>/payroll/inputs</code>).</li>
+  </ul>
+</li>
+<li>الصفحة تعرض المجاميع الشهرية (أيام غياب، دقائق تأخير، دقائق إضافي، إلخ) ولا تستدعي <code>/attendance</code> مباشرة لأنها تعتمد على مدخلات الرواتب التي يُفترض أن الباك يجمعها.</li>
+<li>من المكونات الفرعية يُفتح <code>EmployeeMonthlyCalendarModal</code> لعرض تفاصيل اليومية لكل موظف (وهذا المودال يطلب سجلات الحضور مباشرة عبر <code>/attendance?employeeId&startDate&endDate</code>).</li>
+</ul>
+
+<h3>3) مودال التقويم الشهري (EmployeeMonthlyCalendarModal)</h3>
+<ul>
+<li>يطلب:
+  <ul>
+    <li>GET <code>/attendance?employeeId&startDate&endDate&limit=200</code> — لتحميل سجلات الحضور للموظف للشهر.</li>
+    <li>GET <code>/leave-requests?employeeId&status=APPROVED</code> — لتحميل الإجازات المعتمدة لمطابقة أيام الغياب.</li>
+  </ul>
+</li>
+<li>يعالج الـ records المتلقاة ويتوقع أن كل record قد يحتوي على حقل اختياري <code>shiftPair</code> مع معلومات مثل <code>minutesLate</code> و <code>hoursWorked</code>، ويستخدم هذه الحقول لتحديد الحالة (حاضر/متأخر) وحساب الأوفرتايم.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>قائمة الـ Endpoints المستخدمة (من الواجهة)</h2>
+<ul>
+<li>GET /attendance</li>
+<li>GET /attendance/employee/:employeeId/date/:date</li>
+<li>POST /attendance</li>
+<li>PUT /attendance/:id</li>
+<li>GET /employees</li>
+<li>POST /employees, PUT /employees/:id, PATCH /employees/:id/terminate, PATCH /employees/:id/settle</li>
+<li>GET /payroll/inputs</li>
+<li>POST /payroll/inputs</li>
+<li>GET /leave-requests</li>
+<li>POST /leave-requests</li>
+<li>Socket.io realtime: <code>${API_BASE}/realtime</code> — emits <code>attendanceUpdate</code></li>
+</ul>
+</div>
+
+<div class="section">
+<h2>فحوصات هندلة الأخطاء (Audit)</h2>
+
+<h3>ما هو الجيّد</h3>
+<ul>
+<li>هوك <code>useAttendance</code> يحتوي على <code>getErrorMessage</code> يحاول استخراج رسالة صالحة من ردود Axios ويعطي رسائل fallback مفيدة.</li>
+<li>الـ axios client (`lib/api-client.ts`) يعالج 401 بإزالة الجلسة وإعادة التوجيه للـ /login — سلوك متوقع للحماية.</li>
+<li>عمليات حفظ الحضور (`markAttendance`) تستخدم optimistic updates وتسترجع الحالة عند الفشل — هذا يقلل طنين الواجهة للمستخدم.</li>
+</ul>
+
+<h3>النواقص والفرص للتحسين</h3>
+<ul>
+<li><strong>غياب واجهة إعادة المحاولة الواضحة:</strong> صفحة الحضور لا تعرض زرًا واضحًا لإعادة المحاولة عند فشل الفيتش (رغم إمكانية استدعاء refetch من React Query).</li>
+<li><strong>مودال التقويم قبل التعديل:</strong> لم يكن يتعامل مع حالة الخطأ (`isError`) لأيٍ من الاستعلامين (attendance, leave-requests) مما قد يترك المستخدم مع شاشة فارغة أو لود بلا نهاية.</li>
+<li><strong>تفاصيل أخطاء الشبكة:</strong> لا توجد سياسة retry أو backoff في `api-client` لطلبات GET الحساسة؛ إضافة axios-retry يمكن أن يساعد مع حالات 5xx/429 المؤقتة.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>التعديل الذي نفذته الآن</h2>
+<ul>
+<li>الملف: <code>components/EmployeeMonthlyCalendarModal.tsx</code></li>
+<li>التغيير: قرأت حقول <code>isError, error, refetch</code> للاستعلامين (attendance و leaves) وأضافت بلوك عرض خطأ عندما يفشل أي منهما، مع زر "حاول مرة أخرى" يستدعي <code>refetch()</code> لكل الاستعلامين، وزر "إغلاق".</li>
+<li>الهدف: تحسين تجربة المستخدم عند فشل جلب بيانات الشهر بدلاً من ترك شاشة لا تستجيب.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>الافتراضات وحدود الفحص</h2>
+<ul>
+<li>لم أتمكّن من فتح كود الباك في المجلد <code>werehouse/backend-nest</code> لأن المجلد خارج نطاق مساحة العمل المسموح بقراءتها هنا. لذلك الاستنتاجات حول endpoints وحقول مثل <code>shiftPair</code> مستخرجة من نداءات الفرونت (ماذا يتوقع الفرونت أن يعيد الباك) وليس من قراءة كود الباك الحقيقي.</li>
+<li>إن أردتم تحققاً بعمق (عن مصدر <code>shiftPair</code> أو كيفية احتساب <code>minutesLate</code> في الباك)، احتجت وصولًا إلى controllers/services في الـ backend أو مقتطفات API docs.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>التوصيات الفورية (قابلة للتنفيذ خلال بضع ساعات)</h2>
+<ol>
+<li>إضافة زر "إعادة المحاولة" في صفحة الحضور عند isError، واستدعاء <code>refetch</code> من React Query.</li>
+<li>إضافة سياسة retry في <code>api-client</code> (مثلاً axios-retry) لطلبات GET مع backoff للخطأ المؤقت، مع إمكانية تعطيلها للـ write endpoints.</li>
+<li>توثيق API (OpenAPI/Swagger أو ملف MD) يبيّن شكل ردود <code>/attendance</code> وشرح ما إذا كانت حقول مثل <code>shiftPair</code> تُحسب للواجهة أم تُوفّر من الباك.</li>
+<li>إن أمكن، افتح لي ملفات الـ backend أو أرسل مقتطفات controllers المتعلقة بـ attendance و payroll و leave-requests لأُكمِل الربط التقني بدقة.
+</li>
+</ol>
+</div>
+
+<div class="section">
+<h2>الملفات التي عدلتها</h2>
+<ul>
+<li><code>components/EmployeeMonthlyCalendarModal.tsx</code> — أضفت عرض خطأ و buttons لإعادة المحاولة.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>الخطوات التالية المقترحة مني</h2>
+<ol>
+<li>أريد منك اختيار أحد الخيارات:
+  <ul>
+    <li>أ. أطبق نفس تحسين عرض الخطأ وإعادة المحاولة في صفحة الحضور (`attendance/page.tsx`) الآن.</li>
+    <li>ب. إذا تود نسخة .docx فعلية بدل ملف .doc (HTML داخل) أستطيع محاولة توليد .docx أو تحويل الملف باستخدام أدوات (أحتاج إذن لتشغيل أدوات تثبيت أو توفر بيئة تحويل).</li>
+    <li>ج. تمنحني وصولًا لملفات الباك في `werehouse/backend-nest/src` لأُعد تقريرًا يربط الحقول والـ controllers بشكل دقيق.</li>
+  </ul>
+</li>
+<li>بمجرد اختيارك أطبق التغيير وأؤكد البناء/الفحص السريع إن لزم.</li>
+</ol>
+</div>
+
+<footer style="margin-top:18px; border-top:1px solid #eee; padding-top:10px;">
+<p class="subtle">تم توليد هذا الملف داخل مجلد المشروع. المسار: <code>factory/REPORT_Attendance_TimeTable_Report.doc</code></p>
+</footer>
+</body>
+</html>
