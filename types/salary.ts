@@ -33,6 +33,9 @@ export interface Salary {
   /** التأمينات (خصم) — Canonical */
   insuranceAmount?: number;
 
+  /** فرق التقريب (إختياري) - الفرق بين صافي الراتب المحسوب وصافي الراتب المقرب */
+  roundingDifference?: number;
+
   // --------------- Deprecated aliases kept for backward compatibility ---------------
   /** @deprecated Use extraEffortAllowance */
   extraEffort?: number;

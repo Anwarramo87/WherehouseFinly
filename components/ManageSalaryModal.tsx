@@ -7,7 +7,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  X, Loader2, Save, Coins, Zap, Shield, Search,
+  X, Loader2, Save, Coins, Shield, Search,
   Wallet, Truck, Lock
 } from "lucide-react";
 import type { Employee } from "@/types/employee";
@@ -16,14 +16,13 @@ import type { Salary } from "@/types/salary";
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
 const salarySchema = z.object({
   employeeId:        z.string().min(1, "الرجاء اختيار الموظف"),
-  baseSalary:        z.number({ message: "أدخل رقماً صحيحاً" }).min(1, "الراتب الأساسي مطلوب"),
-  lumpSumSalary:     z.number().min(0),
-  livingAllowance:   z.number().min(0),
-  transportAllowance: z.number().min(0),
-  insuranceAmount:   z.number().min(0),
+  baseSalary:        z.preprocess((val) => (val === "" || Number.isNaN(val) ? undefined : Number(val)), z.number({ required_error: "الراتب الأساسي مطلوب" }).min(1, "الراتب الأساسي مطلوب")),
+  livingAllowance:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
+  transportAllowance: z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
+  insuranceAmount:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
 }).refine(
-  (d) => (d.lumpSumSalary ?? 0) + (d.livingAllowance ?? 0) <= d.baseSalary,
-  { message: "مجموع الراتب المقطوع وبدل المعيشة يتجاوز الراتب الكلي", path: ["lumpSumSalary"] }
+  (d) => (d.livingAllowance ?? 0) <= (d.baseSalary ?? 0),
+  { message: "بدل المعيشة يتجاوز الراتب الأساسي", path: ["livingAllowance"] }
 );
 
 type SalaryFormValues = z.infer<typeof salarySchema>;
@@ -36,7 +35,6 @@ export type SalaryPayload = {
   livingAllowance: number;
   transportAllowance: number;
   insuranceAmount: number;
-  // Hardcoded to 0 - these are now managed in Rewards/Bonuses module:
   responsibilityAllowance: number;
   extraEffortAllowance: number;
   productionIncentive: number;
@@ -60,6 +58,9 @@ const toNum = (val: unknown): number => {
   }
   return Number(val || 0);
 };
+
+// دالة لجعل القيمة فارغة في الواجهة إذا كانت صفر
+const emptyIfZero = (val: number | undefined) => (val === 0 || val === undefined) ? ("" as unknown as number) : val;
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 function ManageSalaryModalContent({
@@ -91,16 +92,15 @@ function ManageSalaryModalContent({
 
   const defaultValues = {
     employeeId: resolvedEmployeeId,
-    baseSalary: initialBaseSalary,
-    lumpSumSalary: toNum(initialData?.lumpSumSalary) || 0,
-    livingAllowance: toNum(initialData?.livingAllowance) || 0,
-    transportAllowance: toNum(initialData?.transportAllowance) || 0,
-    insuranceAmount: toNum(initialData?.insuranceAmount) || 0,
+    baseSalary: emptyIfZero(initialBaseSalary),
+    livingAllowance: emptyIfZero(toNum(initialData?.livingAllowance)),
+    transportAllowance: emptyIfZero(toNum(initialData?.transportAllowance)),
+    insuranceAmount: emptyIfZero(toNum(initialData?.insuranceAmount)),
   };
 
   // ─── React Hook Form ─────────────────────────────────────────────────────────
   const {
-    control, register, handleSubmit, setValue,
+    control, handleSubmit, setValue,
     formState: { errors },
   } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
@@ -152,11 +152,10 @@ function ManageSalaryModalContent({
     const payload: SalaryPayload = {
       profession:             initialData?.profession ?? "",
       baseSalary:             Math.round(Number(values.baseSalary ?? 0)),
-      lumpSumSalary:          Math.round(Number(values.lumpSumSalary ?? 0)),
+      lumpSumSalary:          0, // تم التصفير الثابت لراتب المقطوع
       livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
       transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
       insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
-      // Hardcoded to 0 - managed in Rewards/Bonuses module:
       responsibilityAllowance: 0,
       extraEffortAllowance:    0,
       productionIncentive:     0,
@@ -170,28 +169,77 @@ function ManageSalaryModalContent({
     void handleSubmit(onSubmit)(event);
   };
 
-  // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
+  // Live total display
   const baseSalary = useWatch({ control, name: "baseSalary" });
-  const lumpSumSalary = useWatch({ control, name: "lumpSumSalary" });
   const livingAllowance = useWatch({ control, name: "livingAllowance" });
   const transportAllowance = useWatch({ control, name: "transportAllowance" });
   const insuranceAmount = useWatch({ control, name: "insuranceAmount" });
   
   const netTotal =
     Number(baseSalary || 0) +
-    Number(lumpSumSalary || 0) +
     Number(livingAllowance || 0) +
     Number(transportAllowance || 0) -
     Number(insuranceAmount || 0);
 
   // ─── Shared input class ───────────────────────────────────────────────────────
   const inputCls = (hasErr?: boolean) =>
-    `w-full p-4 bg-[#101720] border ${hasErr ? "border-rose-500" : "border-[#263544]"} rounded-2xl focus:border-[#C89355] outline-none text-white text-lg font-mono font-black pr-12 shadow-inner transition-colors`;
+    `w-full p-4 bg-[#101720] border ${hasErr ? "border-rose-500" : "border-[#263544]"} rounded-2xl focus:border-[#C89355] outline-none text-white text-lg font-mono font-black pr-12 shadow-inner transition-colors placeholder:text-slate-600/50`;
+
+  // ─── Helper: Custom Input Renderer for Currency ───────────────────────────────
+  const renderFormattedNumberInput = (
+    fieldName: keyof SalaryFormValues,
+    IconComponent: React.ComponentType<{ className?: string; size?: number }>,
+    hasError: boolean,
+    isInsurance: boolean = false
+  ) => {
+    return (
+      <Controller
+        name={fieldName}
+        control={control}
+        render={({ field: { onChange, value, ref, onBlur } }) => {
+          // تحويل القيمة لنص منسق بالفواصل
+          const displayValue = (value === 0 || value === "" || value === undefined || Number.isNaN(value))
+            ? ""
+            : Number(value).toLocaleString("en-US");
+
+          const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            // إزالة أي شيء غير الأرقام
+            const rawValue = e.target.value.replace(/\D/g, ""); 
+            if (rawValue === "") {
+              onChange("");
+            } else {
+              onChange(Number(rawValue));
+            }
+          };
+
+          const fieldCls = isInsurance
+            ? `w-full p-4 bg-rose-500/5 border ${hasError ? "border-rose-500" : "border-rose-500/20"} rounded-2xl focus:border-rose-500 outline-none text-rose-400 text-lg font-mono font-black pr-12 shadow-inner transition-colors placeholder:text-rose-500/30 text-right`
+            : `${inputCls(hasError)} text-right`;
+
+          return (
+            <div className="relative group">
+              <input
+                type="text"
+                dir="ltr" // مهم جداً ليحافظ على اتجاه الأرقام أثناء الكتابة
+                ref={ref}
+                value={displayValue}
+                onChange={handleChange}
+                onBlur={onBlur}
+                placeholder="0"
+                className={fieldCls}
+              />
+              <IconComponent className={`absolute right-4 top-4.5 pointer-events-none ${isInsurance ? 'text-rose-500/50 group-focus-within:text-rose-500' : 'text-slate-500 group-focus-within:text-[#C89355]'}`} size={22} />
+            </div>
+          );
+        }}
+      />
+    );
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return createPortal(
     <div
-      className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
+      className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
@@ -282,29 +330,8 @@ function ManageSalaryModalContent({
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
                   الراتب الأساسي الكلي (ل.س) <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative group">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    className={inputCls(!!errors.baseSalary)}
-                    {...register("baseSalary", { valueAsNumber: true })}
-                  />
-                  <Coins className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
-                </div>
+                {renderFormattedNumberInput("baseSalary", Coins, !!errors.baseSalary)}
                 {errors.baseSalary && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.baseSalary.message}</p>}
-              </div>
-
-              {/* lumpSumSalary */}
-              <div>
-                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
-                  الراتب المقطوع (ل.س)
-                </label>
-                <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.lumpSumSalary)} {...register("lumpSumSalary", { valueAsNumber: true })} />
-                  <Zap className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
-                </div>
-                {errors.lumpSumSalary && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.lumpSumSalary.message}</p>}
               </div>
 
               {/* livingAllowance */}
@@ -312,10 +339,7 @@ function ManageSalaryModalContent({
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
                   بدل المعيشة (ل.س)
                 </label>
-                <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.livingAllowance)} {...register("livingAllowance", { valueAsNumber: true })} />
-                  <Shield className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
-                </div>
+                {renderFormattedNumberInput("livingAllowance", Shield, !!errors.livingAllowance)}
                 {errors.livingAllowance && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.livingAllowance.message}</p>}
               </div>
 
@@ -324,40 +348,28 @@ function ManageSalaryModalContent({
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
                   بدل النقل (ل.س)
                 </label>
-                <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.transportAllowance)} {...register("transportAllowance", { valueAsNumber: true })} />
-                  <Truck className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
-                </div>
+                {renderFormattedNumberInput("transportAllowance", Truck, !!errors.transportAllowance)}
                 {errors.transportAllowance && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.transportAllowance.message}</p>}
               </div>
 
               {/* insuranceAmount */}
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-xs font-black text-rose-400 mb-2 uppercase tracking-widest">
                   التأمينات — خصم شهري (ل.س)
                 </label>
-                <div className="relative group">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl focus:border-rose-500 outline-none text-rose-400 text-lg font-mono font-black pr-12 shadow-inner transition-colors"
-                    {...register("insuranceAmount", { valueAsNumber: true })}
-                  />
-                  <Lock className="absolute right-4 top-4.5 text-rose-500/50 group-focus-within:text-rose-500 pointer-events-none" size={22} />
-                </div>
+                {renderFormattedNumberInput("insuranceAmount", Lock, !!errors.insuranceAmount, true)}
                 {errors.insuranceAmount && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.insuranceAmount.message}</p>}
               </div>
             </div>
 
             {/* ── Net Total Bar ── */}
-            <div className="bg-[#1a2530] border border-[#263544] p-5 rounded-2xl flex justify-between items-center shadow-inner">
+            <div className="bg-[#1a2530] border border-[#263544] p-5 rounded-2xl flex justify-between items-center shadow-inner mt-4">
               <div>
                 <span className="text-xs font-black text-slate-400">الإجمالي الثابت</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + المقطوع + المعيشة + نقل − تأمينات</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + المعيشة + نقل − تأمينات</p>
               </div>
               <span className="text-2xl font-mono font-black text-[#C89355]">
-                {netTotal > 0 ? netTotal.toLocaleString() : "—"} <span className="text-xs text-slate-500">ل.س</span>
+                {netTotal > 0 ? netTotal.toLocaleString("en-US") : "—"} <span className="text-xs text-slate-500">ل.س</span>
               </span>
             </div>
 

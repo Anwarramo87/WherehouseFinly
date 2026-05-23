@@ -9,6 +9,7 @@ interface RunPayrollModalProps {
   onClose: () => void;
   onRun: (payload: CalculatePayrollInput) => void;
   isPending?: boolean;
+  initialMonth?: string;
 }
 
 const toLocalDateString = (date = new Date()) => {
@@ -18,7 +19,19 @@ const toLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const getDefaultRange = () => {
+const getDefaultRange = (monthStr?: string) => {
+  if (monthStr) {
+    const [y, m] = monthStr.split('-');
+    const year = parseInt(y, 10);
+    const monthIndex = parseInt(m, 10) - 1;
+    const startDate = new Date(year, monthIndex, 1);
+    const endDate = new Date(year, monthIndex + 1, 0);
+    return {
+      periodStart: toLocalDateString(startDate),
+      periodEnd: toLocalDateString(endDate),
+    };
+  }
+
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - 30);
@@ -28,8 +41,8 @@ const getDefaultRange = () => {
   };
 };
 
-const createDefaultForm = (): CalculatePayrollInput => {
-  const range = getDefaultRange();
+const createDefaultForm = (monthStr?: string): CalculatePayrollInput => {
+  const range = getDefaultRange(monthStr);
   return {
     periodStart: range.periodStart,
     periodEnd: range.periodEnd,
@@ -39,11 +52,13 @@ const createDefaultForm = (): CalculatePayrollInput => {
   };
 };
 
-export default function RunPayrollModal({ isOpen, onClose, onRun, isPending }: RunPayrollModalProps) {
-  const [form, setForm] = useState<CalculatePayrollInput>(() => createDefaultForm());
+export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, initialMonth }: RunPayrollModalProps) {
+  // Initialize form with current initialMonth
+  const [form, setForm] = useState<CalculatePayrollInput>(() => createDefaultForm(initialMonth));
 
   const handleClose = () => {
-    setForm(createDefaultForm());
+    // Reset form to current initialMonth when closing
+    setForm(createDefaultForm(initialMonth));
     onClose();
   };
 

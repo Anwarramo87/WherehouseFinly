@@ -60,12 +60,16 @@ export default function TimeTablePage() {
     if (!periodStart || !periodEnd) return;
 
     // دمج البيانات المالية القديمة (حتى لا تتصفر في الباك إند) مع تعديلات الدوام الجديدة
+    const selectedInput = selectedEmployeeId 
+      ? payrollInputs.find(pi => pi.employeeId === selectedEmployeeId) || null
+      : null;
+
     const payload: UpsertPayrollInputPayload = {
-      ...(selectedInputData || {}), // 👈 هذا السطر السحري يحمي السلف والعقوبات من الحذف!
+      ...(selectedInput || {}), // 👈 هذا السطر السحري يحمي السلف والعقوبات من الحذف!
       ...data,                      // 👈 هذه تعديلات المودال (دوام، تأخير، الخ) وتطغى على القديم
       periodStart,
       periodEnd,
-      deathLeaveDays: selectedInputData?.deathLeaveDays || 0, // الحفاظ على القيمة القديمة إن وجدت
+      deathLeaveDays: selectedInput?.deathLeaveDays || 0, // الحفاظ على القيمة القديمة إن وجدت
     };
 
     upsertPayrollInput.mutate(payload, {
@@ -75,10 +79,9 @@ export default function TimeTablePage() {
     });
   };
 
-  const selectedInputData = useMemo(() => {
-    if (!selectedEmployeeId) return null;
-    return payrollInputs.find(pi => pi.employeeId === selectedEmployeeId) || null;
-  }, [selectedEmployeeId, payrollInputs]);
+  const selectedInputData = selectedEmployeeId
+    ? payrollInputs.find(pi => pi.employeeId === selectedEmployeeId) || null
+    : null;
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">

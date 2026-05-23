@@ -91,12 +91,14 @@ export default function DiscountsPage() {
 
   const handleSaveDiscount = (data: DiscountPayload) => {
     if (editingDiscount) {
-      updateDiscount.mutate(
+      // ✅ الحماية الأولى
+      updateDiscount?.mutate(
         { id: editingDiscount.id, backendModel: editingDiscount.backendModel, payload: data },
         { onSuccess: () => setIsModalOpen(false) }
       );
     } else {
-      createDiscount.mutate(data, {
+      // ✅ الحماية الثانية
+      createDiscount?.mutate(data, {
         onSuccess: () => setIsModalOpen(false)
       });
     }
@@ -104,11 +106,13 @@ export default function DiscountsPage() {
 
   const handleDelete = (id: string, backendModel: "advance" | "penalty") => {
     if (window.confirm("هل أنت متأكد من حذف هذا الإجراء المالي؟")) {
-      deleteDiscount.mutate({ id, backendModel });
+      // ✅ الحماية الثالثة
+      deleteDiscount?.mutate({ id, backendModel });
     }
   };
 
-  const isPending = createDiscount.isPending || updateDiscount.isPending;
+  // ✅ الحماية الرابعة والأهم (منع الانهيار)
+  const isPending = createDiscount?.isPending || updateDiscount?.isPending || false;
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
