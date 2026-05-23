@@ -43,7 +43,7 @@ export const useSalaries = () => {
       const data = res.data?.salaries ?? res.data;
       return Array.isArray(data) ? data : [];
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
@@ -66,7 +66,7 @@ export const useSalaries = () => {
         }
       },
       retry: false,
-      staleTime: QUERY_STALE_TIME.STANDARD,
+      staleTime: QUERY_STALE_TIME.RELAXED,
       gcTime: QUERY_GC_TIME.RELAXED,
     });
 

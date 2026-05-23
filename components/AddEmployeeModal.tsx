@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
@@ -65,7 +65,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const isMounted = typeof document !== "undefined";
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
+  const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const hasInitializedRole = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -100,6 +102,18 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     };
   });
 
+  useEffect(() => {
+    if (!isOpen) {
+      hasInitializedRole.current = false;
+      return;
+    }
+    if (!hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
+      setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
+      setRoleError("");
+      hasInitializedRole.current = true;
+    }
+  }, [isOpen, roleOptions, formData.roleId]);
+
   if (!isOpen || !isMounted) return null;
 
   const validateMobile = (number: string) => {
@@ -128,6 +142,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
       if (!validateMobile(formData.mobile)) return;
       setStep(2);
     } else {
+      if (!resolvedRoleId) {
+        setRoleError("يجب اختيار الدور الوظيفي");
+        return;
+      }
       onSave({ ...formData, roleId: resolvedRoleId });
     }
   };
@@ -175,7 +193,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <label className="block text-sm font-bold text-[#C89355] mb-2">اسم الموظف الثلاثي</label>
                 <div className="relative group">
                   <input
-                    type="text" required placeholder="مثال: أحمد خالد الجابر"
+                    type="text" required placeholder="أسم الثلاثي"
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -219,7 +237,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                     dir="ltr"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="会自动 تعيين من كود الموظف"
+                    placeholder=" أسم الموظف الظاهر"
                   />
                   <UserCircle className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
@@ -283,7 +301,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                     required={step === 2}
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
                     value={formData.roleId || roleOptions[0]?.id || ""}
-                    onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, roleId: e.target.value });
+                      if (roleError) setRoleError("");
+                    }}
                   >
                     {roleOptions.map((role) => (
                       <option key={role.id} value={role.id}>
@@ -298,11 +319,17 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                     placeholder="أدخل Role ID"
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
                     value={formData.roleId}
-                    onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, roleId: e.target.value });
+                      if (roleError) setRoleError("");
+                    }}
                   />
                 )}
                 {rolesLoading && (
                   <p className="text-xs text-slate-400 font-semibold mt-1">جاري تحميل الأدوار...</p>
+                )}
+                {roleError && (
+                  <p className="text-xs text-rose-400 font-bold mt-1.5">{roleError}</p>
                 )}
               </div>
 

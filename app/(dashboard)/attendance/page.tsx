@@ -125,7 +125,7 @@ const rows = useMemo(() => {
     // 2. تجميع البصمات المبعثرة (IN / OUT) لكل موظف في اليوم
     const byKey = new Map();
     
-    rawRecords.forEach((record: { employeeId: string; date: string; timestamp: string; type: string; source: string }) => {
+    rawRecords.forEach((record: Record<string, unknown>) => {
       const key = `${record.employeeId}-${record.date}`;
       if (!byKey.has(key)) {
         byKey.set(key, { key, checkIn: "", checkOut: "", source: record.source });

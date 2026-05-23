@@ -1,10 +1,8 @@
 import { useQueries } from '@tanstack/react-query';
 import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useAttendance } from '@/hooks/useAttendance';
 import { useSalaries } from '@/hooks/useSalaries';
 import { usePayrollSummary } from '@/hooks/usePayroll';
-import { calculateAttendanceMetrics } from '@/lib/attendance-metrics';
 import { api } from '@/lib/http/api';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -57,29 +55,10 @@ const extractAttendanceCounts = (stats: AttendanceStats | undefined) => {
   }
 
   const summary = (stats as { summary?: Record<string, unknown> }).summary;
-  const statsRoot = stats as { statistics?: Record<string, unknown> };
 
-  const active = toNumber(
-    summary?.activeEmployees ??
-      summary?.checkedInCount ??
-      summary?.presentCount ??
-      summary?.attendedCount ??
-      summary?.activeToday ??
-      statsRoot.statistics?.activeToday,
-  );
-
-  const absent = toNumber(
-    summary?.absentCount ??
-      summary?.totalAbsent ??
-      summary?.absentToday ??
-      statsRoot.statistics?.totalAbsent,
-  );
-
-  const lateMinutes = toNumber(
-    summary?.totalLateMinutes ??
-      summary?.lateMinutes ??
-      statsRoot.statistics?.totalLateArrivals,
-  );
+  const active = toNumber(summary?.activeEmployees ?? 0);
+  const absent = toNumber(summary?.absentCount ?? 0);
+  const lateMinutes = toNumber(summary?.totalLateMinutes ?? 0);
 
   return { active, absent, lateMinutes };
 };
@@ -124,7 +103,6 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
   const employeesQuery = useEmployees();
   const salariesQuery = useSalaries();
   const payrollSummaryQuery = usePayrollSummary();
-  const attendanceQuery = useAttendance({ startDate: today, endDate: today, limit: 200 });
 
   const queries = useQueries({
     queries: [
@@ -141,9 +119,7 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
           return withFallback(
             () =>
               api.get<AttendanceStats>('/attendance/stats', {
-                params: hasDateRange
-                  ? { startDate, endDate }
-                  : { startDate, endDate },
+                params: hasDateRange ? { startDate, endDate } : { startDate, endDate },
               }),
             fallbackAttendanceStats,
           );
@@ -158,27 +134,19 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
 
   const employees = Array.isArray(employeesQuery.data) ? employeesQuery.data : [];
   const salaries = Array.isArray(salariesQuery.data) ? salariesQuery.data : [];
-  const todayDailyRecords = Array.isArray(attendanceQuery.data?.dailyRecords)
-    ? attendanceQuery.data.dailyRecords.map((record) => ({
-        employeeId: record.employeeId,
-        checkIn: record.checkIn,
-        checkOut: record.checkOut,
-      }))
-    : [];
 
-  const employeesStats = (queries[0]?.data as EmployeesStats | undefined) ?? fallbackEmployeesStats;
-  const attendanceStats = (queries[1]?.data as AttendanceStats | undefined) ?? fallbackAttendanceStats;
-  const inventoryStats = (queries[2]?.data as InventoryStats | undefined) ?? fallbackInventoryStats;
-
-  const attendanceMetrics = calculateAttendanceMetrics(employees, todayDailyRecords);
+  const [employeesStatsQ, attendanceStatsQ, inventoryStatsQ] = queries;
+  const employeesStats = employeesStatsQ?.data ?? fallbackEmployeesStats;
+  const attendanceStats = attendanceStatsQ?.data ?? fallbackAttendanceStats;
+  const inventoryStats = inventoryStatsQ?.data ?? fallbackInventoryStats;
 
   const attendanceSummary = extractAttendanceCounts(attendanceStats);
 
-  const activeToday = attendanceSummary.active || attendanceMetrics.active;
-  const totalEmployees = attendanceMetrics.totalEmployees || employeesStats.total || 0;
-  const totalAbsentToday = attendanceSummary.absent || attendanceMetrics.absent;
-  const totalLateMinutesToday = attendanceSummary.lateMinutes || attendanceMetrics.totalLateMinutes;
-  const totalOvertimeMinutesToday = attendanceMetrics.totalOvertimeMinutes;
+  const activeToday = attendanceSummary.active;
+  const totalEmployees = employeesStats.total || 0;
+  const totalAbsentToday = attendanceSummary.absent;
+  const totalLateMinutesToday = attendanceSummary.lateMinutes;
+  const totalOvertimeMinutesToday = 0;
 
   const salaryByEmployee = new Map(salaries.map((salary) => [salary.employeeId, salary]));
 
@@ -216,13 +184,11 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
       queries.some((q) => q.isLoading) ||
       employeesQuery.isLoading ||
       salariesQuery.isLoading ||
-      attendanceQuery.isLoading ||
       payrollSummaryQuery.isLoading,
     isError:
       queries.some((q) => q.isError) ||
       Boolean(employeesQuery.error) ||
       Boolean(salariesQuery.error) ||
-      Boolean(attendanceQuery.error) ||
       Boolean(payrollSummaryQuery.error),
   };
 };

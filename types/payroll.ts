@@ -28,7 +28,6 @@ export interface PayrollItem {
   netPayRounded: number | string | { $numberDecimal: string };
   /** فرق التقريب = netPayRounded − netPay */
   roundingDifference: number | string | { $numberDecimal: string };
-  /** = netPayRounded (alias محفوظ في قاعدة البيانات) */
   netPayWithAdvance?: number | string | { $numberDecimal: string };
   anomalies?: string[];
 }

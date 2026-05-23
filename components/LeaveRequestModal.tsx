@@ -372,13 +372,25 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
     const mappedLeaveType = LEAVE_TYPE_MAP[form.leaveType] || "OTHER";
 
+    interface LeavePayload {
+      employeeId: string;
+      startDate: string;
+      endDate: string;
+      leaveType: string;
+      isPaid: boolean;
+      reason: string;
+      isHourly: boolean;
+      startTime?: string;
+      endTime?: string;
+    }
+
     try {
       await Promise.all(
         form.employeeIds.map(empId => {
-          const payload: Record<string, string | boolean> = {
+          const payload: LeavePayload = {
             employeeId: empId,
             startDate: form.startDate,
-            endDate: isHourlyLeave ? form.startDate : form.endDate, 
+            endDate: isHourlyLeave ? form.startDate : form.endDate,
             leaveType: mappedLeaveType,
             isPaid: form.isPaid,
             reason: form.leaveType === "أخرى" || isHourlyLeave ? form.customReason || form.leaveType : form.leaveType,
@@ -394,11 +406,11 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         })
       );
 
-      setForm(buildDefaultForm()); 
+      setForm(buildDefaultForm());
       onClose();
     } catch (error: unknown) {
       console.error("فشل إرسال طلب الإجازة المتعدد:", error);
-      const serverMsg = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message || "تعذر إرسال الطلب حالياً. حاول مرة أخرى.";
+      const serverMsg = error.response?.data?.message || "تعذر إرسال الطلب حالياً. حاول مرة أخرى.";
       setErrorMessage(Array.isArray(serverMsg) ? serverMsg.join(" | ") : serverMsg);
     } finally {
       setIsSubmitting(false);

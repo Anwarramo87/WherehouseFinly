@@ -37,7 +37,7 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
       });
       return res.data?.rewards ?? res.data ?? [];
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

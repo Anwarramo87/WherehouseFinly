@@ -245,19 +245,18 @@ export default function PayrollPage() {
     }
     try {
       const XLSX = await import("xlsx");
-      const rows: Array<Record<string, string | number>> = filteredPayrollData.map(
-        (item, index) => ({
-          "#": index + 1,
-          "القسم": item.department,
-          "كود الموظف": item.employeeId,
-          "اسم الموظف": item.employeeName,
-          "إجمالي الاستحقاقات": Number(item.grossPay.toFixed(2)),
-          "إجمالي الخصومات": Number(item.totalDeductions.toFixed(2)),
-          "صافي الراتب (حسابي دقيق)": Number(item.netPay.toFixed(2)),
-          "الصافي المقبوض (مقرب)": Number(item.netPayRounded.toFixed(2)),
-          "فرق التقريب": Number(item.roundingDifference.toFixed(2)),
-        }),
-      );
+      const rows: Array<Record<string, string | number>> = filteredPayrollData.map((item, index) => ({
+        "#": index + 1,
+        "كود الموظف": item.employeeId,
+        "اسم الموظف": item.employeeName,
+        "الأرباح الثابتة": Number(item.fixedEarnings.toFixed(2)),
+        "الأرباح المتغيرة": Number(item.variableEarnings.toFixed(2)),
+        "إجمالي الأرباح": Number((item.fixedEarnings + item.variableEarnings).toFixed(2)),
+        "إجمالي الخصومات": Number((item.fixedDeductions + item.variableDeductions).toFixed(2)),
+        "صافي الراتب": Number(item.netPay.toFixed(2)),
+      }));
+
+      // Add totals row
       rows.push({
         "#": "",
         "القسم": "",

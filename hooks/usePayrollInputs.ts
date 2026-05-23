@@ -85,8 +85,8 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
     mutationFn: async (payload: UpsertPayrollInputPayload) => {
       const formattedPayload = {
         ...payload,
-        periodStart: new Date(payload.periodStart).toISOString(),
-        periodEnd: new Date(payload.periodEnd).toISOString(),
+        periodStart: payload.periodStart.split('T')[0],
+        periodEnd: payload.periodEnd.split('T')[0],
       };
       
       return apiClient.post("/payroll/inputs", formattedPayload);
