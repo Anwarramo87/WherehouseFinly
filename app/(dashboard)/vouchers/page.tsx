@@ -281,7 +281,7 @@ export default function VouchersPage() {
 
                 {voucher.fixedEarnings > 0 && (
                   <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-200/50 print:p-1.5 print:bg-emerald-50">
-                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1">الأرباح الثابتة</p>
+                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1"> الاستحقاقات الثابتة</p>
                     {voucher.details.salaryConfig && (
                       <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                         {toNumber(voucher.details.salaryConfig.baseSalary) > 0 && (
@@ -319,7 +319,7 @@ export default function VouchersPage() {
 
                 {voucher.variableEarnings > 0 && (
                   <div className="bg-[#C89355]/10 rounded-xl p-3 border border-[#C89355]/30 print:p-1.5 print:bg-transparent">
-                    <p className="text-xs font-black text-[#C89355] mb-2 uppercase print:text-[9px] print:mb-1">الأرباح المتغيرة</p>
+                    <p className="text-xs font-black text-[#C89355] mb-2 uppercase print:text-[9px] print:mb-1">الاستحقاقات المتغيرة</p>
                     <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                       {voucher.details.bonuses.map((bonus, idx) => (
                         <div key={idx} className="flex justify-between">

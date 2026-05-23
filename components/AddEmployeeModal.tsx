@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
@@ -10,7 +10,9 @@ type EmployeeWithExtendedFields = Employee & {
   birthDate?: string | null;
   gender?: string | null;
   jobTitle?: string | null;
-  monthlySalary?: number | string | null;
+  baseSalary?: number | string | null;
+  lumpSumSalary?: number | string | null;
+  livingAllowance?: number | string | null;
 };
 
 const asText = (value: unknown) => {
@@ -31,7 +33,9 @@ export type AddEmployeeFormData = {
   gender: string;
   jobTitle: string;
   department: string;
-  monthlySalary: string;
+  baseSalary: string;
+  lumpSumSalary: string;
+  livingAllowance: string;
   scheduledStart: string;
   scheduledEnd: string;
   roleId: string;
@@ -55,7 +59,9 @@ const defaultFormState = {
   gender: "male",
   jobTitle: "",
   department: "قسم القص",
-  monthlySalary: "",
+  baseSalary: "",
+  lumpSumSalary: "",
+  livingAllowance: "",
   scheduledStart: "08:00",
   scheduledEnd: "16:00",
   roleId: "",
@@ -67,6 +73,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const [mobileError, setMobileError] = useState("");
   const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const hasInitializedRole = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -83,13 +90,14 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         employeeId: initialData.employeeId || "",
         name: initialData.name || "",
         username: "",
-        password: "",
         mobile: initialData.mobile || "",
         birthDate: initialData.birthDate || "",
         gender: initialData.gender || "male",
         jobTitle: initialData.jobTitle || initialData.profession || "",
         department: initialData.department || "قسم القص",
-        monthlySalary: asText(initialData.monthlySalary || initialData.hourlyRate),
+        baseSalary: asText(initialData.baseSalary || ""),
+        lumpSumSalary: asText(initialData.lumpSumSalary || ""),
+        livingAllowance: asText(initialData.livingAllowance || ""),
         scheduledStart: initialData.scheduledStart || "08:00",
         scheduledEnd: initialData.scheduledEnd || "16:00",
         roleId: initialData.roleId || "",
@@ -102,10 +110,14 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   });
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (!formData.roleId && roleOptions.length > 0) {
+    if (!isOpen) {
+      hasInitializedRole.current = false;
+      return;
+    }
+    if (!hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
       setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
       setRoleError("");
+      hasInitializedRole.current = true;
     }
   }, [isOpen, roleOptions, formData.roleId]);
 
@@ -341,18 +353,60 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 </div>
               </div>
 
-              {/* الراتب الشهري يشغل السطر كاملاً */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-[#C89355] mb-2">الراتب الشهري الأساسي (ل.س)</label>
-                <div className="relative group">
-                  <input
-                    type="number" min={0} required={step === 2} placeholder="مثال: 500000"
-                    className="w-full p-3.5 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-black shadow-inner pr-11 placeholder:text-slate-600"
-                    value={formData.monthlySalary}
-                    onChange={(e) => setFormData({ ...formData, monthlySalary: e.target.value })}
-                  />
-                  <Coins className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+              {/* حقول الراتب الثلاثة */}
+              <div className="md:col-span-2 bg-[#1a2530] p-5 rounded-2xl border border-[#263544] shadow-inner">
+                <div className="flex items-center gap-2 border-b border-white/5 pb-3 mb-5">
+                  <Coins size={20} className="text-[#C89355]" />
+                  <span className="text-sm font-bold text-white">معلومات الراتب</span>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* الراتب الأساسي */}
+                  <div>
+                    <label htmlFor="baseSalary" className="block text-xs font-bold text-slate-400 mb-2">الراتب الأساسي (ل.س)</label>
+                    <input
+                      id="baseSalary"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
+                      value={formData.baseSalary}
+                      onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
+                    />
+                  </div>
+
+                  {/* الراتب المقطوع */}
+                  <div>
+                    <label htmlFor="lumpSumSalary" className="block text-xs font-bold text-slate-400 mb-2">الراتب المقطوع (ل.س)</label>
+                    <input
+                      id="lumpSumSalary"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
+                      value={formData.lumpSumSalary}
+                      onChange={(e) => setFormData({ ...formData, lumpSumSalary: e.target.value })}
+                    />
+                  </div>
+
+                  {/* بدل غلاء المعيشة */}
+                  <div>
+                    <label htmlFor="livingAllowance" className="block text-xs font-bold text-slate-400 mb-2">بدل غلاء المعيشة (ل.س)</label>
+                    <input
+                      id="livingAllowance"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
+                      value={formData.livingAllowance}
+                      onChange={(e) => setFormData({ ...formData, livingAllowance: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 mt-3 font-semibold">
+                  💡 يمكنك ترك الحقول فارغة إذا لم تكن مطلوبة (سيتم حفظها كقيمة 0)
+                </p>
               </div>
 
               <div className="bg-[#1a2530] p-5 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-5 shadow-inner">

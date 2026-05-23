@@ -240,7 +240,7 @@
 
 import { useState, useEffect, useMemo , useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, User, CalendarDays, FileText, Save, CheckSquare, Square, Loader2, Check, Search } from "lucide-react";
+import { X, CalendarDays, FileText, Save, CheckSquare, Square, Loader2, Check, Search } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 
@@ -372,13 +372,25 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
     const mappedLeaveType = LEAVE_TYPE_MAP[form.leaveType] || "OTHER";
 
+    interface LeavePayload {
+      employeeId: string;
+      startDate: string;
+      endDate: string;
+      leaveType: string;
+      isPaid: boolean;
+      reason: string;
+      isHourly: boolean;
+      startTime?: string;
+      endTime?: string;
+    }
+
     try {
       await Promise.all(
         form.employeeIds.map(empId => {
-          const payload: Record<string, any> = {
+          const payload: LeavePayload = {
             employeeId: empId,
             startDate: form.startDate,
-            endDate: isHourlyLeave ? form.startDate : form.endDate, 
+            endDate: isHourlyLeave ? form.startDate : form.endDate,
             leaveType: mappedLeaveType,
             isPaid: form.isPaid,
             reason: form.leaveType === "أخرى" || isHourlyLeave ? form.customReason || form.leaveType : form.leaveType,
@@ -394,9 +406,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         })
       );
 
-      setForm(buildDefaultForm()); 
+      setForm(buildDefaultForm());
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("فشل إرسال طلب الإجازة المتعدد:", error);
       const serverMsg = error.response?.data?.message || "تعذر إرسال الطلب حالياً. حاول مرة أخرى.";
       setErrorMessage(Array.isArray(serverMsg) ? serverMsg.join(" | ") : serverMsg);

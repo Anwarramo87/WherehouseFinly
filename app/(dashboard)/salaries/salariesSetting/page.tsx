@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -36,14 +34,12 @@ const getLocalMonth = () => {
   return `${y}-${m}`;
 };
 
-
 const getTabFromQuery = (tabParam: string | null): FinancialTabKey => {
   if (tabParam === "advances") return "advances";
   if (tabParam === "bonuses") return "bonuses";
   if (tabParam === "final-payroll" || tabParam === "payroll") return "final-payroll";
   return "salary-config";
 };
-
 
 // Payload must match UpsertSalaryDto — canonical field names only
 type SalaryPayload = {
@@ -108,7 +104,6 @@ export default function SalariesPage() {
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
 
-
   const openFor = (salary: Salary | null = null, preselectId?: string) => {
     setSelected(salary);
     setPreselectedEmployeeId(preselectId);
@@ -138,7 +133,6 @@ export default function SalariesPage() {
     () => (employees || []).map((emp) => ({ employeeId: emp.employeeId, name: emp.name })),
     [employees],
   );
-
 
   const tabStats = useMemo(() => {
     const totalAdvances = (advances || []).reduce((sum: number, item: Advance) => sum + toNumber(item.remainingAmount), 0);
@@ -172,14 +166,28 @@ export default function SalariesPage() {
     deleteSalary.mutate(employeeId);
   };
 
-
   const openFloatingAction = () => {
     if (activeTab === "salary-config") { openFor(null); return; }
     if (activeTab === "advances") { setIsAdvanceModalOpen(true); return; }
     if (activeTab === "bonuses") { setIsBonusModalOpen(true); }
   };
 
-  const isFloatingActionVisible = activeTab !== "final-payroll";
+  const getActionButtonConfig = () => {
+    switch (activeTab) {
+      case "salary-config":
+        return { text: "ضبط راتب جديد", icon: <Plus size={18} /> };
+      case "advances":
+        return { text: "إضافة سلفة", icon: <HandCoins size={18} /> };
+      case "bonuses":
+        return { text: "إضافة مكافأة / خصم", icon: <Gift size={18} /> };
+      case "final-payroll":
+        return null;
+      default:
+        return { text: "إضافة", icon: <Plus size={18} /> };
+    }
+  };
+
+  const actionButtonConfig = getActionButtonConfig();
 
   return (
     <>
@@ -208,29 +216,16 @@ export default function SalariesPage() {
               <p className="text-slate-600 text-sm font-bold pr-14 mt-1">لوحة موحدة لإدارة الرواتب والسلف والمكافآت وحساب المسير النهائي.</p>
             </div>
 
-            <div className="mt-4 xl:mt-0 flex flex-wrap items-center gap-4 w-full xl:w-auto">
-              <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
-                <div className="flex items-center gap-2 mb-1.5 relative z-10">
-                  <HandCoins size={14} className="text-[#C89355]" />
-                  <p className="text-[11px] font-black text-slate-500">السلف المتبقية</p>
-                </div>
-                <p className="font-black text-xl text-[#263544]">{tabStats.totalAdvances.toLocaleString()}</p>
-              </div>
-              <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
-                <div className="flex items-center gap-2 mb-1.5 relative z-10">
-                  <Gift size={14} className="text-[#C89355]" />
-                  <p className="text-[11px] font-black text-slate-500">إجمالي المكافآت</p>
-                </div>
-                <p className="font-black text-xl text-[#263544]">{tabStats.totalBonus.toLocaleString()}</p>
-              </div>
-              <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
-                <div className="flex items-center gap-2 mb-1.5 relative z-10">
-                  <Wallet size={14} className="text-rose-500" />
-                  <p className="text-[11px] font-black text-slate-500">إجمالي الخصومات</p>
-                </div>
-                <p className="font-black text-xl text-rose-600">{tabStats.totalDeductions.toLocaleString()}</p>
-              </div>
-            </div>
+            {/* Smart Header Button - Task 1 */}
+            {actionButtonConfig && (
+              <button
+                onClick={openFloatingAction}
+                className="bg-[#1a2530] text-[#C89355] hover:bg-[#263544] px-5 py-3 rounded-2xl font-black flex items-center gap-2 transition-all shadow-[0_8px_30px_rgba(38,53,68,0.1)] border border-[#C89355]/30 hover:scale-105"
+              >
+                {actionButtonConfig.icon}
+                <span>{actionButtonConfig.text}</span>
+              </button>
+            )}
           </header>
 
           {/* تبويب إعداد الرواتب المعدل */}
@@ -244,21 +239,21 @@ export default function SalariesPage() {
               ) : (
                 <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
                   <table className="w-full text-right min-w-250">
-                    <thead className="bg-white/40 border-b border-white/80">
+                    {/* Updated Table Header */}
+                    <thead className="bg-[#1a2530] border-b-2 border-[#C89355]/30">
                       <tr>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الموظف (الاسم والكود)</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الراتب الأساسي</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الراتب المقطوع</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">بدل المعيشة</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">بدل النقل</th>
-                        <th className="p-5 text-rose-600 font-black text-xs uppercase tracking-wider text-center">التأمينات (خصم)</th>
-                        <th className="p-5 text-[#1a2530] font-black text-xs uppercase tracking-wider text-center bg-[#C89355]/10">الإجمالي الثابت</th>
-                        <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">إدارة</th>
+                        <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">الموظف (الاسم والكود)</th>
+                        <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">الراتب الأساسي</th>
+                        <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">بدل المعيشة</th>
+                        <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">بدل النقل</th>
+                        <th className="p-5 text-rose-400 font-black text-xs uppercase tracking-wider text-center">التأمينات (خصم)</th>
+                        <th className="p-5 text-[#C89355] font-black text-xs uppercase tracking-wider text-center bg-[#C89355]/20">الإجمالي الثابت</th>
+                        <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">إدارة</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/40">
                       {allIds.length === 0 ? (
-                        <tr><td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
+                        <tr><td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
                       ) : (
                         allIds.map((id: string) => {
                           const s = (salaryMap.get(id) ?? null) as SalaryWithAliases | null;
@@ -268,6 +263,9 @@ export default function SalariesPage() {
                           let base = toNumber(emp?.hourlyRate);
                           let lumpSum = 0;
                           let living = 0;
+                          let responsibility = 0;
+                          let extraEffort = 0;
+                          let production = 0;
                           let transport = 0;
                           let insurance = 0;
 
@@ -275,13 +273,15 @@ export default function SalariesPage() {
                             base = toNumber(s.baseSalary);
                             lumpSum = toNumber(s.lumpSumSalary);
                             living = toNumber(s.livingAllowance);
+                            responsibility = toNumber(s.responsibilityAllowance);
+                            extraEffort = toNumber(s.extraEffortAllowance ?? s.extraEffort);
+                            production = toNumber(s.productionIncentive);
                             transport = toNumber(s.transportAllowance);
-                            // Prefer canonical field; fall back to deprecated alias
                             insurance = toNumber(s.insuranceAmount ?? s.insurances);
                           }
 
-                          // الإجمالي الثابت: أساسي + مقطوع + معيشة + نقل − تأمينات
-                          const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
+                          // الإجمالي الثابت الشامل
+                          const monthlyFixedTotal = base + lumpSum + living + responsibility + extraEffort + production + transport - insurance;
                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? "موظف غير معروف");
 
                           return (
@@ -297,32 +297,27 @@ export default function SalariesPage() {
                                 {base > 0 ? base.toLocaleString() : "—"}
                               </td>
 
-                              {/* 3. الراتب المقطوع */}
-                              <td className="p-4 text-center font-mono font-black text-[#263544]">
-                                {lumpSum > 0 ? lumpSum.toLocaleString() : "—"}
-                              </td>
-
-                              {/* 4. بدل المعيشة */}
+                              {/* 3. بدل المعيشة */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {living > 0 ? living.toLocaleString() : "—"}
                               </td>
 
-                              {/* 5. بدل النقل */}
+                              {/* 4. بدل النقل */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {transport > 0 ? transport.toLocaleString() : "—"}
                               </td>
 
-                              {/* 6. التأمينات (بالأحمر كخصم) */}
+                              {/* 5. التأمينات (بالأحمر كخصم) */}
                               <td className="p-4 text-center font-mono font-black text-rose-500">
                                 {insurance > 0 ? insurance.toLocaleString() : "—"}
                               </td>
 
-                              {/* 7. الإجمالي الثابت */}
+                              {/* 6. الإجمالي الثابت */}
                               <td className="p-4 font-black text-center text-[#1a2530] bg-[#C89355]/5 border-x border-[#C89355]/10">
                                 {monthlyFixedTotal > 0 ? monthlyFixedTotal.toLocaleString() : <span className="text-rose-500 text-[10px] bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">غير مضبوط</span>}
                               </td>
 
-                              {/* 8. إدارة */}
+                              {/* 7. إدارة */}
                               <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2 opacity-60 group-hover/row:opacity-100 transition-opacity">
                                   {!s ? (
@@ -350,19 +345,54 @@ export default function SalariesPage() {
             </div>
           )}
 
-          {/* تبويب السلف والمكافآت والمسير النهائي بقيت كما هي لعدم طلب تعديلها */}
-          {activeTab === "advances" && (/* الكود السابق للسلف */ <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل السلف...</div>)}
-          {activeTab === "bonuses" && (/* الكود السابق للمكافآت */ <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المكافآت...</div>)}
-          {activeTab === "final-payroll" && (/* الكود السابق للمسير */ <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المسير...</div>)}
+          {/* تبويب السلف مع Contextual Stat Card */}
+          {activeTab === "advances" && (
+            <>
+              {/* Contextual Stat Card for Advances */}
+              <div className="flex gap-4 mb-6">
+                <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
+                  <div className="flex items-center gap-2 mb-1.5 relative z-10">
+                    <HandCoins size={14} className="text-[#C89355]" />
+                    <p className="text-[11px] font-black text-slate-500">السلف المتبقية</p>
+                  </div>
+                  <p className="font-black text-xl text-[#263544]">{tabStats.totalAdvances.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل السلف...</div>
+            </>
+          )}
+
+          {/* تبويب المكافآت مع Contextual Stat Cards */}
+          {activeTab === "bonuses" && (
+            <>
+              {/* Contextual Stat Cards for Bonuses */}
+              <div className="flex gap-4 mb-6">
+                <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
+                  <div className="flex items-center gap-2 mb-1.5 relative z-10">
+                    <Gift size={14} className="text-[#C89355]" />
+                    <p className="text-[11px] font-black text-slate-500">إجمالي المكافآت</p>
+                  </div>
+                  <p className="font-black text-xl text-[#263544]">{tabStats.totalBonus.toLocaleString()}</p>
+                </div>
+                <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
+                  <div className="flex items-center gap-2 mb-1.5 relative z-10">
+                    <Wallet size={14} className="text-rose-500" />
+                    <p className="text-[11px] font-black text-slate-500">إجمالي الخصومات</p>
+                  </div>
+                  <p className="font-black text-xl text-rose-600">{tabStats.totalDeductions.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المكافآت...</div>
+            </>
+          )}
+
+          {/* تبويب المسير النهائي */}
+          {activeTab === "final-payroll" && (
+            <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المسير...</div>
+          )}
 
         </div>
       </div>
-
-      {isFloatingActionVisible && (
-        <button onClick={openFloatingAction} className="fixed bottom-8 left-8 z-40 rounded-full w-16 h-16 bg-[#1a2530] text-[#C89355] shadow-[0_10px_30px_rgba(38,53,68,0.5)] hover:bg-[#263544] hover:scale-110 transition-all flex items-center justify-center border-2 border-[#C89355]/40 group">
-          <Plus size={28} className="group-hover:animate-spin" />
-        </button>
-      )}
 
       {/* المودالات الخاصة بالرواتب والمكافآت */}
       {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} />}

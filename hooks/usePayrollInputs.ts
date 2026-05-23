@@ -45,12 +45,12 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
     queryKey: ["payrollInputs", periodStart, periodEnd],
     queryFn: async () => {
       if (!periodStart || !periodEnd) return [];
-      
+
       const params = { periodStart, periodEnd };
       const res = await apiClient.get("/payroll/inputs", { params });
-      
+
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((item: any) => ({
         id: item.id,
@@ -85,10 +85,10 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
     mutationFn: async (payload: UpsertPayrollInputPayload) => {
       const formattedPayload = {
         ...payload,
-        periodStart: payload.periodStart.split('T')[0],
-        periodEnd: payload.periodEnd.split('T')[0],
+        periodStart: payload.periodStart?.split('T')[0] || payload.periodStart,
+        periodEnd: payload.periodEnd?.split('T')[0] || payload.periodEnd,
       };
-      
+
       return apiClient.post("/payroll/inputs", formattedPayload);
     },
     onSuccess: () => {

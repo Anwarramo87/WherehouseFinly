@@ -24,8 +24,10 @@ export interface PayrollItem {
   grossPay: number | string | { $numberDecimal: string };
   totalDeductions: number | string | { $numberDecimal: string };
   netPay: number | string | { $numberDecimal: string };
-  netPayRounded?: number | string | { $numberDecimal: string };
-  roundingDifference?: number | string | { $numberDecimal: string };
+  /** صافي الراتب مقرباً لأقرب ألف — القيمة المدفوعة فعلياً للموظف */
+  netPayRounded: number | string | { $numberDecimal: string };
+  /** فرق التقريب = netPayRounded − netPay */
+  roundingDifference: number | string | { $numberDecimal: string };
   netPayWithAdvance?: number | string | { $numberDecimal: string };
   anomalies?: string[];
 }

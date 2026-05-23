@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
 import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
+import type { Salary } from "@/types/salary";
 import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye } from "lucide-react";
 
 // استيراد المكونات المنفصلة
@@ -58,18 +59,34 @@ type EmployeeRow = Employee & {
   jobTitle?: string;
 };
 
-const resolveDisplayedMonthlySalary = (employee: EmployeeRow) => {
+const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<string, Salary>) => {
+  // أولاً: التحقق من وجود راتب في salaryMap
+  const salaryRecord = salaryMap.get(employee.employeeId);
+  if (salaryRecord?.monthlySalary) {
+    const parsed = toNumber(salaryRecord.monthlySalary);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  
+  // ثانياً: التحقق من monthlySalary في بيانات الموظف نفسه
   if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
     const parsed = toNumber(employee.monthlySalary);
-    return Number.isFinite(parsed) ? parsed : 0;
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
-  // Fallback in case backend still sends hourlyRate for old records
+  
+  // Fallback: حساب من hourlyRate
   const hourly = toNumber(employee.hourlyRate);
-  return Math.round(hourly * 8 * 30);
+  return Math.round(hourly * 8 * 26);
 };
 
 export default function EmployeesPage() {
   const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees();
+  const { data: salaries = [] } = useSalaries();
+
+  const salaryMap = useMemo(() => {
+    const m = new Map<string, Salary>();
+    (salaries || []).forEach((s) => { if (s?.employeeId) m.set(s.employeeId, s); });
+    return m;
+  }, [salaries]);
   
   // تصفية الموظفين النشطين
   const visibleEmployees = useMemo(
@@ -194,7 +211,7 @@ export default function EmployeesPage() {
     }
   };
 
-  // الدالة المحدثة لاستقبال حالة الاستقالة أو الإقالة (بدون any)
+  // الدالة المحدثة لاستقبال حالة الاستقالة أو الإقالة
   const handleConfirmFire = async (fireData: FireEmployeePayload) => {
     try {
       await terminateEmployee.mutateAsync({
@@ -203,7 +220,7 @@ export default function EmployeesPage() {
           terminationDate: new Date(fireData.fireDate).toISOString(),
           terminationReason: fireData.reason,
           notes: fireData.notes,
-          status: "terminated" as const
+          status: fireData.status // إرسال حالة الاستقالة أو الإقالة
         }
       });
       setIsFireModalOpen(false);
@@ -323,7 +340,7 @@ export default function EmployeesPage() {
                           {emp.department} <span className="text-[#C89355] mx-1">/</span> {row.jobTitle || 'موظف'}
                         </td>
                         <td className="p-4 text-center font-mono font-black text-[#263544] text-sm">
-                          {resolveDisplayedMonthlySalary(row).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
+                          {resolveDisplayedMonthlySalary(row, salaryMap).toLocaleString()} <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
                         </td>
                         <td className="p-4 text-center font-mono font-bold text-slate-600 text-sm dir-ltr">
                           {emp.mobile || '—'}
