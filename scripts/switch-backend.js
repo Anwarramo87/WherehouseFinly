@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 /**
  * Quick backend switcher for development
  * Usage: node scripts/switch-backend.js [local|remote]
