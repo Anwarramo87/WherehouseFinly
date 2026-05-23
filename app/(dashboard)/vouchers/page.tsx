@@ -81,8 +81,9 @@ export default function VouchersPage() {
       const employeeName = employee.name;
 
       const salaryConfig = salaries.find(s => s.employeeId === employeeId) || null;
-      
-      const baseSalary = salaryConfig ? toNumber(salaryConfig.baseSalary) : 0;
+      const baseSalary = salaryConfig
+        ? toNumber(salaryConfig.baseSalary)
+        : toNumber(employee.baseSalary ?? employee.hourlyRate);
       const lumpSumSalary = salaryConfig ? toNumber(salaryConfig.lumpSumSalary) : 0;
       const livingAllowance = salaryConfig ? toNumber(salaryConfig.livingAllowance) : 0;
       const transportAllowance = salaryConfig ? toNumber(salaryConfig.transportAllowance) : 0;

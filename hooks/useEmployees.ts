@@ -30,7 +30,7 @@ const normalizeMessage = (value: string | string[] | undefined) => {
   return "";
 };
 
-const getErrorMessage = (error: unknown, fallback: string) => {
+export const getErrorMessage = (error: unknown, fallback: string) => {
   if (axios.isAxiosError<ApiErrorBody>(error)) {
     const message =
       normalizeMessage(error.response?.data?.error?.message) ||
@@ -150,9 +150,19 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
   // 2. إضافة موظف
   const createMutation = useMutation({
     mutationFn: async (newEmployee: Employee) => {
-      const hourlyRate = toHourlyRateNumber(newEmployee.hourlyRate);
-      assertHourlyRate(hourlyRate);
-      const payload = { ...newEmployee, hourlyRate };
+      const hourlyRate =
+        newEmployee.hourlyRate !== undefined && newEmployee.hourlyRate !== null
+          ? toHourlyRateNumber(newEmployee.hourlyRate)
+          : undefined;
+
+      if (hourlyRate !== undefined) {
+        assertHourlyRate(hourlyRate);
+      }
+
+      const payload = {
+        ...newEmployee,
+        ...(hourlyRate !== undefined ? { hourlyRate } : {}),
+      };
       return await apiClient.post("/employees", payload);
     },
     onSuccess: () => {

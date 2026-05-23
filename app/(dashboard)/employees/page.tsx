@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
@@ -16,6 +16,31 @@ import FilterComponent from "@/components/Filter";
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), { loading: () => null });
 const FireEmployeeModal = dynamic(() => import("@/components/FireEmployeeModal"), { loading: () => null });
 
+const normalizeNumericInput = (value: string) => {
+  const arabicDigits: Record<string, string> = {
+    "٠": "0",
+    "١": "1",
+    "٢": "2",
+    "٣": "3",
+    "٤": "4",
+    "٥": "5",
+    "٦": "6",
+    "٧": "7",
+    "٨": "8",
+    "٩": "9",
+  };
+
+  const normalized = value
+    .replace(/[٠-٩]/g, (digit) => arabicDigits[digit] || digit)
+    .replace(/[ ,]/g, "")
+    .replace(/[^0-9.\-]/g, "");
+
+  const dotCount = (normalized.match(/\./g) || []).length;
+  const cleaned = dotCount > 1 ? normalized.replace(/\./g, "") : normalized;
+
+  return cleaned.trim();
+};
+
 const toNumber = (value: unknown) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "object" && value && "$numberDecimal" in value) {
@@ -23,7 +48,7 @@ const toNumber = (value: unknown) => {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   if (typeof value !== "string") return 0;
-  const normalized = value.replace(/,/g, "").trim();
+  const normalized = normalizeNumericInput(value);
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
@@ -163,6 +188,8 @@ export default function EmployeesPage() {
       setIsModalOpen(false);
       setSelectedEmployee(null);
     } catch (err) {
+      const message = getErrorMessage(err, "فشل حفظ الموظف");
+      toast.error(message);
       console.error("Error saving employee:", err);
     }
   };
