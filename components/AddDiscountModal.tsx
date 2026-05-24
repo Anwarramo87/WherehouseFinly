@@ -130,7 +130,10 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
   };
 
   const onSubmit = (data: DiscountFormValues) => {
-    onSave(data);
+    const kind: "advance" | "penalty" | "assistance" = 
+      data.type === "عقوبة" ? "penalty" : 
+      data.type === "شراء ملابس" || data.type === "مساعدة" ? "assistance" : "advance";
+    onSave({ ...data, kind });
   };
 
   const isEditMode = !!initialData;

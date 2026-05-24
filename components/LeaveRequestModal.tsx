@@ -410,7 +410,8 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       onClose();
     } catch (error: unknown) {
       console.error("فشل إرسال طلب الإجازة المتعدد:", error);
-      const serverMsg = error.response?.data?.message || "تعذر إرسال الطلب حالياً. حاول مرة أخرى.";
+      const err = error as { response?: { data?: { message?: string | string[] } } };
+      const serverMsg = err.response?.data?.message || "تعذر إرسال الطلب حالياً. حاول مرة أخرى.";
       setErrorMessage(Array.isArray(serverMsg) ? serverMsg.join(" | ") : serverMsg);
     } finally {
       setIsSubmitting(false);

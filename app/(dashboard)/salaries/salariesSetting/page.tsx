@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import useSalaries from "@/hooks/useSalaries";
@@ -81,8 +81,8 @@ export default function SalariesPage() {
   const activeTab = getTabFromQuery(requestedTab);
 
   const { data: salaries = [], isLoading, isError, error, updateSalary, deleteSalary } = useSalaries();
-  // نجلب جميع الموظفين (حتى غير النشطين مؤقتاً إذا كان اسمهم يظهر بشكل خاطئ) لكي تظهر الأسماء بوضوح 
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees();
+  // نجلب الموظفين مع المتقاعدين كي لا يظهر الاسم كـ "غير معروف" في الرواتب
+  const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees({ includeTerminated: true, limit: 500, fetchAll: false });
   const { data: advances = [] } = useAdvances();
 
   const period = useMemo(() => getLocalMonth(), []);
@@ -115,6 +115,20 @@ export default function SalariesPage() {
     (employees || []).forEach((e) => { if (e?.employeeId) m.set(e.employeeId, e); });
     return m;
   }, [employees]);
+
+  // If there are salary records for IDs not present in `employees`, try refetching employees (best-effort).
+  useEffect(() => {
+    if (!refetchEmployees) return;
+    try {
+      const missing = (salaries || []).some((s) => !!s?.employeeId && !employeeMap.has(s.employeeId));
+      if (missing) {
+        // best-effort refetch to resolve any race where salary appears before employees list
+        refetchEmployees().catch(() => {});
+      }
+    } catch (e) {
+      // swallow errors — this is a best-effort UX improvement
+    }
+  }, [salaries, employeeMap, refetchEmployees]);
 
   const salaryMap = useMemo(() => {
     const m = new Map<string, Salary>();
@@ -262,7 +276,7 @@ export default function SalariesPage() {
                           // Defaults when no salary record exists yet
                           let base = toNumber(emp?.hourlyRate);
                           let lumpSum = 0;
-                          let living = 0;
+                          let living = toNumber(emp?.livingAllowance);
                           let responsibility = 0;
                           let extraEffort = 0;
                           let production = 0;
@@ -272,7 +286,7 @@ export default function SalariesPage() {
                           if (s) {
                             base = toNumber(s.baseSalary);
                             lumpSum = toNumber(s.lumpSumSalary);
-                            living = toNumber(s.livingAllowance);
+                            living = toNumber(s.livingAllowance) || living;
                             responsibility = toNumber(s.responsibilityAllowance);
                             extraEffort = toNumber(s.extraEffortAllowance ?? s.extraEffort);
                             production = toNumber(s.productionIncentive);
@@ -282,7 +296,7 @@ export default function SalariesPage() {
 
                           // الإجمالي الثابت الشامل
                           const monthlyFixedTotal = base + lumpSum + living + responsibility + extraEffort + production + transport - insurance;
-                          const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? "موظف غير معروف");
+                          const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? id);
 
                           return (
                             <tr key={id} className="hover:bg-white/80 transition-all duration-300 group/row">

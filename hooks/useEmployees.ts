@@ -15,6 +15,18 @@ export type UseEmployeesOptions = {
   fetchAll?: boolean;
 };
 
+type TerminateEmployeeData = {
+  terminationDate: string;
+  terminationReason: string;
+  notes?: string;
+  status: "terminated" | "resigned";
+};
+
+type TerminateEmployeeVariables = {
+  id: string;
+  data: TerminateEmployeeData;
+};
+
 type ApiErrorBody = {
   message?: string | string[];
   error?: { message?: string | string[] };
@@ -80,7 +92,7 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 export const useEmployees = (options?: UseEmployeesOptions) => {
   const queryClient = useQueryClient();
 
-  const safeLimit = Math.min(Math.max(options?.limit ?? 200, 1), 200);
+  const safeLimit = Math.min(Math.max(options?.limit ?? 500, 1), 500);
   const fetchAll = options?.fetchAll ?? true;
 
   const shouldExcludeTerminated = !options?.status && options?.includeTerminated !== true;
@@ -143,7 +155,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
       return filterEmployeesByOptions(employeesData, options);
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
@@ -167,6 +179,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -196,6 +209,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم تحديث بيانات الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -210,6 +224,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم حذف الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -219,10 +234,15 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
   
   // 5. إقالة أو استقالة موظف
-  const terminateMutation = useMutation({
-    // 👇 التعديل صار هون: ضفنا status للنوع المطلوب 👇
-    mutationFn: async ({ id, data }: { id: string; data: { terminationDate: string; terminationReason: string; notes?: string; status: "terminated" } }) => {
-      return await apiClient.patch(`/employees/${id}/terminate`, data);
+  const terminateMutation = useMutation<unknown, unknown, TerminateEmployeeVariables>({
+    mutationFn: async ({ id, data }) => {
+      const payload = {
+        terminationDate: data.terminationDate,
+        terminationReason: data.terminationReason,
+      };
+
+      const endpoint = data.status === "resigned" ? "resign" : "terminate";
+      return await apiClient.patch(`/employees/${id}/${endpoint}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });

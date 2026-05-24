@@ -22,7 +22,7 @@ export const useTransportationDeduction = (input: TransportationDeductionInput) 
       });
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
     enabled: !!input.periodStart && !!input.periodEnd,
   });

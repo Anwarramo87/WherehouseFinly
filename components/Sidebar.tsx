@@ -257,6 +257,8 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { resetAuthVerificationCache } from '@/lib/auth-verify';
 import apiClient from '@/lib/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_STALE_TIME } from '@/lib/query-cache';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -273,8 +275,9 @@ const menuItems = [
     name: 'الرواتب', icon: Wallet, roles: ['admin', 'finance', 'manager'],
     subItems: [
       { name: 'إعدادات الرواتب', href: '/salaries/salariesSetting' },
-      { name: 'الخصومات والسلف', href: '/salaries/discounts' },
+      { name: 'السلف', href: '/advances' },
       { name: 'المكافآت والحوافز', href: '/salaries/rewards' },
+      { name: 'الخصومات', href: '/salaries/discounts' },
       { name: 'جدول الدوام', href: '/salaries/timeTable' },
       { name: 'تقارير الرواتب', href: '/salaries/payroll' },
     ]
@@ -295,6 +298,45 @@ function useIsHydrated() {
 }
 
 export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }: SidebarProps) {
+  const queryClient = useQueryClient();
+
+  const prefetchMap: Record<string, () => void> = {
+    '/employees': () => queryClient.prefetchQuery({
+      queryKey: ['employees', 'all-statuses', 'exclude-terminated', 'all-departments', 'no-search', 1, 500, 'fetch-all'],
+      queryFn: () => apiClient.get('/employees', { params: { limit: 500 } }).then((r) => r.data),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/salaries/payroll': () => queryClient.prefetchQuery({
+      queryKey: ['payroll', 'runs'],
+      queryFn: () => apiClient.get(`/payroll/report/${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`).then((r) => r.data),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/salaries/discounts': () => queryClient.prefetchQuery({
+      queryKey: ['discounts', 'all'],
+      queryFn: () => apiClient.get('/discounts').then((r) => r.data ?? []),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/salaries/rewards': () => queryClient.prefetchQuery({
+      queryKey: ['bonuses', 'all', 'all-periods'],
+      queryFn: () => apiClient.get('/bonuses').then((r) => r.data?.rewards ?? r.data ?? []),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/salaries/salariesSetting': () => queryClient.prefetchQuery({
+      queryKey: ['salaries'],
+      queryFn: () => apiClient.get('/salary').then((r) => r.data?.salaries ?? r.data ?? []),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/advances': () => queryClient.prefetchQuery({
+      queryKey: ['advances', 'all'],
+      queryFn: () => apiClient.get('/advances').then((r) => r.data ?? []),
+      staleTime: QUERY_STALE_TIME.RELAXED,
+    }),
+    '/attendance': () => queryClient.prefetchQuery({
+      queryKey: ['attendance'],
+      queryFn: () => apiClient.get('/attendance').then((r) => r.data),
+      staleTime: QUERY_STALE_TIME.STANDARD,
+    }),
+  };
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -344,7 +386,6 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
     try { await apiClient.post('/auth/logout'); } catch { }
     clear();
     resetAuthVerificationCache();
-    setIsMobileOpen(false);
     router.replace('/login');
   };
 
@@ -405,40 +446,75 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
               )}
 
               {hasSubItems ? (
-                <button
-                  onClick={() => {
-                    if (isCollapsed && toggleCollapse) toggleCollapse();
-                    toggleSubMenu(item.name);
-                  }}
-                  className={`w-full flex items-center justify-between py-2.5 px-3 rounded-xl transition-all duration-300 group relative overflow-hidden
-                    ${isMainActive || isOpen ? 'bg-linear-to-l from-[#C89355]/10 to-transparent' : 'hover:bg-[#263544]/50'}
-                  `}
-                >
-                  <div className="flex items-center gap-3 relative z-10">
-                    <div className={`p-2 rounded-xl transition-all duration-300 flex items-center justify-center relative
-                      ${isMainActive || isOpen
-                        ? 'bg-[#C89355] text-[#1a2530] shadow-md shadow-[#C89355]/20'
-                        : 'bg-[#263544] text-slate-400 group-hover:bg-[#1a2530] group-hover:text-[#C89355] border border-transparent group-hover:border-[#C89355]/20'}
-                    `}>
-                      <item.icon
-                        size={20}
-                        strokeWidth={isMainActive ? 2.5 : 2}
-                        className="relative z-10 transition-transform duration-300 group-hover/nav:scale-110 group-hover/nav:-rotate-3"
-                      />
+                <>
+                  <button
+                    onClick={() => {
+                      if (isCollapsed && toggleCollapse) toggleCollapse();
+                      toggleSubMenu(item.name);
+                    }}
+                    className={`w-full flex items-center justify-between py-2.5 px-3 rounded-xl transition-all duration-300 group relative overflow-hidden
+                      ${isMainActive || isOpen ? 'bg-linear-to-l from-[#C89355]/10 to-transparent' : 'hover:bg-[#263544]/50'}
+                    `}
+                  >
+                    <div className="flex items-center gap-3 relative z-10">
+                      <div className={`p-2 rounded-xl transition-all duration-300 flex items-center justify-center relative
+                        ${isMainActive || isOpen
+                          ? 'bg-[#C89355] text-[#1a2530] shadow-md shadow-[#C89355]/20'
+                          : 'bg-[#263544] text-slate-400 group-hover:bg-[#1a2530] group-hover:text-[#C89355] border border-transparent group-hover:border-[#C89355]/20'}
+                      `}>
+                        <item.icon
+                          size={20}
+                          strokeWidth={isMainActive ? 2.5 : 2}
+                          className="relative z-10 transition-transform duration-300 group-hover/nav:scale-110 group-hover/nav:-rotate-3"
+                        />
+                      </div>
+                      {!isCollapsed && (
+                        <span className={`text-sm transition-all duration-300 ${isMainActive || isOpen ? 'font-bold text-[#C89355]' : 'font-medium text-slate-400 group-hover:text-white'}`}>
+                          {item.name}
+                        </span>
+                      )}
                     </div>
                     {!isCollapsed && (
-                      <span className={`text-sm transition-all duration-300 ${isMainActive || isOpen ? 'font-bold text-[#C89355]' : 'font-medium text-slate-400 group-hover:text-white'}`}>
-                        {item.name}
-                      </span>
+                      <ChevronDown size={18} className={`transition-transform duration-300 ${isOpen ? 'text-[#C89355] rotate-180' : 'text-slate-500 group-hover:text-[#C89355] group-hover:translate-y-0.5'}`} />
                     )}
-                  </div>
-                  {!isCollapsed && (
-                    <ChevronDown size={18} className={`transition-transform duration-300 ${isOpen ? 'text-[#C89355] rotate-180' : 'text-slate-500 group-hover:text-[#C89355] group-hover:translate-y-0.5'}`} />
+                  </button>
+
+                  {isOpen && !isCollapsed && (
+                    <div className="overflow-hidden max-h-72 opacity-100 mt-1 transition-all duration-500 ease-in-out">
+                      <div className="flex flex-col gap-1 pr-12 pl-2 relative">
+                        <div className="absolute right-6 top-2 bottom-2 w-0.5 bg-linear-to-b from-transparent via-[#263544] to-transparent rounded-full" />
+
+                        {item.subItems?.map((sub) => {
+                          const isSubActive = isHrefActive(sub.href);
+                          return (
+                            <Link
+                              key={sub.name}
+                              href={sub.href}
+                              prefetch={false}
+                              onMouseEnter={() => prefetchMap[sub.href ?? '']?.()}
+                              onClick={() => {
+                                if (onClose && window.innerWidth < 1024) onClose();
+                              }}
+                              className={`relative text-sm py-2 px-3 rounded-xl transition-all duration-300 flex items-center gap-3
+                                ${isSubActive ? 'font-bold text-[#C89355] bg-[#1a2530] shadow-sm ring-1 ring-[#C89355]/30' : 'font-medium text-slate-500 hover:text-white hover:bg-[#263544]/60 hover:-translate-x-1'}
+                              `}
+                            >
+                              <div className="absolute -right-6.5 flex items-center justify-center">
+                                <div className={`absolute w-4 h-4 bg-[#C89355]/20 rounded-full blur-sm transition-all duration-300 ${isSubActive ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} />
+                                <div className={`w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${isSubActive ? 'bg-[#C89355] border-[#1a2530] scale-100' : 'bg-[#263544] border-transparent scale-50 group-hover:scale-100 group-hover:bg-slate-400'}`} />
+                              </div>
+                              {sub.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
-                </button>
+                </>
               ) : (
                 <Link
                   href={item.href || '#'}
+                  onMouseEnter={() => prefetchMap[item.href ?? '']?.()}
                   onClick={() => {
                     setOpenMenu(null);
                     if (onClose && window.innerWidth < 1024) onClose();
@@ -464,37 +540,6 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
                     </span>
                   )}
                 </Link>
-              )}
-
-              {hasSubItems && !isCollapsed && (
-                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="flex flex-col gap-1 pr-12 pl-2 relative">
-                    <div className="absolute right-6 top-2 bottom-2 w-0.5 bg-linear-to-b from-transparent via-[#263544] to-transparent rounded-full" />
-
-                    {item.subItems?.map((sub) => {
-                      const isSubActive = isHrefActive(sub.href);
-                      return (
-                        <Link
-                          key={sub.name}
-                          href={sub.href}
-                          prefetch={false}
-                          onClick={() => {
-                            if (onClose && window.innerWidth < 1024) onClose();
-                          }}
-                          className={`relative text-sm py-2 px-3 rounded-xl transition-all duration-300 flex items-center gap-3
-                            ${isSubActive ? 'font-bold text-[#C89355] bg-[#1a2530] shadow-sm ring-1 ring-[#C89355]/30' : 'font-medium text-slate-500 hover:text-white hover:bg-[#263544]/60 hover:-translate-x-1'}
-                          `}
-                        >
-                          <div className="absolute -right-6.5 flex items-center justify-center">
-                            <div className={`absolute w-4 h-4 bg-[#C89355]/20 rounded-full blur-sm transition-all duration-300 ${isSubActive ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} />
-                            <div className={`w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${isSubActive ? 'bg-[#C89355] border-[#1a2530] scale-100' : 'bg-[#263544] border-transparent scale-50 group-hover:scale-100 group-hover:bg-slate-400'}`} />
-                          </div>
-                          {sub.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
               )}
             </div>
           );

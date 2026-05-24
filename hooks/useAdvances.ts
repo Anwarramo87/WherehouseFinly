@@ -32,7 +32,7 @@ export const useAdvances = (employeeId?: string) => {
       const res = await apiClient.get("/advances", { params: { employeeId } });
       return Array.isArray(res.data) ? res.data : [];
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

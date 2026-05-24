@@ -16,13 +16,14 @@ export interface Employee {
   profession?: string;
   jobTitle?: string;
   roleId?: string;
-  status?: 'active' | 'inactive' | 'terminated';
+  status?: 'active' | 'inactive' | 'terminated' | 'resigned';
   isSettled?: boolean; // تم تصفية حقوق الموظف (للموظفين المقالين/المستقيلين)
   // الراتب يأتي من الباك إند كـ Decimal، وغالباً يصل للفرونت كـ string أو كائن
   hourlyRate?: number | string | { $numberDecimal: string };
   baseSalary?: number | string | { $numberDecimal: string } | null;
+  lumpSumSalary?: number | string | { $numberDecimal: string } | null;
   monthlySalary?: number | string;
-  livingAllowance?: number | string;
+  livingAllowance?: number | string | null;
   insurances?: number | string;
   scheduledStart?: string;
   scheduledEnd?: string;

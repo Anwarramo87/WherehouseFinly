@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useSalaries } from '@/hooks/useSalaries';
@@ -100,74 +100,68 @@ const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<
 
 export const useDashboard = (opts?: { startDate?: string; endDate?: string }) => {
   const today = getLocalDateString();
-  const employeesQuery = useEmployees();
-  const salariesQuery = useSalaries();
-  const payrollSummaryQuery = usePayrollSummary();
-
-  const queries = useQueries({
-    queries: [
-      {
-        queryKey: queryKeys.employees.stats(),
-        queryFn: () => withFallback(() => api.get<EmployeesStats>('/employees/stats'), fallbackEmployeesStats),
-      },
-      {
-        queryKey: queryKeys.attendance.stats(opts?.startDate, opts?.endDate),
-        queryFn: () => {
-          const hasDateRange = Boolean(opts?.startDate && opts?.endDate);
-          const startDate = opts?.startDate ?? today;
-          const endDate = opts?.endDate ?? today;
-          return withFallback(
-            () =>
-              api.get<AttendanceStats>('/attendance/stats', {
-                params: hasDateRange ? { startDate, endDate } : { startDate, endDate },
-              }),
-            fallbackAttendanceStats,
-          );
+  // Fetch aggregated dashboard payload (reduces multiple /stats calls)
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard', 'home'],
+    queryFn: () =>
+      withFallback(
+        () => api.get<any>('/dashboard/home'),
+        {
+          totalEmployees: 0,
+          attendance: { count: 0, employees: [] },
+          absence: { count: 0, employees: [] },
+          totalDueSalaries: 0,
+          lateness: { totalMinutes: 0, count: 0, employees: [] },
+          overtime: { totalMinutes: 0, count: 0, employees: [] },
+          reportDate: getLocalDateString(),
         },
-      },
-      {
-        queryKey: queryKeys.inventory.stats(),
-        queryFn: () => withFallback(() => api.get<InventoryStats>('/inventory/stats'), fallbackInventoryStats),
-      },
-    ],
+      ),
+    staleTime: 60_000,
   });
+  const dashboard = dashboardQuery.data as {
+    totalEmployees?: number;
+    attendance?: { count?: number; employees?: unknown[] };
+    absence?: { count?: number; employees?: unknown[] };
+    totalDueSalaries?: number;
+    lateness?: { totalMinutes?: number };
+    overtime?: { totalMinutes?: number };
+  } | null;
 
-  const employees = Array.isArray(employeesQuery.data) ? employeesQuery.data : [];
-  const salaries = Array.isArray(salariesQuery.data) ? salariesQuery.data : [];
+  // Derive attendance summary from aggregated payload (simpler and resilient)
+  const attendanceSummary = {
+    active: dashboard?.attendance?.count ?? 0,
+    absent: dashboard?.absence?.count ?? 0,
+    lateMinutes: dashboard?.lateness?.totalMinutes ?? 0,
+  };
 
-  const [employeesStatsQ, attendanceStatsQ, inventoryStatsQ] = queries;
-  const employeesStats = employeesStatsQ?.data ?? fallbackEmployeesStats;
-  const attendanceStats = attendanceStatsQ?.data ?? fallbackAttendanceStats;
-  const inventoryStats = inventoryStatsQ?.data ?? fallbackInventoryStats;
+  // Compatibility shims for existing consumers
+  const employeesStats: EmployeesStats = {
+    ...fallbackEmployeesStats,
+    total: dashboard?.totalEmployees ?? fallbackEmployeesStats.total,
+  };
 
-  const attendanceSummary = extractAttendanceCounts(attendanceStats);
+  const attendanceStats: AttendanceStats = {
+    ...fallbackAttendanceStats,
+    summary: {
+      activeEmployees: attendanceSummary.active,
+      absentCount: attendanceSummary.absent,
+      totalLateMinutes: attendanceSummary.lateMinutes,
+    },
+  } as AttendanceStats;
+
+  const inventoryStats: InventoryStats = fallbackInventoryStats;
 
   const activeToday = attendanceSummary.active;
   const totalEmployees = employeesStats.total || 0;
   const totalAbsentToday = attendanceSummary.absent;
   const totalLateMinutesToday = attendanceSummary.lateMinutes;
-  const totalOvertimeMinutesToday = 0;
+  const totalOvertimeMinutesToday = dashboard?.overtime?.totalMinutes ?? 0;
 
-  const salaryByEmployee = new Map(salaries.map((salary) => [salary.employeeId, salary]));
-
-  const calculatedDueSalaries = employees.reduce((sum, employee) => {
-    if (!employee?.employeeId || employee.status === 'terminated') return sum;
-
-    const salary = salaryByEmployee.get(employee.employeeId);
-    const baseSalary = salary ? toNumber(salary.baseSalary) : toNumber(employee.hourlyRate);
-    const responsibilityAllowance = salary ? toNumber(salary.responsibilityAllowance) : 0;
-    const productionIncentive = salary ? toNumber(salary.productionIncentive) : 0;
-    const transportAllowance = salary ? toNumber(salary.transportAllowance) : 0;
-
-    return sum + baseSalary + responsibilityAllowance + productionIncentive + transportAllowance;
-  }, 0);
-
-  const payrollSummaryTotal = extractPayrollTotal(payrollSummaryQuery.data);
-  const totalDueSalaries = payrollSummaryTotal ?? calculatedDueSalaries;
+  const totalDueSalaries = dashboard?.totalDueSalaries ?? 0;
 
   const kpis: DashboardKpis = {
     ...fallbackKpis,
-    totalEmployees,
+    totalEmployees: dashboard?.totalEmployees ?? totalEmployees,
     activeToday,
     totalAbsentToday,
     totalDueSalaries,
@@ -180,16 +174,8 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
     attendanceStats,
     inventoryStats,
     kpis,
-    isLoading:
-      queries.some((q) => q.isLoading) ||
-      employeesQuery.isLoading ||
-      salariesQuery.isLoading ||
-      payrollSummaryQuery.isLoading,
-    isError:
-      queries.some((q) => q.isError) ||
-      Boolean(employeesQuery.error) ||
-      Boolean(salariesQuery.error) ||
-      Boolean(payrollSummaryQuery.error),
+    isLoading: dashboardQuery.isLoading,
+    isError: Boolean(dashboardQuery.error),
   };
 };
 

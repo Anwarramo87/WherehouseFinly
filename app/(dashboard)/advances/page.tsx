@@ -31,7 +31,7 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function AdvancesPage() {
-  const { data: employees = [] } = useEmployees({ limit: 500, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 500, status: "active", fetchAll: false });
   const { data: advances = [], isLoading, createAdvance, updateAdvance, deleteAdvance } = useAdvances();
 
   const [isModalOpen, setIsModalOpen] = useState(false);

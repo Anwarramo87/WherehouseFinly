@@ -75,7 +75,7 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
       const data = res.data as LeaveListResponse | undefined;
       return data?.leaveRequests ?? [];
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Building2, UserCog, CalendarDays, Save, Loader2 } from "lucide-react";
 import apiClient from "@/lib/api-client";
+import useDepartments from "@/hooks/useDepartments";
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface DeptFormData {
   name: string;
   manager: string;
   date: string;
   originalName?: string; // لمعرفة الاسم القديم في حال التعديل
+  id?: string;
 }
 
 interface Props {
@@ -28,18 +31,20 @@ const buildDefaultForm = (data?: DeptFormData | null): DeptFormData => (
 function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
+    const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
+    const { createDepartment, updateDepartment } = useDepartments();
 
-  const DEPARTMENTS_ENDPOINT = "/departments";
-  const USE_MOCK_API = true;
+  // use real API via hook
+  // submit to /api/departments
+    const submitDepartment = async (payload: DeptFormData) => {
+      const id = (initialData as any)?.id as string | undefined;
+      if (id) {
+        await updateDepartment.mutateAsync({ id, name: payload.name } as any);
+        return;
+      }
 
-  const submitDepartment = async (payload: DeptFormData) => {
-    if (USE_MOCK_API) {
-      console.log("[Mock] Department payload ready:", payload);
-      return;
-    }
-
-    await apiClient.post(DEPARTMENTS_ENDPOINT, payload);
+      // create
+      await createDepartment.mutateAsync({ name: payload.name } as any);
   };
 
   useEffect(() => {

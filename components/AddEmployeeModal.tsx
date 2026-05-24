@@ -4,15 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
+import useDepartments from '@/hooks/useDepartments';
 import type { Employee } from "@/types/employee";
 
 type EmployeeWithExtendedFields = Employee & {
+  username?: string | null;
   birthDate?: string | null;
+  dateOfBirth?: string | null;
   gender?: string | null;
   jobTitle?: string | null;
-  baseSalary?: number | string | null;
-  lumpSumSalary?: number | string | null;
-  livingAllowance?: number | string | null;
+  baseSalary?: number | string | { $numberDecimal: string } | null;
+  lumpSumSalary?: number | string | { $numberDecimal: string } | null;
+  livingAllowance?: number | string | { $numberDecimal: string } | null;
 };
 
 const asText = (value: unknown) => {
@@ -73,7 +76,34 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const [mobileError, setMobileError] = useState("");
   const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const { data: deptsData } = useDepartments();
   const hasInitializedRole = useRef(false);
+
+  const buildFormState = (employee?: EmployeeWithExtendedFields | null) => {
+    if (employee) {
+      return {
+        employeeId: employee.employeeId || "",
+        name: employee.name || "",
+        username: employee.username || employee.name || "",
+        mobile: employee.mobile || "",
+        birthDate: employee.birthDate || employee.dateOfBirth || "",
+        gender: employee.gender || "male",
+        jobTitle: employee.jobTitle || employee.profession || "",
+        department: employee.department || "قسم القص",
+        baseSalary: asText(employee.baseSalary || ""),
+        lumpSumSalary: asText(employee.lumpSumSalary || ""),
+        livingAllowance: asText(employee.livingAllowance || ""),
+        scheduledStart: employee.scheduledStart || "08:00",
+        scheduledEnd: employee.scheduledEnd || "16:00",
+        roleId: employee.roleId || "",
+      };
+    }
+
+    return {
+      ...defaultFormState,
+      employeeId: nextSuggestedId,
+    };
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -84,30 +114,17 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
-  const [formData, setFormData] = useState(() => {
-    if (initialData) {
-      return {
-        employeeId: initialData.employeeId || "",
-        name: initialData.name || "",
-        username: "",
-        mobile: initialData.mobile || "",
-        birthDate: initialData.birthDate || "",
-        gender: initialData.gender || "male",
-        jobTitle: initialData.jobTitle || initialData.profession || "",
-        department: initialData.department || "قسم القص",
-        baseSalary: asText(initialData.baseSalary || ""),
-        lumpSumSalary: asText(initialData.lumpSumSalary || ""),
-        livingAllowance: asText(initialData.livingAllowance || ""),
-        scheduledStart: initialData.scheduledStart || "08:00",
-        scheduledEnd: initialData.scheduledEnd || "16:00",
-        roleId: initialData.roleId || "",
-      };
-    }
-    return {
-      ...defaultFormState,
-      employeeId: nextSuggestedId
-    };
-  });
+  const [formData, setFormData] = useState(() => buildFormState(initialData));
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setStep(1);
+    setMobileError("");
+    setRoleError("");
+    hasInitializedRole.current = false;
+    setFormData(buildFormState(initialData));
+  }, [isOpen, initialData, nextSuggestedId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -228,7 +245,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <label className="block text-sm font-bold text-[#C89355] mb-2">كود الموظف (ID)</label>
                 <input
                   type="text" placeholder="مثال: EMP001" required pattern="^EMP[0-9]{3,}$"
-                  className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500"
+                  readOnly
+                  className="w-full p-3.5 bg-[#1a2530]/80 border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed"
                   dir="ltr"
                   value={formData.employeeId}
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
@@ -293,11 +311,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 >
-                  <option value="قسم القص">قسم القص</option>
-                  <option value="قسم الخياطة">قسم الخياطة</option>
-                  <option value="قسم التعبئة والتغليف">قسم التعبئة والتغليف</option>
-                  <option value="المستودع">المستودع</option>
-                  <option value="الإدارة">الإدارة</option>
+                  {(Array.isArray(deptsData?.departments) ? deptsData.departments : []).map((d: { id: string; name: string }) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
                 </select>
               </div>
 

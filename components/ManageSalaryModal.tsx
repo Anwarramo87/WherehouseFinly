@@ -16,10 +16,10 @@ import type { Salary } from "@/types/salary";
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
 const salarySchema = z.object({
   employeeId:        z.string().min(1, "الرجاء اختيار الموظف"),
-  baseSalary:        z.preprocess((val) => (val === "" || Number.isNaN(val) ? undefined : Number(val)), z.number({ required_error: "الراتب الأساسي مطلوب" }).min(1, "الراتب الأساسي مطلوب")),
-  livingAllowance:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
-  transportAllowance: z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
-  insuranceAmount:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)),
+  baseSalary:        z.preprocess((val) => (val === "" || Number.isNaN(val) ? undefined : Number(val)), z.number().min(1, "الراتب الأساسي مطلوب")) as unknown as number,
+  livingAllowance:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)) as unknown as number,
+  transportAllowance: z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)) as unknown as number,
+  insuranceAmount:   z.preprocess((val) => (val === "" || Number.isNaN(val) ? 0 : Number(val)), z.number().min(0)) as unknown as number,
 }).refine(
   (d) => (d.livingAllowance ?? 0) <= (d.baseSalary ?? 0),
   { message: "بدل المعيشة يتجاوز الراتب الأساسي", path: ["livingAllowance"] }

@@ -20,6 +20,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
+import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { usePenalties } from '@/hooks/usePenalties';
@@ -27,6 +28,7 @@ import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
@@ -36,6 +38,7 @@ import { toLocalDateString } from '@/lib/date-time';
 // ============================================================================
 
 interface DepartmentData {
+  id?: string;
   name: string;
   manager?: string;
   count: number;
@@ -134,8 +137,6 @@ type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 export default function DashboardPage() {
   const { employeesStats, kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees();
-  const { data: advancesData = [] } = useAdvances();
-  const { data: penaltiesData = [] } = usePenalties();
   const router = useRouter();
   const isSkeleton = isLoading;
 
@@ -149,9 +150,9 @@ export default function DashboardPage() {
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
-  const [addedDepartments, setAddedDepartments] = useState<DepartmentEntry[]>([]);
-  const [deletedDepartments, setDeletedDepartments] = useState<string[]>([]);
+  const queryClient = useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
 
   // إغلاق القوائم عند الضغط خارجها
   useEffect(() => {
@@ -325,23 +326,20 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = (data: DeptFormData) => {
-    if (data.originalName) {
-      setAddedDepartments(prev => 
-        prev.map(d => d.name === data.originalName ? { ...d, name: data.name, manager: data.manager } : d)
-      );
-    } else {
-      setAddedDepartments([...addedDepartments, { name: data.name, manager: data.manager, count: 0 }]);
-    }
+  const handleSaveDepartment = async (_data: DeptFormData) => {
+    // creation/update handled by modal via API; just close modal and let departments query refresh
     setIsAddDeptModalOpen(false);
     setEditingDept(null);
   };
 
-  const handleDeleteDepartment = (deptName: string, count: number) => {
-    if (count > 0) return; 
-    if (window.confirm(`هل أنت متأكد من مسح قسم ${deptName}؟`)) {
-      setDeletedDepartments([...deletedDepartments, deptName]);
-      setAddedDepartments(prev => prev.filter(d => d.name !== deptName));
+  const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
+    if (!deptId || count > 0) return;
+    if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
+    try {
+      await deleteDepartment.mutateAsync(deptId);
+    } catch (err) {
+      console.error(err);
+      alert('فشل حذف القسم');
     }
   };
 
@@ -351,62 +349,23 @@ export default function DashboardPage() {
   }, []);
 
   const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
-    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
-    return (Array.isArray(advancesData) ? advancesData : [])
-      .filter((advance) => {
-        const issueDate = advance.issueDate || advance.createdAt || "";
-        return issueDate.startsWith(monthKey);
-      })
-      .map((advance) => {
-        const employee = employeesById.get(advance.employeeId);
-        return {
-          advanceId: advance.id,
-          employeeId: advance.employeeId,
-          name: employee?.name || advance.employeeId,
-          department: employee?.department || "",
-          profession: employee?.jobTitle || "",
-          amount: toNumber(advance.totalAmount),
-          requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
-          approvalDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
-          reason: "سلفة نقدية",
-          status: 'approved',
-          repaymentStatus: 'pending',
-          remainingBalance: toNumber(advance.remainingAmount),
-          avatar: undefined,
-        };
-      });
-  }, [advancesData, employees, monthKey]);
+    // Dashboard aggregated payload does not currently include full advances list.
+    // To avoid extra API requests on the home page we render an empty list here
+    // and rely on dedicated pages to show advances.
+    return [];
+  }, [monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
-    const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
-    return (Array.isArray(penaltiesData) ? penaltiesData : [])
-      .slice(0, 5)
-      .map((penalty) => {
-        const employee = employeesById.get(penalty.employeeId);
-        return {
-          penaltyId: penalty.id,
-          employeeId: penalty.employeeId,
-          name: employee?.name || penalty.employeeId,
-          department: employee?.department || "",
-          profession: employee?.jobTitle || "",
-          reason: penalty.reason || penalty.category,
-          severity: "moderate",
-          amount: toNumber(penalty.amount),
-          date: (penalty.issueDate || "").slice(0, 10),
-          issuedBy: "الإدارة",
-          status: 'active',
-          notes: "",
-          avatar: undefined,
-        };
-      });
-  }, [penaltiesData, employees]);
+    // Avoid fetching penalties on dashboard home; show empty preview list.
+    return [];
+  }, [monthKey]);
+
+  const { data: deptsData, deleteDepartment } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
-    const apiDepts = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
-    const combined = [...apiDepts, ...addedDepartments].filter(d => !deletedDepartments.includes(d.name));
-    const uniqueDepts = Array.from(new Map(combined.map(item => [item.name, item])).values());
-    return uniqueDepts;
-  }, [employeesStats, addedDepartments, deletedDepartments]);
+    const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
+    return apiList.map((d: any) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+  }, [deptsData]);
 
   const stats = [
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
@@ -565,19 +524,20 @@ export default function DashboardPage() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenDropdownDept(openDropdownDept === dept.name ? null : dept.name);
+                        setOpenDropdownDept(openDropdownDept === dept.id ? null : dept.id);
                       }}
                       className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
                     >
                       <MoreVertical size={18} />
                     </button>
 
-                    {openDropdownDept === dept.name && (
+                    {openDropdownDept === dept.id && (
                       <div className="absolute left-0 top-full mt-1 w-32 bg-[#1a2530] border border-[#263544] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingDept({ 
+                              id: dept.id,
                               name: dept.name, 
                               manager: dept.manager || "", 
                               date: new Date().toISOString().split('T')[0],
@@ -595,7 +555,8 @@ export default function DashboardPage() {
                           title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteDepartment(dept.name, dept.count);
+                            setSelectedDeptId(dept.id ?? null);
+                            handleDeleteDepartment(dept.id, dept.count);
                             setOpenDropdownDept(null);
                           }}
                           className="flex items-center gap-2 p-2.5 text-sm text-rose-500 hover:bg-rose-500/10 w-full text-right transition-colors disabled:opacity-30 disabled:cursor-not-allowed"

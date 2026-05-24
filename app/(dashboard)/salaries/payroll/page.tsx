@@ -7,7 +7,6 @@ import {
   HandCoins, Calendar as CalendarIcon,
   ChevronLeft, Search, AlertTriangle, Info, Play,
 } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -94,7 +93,6 @@ export default function PayrollPage() {
   const { calculatePayroll } = usePayroll();
 
   // ── Fetch supporting data (for payslip modal display only) ───────────────────
-  const { isLoading: employeesLoading } = useEmployees({ status: "active", limit: 500 });
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
   const { data: advances = [], isLoading: advancesLoading } = useAdvances();
@@ -103,7 +101,7 @@ export default function PayrollPage() {
   const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
 
   const isLoading =
-    employeesLoading || salariesLoading || bonusesLoading || advancesLoading || reportLoading;
+    salariesLoading || bonusesLoading || advancesLoading || reportLoading;
 
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
@@ -473,7 +471,7 @@ export default function PayrollPage() {
         <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group/table">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/table:border-[#C89355]/50" />
           <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-            <table className="w-full text-right min-w-[900px] border-collapse">
+            <table className="w-full text-right min-w-225 border-collapse">
               <thead className="bg-[#1a2530] text-white outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-[6px]">
                 <tr>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">كود</th>
@@ -536,7 +534,7 @@ export default function PayrollPage() {
                           <td className="p-4 text-center font-mono font-black text-[#263544]">
                             {item.netPay.toLocaleString()}
                           </td>
-                          <td className="p-4 text-center font-black text-xl text-[#1a2530] bg-gradient-to-l from-[#C89355]/10 to-transparent rounded-xl shadow-inner border-l-4 border-l-[#C89355]">
+                          <td className="p-4 text-center font-black text-xl text-[#1a2530] bg-linear-to-l from-[#C89355]/10 to-transparent rounded-xl shadow-inner border-l-4 border-l-[#C89355]">
                             {item.netPayRounded.toLocaleString()}
                           </td>
                           <td className="p-4 text-center font-mono font-black text-amber-600 bg-amber-50/30 rounded-xl">
@@ -594,7 +592,7 @@ export default function PayrollPage() {
       {/* ─── Payslip Modal ────────────────────────────────────────────────────── */}
       {selectedPayslip && (
         <div
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
+          className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
           dir="rtl"
         >
           <div className="payslip-container bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in fade-in zoom-in-95 duration-200">
@@ -643,7 +641,7 @@ export default function PayrollPage() {
                     <p className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-widest print:text-black">
                       اسم الموظف
                     </p>
-                    <p className="text-slate-800 text-2xl font-black print:text-black break-words">
+                    <p className="text-slate-800 text-2xl font-black print:text-black wrap-break-word">
                       {selectedPayslip.employeeName}
                     </p>
                     <p className="text-slate-400 text-sm font-bold mt-1">

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
+import { useSalaries } from "@/hooks/useSalaries";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
@@ -59,11 +60,22 @@ type EmployeeRow = Employee & {
   jobTitle?: string;
 };
 
+type ModalInitialEmployee = Employee & {
+  username?: string | null;
+  birthDate?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  jobTitle?: string | null;
+  baseSalary?: number | string | null;
+  lumpSumSalary?: number | string | null;
+  livingAllowance?: number | string | null;
+};
+
 const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<string, Salary>) => {
   // أولاً: التحقق من وجود راتب في salaryMap
   const salaryRecord = salaryMap.get(employee.employeeId);
-  if (salaryRecord?.monthlySalary) {
-    const parsed = toNumber(salaryRecord.monthlySalary);
+  if (salaryRecord?.baseSalary) {
+    const parsed = toNumber(salaryRecord.baseSalary);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
   
@@ -79,8 +91,8 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees();
-  const { data: salaries = [] } = useSalaries();
+  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
+  const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
     const m = new Map<string, Salary>();
@@ -88,9 +100,8 @@ export default function EmployeesPage() {
     return m;
   }, [salaries]);
   
-  // تصفية الموظفين النشطين
   const visibleEmployees = useMemo(
-    () => (employees || []).filter((emp) => emp.status !== "terminated"),
+    () => employees || [],
     [employees],
   );
   
@@ -102,6 +113,31 @@ export default function EmployeesPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
+
+  const selectedEmployeeForModal = useMemo<ModalInitialEmployee | undefined>(() => {
+    if (!selectedEmployee) return undefined;
+
+    const salary = salaryMap.get(selectedEmployee.employeeId) ?? null;
+
+    const normalizeDecimal = (value: unknown): number | string | null | undefined => {
+      if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
+        return (value as { $numberDecimal?: string }).$numberDecimal ?? null;
+      }
+      if (typeof value === "number" || typeof value === "string" || value == null) {
+        return value as number | string | null | undefined;
+      }
+      return undefined;
+    };
+
+    return {
+      ...selectedEmployee,
+      username: (selectedEmployee as Employee & { username?: string | null }).username || selectedEmployee.name,
+      birthDate: selectedEmployee.birthDate || (selectedEmployee as Employee & { dateOfBirth?: string | null }).dateOfBirth || null,
+      baseSalary: normalizeDecimal(selectedEmployee.baseSalary),
+      lumpSumSalary: normalizeDecimal((selectedEmployee as Employee & { lumpSumSalary?: number | string | null }).lumpSumSalary ?? salary?.lumpSumSalary),
+      livingAllowance: normalizeDecimal(selectedEmployee.livingAllowance ?? salary?.livingAllowance),
+    };
+  }, [selectedEmployee, salaryMap]);
 
   // الفلترة والأقسام
   const departments = useMemo(() => {
@@ -161,7 +197,7 @@ export default function EmployeesPage() {
 
   const handleSaveEmployee = async (formData: AddEmployeeFormData) => {
     const normalizedEmployeeId = formData.employeeId.trim();
-    const monthlySalary = toNumber(formData.monthlySalary);
+    const monthlySalary = toNumber(formData.baseSalary);
     const maxHourlyRate = 99999999.99;
     const maxMonthlySalary = maxHourlyRate * 26 * 8;
 
@@ -175,7 +211,7 @@ export default function EmployeesPage() {
       return;
     }
 
-    const payload: Partial<Employee> & { username?: string, dateOfBirth?: string, baseSalary?: number } = {
+    const payload: Partial<Employee> & { username?: string, dateOfBirth?: string, baseSalary?: number, lumpSumSalary?: number, livingAllowance?: number } = {
       employeeId: normalizedEmployeeId,
       name: formData.name.trim(),
       mobile: formData.mobile.trim() || undefined,
@@ -190,6 +226,14 @@ export default function EmployeesPage() {
       baseSalary: monthlySalary || undefined,
     };
 
+    if (formData.livingAllowance !== "") {
+      payload.livingAllowance = toNumber(formData.livingAllowance);
+    }
+
+    if (formData.lumpSumSalary !== "") {
+      payload.lumpSumSalary = toNumber(formData.lumpSumSalary);
+    }
+
     if (!selectedEmployee) {
       payload.username = formData.username.trim() || normalizedEmployeeId;
     }
@@ -198,9 +242,12 @@ export default function EmployeesPage() {
       if (selectedEmployee) {
         // في حال التعديل
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
+        // Ensure salaries list reflects employeeSalary upsert performed by backend
+        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
       } else {
         // في حال موظف جديد
         await createEmployee.mutateAsync(payload as Employee);
+        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
       }
       setIsModalOpen(false);
       setSelectedEmployee(null);
@@ -220,7 +267,7 @@ export default function EmployeesPage() {
           terminationDate: new Date(fireData.fireDate).toISOString(),
           terminationReason: fireData.reason,
           notes: fireData.notes,
-          status: fireData.status // إرسال حالة الاستقالة أو الإقالة
+          status: fireData.status as "terminated" | "resigned" // إرسال حالة الاستقالة أو الإقالة
         }
       });
       setIsFireModalOpen(false);
@@ -323,17 +370,22 @@ export default function EmployeesPage() {
                       const row = emp as EmployeeRow;
 
                       return (
-                      <tr key={emp.employeeId} className="hover:bg-white/80 transition-all duration-300 group/row">
+                      <tr key={emp.employeeId} className={`hover:bg-white/80 transition-all duration-300 group/row ${emp.status !== 'active' ? 'opacity-75 bg-rose-50/30' : ''}`}>
                         <td className="p-4 text-center font-mono font-bold text-slate-500 text-sm">
                           {emp.employeeId}
                         </td>
                         <td className="p-4 text-center">
                           <Link 
                             href={`/employees/${emp.employeeId}`} 
-                            className="inline-flex items-center gap-1.5 font-black text-slate-800 hover:text-[#C89355] transition-all text-base group/link"
+                            className={`inline-flex items-center gap-1.5 font-black transition-all text-base group/link ${emp.status === 'terminated' ? 'text-rose-500' : 'text-slate-800 hover:text-[#C89355]'}`}
                             title="عرض بروفايل الموظف"
                           >
                             <span className="group-hover/link:underline underline-offset-4 decoration-2 decoration-[#C89355]/40">{emp.name}</span>
+                            {emp.status !== 'active' && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${emp.status === 'terminated' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                                {emp.status === 'terminated' ? 'مقال' : 'مستقيل'}
+                              </span>
+                            )}
                           </Link>
                         </td>
                         <td className="p-4 text-center font-bold text-[#263544] text-sm">
@@ -390,7 +442,7 @@ export default function EmployeesPage() {
               onClose={() => { setIsModalOpen(false); setSelectedEmployee(null); }} 
               onSave={handleSaveEmployee}
               isPending={createEmployee.isPending || updateEmployee.isPending}
-              initialData={selectedEmployee ?? undefined}
+              initialData={selectedEmployeeForModal}
               nextSuggestedId={suggestedEmployeeId} // الكود الآمن المحسوب
             />
           )}

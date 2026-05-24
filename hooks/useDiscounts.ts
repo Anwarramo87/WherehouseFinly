@@ -13,6 +13,7 @@ export type DiscountRecord = {
   notes?: string;
   advanceType?: string;
   category?: string;
+  backendModel?: "advance" | "penalty";
 };
 
 export type DiscountPayload = {
@@ -67,6 +68,7 @@ export const useDiscounts = (employeeId?: string) => {
           employeeId: record.employeeId as string,
           type,
           kind,
+          backendModel: kind === "advance" ? "advance" : "penalty",
           amount: Number(record.amount || record.totalAmount || 0),
           date: (record.issueDate as string || record.date as string || "").split("T")[0],
           notes: (record.notes as string) || (record.reason as string) || "",
@@ -106,6 +108,32 @@ export const useDiscounts = (employeeId?: string) => {
     },
   });
 
+  const updateDiscount = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: DiscountPayload }) => {
+      const body: Record<string, unknown> = {
+        kind: payload.kind,
+        amount: payload.amount,
+        date: payload.date,
+        notes: payload.notes,
+      };
+
+      if (payload.kind === "advance") {
+        body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
+      } else if (payload.kind === "penalty") {
+        body.category = payload.type;
+      }
+
+      return await apiClient.put(`/discounts/${id}`, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      toast.success("تم تحديث الخصم بنجاح");
+    },
+    onError: (error: unknown) => {
+      toast.error(normalizeError(error));
+    },
+  });
+
   const deleteDiscount = useMutation({
     mutationFn: async ({ id, kind }: { id: string; kind: "advance" | "penalty" | "assistance" }) => {
       return await apiClient.delete(`/discounts/${id}?kind=${kind}`);
@@ -122,6 +150,7 @@ export const useDiscounts = (employeeId?: string) => {
   return {
     ...query,
     createDiscount,
+    updateDiscount,
     deleteDiscount,
   };
 };

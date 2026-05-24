@@ -29,7 +29,7 @@ export const usePayrollReport = (month: string) => {
         items: Array.isArray(payload?.items) ? payload.items : [],
       };
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 };

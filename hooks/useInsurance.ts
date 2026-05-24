@@ -55,7 +55,7 @@ export const useInsurance = (employeeId?: string) => {
       }
     },
     enabled: !!employeeId,
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

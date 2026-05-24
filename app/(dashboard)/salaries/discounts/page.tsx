@@ -9,7 +9,7 @@ import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscou
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 
 export default function DiscountsPage() {
-  const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,23 +91,20 @@ export default function DiscountsPage() {
 
   const handleSaveDiscount = (data: DiscountPayload) => {
     if (editingDiscount) {
-      // ✅ الحماية الأولى
       updateDiscount?.mutate(
-        { id: editingDiscount.id, backendModel: editingDiscount.backendModel, payload: data },
+        { id: editingDiscount.id, payload: data },
         { onSuccess: () => setIsModalOpen(false) }
       );
     } else {
-      // ✅ الحماية الثانية
       createDiscount?.mutate(data, {
         onSuccess: () => setIsModalOpen(false)
       });
     }
   };
 
-  const handleDelete = (id: string, backendModel: "advance" | "penalty") => {
+  const handleDelete = (id: string, kind: "advance" | "penalty" | "assistance") => {
     if (window.confirm("هل أنت متأكد من حذف هذا الإجراء المالي؟")) {
-      // ✅ الحماية الثالثة
-      deleteDiscount?.mutate({ id, backendModel });
+      deleteDiscount?.mutate({ id, kind });
     }
   };
 
@@ -289,11 +286,11 @@ export default function DiscountsPage() {
                                             >
                                               <Edit3 size={16} />
                                             </button>
-                                            <button
-                                              onClick={(e) => { e.stopPropagation(); handleDelete(record.id, (record as DiscountRecord).backendModel); }}
-                                              className="text-rose-400 hover:bg-rose-100 hover:text-rose-600 p-2 rounded-lg transition-all"
-                                              title="حذف"
-                                            >
+<button
+                                               onClick={(e) => { e.stopPropagation(); handleDelete(record.id, record.kind); }}
+                                               className="text-rose-400 hover:bg-rose-100 hover:text-rose-600 p-2 rounded-lg transition-all"
+                                               title="حذف"
+                                             >
                                               <Trash2 size={16} />
                                             </button>
                                           </div>

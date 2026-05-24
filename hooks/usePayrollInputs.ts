@@ -77,7 +77,7 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
       }));
     },
     enabled: !!periodStart && !!periodEnd,
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

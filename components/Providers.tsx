@@ -10,12 +10,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: QUERY_STALE_TIME.STANDARD,
-        gcTime: QUERY_GC_TIME.RELAXED,
+        staleTime: 2 * 60 * 1000, // 2 minutes
+        gcTime: 15 * 60 * 1000, // 15 minutes
         refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
+        refetchOnReconnect: 'always',
         refetchOnMount: false,
         retry: 1,
+        networkMode: 'offlineFirst',
       },
     },
   }));

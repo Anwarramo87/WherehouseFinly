@@ -144,7 +144,7 @@ export const useProducts = (params?: { page?: number; limit?: number; search?: s
         pagination: res.data?.pagination,
       };
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
+    staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
     placeholderData: keepPreviousData,
   });
@@ -225,26 +225,18 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
         note: input.note,
       } satisfies StockMovement;
 
-      // Preferred route from frontend contract:
-      try {
-        return await apiClient.post(`/inventory/${input.productId}/movement`, movementPayload);
-      } catch (error: unknown) {
-        const status = (error as { response?: { status?: number } })?.response?.status;
-        if (status && status !== 404 && status !== 405) throw error;
-      }
-
-      // Fallback to current backend contract:
+      // Resolve SKU for the product and call stock adjust endpoint
       const productRes = await apiClient.get(`/inventory/products/${input.productId}`);
       const sku = productRes?.data?.product?.sku;
       if (!sku) {
-        throw new Error("تعذر تحديد SKU للصنف المحدد");
+        throw new Error('تعذر تحديد SKU للصنف المحدد');
       }
 
-      return await apiClient.post("/inventory/stock/adjust", {
+      return await apiClient.post('/inventory/stock/adjust', {
         sku,
-        location: input.location || "MAIN",
+        location: input.location || 'MAIN',
         change,
-        reason: input.note || (input.type === "IN" ? "إضافة مخزون" : "صرف مخزون"),
+        reason: input.note || (input.type === 'IN' ? 'إضافة مخزون' : 'صرف مخزون'),
       });
     },
     onSuccess: () => {

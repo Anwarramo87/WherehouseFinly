@@ -120,25 +120,24 @@ export default function AttendancePage() {
 const rows = useMemo(() => {
     const dateRange = getDateRange(selectedDate, selectedDate);
     // 1. قراءة البيانات من records بدلاً من dailyRecords
-    const rawRecords = data?.records || []; 
+    const rawRecords = (data?.records || []) as unknown as Array<Record<string, unknown>>; 
     
-    // 2. تجميع البصمات المبعثرة (IN / OUT) لكل موظف في اليوم
-    const byKey = new Map();
+    const byKey = new Map<string, { key: string; checkIn: string; checkOut: string; source: unknown }>();
     
-    rawRecords.forEach((record: Record<string, unknown>) => {
-      const key = `${record.employeeId}-${record.date}`;
+    rawRecords.forEach((record) => {
+      const key = `${String(record.employeeId)}-${String(record.date)}`;
       if (!byKey.has(key)) {
         byKey.set(key, { key, checkIn: "", checkOut: "", source: record.source });
       }
       const entry = byKey.get(key);
       
-      // استخراج الوقت (ساعات ودقائق) من الـ timestamp
-      const timeString = new Date(record.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const timeString = new Date(String(record.timestamp)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
-      if (record.type === 'IN') entry.checkIn = timeString;
-      if (record.type === 'OUT') entry.checkOut = timeString;
-      // نأخذ المصدر بناءً على آخر بصمة
-      entry.source = record.source;
+      if (entry) {
+        if (record.type === 'IN') entry.checkIn = timeString;
+        if (record.type === 'OUT') entry.checkOut = timeString;
+        entry.source = record.source;
+      }
     });
 
     const employeeIds = new Set<string>();
@@ -163,7 +162,7 @@ const rows = useMemo(() => {
           checkIn,
           checkOut,
           scheduledStart,
-          source: entry?.source || "manual",
+          source: (entry?.source === "device" ? "device" : "manual") as "manual" | "device",
           status: getStatus(checkIn, scheduledStart),
         });
       }

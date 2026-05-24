@@ -13,7 +13,7 @@ const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { load
 
 export default function RewardsPage() {
   const searchParams = useSearchParams();
-  const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
+  const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: salaries = [] } = useSalaries();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
