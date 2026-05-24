@@ -272,12 +272,13 @@ const menuItems = [
   { name: 'المستقيلون', icon: UserMinus, href: '/resigned', roles: ['admin', 'hr', 'manager'] },
   { name: 'سجل الحضور', icon: ClipboardList, href: '/attendance', roles: ['admin', 'hr', 'manager'] },
   {
-    name: 'الرواتب', icon: Wallet, roles: ['admin', 'finance', 'manager'],
+    name: 'الرواتب',
+    icon: Wallet,
+    roles: ['admin', 'finance', 'manager'],
     subItems: [
       { name: 'إعدادات الرواتب', href: '/salaries/salariesSetting' },
-      { name: 'السلف', href: '/advances' },
       { name: 'المكافآت والحوافز', href: '/salaries/rewards' },
-      { name: 'الخصومات', href: '/salaries/discounts' },
+      { name: 'الخصومات والسلف', href: '/salaries/discounts' },
       { name: 'جدول الدوام', href: '/salaries/timeTable' },
       { name: 'تقارير الرواتب', href: '/salaries/payroll' },
     ]
@@ -326,11 +327,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       queryFn: () => apiClient.get('/salary').then((r) => r.data?.salaries ?? r.data ?? []),
       staleTime: QUERY_STALE_TIME.RELAXED,
     }),
-    '/advances': () => queryClient.prefetchQuery({
-      queryKey: ['advances', 'all'],
-      queryFn: () => apiClient.get('/advances').then((r) => r.data ?? []),
-      staleTime: QUERY_STALE_TIME.RELAXED,
-    }),
+    // advances moved into discounts page; rely on discounts prefetch
     '/attendance': () => queryClient.prefetchQuery({
       queryKey: ['attendance'],
       queryFn: () => apiClient.get('/attendance').then((r) => r.data),

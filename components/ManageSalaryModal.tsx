@@ -35,9 +35,6 @@ export type SalaryPayload = {
   livingAllowance: number;
   transportAllowance: number;
   insuranceAmount: number;
-  responsibilityAllowance: number;
-  extraEffortAllowance: number;
-  productionIncentive: number;
 };
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -156,9 +153,6 @@ function ManageSalaryModalContent({
       livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
       transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
       insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
-      responsibilityAllowance: 0,
-      extraEffortAllowance:    0,
-      productionIncentive:     0,
     };
     savedRef.current = true;
     onSave(values.employeeId, payload);
@@ -239,7 +233,7 @@ function ManageSalaryModalContent({
   // ─── Render ───────────────────────────────────────────────────────────────────
   return createPortal(
     <div
-      className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
+      className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">

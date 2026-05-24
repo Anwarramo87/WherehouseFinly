@@ -91,7 +91,7 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
+  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
@@ -338,6 +338,20 @@ export default function EmployeesPage() {
           <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
             <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
             <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
+              {isError && (
+                <div className="mx-5 mt-5 mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm font-bold flex items-center justify-between gap-4">
+                  <span>
+                    {getErrorMessage(error, "فشل جلب قائمة الموظفين")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="shrink-0 rounded-xl bg-rose-600 px-3 py-2 text-white text-xs font-black hover:bg-rose-700 transition-colors"
+                  >
+                    إعادة المحاولة
+                  </button>
+                </div>
+              )}
               <table className="w-full text-right min-w-225">
                 <thead className="bg-white/40 border-b border-white/80">
                   <tr>

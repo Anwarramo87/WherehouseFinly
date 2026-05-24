@@ -50,6 +50,10 @@ const mapBackendKindToType = (record: Record<string, unknown>): { type: string; 
 export const useDiscounts = (employeeId?: string) => {
   const queryClient = useQueryClient();
 
+  const resolveUpdateEndpoint = (recordKind: DiscountRecord["kind"]) => {
+    return recordKind === "advance" ? "/advances" : "/bonuses";
+  };
+
   const query = useQuery<DiscountRecord[]>({
     queryKey: ["discounts", employeeId || "all"],
     queryFn: async () => {
@@ -85,7 +89,7 @@ export const useDiscounts = (employeeId?: string) => {
     mutationFn: async (payload: DiscountPayload) => {
       const body: Record<string, unknown> = {
         employeeId: payload.employeeId,
-        kind: payload.kind,
+        kind: payload.kind === "advance" ? "advance" : "assistance",
         amount: payload.amount,
         date: payload.date,
         notes: payload.notes,
@@ -93,8 +97,6 @@ export const useDiscounts = (employeeId?: string) => {
 
       if (payload.kind === "advance") {
         body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
-      } else if (payload.kind === "penalty") {
-        body.category = payload.type;
       }
 
       return await apiClient.post("/discounts", body);
@@ -110,20 +112,23 @@ export const useDiscounts = (employeeId?: string) => {
 
   const updateDiscount = useMutation({
     mutationFn: async ({ id, payload }: { id: string; payload: DiscountPayload }) => {
-      const body: Record<string, unknown> = {
-        kind: payload.kind,
-        amount: payload.amount,
-        date: payload.date,
-        notes: payload.notes,
-      };
-
       if (payload.kind === "advance") {
-        body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
-      } else if (payload.kind === "penalty") {
-        body.category = payload.type;
+        const body: Record<string, unknown> = {
+          remainingAmount: Number(payload.amount),
+          installmentAmount: 0,
+          notes: payload.notes,
+        };
+
+        return await apiClient.put(`/advances/${id}`, body);
       }
 
-      return await apiClient.put(`/discounts/${id}`, body);
+      const body: Record<string, unknown> = {
+        assistanceAmount: Number(payload.amount),
+        bonusReason: payload.type,
+        period: payload.date?.slice(0, 7),
+      };
+
+      return await apiClient.put(`/bonuses/${id}`, body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
@@ -136,7 +141,8 @@ export const useDiscounts = (employeeId?: string) => {
 
   const deleteDiscount = useMutation({
     mutationFn: async ({ id, kind }: { id: string; kind: "advance" | "penalty" | "assistance" }) => {
-      return await apiClient.delete(`/discounts/${id}?kind=${kind}`);
+      const backendKind = kind === "advance" ? "advance" : "assistance";
+      return await apiClient.delete(`/discounts/${id}?kind=${backendKind}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });

@@ -5,12 +5,15 @@ import dynamic from "next/dynamic";
 import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
+import { useAdvances } from "@/hooks/useAdvances";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
+const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 export default function DiscountsPage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts();
+  const { data: advances = [], createAdvance, updateAdvance, deleteAdvance } = useAdvances();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +23,8 @@ export default function DiscountsPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
+  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [editingAdvance, setEditingAdvance] = useState<any | null>(null);
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -87,6 +92,24 @@ export default function DiscountsPage() {
   const handleOpenEditModal = (record: DiscountRecord) => {
     setEditingDiscount(record);
     setIsModalOpen(true);
+  };
+
+  const handleOpenAddAdvance = () => {
+    setEditingAdvance(null);
+    setIsAdvanceModalOpen(true);
+  };
+
+  const handleEditAdvance = (adv: any) => {
+    setEditingAdvance(adv);
+    setIsAdvanceModalOpen(true);
+  };
+
+  const handleSaveAdvance = (data: any) => {
+    if (editingAdvance) {
+      updateAdvance.mutate({ id: editingAdvance.id, data }, { onSuccess: () => setIsAdvanceModalOpen(false) });
+    } else {
+      createAdvance.mutate(data, { onSuccess: () => setIsAdvanceModalOpen(false) });
+    }
   };
 
   const handleSaveDiscount = (data: DiscountPayload) => {
@@ -191,6 +214,14 @@ export default function DiscountsPage() {
                 <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
                 <Plus size={18} className="group-hover:animate-spin relative z-10" />
                 <span className="relative z-10 tracking-wide">إضافة إجراء مالي</span>
+              </button>
+              <button
+                onClick={handleOpenAddAdvance}
+                title="إضافة سلفة مفصلة"
+                className="relative overflow-hidden bg-white/80 hover:bg-white text-[#263544] px-4 py-2 rounded-2xl flex items-center gap-2 transition-all shadow-sm border border-slate-200 text-sm font-bold"
+              >
+                <Wallet size={16} />
+                <span>إضافة سلفة</span>
               </button>
             </div>
           </div>
@@ -321,6 +352,17 @@ export default function DiscountsPage() {
             isPending={isPending}
             employees={Array.isArray(employees) ? employees : []}
             initialData={editingDiscount}
+          />
+        )}
+
+        {isAdvanceModalOpen && (
+          <AddAdvanceModal
+            isOpen={isAdvanceModalOpen}
+            onClose={() => setIsAdvanceModalOpen(false)}
+            onSave={handleSaveAdvance}
+            isPending={createAdvance.isPending || updateAdvance.isPending}
+            employees={Array.isArray(employees) ? employees : []}
+            initialData={editingAdvance}
           />
         )}
 
