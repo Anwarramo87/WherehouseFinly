@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, ChevronLeft, Fingerprint, PencilLine, Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck } from "lucide-react";
+import {
+  Calendar as CalendarIcon, ChevronLeft, Fingerprint, PencilLine,
+  Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck, CalendarPlus,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useEmployees } from "@/hooks/useEmployees";
@@ -13,6 +17,11 @@ import {
   type AttendanceRealtimeEventPayload,
 } from "@/lib/realtime/attendance-socket";
 
+const LeaveRequestModal = dynamic(
+  () => import("@/components/LeaveRequestModal"),
+  { loading: () => null }
+);
+
 type TableStatus = "present" | "late" | "absent";
 
 const EMPLOYEE_ID_REGEX = /^EMP[0-9]{3,}$/;
@@ -22,46 +31,28 @@ const toMinutes = (time?: string) => {
   const normalized = time.slice(0, 5);
   const [h, m] = normalized.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return (h * 60) + m;
+  return h * 60 + m;
 };
 
 const getToday = () => toLocalDateString();
 
-const getDateRange = (startDate: string, endDate: string) => {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  const dates: string[] = [];
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return dates;
-
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    dates.push(toLocalDateString(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return dates;
-};
-
 const toArabicDate = (date: string) =>
   new Intl.DateTimeFormat("ar-EG", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date(`${date}T00:00:00`));
 
 const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
   if (!checkIn) return "absent";
-  const checkInMinutes = toMinutes(checkIn);
-  const scheduledMinutes = toMinutes(scheduledStart || "08:00");
-  if (checkInMinutes === null || scheduledMinutes === null) return "present";
-  if (checkInMinutes > (scheduledMinutes + 15)) return "late";
-  return "present";
+  const ci = toMinutes(checkIn);
+  const sc = toMinutes(scheduledStart || "08:00");
+  if (ci === null || sc === null) return "present";
+  return ci > sc + 15 ? "late" : "present";
 };
 
 const statusUi: Record<TableStatus, { label: string; classes: string }> = {
   present: { label: "حاضر", classes: "text-[#C89355] bg-[#1a2530] border-[#C89355]/30 shadow-sm" },
-  late: { label: "متأخر", classes: "text-rose-600 bg-rose-50/80 backdrop-blur-md border-rose-100 shadow-sm" },
-  absent: { label: "غائب", classes: "text-red-700 bg-red-50/80 backdrop-blur-md border-red-200 shadow-sm" },
+  late:    { label: "متأخر", classes: "text-rose-600 bg-rose-50/80 backdrop-blur-md border-rose-100 shadow-sm" },
+  absent:  { label: "غائب",  classes: "text-red-700 bg-red-50/80 backdrop-blur-md border-red-200 shadow-sm" },
 };
 
 interface AttendanceTableRow {
@@ -81,6 +72,7 @@ export default function AttendancePage() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(today);
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
   const [timeModal, setTimeModal] = useState<{
     isOpen: boolean;
@@ -97,92 +89,67 @@ export default function AttendancePage() {
     limit: 200,
   });
 
+  const employeeList = useMemo(
+    () => (Array.isArray(employees) ? employees : []),
+    [employees]
+  );
+
   const employeeNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (Array.isArray(employees)) {
-      for (const employee of employees) {
-        if (employee?.employeeId) map.set(employee.employeeId, employee.name || employee.employeeId);
-      }
+    for (const e of employeeList) {
+      if (e?.employeeId) map.set(e.employeeId, e.name || e.employeeId);
     }
     return map;
-  }, [employees]);
+  }, [employeeList]);
 
   const employeeScheduleMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (Array.isArray(employees)) {
-      for (const employee of employees) {
-        if (employee?.employeeId) map.set(employee.employeeId, employee.scheduledStart || "08:00");
-      }
+    for (const e of employeeList) {
+      if (e?.employeeId) map.set(e.employeeId, e.scheduledStart || "08:00");
     }
     return map;
-  }, [employees]);
+  }, [employeeList]);
 
-const rows = useMemo(() => {
-    const dateRange = getDateRange(selectedDate, selectedDate);
-    // 1. قراءة البيانات من records بدلاً من dailyRecords
-    const rawRecords = (data?.records || []) as unknown as Array<Record<string, unknown>>; 
-    
-    const byKey = new Map<string, { key: string; checkIn: string; checkOut: string; source: unknown }>();
-    
-    rawRecords.forEach((record) => {
-      const key = `${String(record.employeeId)}-${String(record.date)}`;
-      if (!byKey.has(key)) {
-        byKey.set(key, { key, checkIn: "", checkOut: "", source: record.source });
-      }
-      const entry = byKey.get(key);
-      
-      const timeString = new Date(String(record.timestamp)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      
-      if (entry) {
-        if (record.type === 'IN') entry.checkIn = timeString;
-        if (record.type === 'OUT') entry.checkOut = timeString;
-        entry.source = record.source;
-      }
-    });
-
+  const rows = useMemo((): AttendanceTableRow[] => {
     const employeeIds = new Set<string>();
-    (employees || []).forEach((e) => {
+    for (const e of employeeList) {
       if (e?.employeeId && EMPLOYEE_ID_REGEX.test(e.employeeId)) employeeIds.add(e.employeeId);
+    }
+
+    const dailyMap = new Map<string, { checkIn: string; checkOut: string; source: "manual" | "device" }>();
+    (data?.dailyRecords || []).forEach((dr) => {
+      dailyMap.set(dr.key, { checkIn: dr.checkIn || "", checkOut: dr.checkOut || "", source: dr.source });
     });
 
     const tableRows: AttendanceTableRow[] = [];
-    for (const date of dateRange) {
-      for (const employeeId of Array.from(employeeIds).sort()) {
-        const key = `${employeeId}-${date}`;
-        const entry = byKey.get(key);
-        const checkIn = entry?.checkIn || "";
-        const checkOut = entry?.checkOut || "";
-        const scheduledStart = employeeScheduleMap.get(employeeId) || "08:00";
-
-        tableRows.push({
-          key,
-          employeeId,
-          employeeName: employeeNameMap.get(employeeId) || employeeId,
-          date,
-          checkIn,
-          checkOut,
-          scheduledStart,
-          source: (entry?.source === "device" ? "device" : "manual") as "manual" | "device",
-          status: getStatus(checkIn, scheduledStart),
-        });
-      }
+    for (const employeeId of Array.from(employeeIds).sort()) {
+      const key = `${employeeId}-${selectedDate}`;
+      const entry = dailyMap.get(key);
+      const checkIn = entry?.checkIn || "";
+      const checkOut = entry?.checkOut || "";
+      const scheduledStart = employeeScheduleMap.get(employeeId) || "08:00";
+      tableRows.push({
+        key, employeeId,
+        employeeName: employeeNameMap.get(employeeId) || employeeId,
+        date: selectedDate, checkIn, checkOut, scheduledStart,
+        source: entry?.source ?? "manual",
+        status: getStatus(checkIn, scheduledStart),
+      });
     }
-    return tableRows.sort((a, b) => `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`));
-  }, [data?.records, employees, selectedDate, employeeNameMap, employeeScheduleMap]);
-
-  const stats = useMemo(() => {
-    return rows.reduce(
-      (acc, row) => {
-        acc[row.status] += 1;
-        return acc;
-      },
-      { present: 0, late: 0, absent: 0 } as Record<TableStatus, number>,
+    return tableRows.sort((a, b) =>
+      `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`)
     );
-  }, [rows]);
+  }, [data?.dailyRecords, employeeList, selectedDate, employeeNameMap, employeeScheduleMap]);
+
+  const stats = useMemo(() =>
+    rows.reduce(
+      (acc, row) => { acc[row.status] += 1; return acc; },
+      { present: 0, late: 0, absent: 0 } as Record<TableStatus, number>
+    ), [rows]);
 
   useEffect(() => {
     const socket = getAttendanceSocket();
-    if (!socket) return;
+    if (!socket) return () => {};
     const onAttendanceUpdate = (payload: AttendanceRealtimeEventPayload) => {
       if (!payload?.employeeId) return;
       setLiveAttendanceEvent(payload);
@@ -196,40 +163,34 @@ const rows = useMemo(() => {
 
   const handleOpenTimeModal = (row: AttendanceTableRow, field: "checkIn" | "checkOut") => {
     if (!EMPLOYEE_ID_REGEX.test(row.employeeId)) {
-      window.alert(`لا يمكن تسجيل الحضور لهذا السطر لأن رقم الموظف غير صالح: ${row.employeeId}`);
+      toast.error(`رقم الموظف غير صالح: ${row.employeeId}`);
       return;
     }
-    const defaultValue = field === "checkOut" && row.checkOut
-      ? normalizeHHmm(row.checkOut)
-      : field === "checkIn" && row.checkIn ? normalizeHHmm(row.checkIn) : timeNow();
+    const defaultValue =
+      field === "checkOut" && row.checkOut ? normalizeHHmm(row.checkOut)
+      : field === "checkIn" && row.checkIn ? normalizeHHmm(row.checkIn)
+      : timeNow();
     setTimeModal({ isOpen: true, row, field, value: defaultValue });
   };
 
-const handleSaveTime = () => {
+  const handleSaveTime = () => {
     const { row, field, value } = timeModal;
     if (!row || !field) return;
-    if (!value) { window.alert("الرجاء إدخال الوقت"); return; }
-    
+    if (!value) { toast.error("الرجاء إدخال الوقت"); return; }
     const normalizedValue = normalizeHHmm(value);
     if (!HH_MM_REGEX.test(normalizedValue)) {
-      window.alert("صيغة الوقت غير صحيحة. الرجاء استخدام HH:mm");
+      toast.error("صيغة الوقت غير صحيحة. الرجاء استخدام HH:mm");
       return;
     }
-
-    // Pass the data exactly as the hook expects it.
     markAttendance.mutate({
       employeeId: row.employeeId,
       date: row.date,
-      // If the field is checkIn, assign normalizedValue to checkIn, else undefined
       checkIn: field === "checkIn" ? normalizedValue : undefined,
-      // If the field is checkOut, assign normalizedValue to checkOut, else undefined
       checkOut: field === "checkOut" ? normalizedValue : undefined,
       source: "manual",
     });
-    
     setTimeModal({ isOpen: false, row: null, field: null, value: "" });
   };
-
 
   if (isLoading || employeesLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
@@ -240,9 +201,11 @@ const handleSaveTime = () => {
     </div>
   );
 
-  if (isError) {
-    return <div className="p-8 text-center text-red-600 font-bold bg-rose-50/50 mt-10 rounded-2xl mx-10 border border-rose-200">حدث خطأ في تحميل الحضور: {(error as Error)?.message || "خطأ غير معروف"}</div>;
-  }
+  if (isError) return (
+    <div className="p-8 text-center text-red-600 font-bold bg-rose-50/50 mt-10 rounded-2xl mx-10 border border-rose-200">
+      حدث خطأ في تحميل الحضور: {(error as Error)?.message || "خطأ غير معروف"}
+    </div>
+  );
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
@@ -250,12 +213,25 @@ const handleSaveTime = () => {
 
       <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
 
-        <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
-          <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-          <span className="hover:text-[#263544] cursor-pointer transition-colors relative z-10">إدارة الموارد البشرية</span>
-          <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
-          <span className="text-[#263544] relative z-10">سجل الحضور</span>
-        </nav>
+        {/* Breadcrumb + زر طلب إجازة في نفس الصف */}
+        <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <nav className="relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
+            <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
+            <span className="hover:text-[#263544] cursor-pointer transition-colors relative z-10">إدارة الموارد البشرية</span>
+            <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
+            <span className="text-[#263544] relative z-10">سجل الحضور</span>
+          </nav>
+
+          {/* زر طلب إجازة — نفس تصميم أزرار الصفحة */}
+          <button
+            onClick={() => setIsLeaveModalOpen(true)}
+            className="group/btn relative overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black active:scale-95 transition-all shadow-sm"
+          >
+            <div className="absolute inset-0.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/60" />
+            <CalendarPlus size={15} className="relative z-10 group-hover/btn:scale-110 transition-transform" />
+            <span className="relative z-10">طلب إجازة</span>
+          </button>
+        </div>
 
         <header className="mb-10 text-right border-b border-[#263544]/10 pb-6 relative">
           <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
@@ -281,7 +257,8 @@ const handleSaveTime = () => {
                     <div>
                       <p className="text-sm font-black text-[#263544]">{liveAttendanceEvent.message}</p>
                       <p className="text-xs text-slate-500 mt-1 font-bold">
-                        {liveAttendanceEvent.employeeName} <span className="text-[#C89355] mx-1">|</span> <span className="font-mono text-[#263544]">{liveAttendanceEvent.employeeId}</span>
+                        {liveAttendanceEvent.employeeName} <span className="text-[#C89355] mx-1">|</span>
+                        <span className="font-mono text-[#263544]">{liveAttendanceEvent.employeeId}</span>
                       </p>
                     </div>
                   </div>
@@ -298,9 +275,12 @@ const handleSaveTime = () => {
                 <span className="relative z-10 bg-[#1a2530] text-[#C89355] px-4 py-1.5 rounded-xl text-xs font-black border border-[#C89355]/30 shadow-sm">حاضر: {stats.present}</span>
                 <span className="relative z-10 bg-orange-50 text-orange-600 px-4 py-1.5 rounded-xl text-xs font-black border border-orange-100 shadow-sm">متأخر: {stats.late}</span>
                 <span className="relative z-10 bg-red-50 text-red-600 px-4 py-1.5 rounded-xl text-xs font-black border border-red-100 shadow-sm">غائب: {stats.absent}</span>
-                <div className="w-px h-6 bg-[#263544]/20 mx-1 hidden md:block relative z-10"></div>
+                <div className="w-px h-6 bg-[#263544]/20 mx-1 hidden md:block relative z-10" />
                 <span className="relative z-10 text-[#263544] px-3 py-1 text-xs font-black">
-                  {isFetching ? <span className="flex items-center gap-2"><Loader2 size={12} className="animate-spin text-[#C89355]" /> تحديث...</span> : <span className="font-mono">{selectedDate}</span>}
+                  {isFetching
+                    ? <span className="flex items-center gap-2"><Loader2 size={12} className="animate-spin text-[#C89355]" /> تحديث...</span>
+                    : <span className="font-mono">{selectedDate}</span>
+                  }
                 </span>
               </div>
 
@@ -321,6 +301,7 @@ const handleSaveTime = () => {
           </div>
         </header>
 
+        {/* Table */}
         <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
           <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
@@ -357,10 +338,8 @@ const handleSaveTime = () => {
                   rows.map((row) => (
                     <tr key={row.key} className="hover:bg-white/80 transition-all duration-300 group/row">
                       <td className="p-4 text-center">
-                        <div>
-                          <p className="font-black text-slate-800 text-sm group-hover/row:text-[#263544] transition-colors">{row.employeeName}</p>
-                          <p className="text-[11px] text-slate-500 font-mono mt-0.5">{row.employeeId}</p>
-                        </div>
+                        <p className="font-black text-slate-800 text-sm group-hover/row:text-[#263544] transition-colors">{row.employeeName}</p>
+                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">{row.employeeId}</p>
                       </td>
                       <td className="p-4 text-sm text-[#263544]/80 font-bold text-center">{toArabicDate(row.date)}</td>
                       <td className="p-4 text-sm text-[#263544] font-black font-mono text-center bg-white/30 rounded-lg">{normalizeHHmm(row.checkIn) || "—"}</td>
@@ -374,15 +353,9 @@ const handleSaveTime = () => {
                         {row.checkIn || row.checkOut ? (
                           <span className="inline-flex items-center justify-center gap-2 text-xs font-black">
                             {row.source === "device" ? (
-                              <>
-                                <Fingerprint size={16} className="text-[#263544] group-hover/row:animate-pulse transition-all duration-300" />
-                                <span className="text-[#263544]">جهاز</span>
-                              </>
+                              <><Fingerprint size={16} className="text-[#263544] group-hover/row:animate-pulse transition-all duration-300" /><span className="text-[#263544]">جهاز</span></>
                             ) : (
-                              <>
-                                <PencilLine size={16} className="text-[#C89355] group-hover/row:animate-pulse transition-all duration-300" />
-                                <span className="text-[#C89355]">يدوي</span>
-                              </>
+                              <><PencilLine size={16} className="text-[#C89355] group-hover/row:animate-pulse transition-all duration-300" /><span className="text-[#C89355]">يدوي</span></>
                             )}
                           </span>
                         ) : (
@@ -400,7 +373,6 @@ const handleSaveTime = () => {
                             <LogIn size={15} className="group-hover/btn:-translate-x-1 transition-transform relative z-10" />
                             <span className="relative z-10">{row.checkIn ? "تعديل دخول" : "تسجيل دخول"}</span>
                           </button>
-
                           <button
                             onClick={() => handleOpenTimeModal(row, "checkOut")}
                             disabled={markAttendance.isPending || !row.checkIn}
@@ -421,6 +393,7 @@ const handleSaveTime = () => {
           </div>
         </div>
 
+        {/* Footer note */}
         <div className="mt-8 relative overflow-hidden bg-white/60 backdrop-blur-xl p-5 rounded-4xl border border-white/80 shadow-[0_8px_30px_rgba(38,53,68,0.05)] flex flex-col md:flex-row gap-4 justify-between items-start md:items-center group">
           <div className="absolute inset-1 rounded-[1.8rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
           <div className="text-xs text-[#263544] font-black flex items-center gap-2.5 relative z-10">
@@ -433,6 +406,7 @@ const handleSaveTime = () => {
           </div>
         </div>
 
+        {/* Time Modal */}
         {timeModal.isOpen && timeModal.row && (
           <div className="fixed inset-0 z-100 flex items-center justify-center bg-[#101720]/60 backdrop-blur-md p-4">
             <div className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-lg overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-300 relative">
@@ -441,8 +415,8 @@ const handleSaveTime = () => {
               <div className="p-8 flex-1 order-2 md:order-1 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-black text-[#263544] flex items-center gap-2">
-                    {timeModal.field === 'checkIn' ? <LogIn className="text-[#C89355]" /> : <LogOut className="text-[#C89355]" />}
-                    {timeModal.field === 'checkIn' ? 'تسجيل الدخول' : 'تسجيل الخروج'}
+                    {timeModal.field === "checkIn" ? <LogIn className="text-[#C89355]" /> : <LogOut className="text-[#C89355]" />}
+                    {timeModal.field === "checkIn" ? "تسجيل الدخول" : "تسجيل الخروج"}
                   </h3>
                   <button
                     onClick={() => setTimeModal({ isOpen: false, row: null, field: null, value: "" })}
@@ -456,7 +430,7 @@ const handleSaveTime = () => {
                 <input
                   type="time"
                   value={timeModal.value}
-                  onChange={(e) => setTimeModal(prev => ({...prev, value: e.target.value}))}
+                  onChange={(e) => setTimeModal((prev) => ({ ...prev, value: e.target.value }))}
                   className="w-full p-4 bg-white/80 border-2 border-white focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none font-mono text-2xl font-black text-center text-[#263544] transition-all shadow-inner rounded-2xl"
                   dir="ltr"
                 />
@@ -488,6 +462,13 @@ const handleSaveTime = () => {
           </div>
         )}
       </div>
+
+      {/* Leave Request Modal */}
+      <LeaveRequestModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        employees={employeeList}
+      />
     </div>
   );
 }
