@@ -23,7 +23,8 @@ import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
-import { usePenalties } from '@/hooks/usePenalties';
+import { useDiscounts } from '@/hooks/useDiscounts';
+import useSalaries from '@/hooks/useSalaries';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
@@ -32,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
+import { useAuthStore } from '@/stores/auth-store';
 
 // ============================================================================
 // TypeScript Interfaces
@@ -137,6 +139,7 @@ type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 export default function DashboardPage() {
   const { employeesStats, kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees();
+  const canViewFinancialRecords = useAuthStore((state) => state.hasAnyRole(["admin"]));
   const router = useRouter();
   const isSkeleton = isLoading;
 
@@ -348,17 +351,97 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
+  const employeeList = Array.isArray(employees) ? employees : [];
+  const { data: salaries = [] } = useSalaries();
+
+  
+
+  const resolveDisplayedMonthlySalary = (employee: any, salaryMap: Map<string, any>) => {
+    const salaryRecord = salaryMap.get(employee.employeeId);
+    if (salaryRecord) {
+      const fixedTotal =
+        toNumber(salaryRecord.baseSalary) +
+        toNumber(salaryRecord.lumpSumSalary) +
+        toNumber(salaryRecord.livingAllowance) +
+        toNumber(salaryRecord.responsibilityAllowance) +
+        toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
+        toNumber(salaryRecord.productionIncentive) +
+        toNumber(salaryRecord.transportAllowance);
+
+      if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
+    }
+
+    if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
+      const parsed = toNumber(employee.monthlySalary);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    const hourly = toNumber(employee.hourlyRate);
+    return Math.round(hourly * 8 * 26);
+  };
+
+  const salaryMap = useMemo(() => {
+    const m = new Map<string, any>();
+    (salaries || []).forEach((s: any) => { if (s?.employeeId) m.set(s.employeeId, s); });
+    return m;
+  }, [salaries]);
+
+  const totalSalaries = useMemo(() => {
+    return employeeList.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
+  }, [employeeList, salaryMap]);
+
+  const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
+  const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
+
   const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
-    // Dashboard aggregated payload does not currently include full advances list.
-    // To avoid extra API requests on the home page we render an empty list here
-    // and rely on dedicated pages to show advances.
-    return [];
-  }, [monthKey]);
+    return advances
+      .filter((advance) => {
+        const advanceDate = advance.issueDate || advance.createdAt || "";
+        return advanceDate.startsWith(monthKey);
+      })
+      .slice()
+      .sort((a, b) => (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""))
+      .slice(0, 6)
+      .map((advance) => {
+        const employee = employeeList.find((emp) => emp.employeeId === advance.employeeId);
+        return {
+          advanceId: advance.id,
+          employeeId: advance.employeeId,
+          name: employee ? `${employee.name} - ${employee.employeeId}` : advance.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || employee?.profession || "",
+          amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
+          requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          remainingBalance: Number(advance.remainingAmount ?? 0),
+          avatar: undefined,
+        };
+      });
+  }, [advances, employeeList, monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
-    // Avoid fetching penalties on dashboard home; show empty preview list.
-    return [];
-  }, [monthKey]);
+    const monthRecords = discounts.filter((record) => (record.date || "").startsWith(monthKey));
+    const source = monthRecords.length > 0 ? monthRecords : discounts;
+
+    return source
+      .sort((a, b) => (b.date || b.createdAt || "").localeCompare(a.date || a.createdAt || ""))
+      .slice(0, 6)
+      .map((penalty) => {
+        const employee = employeeList.find((emp) => emp.employeeId === penalty.employeeId);
+        const isAdvance = penalty.kind === "advance" || penalty.backendModel === "advance" || Boolean(penalty.advanceType);
+        return {
+          penaltyId: penalty.id,
+          employeeId: penalty.employeeId,
+          name: employee ? `${employee.name} - ${employee.employeeId}` : penalty.employeeId,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || employee?.profession || "",
+          reason: penalty.notes || penalty.type || (isAdvance ? "سلفة" : "عقوبة"),
+          severity: "moderate",
+          amount: Number(penalty.amount ?? 0),
+          date: (penalty.date || penalty.createdAt || "").slice(0, 10),
+          avatar: undefined,
+        };
+      });
+  }, [discounts, employeeList, monthKey]);
 
   const { data: deptsData, deleteDepartment } = useDepartments();
 
@@ -371,7 +454,7 @@ export default function DashboardPage() {
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
-    { title: 'الرواتب المستحقة', value: kpis.totalDueSalaries?.toLocaleString() || '0', subValue: 'ليرة سورية', icon: Wallet, clickable: false },
+    { title: 'إجمالي المستحقات', value: totalSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: Wallet, clickable: false },
     { title: 'دقائق التأخير', value: kpis.totalLateMinutesToday, subValue: 'إجمالي تأخير اليوم', icon: Clock, clickable: true, onClick: () => handleCardClick('late') },
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];

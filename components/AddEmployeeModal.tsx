@@ -27,6 +27,11 @@ const asText = (value: unknown) => {
   return String(value);
 };
 
+const normalizeDateValue = (value?: string | null) => {
+  if (!value) return "";
+  return value.includes("T") ? value.split("T")[0] : value;
+};
+
 export type AddEmployeeFormData = {
   employeeId: string;
   name: string;
@@ -86,7 +91,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         name: employee.name || "",
         username: employee.username || employee.name || "",
         mobile: employee.mobile || "",
-        birthDate: employee.birthDate || employee.dateOfBirth || "",
+        birthDate: normalizeDateValue(employee.birthDate || employee.dateOfBirth),
         gender: employee.gender || "male",
         jobTitle: employee.jobTitle || employee.profession || "",
         department: employee.department || "قسم القص",

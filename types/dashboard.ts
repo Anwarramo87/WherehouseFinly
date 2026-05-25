@@ -53,6 +53,7 @@ export interface DashboardKpis {
   activeToday: number;
   totalAbsentToday: number;
   totalDueSalaries: number;
+  totalReceivedSalaries: number;
   totalLateMinutesToday: number;
   totalOvertimeMinutesToday: number;
 }

@@ -79,7 +79,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const today = useMemo(() => toLocalDateString(), []);
 
   // --- Modal States ---
-  type DrilldownType = 'bonuses' | 'deductions' | null;
+  type DrilldownType = 'bonuses' | 'deductions' | 'advances' | null;
   const [activeDrilldown, setActiveDrilldown] = useState<DrilldownType>(null);
   
   interface DrilldownItem {
@@ -108,8 +108,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   });
 
   const { data: salaries = [] } = useSalaries();
-  const { isLoading: isAdvancesLoading } = useAdvances(employeeId);
-  const { isLoading: isBonusesLoading } = useBonuses({ employeeId, period: month.period });
+  const { data: employeeAdvances = [], isLoading: isAdvancesLoading } = useAdvances(employeeId);
+  const { data: employeeBonuses = [], isLoading: isBonusesLoading } = useBonuses({ employeeId, period: month.period });
   
   const salary = useMemo<Salary | null>(() => {
     if (!employeeId) return null;
@@ -165,42 +165,62 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const salaryBreakdown = useMemo(() => {
     const fallbackBase = toNumber(extEmployee?.baseSalary) || toNumber(extEmployee?.salary) || toNumber(extEmployee?.hourlyRate);
     const baseSalary = (salary && toNumber(salary.baseSalary) > 0) ? toNumber(salary.baseSalary) : fallbackBase;
-    
-    const mockBonusesList = [
-      { id: '1', name: 'جهد إضافي', department: 'تجاوز الهدف الإنتاجي', amount: 50000 },
-      { id: '2', name: 'بدل غلاء معيشة', department: 'ثابت شهري', amount: 150000 },
-      { id: '3', name: 'بدل طعام وملابس', department: 'تعويض', amount: 25000 },
-    ];
+    const fixedEarnings = salary
+      ? toNumber(salary.baseSalary) +
+        toNumber(salary.lumpSumSalary) +
+        toNumber(salary.livingAllowance) +
+        toNumber(salary.responsibilityAllowance) +
+        toNumber(salary.extraEffortAllowance ?? salary.extraEffort) +
+        toNumber(salary.productionIncentive) +
+        toNumber(salary.transportAllowance)
+      : baseSalary;
+    const bonusesList = employeeBonuses.map((record) => ({
+      id: record.id,
+      name: record.bonusReason || 'مكافأة',
+      department: record.period || month.period,
+      amount: toNumber(record.bonusAmount),
+    }));
 
-    const mockDeductionsList = [
-      { id: '1', name: 'تأخير صباحي', department: 'خصم تلقائي (6 أيام)', amount: 15000 },
-      { id: '2', name: 'عقوبة إدارية', department: 'إهمال في العمل', amount: 20000 },
-      { id: '3', name: 'إجازة بلا أجر', department: 'يوم واحد', amount: 35000 },
-    ];
+    const deductionsList = employeeBonuses
+      .filter((record) => toNumber(record.assistanceAmount) > 0)
+      .map((record) => ({
+        id: record.id,
+        name: record.bonusReason || 'خصم',
+        department: record.period || month.period,
+        amount: toNumber(record.assistanceAmount),
+      }));
 
-    const mockAdvancesList = [
-      { id: '1', name: 'سلفة نقدية', department: 'منتصف الشهر', amount: 100000 }
-    ];
+    const advancesList = employeeAdvances
+      .filter((record) => (record.issueDate || '').slice(0, 7) === month.period)
+      .map((record) => ({
+        id: record.id,
+        name: record.advanceType === 'clothing' ? 'سلفة ملابس' : record.advanceType === 'other' ? 'سلفة أخرى' : 'سلفة راتب',
+        department: record.notes || record.issueDate.slice(0, 10),
+        amount: toNumber(record.remainingAmount ?? record.totalAmount),
+      }));
 
-    const totalBonuses = mockBonusesList.reduce((sum, item) => sum + item.amount, 0);
-    const totalDeductions = mockDeductionsList.reduce((sum, item) => sum + item.amount, 0);
-    const totalAdvances = mockAdvancesList.reduce((sum, item) => sum + item.amount, 0);
+    const totalBonuses = bonusesList.reduce((sum, item) => sum + item.amount, 0);
+    const totalDeductions = deductionsList.reduce((sum, item) => sum + item.amount, 0);
+    const totalAdvances = advancesList.reduce((sum, item) => sum + item.amount, 0);
 
-    const totalDues = baseSalary + totalBonuses - totalDeductions - totalAdvances;
+    const totalDues = fixedEarnings + totalBonuses - totalDeductions - totalAdvances;
 
-    const formattedBonuses = mockBonusesList.map(b => ({ ...b, extraInfo: `+${formatMoney(b.amount)} ل.س` }));
-    const formattedDeductions = mockDeductionsList.map(d => ({ ...d, extraInfo: `-${formatMoney(d.amount)} ل.س` }));
+    const formattedBonuses = bonusesList.map((bonus) => ({ ...bonus, extraInfo: `+${formatMoney(bonus.amount)} ل.س` }));
+    const formattedDeductions = deductionsList.map((deduction) => ({ ...deduction, extraInfo: `-${formatMoney(deduction.amount)} ل.س` }));
+    const formattedAdvances = advancesList.map((advance) => ({ ...advance, extraInfo: `-${formatMoney(advance.amount)} ل.س` }));
 
     return { 
       baseSalary, 
+      fixedEarnings,
       extraAndBonuses: totalBonuses, 
       deductions: totalDeductions, 
       advances: totalAdvances, 
       totalDues,
       formattedBonuses,
-      formattedDeductions
+      formattedDeductions,
+      formattedAdvances,
     };
-  }, [salary, extEmployee]);
+  }, [employeeAdvances, employeeBonuses, month.period, salary, extEmployee]);
 
   const handleOpenDrilldown = (type: DrilldownType) => {
     setActiveDrilldown(type);
@@ -212,6 +232,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
         setDrilldownData(salaryBreakdown.formattedBonuses);
       } else if (type === 'deductions') {
         setDrilldownData(salaryBreakdown.formattedDeductions);
+      } else if (type === 'advances') {
+        setDrilldownData(salaryBreakdown.formattedAdvances);
       }
       setIsModalLoading(false);
     }, 600);
@@ -220,6 +242,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const getModalConfig = () => {
     if (activeDrilldown === 'bonuses') return { title: 'تفاصيل الإضافي والمكافآت والبدلات', icon: TrendingUp };
     if (activeDrilldown === 'deductions') return { title: 'تفاصيل الخصومات والعقوبات', icon: TrendingDown };
+    if (activeDrilldown === 'advances') return { title: 'تفاصيل السلف', icon: CreditCard };
     return { title: '', icon: AlertTriangle };
   };
 
@@ -256,6 +279,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
               <span className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm border ${
                 activeDrilldown === 'deductions' 
                   ? 'bg-rose-50 text-rose-700 border-rose-100' 
+                  : activeDrilldown === 'advances'
+                    ? 'bg-orange-50 text-orange-700 border-orange-100'
                   : 'bg-[#1a2530] text-[#C89355] border-[#C89355]/30' 
               }`}>
                 {item.extraInfo}
@@ -386,7 +411,10 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                   <div className="p-2 bg-white/60 rounded-xl text-rose-400 group-hover/box:bg-rose-500 group-hover/box:text-white transition-colors shadow-sm"><ShieldAlert size={20} /></div>
                 </div>
 
-                <div className="bg-orange-50/80 p-5 rounded-2xl border border-orange-100 flex items-start justify-between">
+                <div
+                  onClick={() => handleOpenDrilldown('advances')}
+                  className="bg-orange-50/80 p-5 rounded-2xl border border-orange-100 flex items-start justify-between group/box hover:shadow-[0_10px_20px_rgba(249,115,22,0.1)] hover:-translate-y-1 hover:border-orange-300 cursor-pointer transition-all duration-300"
+                >
                   <div>
                     <p className="text-xs font-black text-orange-600 mb-1">السلف المسحوبة هذا الشهر</p>
                     <p className="text-2xl font-black text-orange-700">{formatMoney(salaryBreakdown.advances)}</p>

@@ -47,7 +47,7 @@ const mapBackendKindToType = (record: Record<string, unknown>): { type: string; 
   return { type: "أخرى", kind: "advance" as const };
 };
 
-export const useDiscounts = (employeeId?: string) => {
+export const useDiscounts = (employeeId?: string, enabled = true) => {
   const queryClient = useQueryClient();
 
   const resolveUpdateEndpoint = (recordKind: DiscountRecord["kind"]) => {
@@ -81,6 +81,7 @@ export const useDiscounts = (employeeId?: string) => {
         };
       });
     },
+    enabled,
     staleTime: QUERY_STALE_TIME.STANDARD,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
@@ -89,6 +90,7 @@ export const useDiscounts = (employeeId?: string) => {
     mutationFn: async (payload: DiscountPayload) => {
       const body: Record<string, unknown> = {
         employeeId: payload.employeeId,
+        type: payload.type,
         kind: payload.kind === "advance" ? "advance" : "assistance",
         amount: payload.amount,
         date: payload.date,

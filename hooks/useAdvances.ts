@@ -23,7 +23,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-export const useAdvances = (employeeId?: string) => {
+export const useAdvances = (employeeId?: string, enabled = true) => {
   const queryClient = useQueryClient();
 
   const advancesQuery = useQuery<Advance[]>({
@@ -32,6 +32,7 @@ export const useAdvances = (employeeId?: string) => {
       const res = await apiClient.get("/advances", { params: { employeeId } });
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled,
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });

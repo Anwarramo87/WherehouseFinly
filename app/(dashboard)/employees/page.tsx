@@ -72,20 +72,25 @@ type ModalInitialEmployee = Employee & {
 };
 
 const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<string, Salary>) => {
-  // أولاً: التحقق من وجود راتب في salaryMap
   const salaryRecord = salaryMap.get(employee.employeeId);
-  if (salaryRecord?.baseSalary) {
-    const parsed = toNumber(salaryRecord.baseSalary);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  if (salaryRecord) {
+    const fixedTotal =
+      toNumber(salaryRecord.baseSalary) +
+      toNumber(salaryRecord.lumpSumSalary) +
+      toNumber(salaryRecord.livingAllowance) +
+      toNumber(salaryRecord.responsibilityAllowance) +
+      toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
+      toNumber(salaryRecord.productionIncentive) +
+      toNumber(salaryRecord.transportAllowance);
+
+    if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
   }
-  
-  // ثانياً: التحقق من monthlySalary في بيانات الموظف نفسه
+
   if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
     const parsed = toNumber(employee.monthlySalary);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
-  
-  // Fallback: حساب من hourlyRate
+
   const hourly = toNumber(employee.hourlyRate);
   return Math.round(hourly * 8 * 26);
 };
