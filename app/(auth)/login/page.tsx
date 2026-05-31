@@ -16,11 +16,19 @@ export default function LoginPage() {
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
   const setStatus = useAuthStore((state) => state.setStatus);
+  const authStatus = useAuthStore((state) => state.status);
   const clear = useAuthStore((state) => state.clear);
   const skipInitialSessionProbeRef = useRef(false);
 
   useEffect(() => {
     let active = true;
+
+    if (authStatus === "authenticated") {
+      router.replace("/home");
+      return () => {
+        active = false;
+      };
+    }
 
     const checkExistingSession = async () => {
       const result = await verifyAuthSession();
@@ -46,7 +54,7 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [router, clear, setStatus]);
+  }, [authStatus, router, clear, setStatus]);
   
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -81,8 +89,25 @@ export default function LoginPage() {
         });
       } catch (proxyError: unknown) {
         const proxyStatus = axios.isAxiosError(proxyError) ? proxyError.response?.status : undefined;
+        const shouldTryDirectFallback = (() => {
+          if (!(proxyStatus && proxyStatus >= 500)) {
+            return false;
+          }
 
-        if (proxyStatus && proxyStatus >= 500) {
+          if (typeof window === "undefined") {
+            return false;
+          }
+
+          try {
+            const directUrl = new URL(backendBaseUrl, window.location.origin);
+            // Avoid retrying the same-origin backend via a second path.
+            return directUrl.origin !== window.location.origin;
+          } catch {
+            return false;
+          }
+        })();
+
+        if (shouldTryDirectFallback) {
           response = await axios.post(`${backendBaseUrl}/auth/login`, {
             username: normalizedUsername,
             password: normalizedPassword,

@@ -14,6 +14,7 @@ export type DiscountRecord = {
   advanceType?: string;
   category?: string;
   backendModel?: "advance" | "penalty";
+  createdAt?: string;
 };
 
 export type DiscountPayload = {

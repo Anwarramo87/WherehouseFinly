@@ -25,6 +25,7 @@ export interface Employee {
   monthlySalary?: number | string;
   livingAllowance?: number | string | null;
   insurances?: number | string;
+  residence?: string | null;
   scheduledStart?: string;
   scheduledEnd?: string;
   avatar?: string;

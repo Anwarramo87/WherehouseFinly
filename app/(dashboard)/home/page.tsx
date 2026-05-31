@@ -607,7 +607,7 @@ export default function DashboardPage() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenDropdownDept(openDropdownDept === dept.id ? null : dept.id);
+                        setOpenDropdownDept(openDropdownDept === dept.id ? null : (dept.id ?? null));
                       }}
                       className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
                     >

@@ -2,11 +2,13 @@
 
 import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+const RewardsTab = dynamic(() => import("../rewards/page"), { ssr: false, loading: () => null });
 import { useSearchParams } from "next/navigation";
 import useSalaries from "@/hooks/useSalaries";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
+import type { Advance } from "@/types/advance";
 import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { Salary } from "@/types/salary";
@@ -17,6 +19,7 @@ export type FinancialTabKey = "salary-config" | "advances" | "bonuses" | "final-
 
 const ManageSalaryModal = dynamic(() => import("@/components/ManageSalaryModal"), { loading: () => null });
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
+const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 const toNumber = (value: unknown) => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
@@ -59,6 +62,7 @@ const SkeletonRows = () => (
 const tabLabels: Record<FinancialTabKey, string> = {
   "salary-config": "إعداد الرواتب",
   "bonuses": "المكافآت والخصومات",
+  "advances": "السلف",
   "final-payroll": "المسير النهائي",
 };
 
@@ -359,7 +363,8 @@ export default function SalariesPage() {
                   <p className="font-black text-xl text-rose-600">{tabStats.totalDeductions.toLocaleString()}</p>
                 </div>
               </div>
-              <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المكافآت...</div>
+              {/* Render full rewards table via dynamic import to restore dashboard view */}
+              <RewardsTab />
             </>
           )}
 

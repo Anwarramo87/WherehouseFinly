@@ -591,7 +591,7 @@ export default function ImportPage() {
 
   return (
     /* الحاوية الرئيسية: تأثير زجاجي مع درازة خارجية متطابقة مع باقي النظام */
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-[40px] rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/30 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
         
         {/* نقشة الفايبر (القماش) الثابتة والشفافة */}
         <div 
@@ -618,7 +618,7 @@ export default function ImportPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 {/* أيقونة العنوان بهوية الماركة الكحلية والنحاسية مع الدرزة */}
-                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline outline-dashed outline-1 outline-[#C89355]/50 outline-offset-[-4px] group">
+                <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4 group">
                   <Upload size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
                 </div>
                 <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">استيراد البيانات</h1>
@@ -629,7 +629,7 @@ export default function ImportPage() {
 
           {/* منطقة عرض حالة الرفع إن وجدت */}
           {status && (
-            <div className="mb-8 text-center p-5 relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2rem] border-2 border-white/90 shadow-[0_15px_30px_rgba(38,53,68,0.06)] animate-in slide-in-from-top-4 duration-300 group/status">
+            <div className="mb-8 text-center p-5 relative overflow-hidden bg-white/70 backdrop-blur-xl rounded-4xl border-2 border-white/90 shadow-[0_15px_30px_rgba(38,53,68,0.06)] animate-in slide-in-from-top-4 duration-300 group/status">
               <div className="absolute inset-1.5 rounded-[1.7rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/status:border-[#C89355]/50 z-0" />
               <p className="text-sm font-black text-[#263544] flex items-center justify-center gap-2 relative z-10">
                 <Sparkles size={16} className="group-hover/status:animate-pulse transition-all duration-300 text-[#C89355]" /> {status}
@@ -742,7 +742,7 @@ export default function ImportPage() {
               </div>
             </div>
 
-            <label className="w-full block relative z-10 border-2 border-dashed border-slate-300/50 bg-white/40 hover:border-[#C89355]/60 hover:bg-white/80 rounded-[2rem] p-10 cursor-pointer transition-all group/drop">
+            <label className="w-full block relative z-10 border-2 border-dashed border-slate-300/50 bg-white/40 hover:border-[#C89355]/60 hover:bg-white/80 rounded-4xl p-10 cursor-pointer transition-all group/drop">
               <input
                 type="file"
                 accept={SUPPORTED_GENERAL_ACCEPT}

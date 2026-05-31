@@ -141,10 +141,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, Save, UserPlus, Search, Coins, Calculator } from "lucide-react";
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/page";
+import { useEmployees } from "@/hooks/useEmployees";
 
 interface Props {
   isOpen: boolean;
@@ -155,11 +156,12 @@ interface Props {
 
 export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: Props) {
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isAutoCalc, setIsAutoCalc] = useState(true);
   const [customCost, setCustomCost] = useState("");
 
   // Logic: الحساب الديناميكي العادل
-  const netCost = busData.totalCost - (busData.totalCost * (busData.discountPercent / 100));
+  const netCost = busData.totalCost - (busData.totalCost * (busData.companyDeductionPct / 100));
   const manualTotal = busData.passengers.filter(p => p.isManual).reduce((sum, p) => sum + p.paidAmount, 0);
   const autoCount = busData.passengers.filter(p => !p.isManual).length + 1; // +1 للراكب الجديد
   const remainingCost = Math.max(0, netCost - manualTotal);
@@ -171,20 +173,73 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
+  const routeText = useMemo(() => {
+    if (!busData?.route) return "";
+    return busData.route.trim();
+  }, [busData]);
+
+  const { data: allEmployees = [] } = useEmployees({ fetchAll: true });
+  const existingEmployeeIds = useMemo(() => new Set((busData.passengers || []).map(p => p.employeeId)), [busData.passengers]);
+
+  // Normalize Arabic text: remove diacritics, normalize alef variants, remove tatweel
+  const normalize = (s: string) => {
+    if (!s) return "";
+    return s
+      .toLowerCase()
+      .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") // remove tashkeel
+      .replace(/[إأآا]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ؤ/g, "و")
+      .replace(/ئ/g, "ي")
+      .replace(/ـ/g, "")
+      .replace(/[^\p{L}\p{N}\s]/gu, "")
+      .trim();
+  };
+
+  const { matched: matchingEmployees, others: otherEmployees } = useMemo(() => {
+    const normRoute = normalize(routeText);
+    const matched: any[] = [];
+    const others: any[] = [];
+    for (const e of (allEmployees || [])) {
+      if (!e) continue;
+      if (existingEmployeeIds.has(e.employeeId)) continue; // skip already added
+      const r = normalize(e.residence || "");
+      // Match if residence contains origin or origin contains residence or exact token match
+      const isMatch = normRoute && r && (normRoute.includes(r) || r.includes(normRoute) || r.split(" ").some(tok => normRoute.includes(tok)));
+      if (isMatch) matched.push(e);
+      else others.push(e);
+    }
+    // Sort matched by best heuristic: exact token match first
+    matched.sort((a: any, b: any) => {
+      const aScore = normalize(a.residence || "").includes(normRoute) ? 0 : 1;
+      const bScore = normalize(b.residence || "").includes(normRoute) ? 0 : 1;
+      return aScore - bScore;
+    });
+    return { matched: matched.slice(0, 50), others: otherEmployeesLimited(others, 50) };
+  }, [allEmployees, routeText, existingEmployeeIds]);
+
+  function otherEmployeesLimited(list: any[], limit = 30) {
+    return list.slice(0, limit);
+  }
+
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if(!employeeSearch.trim()) return alert("الرجاء إدخال كود أو اسم الموظف");
+    if (!employeeSearch.trim() && !selectedEmployeeId) return alert("الرجاء إدخال كود أو اسم الموظف");
 
-    const normalizedEmployeeId = employeeSearch.split('-')[0]?.trim() || "EMP";
-    const generatedId = `${busData.id}-${normalizedEmployeeId}-${busData.passengers.length + 1}`;
+    const employeeId = selectedEmployeeId || (employeeSearch.split('-')[0]?.trim() || employeeSearch.trim());
+    const name = selectedEmployeeId
+      ? (allEmployees.find((e: any) => e.employeeId === selectedEmployeeId)?.name || employeeSearch)
+      : employeeSearch;
+
+    const generatedId = `${busData.id}-${employeeId}-${busData.passengers.length + 1}`;
 
     onSave({
       id: generatedId,
-      employeeId: normalizedEmployeeId, // محاكاة (يجب ربطها بقائمة فعلية لاحقاً)
-      name: employeeSearch, 
+      employeeId,
+      name,
       paidAmount: isAutoCalc ? autoAmountPerPerson : Number(customCost),
       isManual: !isAutoCalc,
     });
@@ -213,8 +268,55 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
             <div>
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">الموظف (الاسم أو الكود)</label>
               <div className="relative group">
-                <input type="text" required placeholder="ابحث بكود أو اسم الموظف..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold pr-12" value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} />
+                <input type="text" required placeholder="ابحث بكود أو اسم الموظف..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold pr-12" value={employeeSearch} onChange={(e) => { setEmployeeSearch(e.target.value); setSelectedEmployeeId(null); }} />
                 <Search className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355]" size={22} />
+              </div>
+
+              {/* Suggestions based on residence / origin */}
+              <div className="mt-2 grid gap-2">
+                {matchingEmployees.length > 0 && (
+                  <div>
+                    <div className="text-xs text-slate-400 mb-2">الموظفون المطابقون للرحلة ({routeText || '—'})</div>
+                    <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
+                      {matchingEmployees.map((emp: any) => (
+                        <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
+                          <div className="text-left">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="font-mono text-sm text-white">{emp.employeeId}</span>
+                              <span className="text-slate-400 text-xs">{emp.residence || '—'}</span>
+                            </div>
+                            <div className="text-xs text-slate-300">{emp.name}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setEmployeeSearch(`${emp.employeeId} - ${emp.name}`); setSelectedEmployeeId(emp.employeeId); }}
+                            className="px-3 py-1 rounded-2xl bg-[#C89355] text-[#101720] text-xs font-black border border-[#C89355]/30"
+                          >اختيار</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {otherEmployees.length > 0 && (
+                  <div>
+                    <div className="text-xs text-slate-400 mb-2">موظفون آخرون</div>
+                    <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
+                      {otherEmployees.map((emp: any) => (
+                        <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
+                          <div>
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="font-mono text-sm text-white">{emp.employeeId}</span>
+                              <span className="text-slate-400 text-xs">{emp.residence || '—'}</span>
+                            </div>
+                            <div className="text-xs text-slate-300">{emp.name}</div>
+                          </div>
+                          <button type="button" onClick={() => { setEmployeeSearch(`${emp.employeeId} - ${emp.name}`); setSelectedEmployeeId(emp.employeeId); }} className="px-3 py-1 rounded-2xl bg-[#C89355] text-[#101720] text-xs font-black border border-[#C89355]/30">اختيار</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

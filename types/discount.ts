@@ -8,6 +8,7 @@ export interface DiscountRecord {
   date: string;
   notes?: string | null;
   kind: DiscountKind;
+  createdAt?: string;
 }
 
 export interface DiscountInput {

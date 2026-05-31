@@ -223,6 +223,7 @@ export default function EmployeesPage() {
       dateOfBirth: formData.birthDate || undefined,
       gender: formData.gender || undefined,
       department: formData.department || undefined,
+      residence: (formData as any).residence?.trim() || undefined,
       profession: formData.jobTitle || undefined,
       jobTitle: formData.jobTitle || undefined,
       roleId: formData.roleId || undefined,
