@@ -43,23 +43,6 @@ export default function GlobalError({ error, reset }: ErrorProps) {
         </div>
       </div>
     </div>
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            onClick={reset}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-          >
-            <RefreshCcw size={16} />
-            إعادة المحاولة
-          </button>
-          <button
-            onClick={() => window.location.assign("/home")}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            العودة للرئيسية
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
