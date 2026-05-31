@@ -7,7 +7,7 @@ import {
   AlertTriangle, CalendarCheck, ChevronLeft, Clock,
   Coins, CreditCard, Loader2, Phone, TrendingDown,
   TrendingUp, Wallet, User, X, Briefcase, Bus, ShieldAlert,
-  Hash
+  Hash, Cake
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -68,6 +68,23 @@ const getMonthBoundsToDate = () => {
   const period = `${year}-${String(month + 1).padStart(2, "0")}`;
 
   return { start, end, period, elapsedDays: now.getDate() };
+};
+
+/**
+ * يحسب العمر بالسنوات من تاريخ الميلاد حتى اليوم.
+ * يأخذ بعين الاعتبار ما إذا كان عيد الميلاد قد مرّ هذا العام أم لا.
+ */
+const calculateAge = (birthDate?: string | null): number | null => {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age >= 0 ? age : null;
 };
 
 // ==========================================
@@ -254,6 +271,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
 
   const contactPhone = employee.mobile || employee.phone || "—";
   const modalConfig = getModalConfig();
+  // يقرأ dateOfBirth (الاسم الفعلي في الباك إند) أو birthDate كـ fallback
+  const age = calculateAge(employee.dateOfBirth ?? employee.birthDate);
 
   return (
     <>
@@ -335,6 +354,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                       <div className="w-1 h-1 rounded-full bg-[#C89355] mx-1" />
                       <span className="text-white/80 font-bold">{employee.department || "القسم غير محدد"}</span>
                     </span>
+                    {age !== null && (
+                      <span className="bg-violet-50 text-violet-700 border border-violet-200 px-4 py-2 rounded-xl text-sm font-black shadow-sm flex items-center gap-2">
+                        <Cake size={14} className="text-violet-500" />
+                        {age} سنة
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
