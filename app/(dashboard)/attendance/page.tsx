@@ -10,6 +10,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useEmployees } from "@/hooks/useEmployees";
+import { useLeaves } from "@/hooks/useLeaves";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
 import { timeNow, toLocalDateString } from "@/lib/date-time";
 import {
@@ -55,6 +56,14 @@ const statusUi: Record<TableStatus, { label: string; classes: string }> = {
   absent:  { label: "غائب",  classes: "text-red-700 bg-red-50/80 backdrop-blur-md border-red-200 shadow-sm" },
 };
 
+const LEAVE_TYPE_LABELS: Record<string, string> = {
+  SICK: "مرضية",
+  ADMIN: "إدارية",
+  UNPAID: "بدون أجر",
+  DEATH: "وفاة",
+  OTHER: "أخرى",
+};
+
 interface AttendanceTableRow {
   key: string;
   employeeId: string;
@@ -65,6 +74,7 @@ interface AttendanceTableRow {
   scheduledStart?: string;
   source: "manual" | "device";
   status: TableStatus;
+  leaveStatus?: string[];
 }
 
 export default function AttendancePage() {
@@ -82,6 +92,7 @@ export default function AttendancePage() {
   }>({ isOpen: false, row: null, field: null, value: "" });
 
   const { data: employees = [], isLoading: employeesLoading } = useEmployees();
+  const { data: leaves = [], isLoading: leavesLoading } = useLeaves({ startDate: selectedDate, endDate: selectedDate });
   const { data, isLoading, isFetching, isError, error, markAttendance } = useAttendance({
     date: selectedDate,
     startDate: selectedDate,
@@ -121,6 +132,16 @@ export default function AttendancePage() {
       dailyMap.set(dr.key, { checkIn: dr.checkIn || "", checkOut: dr.checkOut || "", source: dr.source });
     });
 
+    const leavesMap = new Map<string, string[]>();
+    (leaves || []).forEach((leave) => {
+      if (leave.employeeId && leave.leaveType) {
+        if (!leavesMap.has(leave.employeeId)) {
+          leavesMap.set(leave.employeeId, []);
+        }
+        leavesMap.get(leave.employeeId)?.push(leave.leaveType);
+      }
+    });
+
     const tableRows: AttendanceTableRow[] = [];
     for (const employeeId of Array.from(employeeIds).sort()) {
       const key = `${employeeId}-${selectedDate}`;
@@ -128,18 +149,20 @@ export default function AttendancePage() {
       const checkIn = entry?.checkIn || "";
       const checkOut = entry?.checkOut || "";
       const scheduledStart = employeeScheduleMap.get(employeeId) || "08:00";
+      const leaveStatus = leavesMap.get(employeeId); // Get leave status for the employee
       tableRows.push({
         key, employeeId,
         employeeName: employeeNameMap.get(employeeId) || employeeId,
         date: selectedDate, checkIn, checkOut, scheduledStart,
         source: entry?.source ?? "manual",
         status: getStatus(checkIn, scheduledStart),
+        leaveStatus, // Add leave status to the row
       });
     }
     return tableRows.sort((a, b) =>
       `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`)
     );
-  }, [data?.dailyRecords, employeeList, selectedDate, employeeNameMap, employeeScheduleMap]);
+  }, [data?.dailyRecords, employeeList, selectedDate, employeeNameMap, employeeScheduleMap, leaves]);
 
   const stats = useMemo(() =>
     rows.reduce(
@@ -192,7 +215,7 @@ export default function AttendancePage() {
     setTimeModal({ isOpen: false, row: null, field: null, value: "" });
   };
 
-  if (isLoading || employeesLoading) return (
+  if (isLoading || employeesLoading || leavesLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4 relative z-10 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
         <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
@@ -313,6 +336,7 @@ export default function AttendancePage() {
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الدخول</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الخروج</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الحالة</th>
+                  <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">حالة الإجازة</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">المصدر</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">إجراءات</th>
                 </tr>
@@ -320,7 +344,7 @@ export default function AttendancePage() {
               <tbody className="divide-y divide-white/40">
                 {markAttendance.isPending && (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-[#263544] bg-white/50">
+                    <td colSpan={8} className="p-6 text-center text-[#263544] bg-white/50">
                       <span className="inline-flex items-center gap-2 font-black">
                         <Loader2 size={18} className="animate-spin text-[#C89355]" />
                         جارٍ حفظ سجل الحضور...
@@ -330,7 +354,7 @@ export default function AttendancePage() {
                 )}
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black text-lg">
+                    <td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black text-lg">
                       لا توجد بيانات حضور ضمن هذا النطاق
                     </td>
                   </tr>
@@ -348,6 +372,15 @@ export default function AttendancePage() {
                         <span className={`px-4 py-1.5 rounded-xl text-[11px] font-black border ${statusUi[row.status].classes}`}>
                           {statusUi[row.status].label}
                         </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        {row.leaveStatus && row.leaveStatus.length > 0 ? (
+                          <span className="px-4 py-1.5 rounded-xl text-[11px] font-black border text-blue-600 bg-blue-50/80 backdrop-blur-md border-blue-100 shadow-sm">
+                            {row.leaveStatus.map(type => LEAVE_TYPE_LABELS[type] || type).join(", ")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-bold">—</span>
+                        )}
                       </td>
                       <td className="p-4 text-center">
                         {row.checkIn || row.checkOut ? (

@@ -310,6 +310,14 @@ interface Props {
 
 const WEEK_DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
 
+const LEAVE_TYPE_LABELS: Record<string, string> = {
+  SICK: "مرضية",
+  ADMIN: "إدارية",
+  UNPAID: "بدون أجر",
+  DEATH: "وفاة",
+  OTHER: "أخرى",
+};
+
 export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employeeId, employeeName, initialMonth }: Props) {
   const isBrowser = typeof window !== "undefined";
   const [currentMonth, setCurrentMonth] = useState(initialMonth);
@@ -342,14 +350,19 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
-  // جلب الإجازات الموافَق عليها
+  // جلب الإجازات للموظف — بدون فلتر تاريخ لأن الفرونت يفلتر حسب الشهر
   const { data: leavesData } = useQuery({
     queryKey: ["employeeMonthlyLeaves", employeeId, currentMonth],
     queryFn: async () => {
-      const res = await apiClient.get(`/leave-requests`, {
-        params: { employeeId, status: "APPROVED" }
+      const res = await apiClient.get(`/leaves`, {
+        params: { employeeId }
       });
-      return Array.isArray(res.data) ? res.data : [];
+      const data = res.data as { leaveRequests?: unknown[] } | unknown[];
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && 'leaveRequests' in data) {
+        return (data as { leaveRequests: unknown[] }).leaveRequests ?? [];
+      }
+      return [];
     },
     enabled: isOpen && !!employeeId,
     staleTime: QUERY_STALE_TIME.STANDARD,
@@ -499,7 +512,7 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                     statusText = info.isLate ? "متأخر" : "حاضر";
                   } else if (info?.leaveType) {
                     styleClass = "border-amber-500/30 bg-amber-500/10 text-amber-400";
-                    statusText = `إجازة ${info.leaveType}`;
+                    statusText = `إجازة ${LEAVE_TYPE_LABELS[info.leaveType] || info.leaveType}`;
                   }
 
                   return (

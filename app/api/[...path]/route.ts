@@ -19,7 +19,9 @@ export async function handler(request: NextRequest) {
     
     // Construct the full backend URL
     const backendUrl = new URL(BACKEND_API_URL);
-    backendUrl.pathname = apiPath;
+    const backendBasePath = backendUrl.pathname.replace(/\/+$|^\/+/g, "");
+    const forwardedPath = apiPath === "/" ? "" : apiPath;
+    backendUrl.pathname = `/${backendBasePath}${forwardedPath}`;
     backendUrl.search = search;
 
     // Prepare headers
