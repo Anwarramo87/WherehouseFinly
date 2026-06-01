@@ -144,7 +144,7 @@ type BusFormData = {
   id?: string;
   driverName: string;
   driverPhone: string;
-  busNumber: string;
+  plateNumber: string;
   capacity: string;
   route: string;
   totalCost: string;
@@ -155,18 +155,19 @@ type BusPayload = {
   id?: string;
   driverName: string;
   driverPhone: string;
-  busNumber: string;
+  plateNumber: string;
   capacity: number;
   route: string;
   totalCost: number;
-  discountPercent: number;
+  companyDeductionPct: number;
+  employeeDeductionPct: number;
 };
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: BusPayload) => void;
-  initialData?: Partial<BusPayload>;
+  initialData?: Partial<BusPayload> & { employeeDeductionPct?: number };
 }
 
 export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Props) {
@@ -176,14 +177,14 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
         id: initialData.id,
         driverName: initialData.driverName || "",
         driverPhone: initialData.driverPhone || "",
-        busNumber: initialData.busNumber || "",
+        plateNumber: initialData.plateNumber || "",
         capacity: String(initialData.capacity ?? ""),
         route: initialData.route || "",
         totalCost: String(initialData.totalCost ?? ""),
-        discountPercent: String(initialData.discountPercent ?? "0"),
+        discountPercent: String(initialData.companyDeductionPct ?? "0"),
       };
     }
-    return { driverName: "", driverPhone: "", busNumber: "", capacity: "", route: "", totalCost: "", discountPercent: "0" };
+    return { driverName: "", driverPhone: "", plateNumber: "", capacity: "", route: "", totalCost: "", discountPercent: "0" };
   });
 
   useEffect(() => {
@@ -201,7 +202,8 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
       ...formData,
       capacity: Number(formData.capacity),
       totalCost: Number(formData.totalCost),
-      discountPercent: Number(formData.discountPercent),
+      companyDeductionPct: Number(formData.discountPercent),
+      employeeDeductionPct: initialData?.employeeDeductionPct ?? 0,
     });
   };
 
@@ -229,7 +231,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
             </div>
             <div>
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم اللوحة</label>
-              <div className="relative group"><input type="text" required className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 dir-ltr text-left" value={formData.busNumber} onChange={(e) => setFormData({ ...formData, busNumber: e.target.value })} /><Hash className="absolute right-4 top-4 text-slate-500" size={22} /></div>
+              <div className="relative group"><input type="text" required className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 dir-ltr text-left" value={formData.plateNumber} onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value })} /><Hash className="absolute right-4 top-4 text-slate-500" size={22} /></div>
             </div>
             <div>
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">اسم السائق</label>

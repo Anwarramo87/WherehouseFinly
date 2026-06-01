@@ -122,10 +122,62 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         return apiClient.get("/employees", { params });
       };
 
+      const unwrapEmployeeList = (payload: unknown): unknown => {
+        if (!payload || typeof payload !== "object") {
+          return payload;
+        }
+
+        const record = payload as Record<string, unknown>;
+
+        if (Array.isArray(record.employees)) {
+          return record.employees;
+        }
+
+        if (Array.isArray(record.items)) {
+          return record.items;
+        }
+
+        if (Array.isArray(record.results)) {
+          return record.results;
+        }
+
+        if (Array.isArray(record.data)) {
+          return record.data;
+        }
+
+        if (record.data && typeof record.data === "object") {
+          return unwrapEmployeeList(record.data);
+        }
+
+        return payload;
+      };
+
       const firstPage = options?.page || 1;
       const response = await requestEmployees(firstPage);
 
       const resolveEmployees = (payload: unknown): Employee[] => {
+        const normalizedPayload = unwrapEmployeeList(payload);
+
+        if (Array.isArray(normalizedPayload)) {
+          return normalizedPayload as Employee[];
+        }
+
+        if (
+          normalizedPayload &&
+          typeof normalizedPayload === "object" &&
+          Array.isArray((normalizedPayload as { employees?: unknown }).employees)
+        ) {
+          return (normalizedPayload as { employees: Employee[] }).employees;
+        }
+
+        if (
+          normalizedPayload &&
+          typeof normalizedPayload === "object" &&
+          Array.isArray((normalizedPayload as { data?: unknown }).data)
+        ) {
+          return (normalizedPayload as { data: Employee[] }).data;
+        }
+
         if (Array.isArray(payload)) {
           return payload as Employee[];
         }

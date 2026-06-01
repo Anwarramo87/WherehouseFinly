@@ -40,6 +40,11 @@ const formatWithCommas = (value: string | number) => {
   return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
 };
 
+const normalizeDateValue = (value?: string | null) => {
+  if (!value) return new Date().toISOString().split("T")[0];
+  return value.includes("T") ? value.split("T")[0] : value;
+};
+
 export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, employees = [], initialData }: Props) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -59,7 +64,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
       employeeId: "",
       type: "سلفة",
       amount: undefined,
-      date: new Date().toISOString().split('T')[0],
+        date: normalizeDateValue(),
       notes: "",
     }
   });
@@ -76,7 +81,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
           employeeId: initialData.employeeId,
           type: initialData.type,
           amount: initialData.amount,
-          date: initialData.date,
+          date: normalizeDateValue(initialData.date),
           notes: initialData.notes || "",
         });
         setSearchQuery(newQuery);
@@ -87,14 +92,14 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
           employeeId: "",
           type: "سلفة",
           amount: undefined,
-          date: new Date().toISOString().split('T')[0],
+          date: normalizeDateValue(),
           notes: "",
         });
         setSearchQuery("");
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData?.employeeId, initialData?.type]);
+  }, [isOpen, initialData?.employeeId, initialData?.type, initialData?.date]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -131,9 +136,8 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
 
   const onSubmit = (data: DiscountFormValues) => {
     const kind: "advance" | "penalty" | "assistance" = 
-      data.type === "عقوبة" ? "penalty" : 
-      data.type === "شراء ملابس" || data.type === "مساعدة" ? "assistance" : "advance";
-    onSave({ ...data, kind });
+      data.type === "سلفة" ? "advance" : "assistance";
+    onSave({ ...data, date: normalizeDateValue(data.date), kind });
   };
 
   const isEditMode = !!initialData;

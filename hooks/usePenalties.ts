@@ -23,7 +23,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-export const usePenalties = (params?: { employeeId?: string; startDate?: string; endDate?: string }) => {
+export const usePenalties = (params?: { employeeId?: string; startDate?: string; endDate?: string; enabled?: boolean }) => {
   const queryClient = useQueryClient();
 
   const penaltiesQuery = useQuery<Penalty[]>({
@@ -38,6 +38,7 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
       });
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled: params?.enabled ?? true,
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });

@@ -8,16 +8,15 @@ import { useSalaries } from "@/hooks/useSalaries";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
-import type { TerminationData } from "@/components/TerminateEmployeeModal";
+import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
 import type { Salary } from "@/types/salary";
-import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye, Lock } from "lucide-react";
-import { PermissionGuard } from "@/components/PermissionGuard";
+import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye } from "lucide-react";
 
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
 
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), { loading: () => null });
-const TerminateEmployeeModal = dynamic(() => import("@/components/TerminateEmployeeModal"), { loading: () => null });
+const FireEmployeeModal = dynamic(() => import("@/components/FireEmployeeModal"), { loading: () => null });
 
 const normalizeNumericInput = (value: string) => {
   const arabicDigits: Record<string, string> = {
@@ -73,26 +72,31 @@ type ModalInitialEmployee = Employee & {
 };
 
 const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<string, Salary>) => {
-  // أولاً: التحقق من وجود راتب في salaryMap
   const salaryRecord = salaryMap.get(employee.employeeId);
-  if (salaryRecord?.baseSalary) {
-    const parsed = toNumber(salaryRecord.baseSalary);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  if (salaryRecord) {
+    const fixedTotal =
+      toNumber(salaryRecord.baseSalary) +
+      toNumber(salaryRecord.lumpSumSalary) +
+      toNumber(salaryRecord.livingAllowance) +
+      toNumber(salaryRecord.responsibilityAllowance) +
+      toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
+      toNumber(salaryRecord.productionIncentive) +
+      toNumber(salaryRecord.transportAllowance);
+
+    if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
   }
-  
-  // ثانياً: التحقق من monthlySalary في بيانات الموظف نفسه
+
   if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
     const parsed = toNumber(employee.monthlySalary);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
-  
-  // Fallback: حساب من hourlyRate
+
   const hourly = toNumber(employee.hourlyRate);
   return Math.round(hourly * 8 * 26);
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: false });
+  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
@@ -101,17 +105,16 @@ export default function EmployeesPage() {
     return m;
   }, [salaries]);
   
-  // Filter out terminated and resigned employees from the active list
   const visibleEmployees = useMemo(
-    () => (employees || []).filter(emp => emp.status === 'active' || !emp.status),
+    () => employees || [],
     [employees],
   );
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   
-  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
-  const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
+  const [isFireModalOpen, setIsFireModalOpen] = useState(false);
+  const [employeeToFire, setEmployeeToFire] = useState<Employee | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
@@ -220,6 +223,7 @@ export default function EmployeesPage() {
       dateOfBirth: formData.birthDate || undefined,
       gender: formData.gender || undefined,
       department: formData.department || undefined,
+      residence: (formData as any).residence?.trim() || undefined,
       profession: formData.jobTitle || undefined,
       jobTitle: formData.jobTitle || undefined,
       roleId: formData.roleId || undefined,
@@ -245,11 +249,11 @@ export default function EmployeesPage() {
         // في حال التعديل
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
         // Ensure salaries list reflects employeeSalary upsert performed by backend
-        try { await refetchSalaries(); } catch { /* best-effort */ }
+        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
       } else {
         // في حال موظف جديد
         await createEmployee.mutateAsync(payload as Employee);
-        try { await refetchSalaries(); } catch { /* best-effort */ }
+        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
       }
       setIsModalOpen(false);
       setSelectedEmployee(null);
@@ -260,24 +264,22 @@ export default function EmployeesPage() {
     }
   };
 
-  // الدالة المحدثة لاستقبال بيانات إنهاء الخدمة
-  const handleConfirmTerminate = async (terminationData: TerminationData) => {
-    if (!employeeToTerminate) return;
-    
+  // الدالة المحدثة لاستقبال حالة الاستقالة أو الإقالة
+  const handleConfirmFire = async (fireData: FireEmployeePayload) => {
     try {
       await terminateEmployee.mutateAsync({
-        id: employeeToTerminate.employeeId,
+        id: fireData.employeeId,
         data: {
-          terminationDate: new Date(terminationData.terminationDate).toISOString(),
-          terminationReason: terminationData.reason,
-          notes: terminationData.notes,
-          status: terminationData.terminationType === 'resignation' ? 'resigned' : 'terminated'
+          terminationDate: new Date(fireData.fireDate).toISOString(),
+          terminationReason: fireData.reason,
+          notes: fireData.notes,
+          status: fireData.status as "terminated" | "resigned" // إرسال حالة الاستقالة أو الإقالة
         }
       });
-      setIsTerminateModalOpen(false);
-      setEmployeeToTerminate(null);
+      setIsFireModalOpen(false);
+      setEmployeeToFire(null);
     } catch (err) {
-      toast.error(getErrorMessage(err, "فشل في إنهاء الخدمة"));
+      console.error("Error firing employee:", err);
     }
   };
 
@@ -342,6 +344,20 @@ export default function EmployeesPage() {
           <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
             <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
             <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
+              {isError && (
+                <div className="mx-5 mt-5 mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm font-bold flex items-center justify-between gap-4">
+                  <span>
+                    {getErrorMessage(error, "فشل جلب قائمة الموظفين")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="shrink-0 rounded-xl bg-rose-600 px-3 py-2 text-white text-xs font-black hover:bg-rose-700 transition-colors"
+                  >
+                    إعادة المحاولة
+                  </button>
+                </div>
+              )}
               <table className="w-full text-right min-w-225">
                 <thead className="bg-white/40 border-b border-white/80">
                   <tr>
@@ -374,17 +390,22 @@ export default function EmployeesPage() {
                       const row = emp as EmployeeRow;
 
                       return (
-                      <tr key={emp.employeeId} className="hover:bg-white/80 transition-all duration-300 group/row">
+                      <tr key={emp.employeeId} className={`hover:bg-white/80 transition-all duration-300 group/row ${emp.status !== 'active' ? 'opacity-75 bg-rose-50/30' : ''}`}>
                         <td className="p-4 text-center font-mono font-bold text-slate-500 text-sm">
                           {emp.employeeId}
                         </td>
                         <td className="p-4 text-center">
                           <Link 
                             href={`/employees/${emp.employeeId}`} 
-                            className="inline-flex items-center gap-1.5 font-black transition-all text-base group/link text-slate-800 hover:text-[#C89355]"
+                            className={`inline-flex items-center gap-1.5 font-black transition-all text-base group/link ${emp.status === 'terminated' ? 'text-rose-500' : 'text-slate-800 hover:text-[#C89355]'}`}
                             title="عرض بروفايل الموظف"
                           >
                             <span className="group-hover/link:underline underline-offset-4 decoration-2 decoration-[#C89355]/40">{emp.name}</span>
+                            {emp.status !== 'active' && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${emp.status === 'terminated' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                                {emp.status === 'terminated' ? 'مقال' : 'مستقيل'}
+                              </span>
+                            )}
                           </Link>
                         </td>
                         <td className="p-4 text-center font-bold text-[#263544] text-sm">
@@ -415,26 +436,13 @@ export default function EmployeesPage() {
                               <Edit2 size={16} />
                             </button>
 
-                            <PermissionGuard
-                              permission="termination:create"
-                              fallback={
-                                <button
-                                  className="text-slate-300 cursor-not-allowed p-2.5 rounded-xl"
-                                  title="ليس لديك صلاحية إنهاء الخدمة"
-                                  disabled
-                                >
-                                  <Lock size={16} />
-                                </button>
-                              }
+                            <button 
+                              onClick={() => { setEmployeeToFire(emp); setIsFireModalOpen(true); }}
+                              className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
+                              title="إنهاء خدمة موظف"
                             >
-                              <button
-                                onClick={() => { setEmployeeToTerminate(emp); setIsTerminateModalOpen(true); }}
-                                className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
-                                title="إنهاء عمل الموظف"
-                              >
-                                <UserMinus size={16} />
-                              </button>
-                            </PermissionGuard>
+                              <UserMinus size={16} />
+                            </button>
 
                           </div>
                         </td>
@@ -459,12 +467,12 @@ export default function EmployeesPage() {
             />
           )}
 
-          {isTerminateModalOpen && employeeToTerminate && (
-            <TerminateEmployeeModal 
-               employee={employeeToTerminate}
-               isOpen={isTerminateModalOpen}
-               onClose={() => { setIsTerminateModalOpen(false); setEmployeeToTerminate(null); }}
-               onConfirm={handleConfirmTerminate}
+          {isFireModalOpen && employeeToFire && (
+            <FireEmployeeModal 
+               isOpen={isFireModalOpen}
+               onClose={() => { setIsFireModalOpen(false); setEmployeeToFire(null); }}
+               employee={employeeToFire}
+               onConfirm={handleConfirmFire}
                isPending={terminateEmployee.isPending}
             />
           )}

@@ -7,7 +7,7 @@ import {
   AlertTriangle, CalendarCheck, ChevronLeft, Clock,
   Coins, CreditCard, Loader2, Phone, TrendingDown,
   TrendingUp, Wallet, User, X, Briefcase, Bus, ShieldAlert,
-  Hash
+  Hash, Cake
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -70,6 +70,23 @@ const getMonthBoundsToDate = () => {
   return { start, end, period, elapsedDays: now.getDate() };
 };
 
+/**
+ * يحسب العمر بالسنوات من تاريخ الميلاد حتى اليوم.
+ * يأخذ بعين الاعتبار ما إذا كان عيد الميلاد قد مرّ هذا العام أم لا.
+ */
+const calculateAge = (birthDate?: string | null): number | null => {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age >= 0 ? age : null;
+};
+
 // ==========================================
 // Main Component
 // ==========================================
@@ -79,7 +96,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const today = useMemo(() => toLocalDateString(), []);
 
   // --- Modal States ---
-  type DrilldownType = 'bonuses' | 'deductions' | null;
+  type DrilldownType = 'bonuses' | 'deductions' | 'advances' | null;
   const [activeDrilldown, setActiveDrilldown] = useState<DrilldownType>(null);
   
   interface DrilldownItem {
@@ -108,8 +125,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   });
 
   const { data: salaries = [] } = useSalaries();
-  const { isLoading: isAdvancesLoading } = useAdvances(employeeId);
-  const { isLoading: isBonusesLoading } = useBonuses({ employeeId, period: month.period });
+  const { data: employeeAdvances = [], isLoading: isAdvancesLoading } = useAdvances(employeeId);
+  const { data: employeeBonuses = [], isLoading: isBonusesLoading } = useBonuses({ employeeId, period: month.period });
   
   const salary = useMemo<Salary | null>(() => {
     if (!employeeId) return null;
@@ -165,42 +182,62 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const salaryBreakdown = useMemo(() => {
     const fallbackBase = toNumber(extEmployee?.baseSalary) || toNumber(extEmployee?.salary) || toNumber(extEmployee?.hourlyRate);
     const baseSalary = (salary && toNumber(salary.baseSalary) > 0) ? toNumber(salary.baseSalary) : fallbackBase;
-    
-    const mockBonusesList = [
-      { id: '1', name: 'جهد إضافي', department: 'تجاوز الهدف الإنتاجي', amount: 50000 },
-      { id: '2', name: 'بدل غلاء معيشة', department: 'ثابت شهري', amount: 150000 },
-      { id: '3', name: 'بدل طعام وملابس', department: 'تعويض', amount: 25000 },
-    ];
+    const fixedEarnings = salary
+      ? toNumber(salary.baseSalary) +
+        toNumber(salary.lumpSumSalary) +
+        toNumber(salary.livingAllowance) +
+        toNumber(salary.responsibilityAllowance) +
+        toNumber(salary.extraEffortAllowance ?? salary.extraEffort) +
+        toNumber(salary.productionIncentive) +
+        toNumber(salary.transportAllowance)
+      : baseSalary;
+    const bonusesList = employeeBonuses.map((record) => ({
+      id: record.id,
+      name: record.bonusReason || 'مكافأة',
+      department: record.period || month.period,
+      amount: toNumber(record.bonusAmount),
+    }));
 
-    const mockDeductionsList = [
-      { id: '1', name: 'تأخير صباحي', department: 'خصم تلقائي (6 أيام)', amount: 15000 },
-      { id: '2', name: 'عقوبة إدارية', department: 'إهمال في العمل', amount: 20000 },
-      { id: '3', name: 'إجازة بلا أجر', department: 'يوم واحد', amount: 35000 },
-    ];
+    const deductionsList = employeeBonuses
+      .filter((record) => toNumber(record.assistanceAmount) > 0)
+      .map((record) => ({
+        id: record.id,
+        name: record.bonusReason || 'خصم',
+        department: record.period || month.period,
+        amount: toNumber(record.assistanceAmount),
+      }));
 
-    const mockAdvancesList = [
-      { id: '1', name: 'سلفة نقدية', department: 'منتصف الشهر', amount: 100000 }
-    ];
+    const advancesList = employeeAdvances
+      .filter((record) => (record.issueDate || '').slice(0, 7) === month.period)
+      .map((record) => ({
+        id: record.id,
+        name: record.advanceType === 'clothing' ? 'سلفة ملابس' : record.advanceType === 'other' ? 'سلفة أخرى' : 'سلفة راتب',
+        department: record.notes || record.issueDate.slice(0, 10),
+        amount: toNumber(record.remainingAmount ?? record.totalAmount),
+      }));
 
-    const totalBonuses = mockBonusesList.reduce((sum, item) => sum + item.amount, 0);
-    const totalDeductions = mockDeductionsList.reduce((sum, item) => sum + item.amount, 0);
-    const totalAdvances = mockAdvancesList.reduce((sum, item) => sum + item.amount, 0);
+    const totalBonuses = bonusesList.reduce((sum, item) => sum + item.amount, 0);
+    const totalDeductions = deductionsList.reduce((sum, item) => sum + item.amount, 0);
+    const totalAdvances = advancesList.reduce((sum, item) => sum + item.amount, 0);
 
-    const totalDues = baseSalary + totalBonuses - totalDeductions - totalAdvances;
+    const totalDues = fixedEarnings + totalBonuses - totalDeductions - totalAdvances;
 
-    const formattedBonuses = mockBonusesList.map(b => ({ ...b, extraInfo: `+${formatMoney(b.amount)} ل.س` }));
-    const formattedDeductions = mockDeductionsList.map(d => ({ ...d, extraInfo: `-${formatMoney(d.amount)} ل.س` }));
+    const formattedBonuses = bonusesList.map((bonus) => ({ ...bonus, extraInfo: `+${formatMoney(bonus.amount)} ل.س` }));
+    const formattedDeductions = deductionsList.map((deduction) => ({ ...deduction, extraInfo: `-${formatMoney(deduction.amount)} ل.س` }));
+    const formattedAdvances = advancesList.map((advance) => ({ ...advance, extraInfo: `-${formatMoney(advance.amount)} ل.س` }));
 
     return { 
       baseSalary, 
+      fixedEarnings,
       extraAndBonuses: totalBonuses, 
       deductions: totalDeductions, 
       advances: totalAdvances, 
       totalDues,
       formattedBonuses,
-      formattedDeductions
+      formattedDeductions,
+      formattedAdvances,
     };
-  }, [salary, extEmployee]);
+  }, [employeeAdvances, employeeBonuses, month.period, salary, extEmployee]);
 
   const handleOpenDrilldown = (type: DrilldownType) => {
     setActiveDrilldown(type);
@@ -212,6 +249,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
         setDrilldownData(salaryBreakdown.formattedBonuses);
       } else if (type === 'deductions') {
         setDrilldownData(salaryBreakdown.formattedDeductions);
+      } else if (type === 'advances') {
+        setDrilldownData(salaryBreakdown.formattedAdvances);
       }
       setIsModalLoading(false);
     }, 600);
@@ -220,6 +259,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const getModalConfig = () => {
     if (activeDrilldown === 'bonuses') return { title: 'تفاصيل الإضافي والمكافآت والبدلات', icon: TrendingUp };
     if (activeDrilldown === 'deductions') return { title: 'تفاصيل الخصومات والعقوبات', icon: TrendingDown };
+    if (activeDrilldown === 'advances') return { title: 'تفاصيل السلف', icon: CreditCard };
     return { title: '', icon: AlertTriangle };
   };
 
@@ -231,6 +271,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
 
   const contactPhone = employee.mobile || employee.phone || "—";
   const modalConfig = getModalConfig();
+  // يقرأ dateOfBirth (الاسم الفعلي في الباك إند) أو birthDate كـ fallback
+  const age = calculateAge(employee.dateOfBirth ?? employee.birthDate);
 
   return (
     <>
@@ -256,6 +298,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
               <span className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm border ${
                 activeDrilldown === 'deductions' 
                   ? 'bg-rose-50 text-rose-700 border-rose-100' 
+                  : activeDrilldown === 'advances'
+                    ? 'bg-orange-50 text-orange-700 border-orange-100'
                   : 'bg-[#1a2530] text-[#C89355] border-[#C89355]/30' 
               }`}>
                 {item.extraInfo}
@@ -284,14 +328,14 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
             </Link>
           </div>
 
-          <div className="relative bg-gradient-to-l from-white/90 to-white/50 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group mb-8 p-6 md:p-8">
+          <div className="relative bg-linear-to-l from-white/90 to-white/50 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group mb-8 p-6 md:p-8">
             <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/60 z-0" />
             
             <div className="flex flex-col lg:flex-row justify-between items-center gap-8 relative z-10 w-full">
               
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 w-full lg:w-auto text-center sm:text-right">
                 <div className="flex flex-col items-center gap-3 shrink-0 group/avatar">
-                  <div className="w-24 h-24 bg-gradient-to-br from-[#1a2530] to-[#263544] text-[#C89355] rounded-3xl flex items-center justify-center text-4xl font-black shadow-[0_15px_30px_rgba(38,53,68,0.4)] border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 relative transition-transform duration-500 group-hover/avatar:scale-105 group-hover/avatar:-rotate-2">
+                  <div className="w-24 h-24 bg-linear-to-br from-[#1a2530] to-[#263544] text-[#C89355] rounded-3xl flex items-center justify-center text-4xl font-black shadow-[0_15px_30px_rgba(38,53,68,0.4)] border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 relative transition-transform duration-500 group-hover/avatar:scale-105 group-hover/avatar:-rotate-2">
                     <div className="absolute inset-0 bg-[#C89355] opacity-0 group-hover/avatar:opacity-10 transition-opacity duration-300 rounded-3xl" />
                     {employee.name?.[0] || <User size={40} />}
                   </div>
@@ -304,12 +348,18 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                 <div className="mt-2 sm:mt-1">
                   <h1 className="text-3xl md:text-4xl font-black text-[#263544] mb-4 drop-shadow-sm">{employee.name}</h1>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
-                    <span className="bg-gradient-to-l from-[#263544] to-[#1a2530] text-white px-4 py-2 rounded-xl text-sm font-black shadow-md border border-[#263544] flex items-center gap-2">
+                    <span className="bg-linear-to-l from-[#263544] to-[#1a2530] text-white px-4 py-2 rounded-xl text-sm font-black shadow-md border border-[#263544] flex items-center gap-2">
                       <Briefcase size={14} className="text-[#C89355]" />
                       {extEmployee.jobTitle || "الوظيفة غير محددة"} 
                       <div className="w-1 h-1 rounded-full bg-[#C89355] mx-1" />
                       <span className="text-white/80 font-bold">{employee.department || "القسم غير محدد"}</span>
                     </span>
+                    {age !== null && (
+                      <span className="bg-violet-50 text-violet-700 border border-violet-200 px-4 py-2 rounded-xl text-sm font-black shadow-sm flex items-center gap-2">
+                        <Cake size={14} className="text-violet-500" />
+                        {age} سنة
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -326,9 +376,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-[#1a2530] via-[#263544] to-[#1a2530] rounded-[1.5rem] p-6 text-center border border-[#C89355]/40 shadow-[0_20px_40px_rgba(38,53,68,0.4)] min-w-[240px] w-full sm:w-auto relative overflow-hidden group/dues transform hover:-translate-y-1 transition-all duration-500 flex flex-col justify-center">
+                <div className="bg-linear-to-br from-[#1a2530] via-[#263544] to-[#1a2530] rounded-3xl p-6 text-center border border-[#C89355]/40 shadow-[0_20px_40px_rgba(38,53,68,0.4)] min-w-60 w-full sm:w-auto relative overflow-hidden group/dues transform hover:-translate-y-1 transition-all duration-500 flex flex-col justify-center">
                   <div className="absolute inset-1.5 rounded-[1.2rem] border border-dashed border-[#C89355]/20 pointer-events-none transition-colors group-hover/dues:border-[#C89355]/50 z-0" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#C89355]/10 to-transparent -translate-x-full group-hover/dues:translate-x-full transition-transform duration-1000 ease-in-out" />
+                  <div className="absolute inset-0 bg-linear-to-r from-transparent via-[#C89355]/10 to-transparent -translate-x-full group-hover/dues:translate-x-full transition-transform duration-1000 ease-in-out" />
                   
                   <p className="text-[#C89355]/80 font-black mb-2 text-xs uppercase tracking-widest relative z-10 flex items-center justify-center gap-1.5">
                     <Wallet size={12} />
@@ -386,7 +436,10 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                   <div className="p-2 bg-white/60 rounded-xl text-rose-400 group-hover/box:bg-rose-500 group-hover/box:text-white transition-colors shadow-sm"><ShieldAlert size={20} /></div>
                 </div>
 
-                <div className="bg-orange-50/80 p-5 rounded-2xl border border-orange-100 flex items-start justify-between">
+                <div
+                  onClick={() => handleOpenDrilldown('advances')}
+                  className="bg-orange-50/80 p-5 rounded-2xl border border-orange-100 flex items-start justify-between group/box hover:shadow-[0_10px_20px_rgba(249,115,22,0.1)] hover:-translate-y-1 hover:border-orange-300 cursor-pointer transition-all duration-300"
+                >
                   <div>
                     <p className="text-xs font-black text-orange-600 mb-1">السلف المسحوبة هذا الشهر</p>
                     <p className="text-2xl font-black text-orange-700">{formatMoney(salaryBreakdown.advances)}</p>

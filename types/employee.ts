@@ -10,7 +10,8 @@ export interface Employee {
   nationalId?: string | null;
   employmentStartDate?: string | null;
   terminationDate?: string | null;
-  birthDate?: string | null;
+  birthDate?: string | null;       // legacy — قد لا يُرسله الباك إند
+  dateOfBirth?: string | null;     // الاسم الفعلي في قاعدة البيانات
   gender?: string | null;
   department?: string;
   profession?: string;
@@ -69,6 +70,7 @@ export interface Employee {
   monthlySalary?: number | string;
   livingAllowance?: number | string | null;
   insurances?: number | string;
+  residence?: string | null;
   scheduledStart?: string;
   scheduledEnd?: string;
   avatar?: string;

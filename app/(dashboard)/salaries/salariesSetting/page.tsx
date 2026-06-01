@@ -2,23 +2,24 @@
 
 import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+const RewardsTab = dynamic(() => import("../rewards/page"), { ssr: false, loading: () => null });
 import { useSearchParams } from "next/navigation";
 import useSalaries from "@/hooks/useSalaries";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useAdvances } from "@/hooks/useAdvances";
 import { useBonuses } from "@/hooks/useBonuses";
+import { useAdvances } from "@/hooks/useAdvances";
+import type { Advance } from "@/types/advance";
 import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { Salary } from "@/types/salary";
 import type { Employee } from "@/types/employee";
-import type { Advance } from "@/types/advance";
 import type { Bonus } from "@/types/bonus";
 
 export type FinancialTabKey = "salary-config" | "advances" | "bonuses" | "final-payroll";
 
 const ManageSalaryModal = dynamic(() => import("@/components/ManageSalaryModal"), { loading: () => null });
-const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
+const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 const toNumber = (value: unknown) => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
@@ -35,7 +36,6 @@ const getLocalMonth = () => {
 };
 
 const getTabFromQuery = (tabParam: string | null): FinancialTabKey => {
-  if (tabParam === "advances") return "advances";
   if (tabParam === "bonuses") return "bonuses";
   if (tabParam === "final-payroll" || tabParam === "payroll") return "final-payroll";
   return "salary-config";
@@ -49,15 +49,6 @@ type SalaryPayload = {
   livingAllowance: number;
   transportAllowance: number;
   insuranceAmount: number;        // canonical (NOT insurances)
-  responsibilityAllowance: number;
-  extraEffortAllowance: number;   // canonical (NOT extraEffort)
-  productionIncentive: number;
-};
-
-// Helper to safely read Salary fields regardless of deprecated aliases
-type SalaryWithAliases = Salary & {
-  extraEffort?: unknown;        // @deprecated
-  insurances?: unknown;         // @deprecated
 };
 
 const SkeletonRows = () => (
@@ -70,8 +61,8 @@ const SkeletonRows = () => (
 
 const tabLabels: Record<FinancialTabKey, string> = {
   "salary-config": "إعداد الرواتب",
-  "advances": "السلف",
   "bonuses": "المكافآت والخصومات",
+  "advances": "السلف",
   "final-payroll": "المسير النهائي",
 };
 
@@ -167,9 +158,6 @@ export default function SalariesPage() {
         livingAllowance: payload.livingAllowance,
         transportAllowance: payload.transportAllowance,
         insuranceAmount: payload.insuranceAmount,
-        responsibilityAllowance: payload.responsibilityAllowance,
-        extraEffortAllowance: payload.extraEffortAllowance,
-        productionIncentive: payload.productionIncentive,
       },
     });
     setIsModalOpen(false);
@@ -270,16 +258,13 @@ export default function SalariesPage() {
                         <tr><td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
                       ) : (
                         allIds.map((id: string) => {
-                          const s = (salaryMap.get(id) ?? null) as SalaryWithAliases | null;
+                          const s = salaryMap.get(id) ?? null;
                           const emp = employeeMap.get(id) ?? null;
 
                           // Defaults when no salary record exists yet
                           let base = toNumber(emp?.hourlyRate);
                           let lumpSum = 0;
                           let living = toNumber(emp?.livingAllowance);
-                          let responsibility = 0;
-                          let extraEffort = 0;
-                          let production = 0;
                           let transport = 0;
                           let insurance = 0;
 
@@ -287,15 +272,12 @@ export default function SalariesPage() {
                             base = toNumber(s.baseSalary);
                             lumpSum = toNumber(s.lumpSumSalary);
                             living = toNumber(s.livingAllowance) || living;
-                            responsibility = toNumber(s.responsibilityAllowance);
-                            extraEffort = toNumber(s.extraEffortAllowance ?? s.extraEffort);
-                            production = toNumber(s.productionIncentive);
                             transport = toNumber(s.transportAllowance);
-                            insurance = toNumber(s.insuranceAmount ?? s.insurances);
+                            insurance = toNumber(s.insuranceAmount);
                           }
 
-                          // الإجمالي الثابت الشامل
-                          const monthlyFixedTotal = base + lumpSum + living + responsibility + extraEffort + production + transport - insurance;
+                          // الإجمالي الثابت الشامل بدون أي تعويضات إضافية
+                          const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? id);
 
                           return (
@@ -359,22 +341,7 @@ export default function SalariesPage() {
             </div>
           )}
 
-          {/* تبويب السلف مع Contextual Stat Card */}
-          {activeTab === "advances" && (
-            <>
-              {/* Contextual Stat Card for Advances */}
-              <div className="flex gap-4 mb-6">
-                <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
-                  <div className="flex items-center gap-2 mb-1.5 relative z-10">
-                    <HandCoins size={14} className="text-[#C89355]" />
-                    <p className="text-[11px] font-black text-slate-500">السلف المتبقية</p>
-                  </div>
-                  <p className="font-black text-xl text-[#263544]">{tabStats.totalAdvances.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل السلف...</div>
-            </>
-          )}
+          {/* Advances tab removed — advances are now managed inside الخصومات والسلف (discounts) page */}
 
           {/* تبويب المكافآت مع Contextual Stat Cards */}
           {activeTab === "bonuses" && (
@@ -396,7 +363,8 @@ export default function SalariesPage() {
                   <p className="font-black text-xl text-rose-600">{tabStats.totalDeductions.toLocaleString()}</p>
                 </div>
               </div>
-              <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المكافآت...</div>
+              {/* Render full rewards table via dynamic import to restore dashboard view */}
+              <RewardsTab />
             </>
           )}
 

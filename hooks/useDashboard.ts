@@ -25,6 +25,7 @@ const fallbackKpis: DashboardKpis = {
   activeToday: 0,
   totalAbsentToday: 0,
   totalDueSalaries: 0,
+  totalReceivedSalaries: 0,
   totalLateMinutesToday: 0,
   totalOvertimeMinutesToday: 0,
 };
@@ -57,6 +58,7 @@ export const useDashboard = () => {
           attendance: { count: 0, employees: [] },
           absence: { count: 0, employees: [] },
           totalDueSalaries: 0,
+          totalReceivedSalaries: 0,
           lateness: { totalMinutes: 0, count: 0, employees: [] },
           overtime: { totalMinutes: 0, count: 0, employees: [] },
           reportDate: getLocalDateString(),
@@ -69,6 +71,7 @@ export const useDashboard = () => {
     attendance?: { count?: number; employees?: unknown[] };
     absence?: { count?: number; employees?: unknown[] };
     totalDueSalaries?: number;
+    totalReceivedSalaries?: number;
     lateness?: { totalMinutes?: number };
     overtime?: { totalMinutes?: number };
   } | null;
@@ -104,6 +107,7 @@ export const useDashboard = () => {
   const totalOvertimeMinutesToday = dashboard?.overtime?.totalMinutes ?? 0;
 
   const totalDueSalaries = dashboard?.totalDueSalaries ?? 0;
+  const totalReceivedSalaries = dashboard?.totalReceivedSalaries ?? 0;
 
   const kpis: DashboardKpis = {
     ...fallbackKpis,
@@ -111,6 +115,7 @@ export const useDashboard = () => {
     activeToday,
     totalAbsentToday,
     totalDueSalaries,
+    totalReceivedSalaries,
     totalLateMinutesToday,
     totalOvertimeMinutesToday,
   };

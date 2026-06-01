@@ -27,6 +27,11 @@ const asText = (value: unknown) => {
   return String(value);
 };
 
+const normalizeDateValue = (value?: string | null) => {
+  if (!value) return "";
+  return value.includes("T") ? value.split("T")[0] : value;
+};
+
 export type AddEmployeeFormData = {
   employeeId: string;
   name: string;
@@ -42,6 +47,7 @@ export type AddEmployeeFormData = {
   scheduledStart: string;
   scheduledEnd: string;
   roleId: string;
+  residence?: string;
 };
 
 interface Props {
@@ -68,6 +74,7 @@ const defaultFormState = {
   scheduledStart: "08:00",
   scheduledEnd: "16:00",
   roleId: "",
+  residence: "",
 };
 
 export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001" }: Props) {
@@ -87,7 +94,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         name: employee.name || "",
         username: employee.username || employee.name || "",
         mobile: employee.mobile || "",
-        birthDate: employee.birthDate || employee.dateOfBirth || "",
+        birthDate: normalizeDateValue(employee.birthDate || employee.dateOfBirth),
         gender: employee.gender || "male",
         jobTitle: employee.jobTitle || employee.profession || "",
         department: employee.department || "قسم القص",
@@ -97,6 +104,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         scheduledStart: employee.scheduledStart || "08:00",
         scheduledEnd: employee.scheduledEnd || "16:00",
         roleId: employee.roleId || "",
+        residence: employee.residence || "",
       };
     }
 
@@ -263,6 +271,18 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                   value={formData.employeeId}
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">مكان الإقامة</label>
+                <div className="relative group">
+                  <input
+                    type="text" placeholder="مثال: دوما، دمشق" 
+                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500"
+                    value={formData.residence}
+                    onChange={(e) => setFormData({ ...formData, residence: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div>
