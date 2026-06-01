@@ -223,7 +223,7 @@ export default function EmployeesPage() {
       dateOfBirth: formData.birthDate || undefined,
       gender: formData.gender || undefined,
       department: formData.department || undefined,
-      residence: (formData as any).residence?.trim() || undefined,
+      residence: (formData as Record<string, unknown>).residence as string | undefined || undefined,
       profession: formData.jobTitle || undefined,
       jobTitle: formData.jobTitle || undefined,
       roleId: formData.roleId || undefined,
@@ -249,11 +249,11 @@ export default function EmployeesPage() {
         // في حال التعديل
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
         // Ensure salaries list reflects employeeSalary upsert performed by backend
-        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
+        try { await refetchSalaries(); } catch { /* best-effort */ }
       } else {
         // في حال موظف جديد
         await createEmployee.mutateAsync(payload as Employee);
-        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
+        try { await refetchSalaries(); } catch { /* best-effort */ }
       }
       setIsModalOpen(false);
       setSelectedEmployee(null);

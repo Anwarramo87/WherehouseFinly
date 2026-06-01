@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
-import { AdjustStockInput, InventoryItem, InventoryItemInput, StockMovement } from "@/types/inventory";
+import { AdjustStockInput, InventoryItem, InventoryItemInput } from "@/types/inventory";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 
 type InventoryListResponse = {
@@ -217,13 +217,6 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
     mutationFn: async (input: AdjustStockInput) => {
       const quantity = Number(input.quantity || 0);
       const change = input.type === "IN" ? quantity : -quantity;
-
-      const movementPayload = {
-        type: input.type,
-        quantity,
-        date: new Date().toISOString(),
-        note: input.note,
-      } satisfies StockMovement;
 
       // Resolve SKU for the product and call stock adjust endpoint
       const productRes = await apiClient.get(`/inventory/products/${input.productId}`);

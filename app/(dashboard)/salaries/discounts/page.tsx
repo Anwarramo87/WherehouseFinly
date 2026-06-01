@@ -13,7 +13,7 @@ const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { 
 export default function DiscountsPage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts();
-  const { data: advances = [], createAdvance, updateAdvance, deleteAdvance } = useAdvances();
+  const { data: _advances = [], createAdvance, updateAdvance } = useAdvances();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,7 +24,7 @@ export default function DiscountsPage() {
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
-  const [editingAdvance, setEditingAdvance] = useState<any | null>(null);
+  const [editingAdvance, setEditingAdvance] = useState<Record<string, unknown> | null>(null);
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -99,12 +99,7 @@ export default function DiscountsPage() {
     setIsAdvanceModalOpen(true);
   };
 
-  const handleEditAdvance = (adv: any) => {
-    setEditingAdvance(adv);
-    setIsAdvanceModalOpen(true);
-  };
-
-  const handleSaveAdvance = (data: any) => {
+  const handleSaveAdvance = (data: Record<string, unknown>) => {
     if (editingAdvance) {
       updateAdvance.mutate({ id: editingAdvance.id, data }, { onSuccess: () => setIsAdvanceModalOpen(false) });
     } else {

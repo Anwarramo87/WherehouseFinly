@@ -19,6 +19,50 @@ export interface Employee {
   roleId?: string;
   status?: 'active' | 'inactive' | 'terminated' | 'resigned';
   isSettled?: boolean; // تم تصفية حقوق الموظف (للموظفين المقالين/المستقيلين)
+  
+  // ============================================================================
+  // Resignation Management Fields
+  // ============================================================================
+  
+  /**
+   * Type of termination (resignation or termination)
+   */
+  terminationType?: 'resignation' | 'termination' | null;
+  
+  /**
+   * Reason for termination
+   */
+  terminationReason?: string | null;
+  
+  /**
+   * Additional notes about termination
+   */
+  terminationNotes?: string | null;
+  
+  /**
+   * Financial settlement status
+   */
+  financialSettlementStatus?: 'pending' | 'completed';
+  
+  /**
+   * Date when financial settlement was completed
+   */
+  financialSettlementDate?: string | null;
+  
+  /**
+   * Date when employee was rehired (if applicable)
+   */
+  rehireDate?: string | null;
+  
+  /**
+   * Whether employee has been financially settled
+   */
+  isFinanciallySettled?: boolean;
+  
+  // ============================================================================
+  // Salary and Financial Fields
+  // ============================================================================
+  
   // الراتب يأتي من الباك إند كـ Decimal، وغالباً يصل للفرونت كـ string أو كائن
   hourlyRate?: number | string | { $numberDecimal: string };
   baseSalary?: number | string | { $numberDecimal: string } | null;

@@ -6,12 +6,14 @@ import {
   Download, FileSpreadsheet, Wallet, Receipt,
   HandCoins, Calendar as CalendarIcon,
   ChevronLeft, Search, AlertTriangle, Info, Play,
+  UserMinus, ExternalLink,
 } from "lucide-react";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
 import { usePayrollReport } from "@/hooks/usePayrollReport";
 import { usePayroll } from "@/hooks/usePayroll";
+import { useResignedEmployees } from "@/hooks/useEmployees";
 import RunPayrollModal from "@/components/RunPayrollModal";
 import { toast } from "react-hot-toast";
 
@@ -19,6 +21,7 @@ import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
 import type { Advance } from "@/types/advance";
 import type { PayrollItem } from "@/types/payroll";
+import type { Employee } from "@/types/employee";
 
 // ─── TypeScript Interfaces ────────────────────────────────────────────────────
 
@@ -100,8 +103,21 @@ export default function PayrollPage() {
   // ── PRIMARY data source — backend-calculated payroll for the selected month ──
   const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
 
+  // ── Fetch resigned employees pending financial settlement ──
+  const { data: allResignedEmployees = [] } = useResignedEmployees();
+
   const isLoading =
     salariesLoading || bonusesLoading || advancesLoading || reportLoading;
+
+  // ── Filter resigned employees pending financial settlement ──
+  const resignedPendingSettlement = useMemo<Employee[]>(() => {
+    return allResignedEmployees.filter(
+      (emp) =>
+        (emp.status === "resigned" || emp.status === "terminated") &&
+        emp.financialSettlementStatus === "pending" &&
+        !emp.isSettled
+    );
+  }, [allResignedEmployees]);
 
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
@@ -573,6 +589,110 @@ export default function PayrollPage() {
             </table>
           </div>
         </div>
+
+        {/* ── Resigned Employees Section (Pending Financial Settlement) ─────────── */}
+        {resignedPendingSettlement.length > 0 && (
+          <div className="mt-8">
+            {/* Warning Banner */}
+            <div className="mb-6 flex items-start gap-4 p-5 bg-amber-50/80 border-2 border-amber-300 rounded-3xl shadow-sm animate-in fade-in duration-300">
+              <div className="p-2.5 bg-amber-100 rounded-xl border border-amber-300 shrink-0 mt-0.5">
+                <AlertTriangle size={20} className="text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-black text-amber-800 text-sm mb-1">
+                  موظفون مستقيلون بحاجة إلى تصفية مالية
+                </p>
+                <p className="text-amber-700 text-xs font-bold leading-relaxed">
+                  الموظفون التالية أسماؤهم قد أنهوا خدمتهم ولكن لم تتم تصفية مستحقاتهم المالية بعد. 
+                  يجب إتمام التصفية المالية قبل إغلاق المسير النهائي.
+                </p>
+              </div>
+              <Link
+                href="/resigned"
+                className="relative overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white font-black text-xs hover:bg-amber-700 transition-all shadow-sm active:scale-95 group shrink-0"
+              >
+                <div className="absolute inset-1 rounded-lg border border-dashed border-white/30 pointer-events-none" />
+                <ExternalLink size={14} className="relative z-10" />
+                <span className="relative z-10">إدارة التصفيات</span>
+              </Link>
+            </div>
+
+            {/* Resigned Employees Table */}
+            <div className="relative bg-amber-50/40 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(245,158,11,0.15)] border-2 border-amber-200/80 overflow-hidden group/resigned">
+              <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-amber-400/40 pointer-events-none z-0 transition-colors group-hover/resigned:border-amber-400/60" />
+              
+              {/* Section Header */}
+              <div className="relative z-10 bg-amber-100/60 backdrop-blur-md border-b-2 border-amber-200 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-600 rounded-xl shadow-md">
+                    <UserMinus size={20} className="text-white" strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-amber-900 tracking-tight">
+                      المستقيلون (قيد التصفية المالية)
+                    </h2>
+                    <p className="text-xs text-amber-700 font-bold mt-0.5">
+                      {resignedPendingSettlement.length} موظف بحاجة إلى تصفية مالية
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
+                <table className="w-full text-right min-w-225 border-collapse">
+                  <thead className="bg-amber-600/90 text-white">
+                    <tr>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">كود الموظف</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">اسم الموظف</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">القسم</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">تاريخ الإنهاء</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">نوع الإنهاء</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-amber-200/50">
+                    {resignedPendingSettlement.map((employee) => {
+                      const isFired = employee.status === "terminated";
+                      const terminationType = isFired ? "إقالة" : "استقالة";
+                      const terminationColor = isFired 
+                        ? "text-rose-700 bg-rose-100/80 border-rose-300" 
+                        : "text-amber-700 bg-amber-100/80 border-amber-300";
+
+                      return (
+                        <tr
+                          key={employee.employeeId}
+                          className="bg-white/60 hover:bg-white/90 transition-all duration-300 group/row"
+                        >
+                          <td className="p-4 text-center font-mono text-sm font-black text-amber-900/70 group-hover/row:text-amber-700 transition-colors">
+                            {employee.employeeId}
+                          </td>
+                          <td className="p-4 text-center font-black text-slate-800 group-hover/row:text-amber-900 transition-colors">
+                            {employee.name}
+                          </td>
+                          <td className="p-4 text-center font-bold text-slate-700 text-sm">
+                            {employee.department || employee.profession || "—"}
+                          </td>
+                          <td className="p-4 text-center font-mono font-bold text-slate-700 text-sm">
+                            {employee.terminationDate
+                              ? new Date(employee.terminationDate).toLocaleDateString("ar-SY")
+                              : "—"}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span
+                              className={`inline-block px-3 py-1.5 rounded-xl text-xs font-black border shadow-sm ${terminationColor}`}
+                            >
+                              {terminationType}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <RunPayrollModal

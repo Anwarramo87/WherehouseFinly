@@ -149,7 +149,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Plus, Bus, ChevronLeft, MapPin, MoreVertical, Edit2, Trash2, UserMinus } from "lucide-react";
+import { Plus, Bus, ChevronLeft } from "lucide-react";
 import useTransportation, { type BusDetailsResponse } from "@/hooks/useTransportation";
 import { useEmployees } from "@/hooks/useEmployees";
 
@@ -179,10 +179,7 @@ export interface BusData {
   passengers: Passenger[];
 }
 
-type BusDraft = Omit<BusData, "id" | "passengers"> & {
-  id?: string;
-  passengers?: Passenger[];
-};
+
 
 type BusPayload = {
   id?: string;
@@ -290,34 +287,27 @@ function CostCard({ label, value, isGold }: { label: string; value: string | num
 }
 
 export default function TransportationPage() {
-  const { data: buses = [], isLoading: busesLoading, createBus, updateBus, deleteBus, addPassenger, removePassenger, getBus } = useTransportation();
+  const { data: buses = [], createBus, updateBus, addPassenger, removePassenger, getBus } = useTransportation();
   const { data: employees = [] } = useEmployees({ fetchAll: true });
   const [busDetails, setBusDetails] = useState<Record<string, BusData | null>>({});
-  const [passengerCache, setPassengerCache] = useState<PassengerCache>({});
+  const [passengerCache, setPassengerCache] = useState<PassengerCache>(() => loadPassengerCache());
   const [modalContext, setModalContext] = useState<{ busId: string; passenger: Passenger } | null>(null);
   const [isAddBusOpen, setIsAddBusOpen] = useState(false);
   const [isAddPassengerOpen, setIsAddPassengerOpen] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusData | null>(null);
-  // ID of the most recently added passenger (used to highlight the new row)
-  const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(null);
-
-  // restore last-added passenger highlight across refreshes
-  useEffect(() => {
+  const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
     try {
-      const stored = sessionStorage.getItem("lastAddedPassengerId");
-      if (stored) setLastAddedPassengerId(stored);
-    } catch (e) {
-      // noop
+      return sessionStorage.getItem("lastAddedPassengerId");
+    } catch {
+      return null;
     }
-  }, []);
+  });
 
-  useEffect(() => {
-    setPassengerCache(loadPassengerCache());
-  }, []);
-
-  // whenever passengerCache is loaded/updated, merge its presentation into any already-fetched bus details
+  // Merge passenger cache presentation into bus details whenever cache updates
   useEffect(() => {
     if (!passengerCache || Object.keys(passengerCache).length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBusDetails((prev) => {
       const next = { ...prev };
       for (const busId of Object.keys(next)) {
@@ -342,7 +332,9 @@ export default function TransportationPage() {
   }, [passengerCache]);
 
   const safeEmployees = Array.isArray(employees) ? employees : [];
-  const employeeNameMap = new Map(safeEmployees.map((employee: any) => [employee.employeeId, employee.name]));
+  const employeeNameMap = new Map(
+    safeEmployees.map((employee: { employeeId: string; name: string }) => [employee.employeeId, employee.name])
+  );
 
   const resolvePassengerName = (busId: string, passenger: Passenger) => {
     const cached = passengerCache[busId]?.[passenger.employeeId];
@@ -356,8 +348,7 @@ export default function TransportationPage() {
     return undefined;
   };
 
-  // للتحكم بقائمة الـ 3 نقاط
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
 
   const handleSaveBus = async (newBus: BusPayload) => {
     try {
@@ -366,27 +357,20 @@ export default function TransportationPage() {
       } else {
         await createBus.mutateAsync(newBus);
       }
-    } catch (e) {
+    } catch {
       // handled by hook
     } finally {
       setIsAddBusOpen(false);
     }
   };
 
-  const handleDeleteBus = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الباص؟")) return;
-    try {
-      await deleteBus.mutateAsync(id);
-      setActiveDropdown(null);
-    } catch (e) {
-      // handled by hook
-    }
-  };
+
 
   const handleSavePassenger = async (passengerData: Passenger) => {
     if (!selectedBus) return;
     try {
-      const res = await addPassenger.mutateAsync({
+      await addPassenger.mutateAsync({
+        busId: selectedBus.id,
         busId: selectedBus.id,
         payload: {
           employeeId: passengerData.employeeId,
@@ -422,11 +406,11 @@ export default function TransportationPage() {
       const newId = passengerData.employeeId;
       try {
         sessionStorage.setItem("lastAddedPassengerId", String(newId));
-      } catch (e) {
+      } catch {
         // ignore
       }
       setLastAddedPassengerId(String(newId));
-    } catch (e) {
+    } catch {
       // handled by hook
     } finally {
       setIsAddPassengerOpen(false);
@@ -447,7 +431,7 @@ export default function TransportationPage() {
         savePassengerCache(next);
         return next;
       });
-    } catch (e) {
+    } catch {
       // handled by hook
     }
   };
@@ -455,11 +439,11 @@ export default function TransportationPage() {
   // Fetch bus details (with passengers) for display
   useEffect(() => {
     if (!buses || buses.length === 0) return;
-    buses.forEach((b: any) => {
-      if (busDetails[b.id] !== undefined) return;
+    buses.forEach((b: Record<string, unknown>) => {
+      if (busDetails[b.id as string] !== undefined) return;
       (async () => {
         try {
-          const details = await getBus(b.id);
+          const details = await getBus(b.id as string);
           // normalize then merge any cached presentation (session) immediately
           const normalized = normalizeBusDetails(details);
           const busCache = passengerCache[b.id] || {};
@@ -474,14 +458,14 @@ export default function TransportationPage() {
               isManual: typeof meta.isManual === 'boolean' ? meta.isManual : p.isManual,
             };
           });
-          setBusDetails((prev) => ({ ...prev, [b.id]: normalized }));
-        } catch (e) {
+          setBusDetails((prev) => ({ ...prev, [b.id as string]: normalized }));
+        } catch {
           // ignore per-bus failure
-          setBusDetails((prev) => ({ ...prev, [b.id]: null }));
+          setBusDetails((prev) => ({ ...prev, [b.id as string]: null }));
         }
       })();
     });
-  }, [buses, getBus]);
+  }, [buses, getBus, busDetails, passengerCache]);
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-[#101720]/80 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)] border border-white/5 flex flex-col overflow-hidden" dir="rtl">

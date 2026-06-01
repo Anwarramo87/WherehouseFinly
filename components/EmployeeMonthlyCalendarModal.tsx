@@ -376,24 +376,31 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
 
   // معالجة البيانات وتصفيتها بدقة وحمايتها من الـ Timezone
   const mappedDays = useMemo(() => {
-    const dayMap = new Map<string, any>();
+    interface DayRecord {
+      isPresent: boolean;
+      isLate: boolean;
+      overtimeMin: number;
+      leaveType: string | null;
+    }
+    const dayMap = new Map<string, DayRecord>();
 
     if (Array.isArray(attendanceData)) {
-      attendanceData.forEach((rec: any) => {
+      attendanceData.forEach((rec: Record<string, unknown>) => {
         // قراءة التاريخ النصي المباشر لمنع قفز التواريخ بسبب الـ Timezone
-        const dateKey = rec.date?.split("T")[0] || rec.date; 
+        const dateKey = (typeof rec.date === 'string' ? rec.date.split("T")[0] : String(rec.date)) || '';
         
         if (!dayMap.has(dateKey)) {
           dayMap.set(dateKey, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
         }
-        const current = dayMap.get(dateKey);
+        const current = dayMap.get(dateKey)!;
         current.isPresent = true;
 
         // دعم قراءة حقل minutesLate سواء كان مباشراً أو متداخلاً في shiftPair حسب تقرير الـ API
-        const minutesLate = Number(rec.minutesLate ?? rec.shiftPair?.minutesLate ?? 0);
+        const recData = rec as Record<string, unknown>;
+        const minutesLate = Number(recData.minutesLate ?? (recData.shiftPair as Record<string, unknown>)?.minutesLate ?? 0);
         if (minutesLate > 0) current.isLate = true;
 
-        const hoursWorked = Number(rec.hoursWorked ?? rec.shiftPair?.hoursWorked ?? 0);
+        const hoursWorked = Number(recData.hoursWorked ?? (recData.shiftPair as Record<string, unknown>)?.hoursWorked ?? 0);
         if (hoursWorked > 8) {
           current.overtimeMin += (hoursWorked - 8) * 60;
         }
@@ -401,9 +408,9 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     }
 
     if (Array.isArray(leavesData)) {
-      leavesData.forEach((leave: any) => {
-        const startStr = leave.startDate?.split("T")[0] || leave.startDate;
-        const endStr = leave.endDate?.split("T")[0] || leave.endDate;
+      leavesData.forEach((leave: Record<string, unknown>) => {
+        const startStr = (typeof leave.startDate === 'string' ? leave.startDate.split("T")[0] : String(leave.startDate ?? ''));
+        const endStr = (typeof leave.endDate === 'string' ? leave.endDate.split("T")[0] : String(leave.endDate ?? ''));
         const start = new Date(startStr);
         const end = new Date(endStr);
 
@@ -413,7 +420,8 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
             if (!dayMap.has(dayStr)) {
               dayMap.set(dayStr, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
             }
-            dayMap.get(dayStr).leaveType = leave.leaveType;
+            const dayEntry = dayMap.get(dayStr)!;
+            dayEntry.leaveType = (leave.leaveType as string | null) ?? dayEntry.leaveType;
           }
         });
       });
@@ -522,10 +530,10 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                         <span className="text-[9px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md border border-white/5">{statusText}</span>
                       </div>
 
-                      {info?.overtimeMin > 0 && (
+                      {(info?.overtimeMin ?? 0) > 0 && (
                         <div className="mt-2 flex items-center gap-1 text-[10px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded-lg w-fit">
                           <Clock size={10} />
-                          <span>+{Math.round(info.overtimeMin)} د إضافي</span>
+                          <span>+{Math.round(info?.overtimeMin ?? 0)} د إضافي</span>
                         </div>
                       )}
                     </div>
