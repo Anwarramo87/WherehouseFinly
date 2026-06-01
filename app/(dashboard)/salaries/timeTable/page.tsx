@@ -886,6 +886,13 @@ import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
 const EditAttendanceTotalsModal = dynamic(() => import("@/components/EditAttendanceTotalsModal"), { loading: () => null });
 const EmployeeMonthlyCalendarModal = dynamic(() => import("@/components/EmployeeMonthlyCalendarModal"), { loading: () => null });
 
+// Type for automatic deductions returned by the attendance deductions API
+type AutoDeductionRecord = {
+  employeeId: string;
+  absentDays?: number;
+  delayMinutes?: number;
+};
+
 export default function TimeTablePage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active" });
 
@@ -931,7 +938,7 @@ export default function TimeTablePage() {
       
       // المصفوفة جاهزة ومحمية من استعلام autoDeductions الجديد
       const autoDeductionsArray = autoDeductions || [];
-      const autoInput = autoDeductionsArray.find((d: any) => d.employeeId === emp.employeeId);
+      const autoInput = autoDeductionsArray.find((d: { employeeId: string; absentDays?: number; delayMinutes?: number }) => d.employeeId === emp.employeeId);
 
       // الدمج الذكي: إذا لم يكن هناك تعديل يدوي، خذ الآلي!
       const absenceDays = manualInput?.absenceDays ?? autoInput?.absentDays ?? 0;
@@ -990,14 +997,14 @@ export default function TimeTablePage() {
     });
   };
 
-  const selectedInputData = useMemo(() => {
+  const selectedInputData = (() => {
     if (!selectedEmployeeId || !periodStart || !periodEnd) return null;
     
     const manualInput = payrollInputs.find(pi => pi.employeeId === selectedEmployeeId);
     if (manualInput) return manualInput; 
 
     const autoDeductionsArray = autoDeductions || [];
-    const autoInput = autoDeductionsArray.find((d: any) => d.employeeId === selectedEmployeeId);
+    const autoInput = autoDeductionsArray.find((d: AutoDeductionRecord) => d.employeeId === selectedEmployeeId);
 
     // ✅ الحل العبقري للمشكلة الثانية:
     // تعريف الكائن بصرامة باستخدام TypeScript Type لضمان عدم وجود أخطاء أو نواقص
@@ -1018,7 +1025,7 @@ export default function TimeTablePage() {
     };
 
     return defaultRecord;
-  }, [selectedEmployeeId, payrollInputs, autoDeductions, periodStart, periodEnd]);
+  })();
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">

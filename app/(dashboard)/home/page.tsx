@@ -22,14 +22,10 @@ import {
 import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useAdvances } from '@/hooks/useAdvances';
-import { usePenalties } from '@/hooks/usePenalties';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
 
@@ -125,17 +121,11 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
-interface DepartmentEntry {
-  name: string;
-  manager: string;
-  count: number;
-  originalName?: string;
-}
-
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
-  const { employeesStats, kpis, isLoading } = useDashboard();
+  // Remove unused imports and variables
+  const { kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees();
   const router = useRouter();
   const isSkeleton = isLoading;
@@ -150,9 +140,7 @@ export default function DashboardPage() {
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
-  const queryClient = useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
-  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
 
   // إغلاق القوائم عند الضغط خارجها
   useEffect(() => {
@@ -198,7 +186,7 @@ export default function DashboardPage() {
         try {
           attendanceRes = await apiClient.get("/attendance", { params: { date: today, limit: 500 } });
         } catch (err) {
-          if (axios.isAxiosError(err) && err.response?.status === 400) {
+          if ((err as { response?: { status?: number } })?.response?.status === 400) {
             attendanceRes = await apiClient.get("/attendance", { params: { limit: 500 } });
           } else {
             throw err;
@@ -237,7 +225,6 @@ export default function DashboardPage() {
             });
           setModalData(presentData);
         } else {
-          // التعديل الأول: تحديد نوع الإرجاع لـ map
           const overtimeData: OvertimeEmployee[] = Array.from(byEmployee.entries())
             .map(([employeeId, entry]): OvertimeEmployee | null => {
               const employee = employeesById.get(employeeId);
@@ -275,7 +262,6 @@ export default function DashboardPage() {
       } else {
         const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
         
-        // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
         const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
 
         if (type === 'absent') {
@@ -326,7 +312,7 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = async (_data: DeptFormData) => {
+  const handleSaveDepartment = async () => {
     // creation/update handled by modal via API; just close modal and let departments query refresh
     setIsAddDeptModalOpen(false);
     setEditingDept(null);
@@ -343,28 +329,28 @@ export default function DashboardPage() {
     }
   };
 
-  const monthKey = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
-
   const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
     // Dashboard aggregated payload does not currently include full advances list.
     // To avoid extra API requests on the home page we render an empty list here
     // and rely on dedicated pages to show advances.
     return [];
-  }, [monthKey]);
+  }, []);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
     // Avoid fetching penalties on dashboard home; show empty preview list.
     return [];
-  }, [monthKey]);
+  }, []);
 
   const { data: deptsData, deleteDepartment } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
-    return apiList.map((d: any) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+    return apiList.map((d: { id: string; name: string; employeeCount?: number; manager?: string }) => ({ 
+      id: d.id, 
+      name: d.name, 
+      count: Number(d.employeeCount ?? 0), 
+      manager: d.manager ?? '' 
+    }));
   }, [deptsData]);
 
   const stats = [
@@ -524,7 +510,7 @@ export default function DashboardPage() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenDropdownDept(openDropdownDept === dept.id ? null : dept.id);
+                        setOpenDropdownDept(openDropdownDept === dept.id ? null : (dept.id || null));
                       }}
                       className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
                     >
@@ -555,7 +541,6 @@ export default function DashboardPage() {
                           title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedDeptId(dept.id ?? null);
                             handleDeleteDepartment(dept.id, dept.count);
                             setOpenDropdownDept(null);
                           }}

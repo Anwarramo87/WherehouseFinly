@@ -8,15 +8,16 @@ import { useSalaries } from "@/hooks/useSalaries";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
-import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
+import type { TerminationData } from "@/components/TerminateEmployeeModal";
 import type { Salary } from "@/types/salary";
-import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye } from "lucide-react";
+import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye, Lock } from "lucide-react";
+import { PermissionGuard } from "@/components/PermissionGuard";
 
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
 
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), { loading: () => null });
-const FireEmployeeModal = dynamic(() => import("@/components/FireEmployeeModal"), { loading: () => null });
+const TerminateEmployeeModal = dynamic(() => import("@/components/TerminateEmployeeModal"), { loading: () => null });
 
 const normalizeNumericInput = (value: string) => {
   const arabicDigits: Record<string, string> = {
@@ -91,7 +92,7 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
+  const { data: employees, isLoading, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: false });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
@@ -100,16 +101,17 @@ export default function EmployeesPage() {
     return m;
   }, [salaries]);
   
+  // Filter out terminated and resigned employees from the active list
   const visibleEmployees = useMemo(
-    () => employees || [],
+    () => (employees || []).filter(emp => emp.status === 'active' || !emp.status),
     [employees],
   );
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   
-  const [isFireModalOpen, setIsFireModalOpen] = useState(false);
-  const [employeeToFire, setEmployeeToFire] = useState<Employee | null>(null);
+  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
+  const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
@@ -243,11 +245,11 @@ export default function EmployeesPage() {
         // في حال التعديل
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
         // Ensure salaries list reflects employeeSalary upsert performed by backend
-        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
+        try { await refetchSalaries(); } catch { /* best-effort */ }
       } else {
         // في حال موظف جديد
         await createEmployee.mutateAsync(payload as Employee);
-        try { await refetchSalaries(); } catch (e) { /* best-effort */ }
+        try { await refetchSalaries(); } catch { /* best-effort */ }
       }
       setIsModalOpen(false);
       setSelectedEmployee(null);
@@ -258,22 +260,24 @@ export default function EmployeesPage() {
     }
   };
 
-  // الدالة المحدثة لاستقبال حالة الاستقالة أو الإقالة
-  const handleConfirmFire = async (fireData: FireEmployeePayload) => {
+  // الدالة المحدثة لاستقبال بيانات إنهاء الخدمة
+  const handleConfirmTerminate = async (terminationData: TerminationData) => {
+    if (!employeeToTerminate) return;
+    
     try {
       await terminateEmployee.mutateAsync({
-        id: fireData.employeeId,
+        id: employeeToTerminate.employeeId,
         data: {
-          terminationDate: new Date(fireData.fireDate).toISOString(),
-          terminationReason: fireData.reason,
-          notes: fireData.notes,
-          status: fireData.status as "terminated" | "resigned" // إرسال حالة الاستقالة أو الإقالة
+          terminationDate: new Date(terminationData.terminationDate).toISOString(),
+          terminationReason: terminationData.reason,
+          notes: terminationData.notes,
+          status: terminationData.terminationType === 'resignation' ? 'resigned' : 'terminated'
         }
       });
-      setIsFireModalOpen(false);
-      setEmployeeToFire(null);
+      setIsTerminateModalOpen(false);
+      setEmployeeToTerminate(null);
     } catch (err) {
-      console.error("Error firing employee:", err);
+      toast.error(getErrorMessage(err, "فشل في إنهاء الخدمة"));
     }
   };
 
@@ -370,22 +374,17 @@ export default function EmployeesPage() {
                       const row = emp as EmployeeRow;
 
                       return (
-                      <tr key={emp.employeeId} className={`hover:bg-white/80 transition-all duration-300 group/row ${emp.status !== 'active' ? 'opacity-75 bg-rose-50/30' : ''}`}>
+                      <tr key={emp.employeeId} className="hover:bg-white/80 transition-all duration-300 group/row">
                         <td className="p-4 text-center font-mono font-bold text-slate-500 text-sm">
                           {emp.employeeId}
                         </td>
                         <td className="p-4 text-center">
                           <Link 
                             href={`/employees/${emp.employeeId}`} 
-                            className={`inline-flex items-center gap-1.5 font-black transition-all text-base group/link ${emp.status === 'terminated' ? 'text-rose-500' : 'text-slate-800 hover:text-[#C89355]'}`}
+                            className="inline-flex items-center gap-1.5 font-black transition-all text-base group/link text-slate-800 hover:text-[#C89355]"
                             title="عرض بروفايل الموظف"
                           >
                             <span className="group-hover/link:underline underline-offset-4 decoration-2 decoration-[#C89355]/40">{emp.name}</span>
-                            {emp.status !== 'active' && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${emp.status === 'terminated' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                                {emp.status === 'terminated' ? 'مقال' : 'مستقيل'}
-                              </span>
-                            )}
                           </Link>
                         </td>
                         <td className="p-4 text-center font-bold text-[#263544] text-sm">
@@ -416,13 +415,26 @@ export default function EmployeesPage() {
                               <Edit2 size={16} />
                             </button>
 
-                            <button 
-                              onClick={() => { setEmployeeToFire(emp); setIsFireModalOpen(true); }}
-                              className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
-                              title="إنهاء خدمة موظف"
+                            <PermissionGuard
+                              permission="termination:create"
+                              fallback={
+                                <button
+                                  className="text-slate-300 cursor-not-allowed p-2.5 rounded-xl"
+                                  title="ليس لديك صلاحية إنهاء الخدمة"
+                                  disabled
+                                >
+                                  <Lock size={16} />
+                                </button>
+                              }
                             >
-                              <UserMinus size={16} />
-                            </button>
+                              <button
+                                onClick={() => { setEmployeeToTerminate(emp); setIsTerminateModalOpen(true); }}
+                                className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
+                                title="إنهاء عمل الموظف"
+                              >
+                                <UserMinus size={16} />
+                              </button>
+                            </PermissionGuard>
 
                           </div>
                         </td>
@@ -447,12 +459,12 @@ export default function EmployeesPage() {
             />
           )}
 
-          {isFireModalOpen && employeeToFire && (
-            <FireEmployeeModal 
-               isOpen={isFireModalOpen}
-               onClose={() => { setIsFireModalOpen(false); setEmployeeToFire(null); }}
-               employee={employeeToFire}
-               onConfirm={handleConfirmFire}
+          {isTerminateModalOpen && employeeToTerminate && (
+            <TerminateEmployeeModal 
+               employee={employeeToTerminate}
+               isOpen={isTerminateModalOpen}
+               onClose={() => { setIsTerminateModalOpen(false); setEmployeeToTerminate(null); }}
+               onConfirm={handleConfirmTerminate}
                isPending={terminateEmployee.isPending}
             />
           )}

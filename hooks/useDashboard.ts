@@ -1,10 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
-import { useEmployees } from '@/hooks/useEmployees';
-import { useSalaries } from '@/hooks/useSalaries';
-import { usePayrollSummary } from '@/hooks/usePayroll';
+import type { DashboardKpis, EmployeesStats, AttendanceStats, InventoryStats } from '@/types/dashboard';
 import { api } from '@/lib/http/api';
-import { queryKeys } from '@/lib/query-keys';
 
 const fallbackEmployeesStats: EmployeesStats = {
   total: 0,
@@ -40,55 +36,6 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const toNumber = (value: unknown) => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
-
-const extractAttendanceCounts = (stats: AttendanceStats | undefined) => {
-  if (!stats || typeof stats !== 'object') {
-    return { active: 0, absent: 0, lateMinutes: 0 };
-  }
-
-  const summary = (stats as { summary?: Record<string, unknown> }).summary;
-
-  const active = toNumber(summary?.activeEmployees ?? 0);
-  const absent = toNumber(summary?.absentCount ?? 0);
-  const lateMinutes = toNumber(summary?.totalLateMinutes ?? 0);
-
-  return { active, absent, lateMinutes };
-};
-
-const extractPayrollTotal = (summary: unknown) => {
-  if (!summary || typeof summary !== 'object') return null;
-
-  const record = summary as Record<string, unknown>;
-  const totals = (record.totals as Record<string, unknown>) || {};
-
-  const candidates: unknown[] = [
-    totals.totalNetPay,
-    totals.totalNetPayRounded,
-    totals.totalNetPayWithAdvance,
-    record.totalNetPay,
-    record.totalNetPayRounded,
-    record.totalNetPayWithAdvance,
-    record.netPayRounded,
-    record.netPayWithAdvance,
-    record.payrolliteam,
-  ];
-
-  for (const candidate of candidates) {
-    const value = toNumber(candidate);
-    if (value > 0) return value;
-  }
-
-  return null;
-};
-
 const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<T> => {
   try {
     const result = await fetcher();
@@ -98,14 +45,13 @@ const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<
   }
 };
 
-export const useDashboard = (opts?: { startDate?: string; endDate?: string }) => {
-  const today = getLocalDateString();
+export const useDashboard = () => {
   // Fetch aggregated dashboard payload (reduces multiple /stats calls)
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'home'],
     queryFn: () =>
       withFallback(
-        () => api.get<any>('/dashboard/home'),
+        () => api.get<DashboardKpis>('/dashboard/home'),
         {
           totalEmployees: 0,
           attendance: { count: 0, employees: [] },

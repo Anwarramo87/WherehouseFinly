@@ -236,9 +236,13 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
   // 5. إقالة أو استقالة موظف
   const terminateMutation = useMutation<unknown, unknown, TerminateEmployeeVariables>({
     mutationFn: async ({ id, data }) => {
+      // terminationType مطلوب من الـ DTO — يُشتق من حقل status
+      const terminationType = data.status === "resigned" ? "resignation" : "termination";
       const payload = {
         terminationDate: data.terminationDate,
+        terminationType,
         terminationReason: data.terminationReason,
+        ...(data.notes ? { terminationNotes: data.notes } : {}),
       };
 
       const endpoint = data.status === "resigned" ? "resign" : "terminate";
@@ -279,5 +283,47 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 };
 
 // التعديل الرابع: جلب الأرشيف (المقالين والمستقيلين معاً)
-export const useResignedEmployees = () =>
-   useEmployees({ includeTerminated: true });
+// يستخدم نقطة النهاية المخصصة GET /employees/resigned بدلاً من القائمة العامة
+export const useResignedEmployees = () => {
+  const queryClient = useQueryClient();
+
+  const query = useQuery<Employee[]>({
+    queryKey: ["resigned-employees"],
+    queryFn: async () => {
+      const response = await apiClient.get("/employees/resigned", {
+        params: { limit: 500, page: 1 },
+      });
+
+      // الاستجابة: { success, employees, pagination, statistics }
+      const payload = response.data;
+      if (payload && Array.isArray(payload.employees)) {
+        return payload.employees as Employee[];
+      }
+      if (Array.isArray(payload)) {
+        return payload as Employee[];
+      }
+      return [];
+    },
+    staleTime: QUERY_STALE_TIME.RELAXED,
+    gcTime: QUERY_GC_TIME.RELAXED,
+  });
+
+  // تصفية مستحقات موظف (للمحاسب)
+  const settleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiClient.patch(`/employees/${id}/settle`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "فشل في تصفية الموظف"));
+    },
+  });
+
+  return {
+    ...query,
+    settleEmployee: settleMutation,
+  };
+};

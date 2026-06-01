@@ -125,7 +125,7 @@ export default function SalariesPage() {
         // best-effort refetch to resolve any race where salary appears before employees list
         refetchEmployees().catch(() => {});
       }
-    } catch (e) {
+    } catch {
       // swallow errors — this is a best-effort UX improvement
     }
   }, [salaries, employeeMap, refetchEmployees]);

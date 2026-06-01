@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { useRoles } from "@/hooks/useRoles";
@@ -78,8 +78,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
   const { data: deptsData } = useDepartments();
   const hasInitializedRole = useRef(false);
+  const prevIsOpen = useRef(isOpen);
 
-  const buildFormState = (employee?: EmployeeWithExtendedFields | null) => {
+  const buildFormState = useCallback((employee?: EmployeeWithExtendedFields | null) => {
     if (employee) {
       return {
         employeeId: employee.employeeId || "",
@@ -103,7 +104,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
       ...defaultFormState,
       employeeId: nextSuggestedId,
     };
-  };
+  }, [nextSuggestedId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -116,15 +117,26 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
 
   const [formData, setFormData] = useState(() => buildFormState(initialData));
 
+  // Reset form data when modal opens or initialData changes
   useEffect(() => {
-    if (!isOpen) return;
-
-    setStep(1);
-    setMobileError("");
-    setRoleError("");
-    hasInitializedRole.current = false;
-    setFormData(buildFormState(initialData));
-  }, [isOpen, initialData, nextSuggestedId]);
+    if (isOpen && !prevIsOpen.current) {
+      // Modal just opened - reset form data and errors
+      setFormData(buildFormState(initialData));
+      setMobileError("");
+      setRoleError("");
+      hasInitializedRole.current = false;
+    }
+    
+    prevIsOpen.current = isOpen;
+  }, [isOpen, initialData, nextSuggestedId, buildFormState]);
+  
+  // Reset step to 1 when modal closes (not when it opens to avoid cascading renders)
+  useEffect(() => {
+    if (!isOpen && prevIsOpen.current) {
+      // Modal just closed - reset step for next time
+      setStep(1);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
