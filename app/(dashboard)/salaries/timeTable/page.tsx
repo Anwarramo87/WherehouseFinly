@@ -163,7 +163,7 @@ export default function TimeTablePage() {
     });
   };
 
-  const selectedInputData = useMemo((): PayrollInputRecord | null => {
+  const getSelectedInputData = (): PayrollInputRecord | null => {
     if (!selectedEmployeeId || !periodStart || !periodEnd) return null;
 
     // إذا وُجد تعديل يدوي مسبق، نعرضه في المودال كما هو
@@ -193,7 +193,9 @@ export default function TimeTablePage() {
     };
 
     return defaultRecord;
-  }, [selectedEmployeeId, payrollInputs, autoDeductions, periodStart, periodEnd]);
+  };
+
+  const selectedInputData = getSelectedInputData();
 
   return (
     <div

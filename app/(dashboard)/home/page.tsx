@@ -28,7 +28,7 @@ import useSalaries from '@/hooks/useSalaries';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
@@ -127,13 +127,6 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
-interface DepartmentEntry {
-  name: string;
-  manager: string;
-  count: number;
-  originalName?: string;
-}
-
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
@@ -153,9 +146,9 @@ export default function DashboardPage() {
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
-  const queryClient = useQueryClient();
+  const _queryClientRef = useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
-  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const _selectedDeptId = useState<string | null>(null)[0];
 
   // إغلاق القوائم عند الضغط خارجها
   useEffect(() => {
@@ -329,7 +322,7 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = async (_data: DeptFormData) => {
+  const handleSaveDepartment = async () => {
     // creation/update handled by modal via API; just close modal and let departments query refresh
     setIsAddDeptModalOpen(false);
     setEditingDept(null);
@@ -340,8 +333,8 @@ export default function DashboardPage() {
     if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
     try {
       await deleteDepartment.mutateAsync(deptId);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      console.error('Error deleting department');
       alert('فشل حذف القسم');
     }
   };
@@ -351,12 +344,9 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  const employeeList = Array.isArray(employees) ? employees : [];
   const { data: salaries = [] } = useSalaries();
 
-  
-
-  const resolveDisplayedMonthlySalary = (employee: any, salaryMap: Map<string, any>) => {
+  const resolveDisplayedMonthlySalary = useCallback((employee: Record<string, unknown>, salaryMap: Map<string, Record<string, unknown>>) => {
     const salaryRecord = salaryMap.get(employee.employeeId);
     if (salaryRecord) {
       const fixedTotal =
@@ -378,17 +368,21 @@ export default function DashboardPage() {
 
     const hourly = toNumber(employee.hourlyRate);
     return Math.round(hourly * 8 * 26);
-  };
+  }, []);
 
   const salaryMap = useMemo(() => {
-    const m = new Map<string, any>();
-    (salaries || []).forEach((s: any) => { if (s?.employeeId) m.set(s.employeeId, s); });
+    const m = new Map<string, Record<string, unknown>>();
+    (salaries || []).forEach((s: Record<string, unknown>) => { if (s?.employeeId) m.set(s.employeeId as string, s); });
     return m;
   }, [salaries]);
 
+  const employeeListMemo = useMemo(() => {
+    return Array.isArray(employees) ? employees : [];
+  }, [employees]);
+
   const totalSalaries = useMemo(() => {
-    return employeeList.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
-  }, [employeeList, salaryMap]);
+    return employeeListMemo.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
+  }, [employeeListMemo, salaryMap, resolveDisplayedMonthlySalary]);
 
   const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
   const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
@@ -403,7 +397,7 @@ export default function DashboardPage() {
       .sort((a, b) => (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""))
       .slice(0, 6)
       .map((advance) => {
-        const employee = employeeList.find((emp) => emp.employeeId === advance.employeeId);
+        const employee = employeeListMemo.find((emp) => emp.employeeId === advance.employeeId);
         return {
           advanceId: advance.id,
           employeeId: advance.employeeId,
@@ -416,7 +410,7 @@ export default function DashboardPage() {
           avatar: undefined,
         };
       });
-  }, [advances, employeeList, monthKey]);
+  }, [advances, employeeListMemo, monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
     const monthRecords = discounts.filter((record) => (record.date || "").startsWith(monthKey));
@@ -426,7 +420,7 @@ export default function DashboardPage() {
       .sort((a, b) => (b.date || b.createdAt || "").localeCompare(a.date || a.createdAt || ""))
       .slice(0, 6)
       .map((penalty) => {
-        const employee = employeeList.find((emp) => emp.employeeId === penalty.employeeId);
+        const employee = employeeListMemo.find((emp) => emp.employeeId === penalty.employeeId);
         const isAdvance = penalty.kind === "advance" || penalty.backendModel === "advance" || Boolean(penalty.advanceType);
         return {
           penaltyId: penalty.id,
@@ -441,13 +435,13 @@ export default function DashboardPage() {
           avatar: undefined,
         };
       });
-  }, [discounts, employeeList, monthKey]);
+  }, [discounts, employeeListMemo, monthKey]);
 
   const { data: deptsData, deleteDepartment } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
-    return apiList.map((d: any) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+    return apiList.map((d: Record<string, unknown>) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
   }, [deptsData]);
 
   const stats = [

@@ -198,19 +198,19 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
 
   const { matched: matchingEmployees, others: otherEmployees } = useMemo(() => {
     const normRoute = normalize(routeText);
-    const matched: any[] = [];
-    const others: any[] = [];
+    const matched: Employee[] = [];
+    const others: Employee[] = [];
     for (const e of (allEmployees || [])) {
       if (!e) continue;
       if (existingEmployeeIds.has(e.employeeId)) continue; // skip already added
       const r = normalize(e.residence || "");
       // Match if residence contains origin or origin contains residence or exact token match
-      const isMatch = normRoute && r && (normRoute.includes(r) || r.includes(normRoute) || r.split(" ").some(tok => normRoute.includes(tok)));
+      const isMatch = normRoute && r && (normRoute.includes(r) || r.includes(normRoute) || r.split(" ").some((tok: string) => normRoute.includes(tok)));
       if (isMatch) matched.push(e);
       else others.push(e);
     }
     // Sort matched by best heuristic: exact token match first
-    matched.sort((a: any, b: any) => {
+    matched.sort((a: Employee, b: Employee) => {
       const aScore = normalize(a.residence || "").includes(normRoute) ? 0 : 1;
       const bScore = normalize(b.residence || "").includes(normRoute) ? 0 : 1;
       return aScore - bScore;
@@ -218,7 +218,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
     return { matched: matched.slice(0, 50), others: otherEmployeesLimited(others, 50) };
   }, [allEmployees, routeText, existingEmployeeIds]);
 
-  function otherEmployeesLimited(list: any[], limit = 30) {
+  function otherEmployeesLimited(list: Employee[], limit = 30) {
     return list.slice(0, limit);
   }
 
@@ -231,7 +231,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
 
     const employeeId = selectedEmployeeId || (employeeSearch.split('-')[0]?.trim() || employeeSearch.trim());
     const name = selectedEmployeeId
-      ? (allEmployees.find((e: any) => e.employeeId === selectedEmployeeId)?.name || employeeSearch)
+      ? (allEmployees.find((e: Employee) => e.employeeId === selectedEmployeeId)?.name || employeeSearch)
       : employeeSearch;
 
     const generatedId = `${busData.id}-${employeeId}-${busData.passengers.length + 1}`;
@@ -278,7 +278,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                   <div>
                     <div className="text-xs text-slate-400 mb-2">الموظفون المطابقون للرحلة ({routeText || '—'})</div>
                     <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
-                      {matchingEmployees.map((emp: any) => (
+                      {matchingEmployees.map((emp: Employee) => (
                         <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
                           <div className="text-left">
                             <div className="flex justify-between items-center gap-2">
@@ -302,7 +302,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                   <div>
                     <div className="text-xs text-slate-400 mb-2">موظفون آخرون</div>
                     <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
-                      {otherEmployees.map((emp: any) => (
+                      {otherEmployees.map((emp: Employee) => (
                         <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
                           <div>
                             <div className="flex justify-between items-center gap-2">

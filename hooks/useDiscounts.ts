@@ -51,10 +51,6 @@ const mapBackendKindToType = (record: Record<string, unknown>): { type: string; 
 export const useDiscounts = (employeeId?: string, enabled = true) => {
   const queryClient = useQueryClient();
 
-  const resolveUpdateEndpoint = (recordKind: DiscountRecord["kind"]) => {
-    return recordKind === "advance" ? "/advances" : "/bonuses";
-  };
-
   const query = useQuery<DiscountRecord[]>({
     queryKey: ["discounts", employeeId || "all"],
     queryFn: async () => {

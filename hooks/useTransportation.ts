@@ -36,11 +36,6 @@ export interface BusDetailsResponse extends BusResponse {
   passengers: PassengerResponse[];
 }
 
-type ApiErrorBody = {
-  message?: string;
-  error?: { message?: string };
-};
-
 const normalizeError = (error: unknown): string => {
   const err = error as { response?: { data?: { message?: string | string[] } }; message?: string };
   const message = err?.response?.data?.message || err?.message || "حدث خطأ غير معروف";

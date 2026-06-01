@@ -374,7 +374,7 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     if (Array.isArray(attendanceData)) {
       attendanceData.forEach((rec: Record<string, unknown>) => {
         // قراءة التاريخ النصي المباشر لمنع قفز التواريخ بسبب الـ Timezone
-        const dateKey = (typeof rec.date === 'string' ? rec.date.split("T")[0] : String(rec.date ?? ''));
+        const dateKey = (typeof rec.date === 'string' ? rec.date.split("T")[0] : String(rec.date)) || '';
         
         if (!dayMap.has(dateKey)) {
           dayMap.set(dateKey, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
@@ -383,10 +383,11 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
         current.isPresent = true;
 
         // دعم قراءة حقل minutesLate سواء كان مباشراً أو متداخلاً في shiftPair حسب تقرير الـ API
-        const minutesLate = Number((rec as any).minutesLate ?? (rec as any).shiftPair?.minutesLate ?? 0);
+        const recData = rec as Record<string, unknown>;
+        const minutesLate = Number(recData.minutesLate ?? (recData.shiftPair as Record<string, unknown>)?.minutesLate ?? 0);
         if (minutesLate > 0) current.isLate = true;
 
-        const hoursWorked = Number((rec as any).hoursWorked ?? (rec as any).shiftPair?.hoursWorked ?? 0);
+        const hoursWorked = Number(recData.hoursWorked ?? (recData.shiftPair as Record<string, unknown>)?.hoursWorked ?? 0);
         if (hoursWorked > 8) {
           current.overtimeMin += (hoursWorked - 8) * 60;
         }
