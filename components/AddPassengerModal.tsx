@@ -145,6 +145,7 @@ import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, Save, UserPlus, Search, Coins, Calculator } from "lucide-react";
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/page";
+import type { Employee } from "@/types/employee";
 import { useEmployees } from "@/hooks/useEmployees";
 
 interface Props {
@@ -162,7 +163,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
 
   // Logic: الحساب الديناميكي العادل
   const netCost = busData.totalCost - (busData.totalCost * (busData.companyDeductionPct / 100));
-  const manualTotal = busData.passengers.filter(p => p.isManual).reduce((sum, p) => sum + p.paidAmount, 0);
+  const manualTotal = busData.passengers.filter(p => p.isManual).reduce((sum, p) => sum + (p.paidAmount ?? 0), 0);
   const autoCount = busData.passengers.filter(p => !p.isManual).length + 1; // +1 للراكب الجديد
   const remainingCost = Math.max(0, netCost - manualTotal);
   const autoAmountPerPerson = Math.round(remainingCost / autoCount);

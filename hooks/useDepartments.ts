@@ -4,6 +4,8 @@ import { api } from '@/lib/http/api';
 interface Department {
   id: string;
   name: string;
+  manager?: string;
+  employeeCount?: number;
 }
 
 interface DepartmentsResponse {

@@ -336,8 +336,8 @@ export default function AttendancePage() {
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الدخول</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الخروج</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الحالة</th>
-                  <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">حالة الإجازة</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">المصدر</th>
+                  <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">حالة الإجازة</th>
                   <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">إجراءات</th>
                 </tr>
               </thead>

@@ -160,7 +160,7 @@
 //     }
 //   };
 
-//   // دالة التقدم شهراً واحداً إلى الأمام بدقة
+//   // دالة التقدم شهماً واحداً إلى الأمام بدقة
 //   const handleNextMonth = () => {
 //     const [y, m] = currentMonth.split("-").map(Number);
 //     // نمرر الترتيب المباشر للشهر التالي ليعالجه كائن التاريخ بسلاسة
@@ -408,9 +408,10 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     }
 
     if (Array.isArray(leavesData)) {
-      leavesData.forEach((leave: Record<string, unknown>) => {
-        const startStr = (typeof leave.startDate === 'string' ? leave.startDate.split("T")[0] : String(leave.startDate ?? ''));
-        const endStr = (typeof leave.endDate === 'string' ? leave.endDate.split("T")[0] : String(leave.endDate ?? ''));
+      leavesData.forEach((leave) => {
+        const leaveRecord = leave as Record<string, unknown>;
+        const startStr = (typeof leaveRecord.startDate === 'string' ? leaveRecord.startDate.split("T")[0] : String(leaveRecord.startDate ?? ''));
+        const endStr = (typeof leaveRecord.endDate === 'string' ? leaveRecord.endDate.split("T")[0] : String(leaveRecord.endDate ?? ''));
         const start = new Date(startStr);
         const end = new Date(endStr);
 
@@ -421,7 +422,7 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
               dayMap.set(dayStr, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
             }
             const dayEntry = dayMap.get(dayStr)!;
-            dayEntry.leaveType = (leave.leaveType as string | null) ?? dayEntry.leaveType;
+            dayEntry.leaveType = (leaveRecord.leaveType as string | null) ?? dayEntry.leaveType;
           }
         });
       });

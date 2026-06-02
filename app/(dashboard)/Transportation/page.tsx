@@ -371,7 +371,6 @@ export default function TransportationPage() {
     try {
       await addPassenger.mutateAsync({
         busId: selectedBus.id,
-        busId: selectedBus.id,
         payload: {
           employeeId: passengerData.employeeId,
           name: passengerData.name,
@@ -439,7 +438,7 @@ export default function TransportationPage() {
   // Fetch bus details (with passengers) for display
   useEffect(() => {
     if (!buses || buses.length === 0) return;
-    buses.forEach((b: Record<string, unknown>) => {
+    buses.forEach((b) => {
       if (busDetails[b.id as string] !== undefined) return;
       (async () => {
         try {

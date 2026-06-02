@@ -30,13 +30,6 @@ const fallbackKpis: DashboardKpis = {
   totalOvertimeMinutesToday: 0,
 };
 
-const getLocalDateString = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<T> => {
   try {
     const result = await fetcher();
@@ -55,13 +48,12 @@ export const useDashboard = () => {
         () => api.get<DashboardKpis>('/dashboard/home'),
         {
           totalEmployees: 0,
-          attendance: { count: 0, employees: [] },
-          absence: { count: 0, employees: [] },
           totalDueSalaries: 0,
           totalReceivedSalaries: 0,
-          lateness: { totalMinutes: 0, count: 0, employees: [] },
-          overtime: { totalMinutes: 0, count: 0, employees: [] },
-          reportDate: getLocalDateString(),
+          totalLateMinutesToday: 0,
+          totalOvertimeMinutesToday: 0,
+          activeToday: 0,
+          totalAbsentToday: 0,
         },
       ),
     staleTime: 60_000,
