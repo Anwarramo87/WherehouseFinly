@@ -73,6 +73,9 @@ export interface Employee {
   residence?: string | null;
   scheduledStart?: string;
   scheduledEnd?: string;
+  gracePeriodMinutes?: number;
+  workDaysInPeriod?: number;
+  hoursPerDay?: number;
   avatar?: string;
   currency?: string;
   createdAt?: string;

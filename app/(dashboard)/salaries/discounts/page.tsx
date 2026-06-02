@@ -6,7 +6,7 @@ import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, 
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 import { useAdvances } from "@/hooks/useAdvances";
-import type { AdvanceInput } from "@/types/advance";
+import { Advance, AdvanceInput } from "@/types/advance";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
@@ -25,7 +25,7 @@ export default function DiscountsPage() {
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
-  const [editingAdvance, setEditingAdvance] = useState<AdvanceInput | null>(null);
+  const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});

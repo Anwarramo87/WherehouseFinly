@@ -1,4 +1,3 @@
-
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
@@ -25,6 +24,8 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
 import useSalaries from '@/hooks/useSalaries';
+import { Employee } from '@/types/employee';
+import { Salary } from '@/types/salary';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
@@ -145,6 +146,7 @@ export default function DashboardPage() {
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
+  useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
   // إغلاق القوائم عند الضغط خارجها
@@ -266,7 +268,12 @@ export default function DashboardPage() {
           setModalData(overtimeData);
         }
       } else {
-        const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
+        const alertsRes = await apiClient.get("/attendance/alerts", { 
+          params: { 
+            date: today,
+            lateThresholdMinutes: 15  // تحديد threshold بوضوح (15 دقيقة grace period)
+          } 
+        });
         
         // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
         const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
@@ -343,7 +350,7 @@ export default function DashboardPage() {
 
   const { data: salaries = [] } = useSalaries();
 
-  const resolveDisplayedMonthlySalary = useCallback((employee: Record<string, unknown>, salaryMap: Map<string, Record<string, unknown>>) => {
+  const resolveDisplayedMonthlySalary = useCallback((employee: Employee, salaryMap: Map<string, Salary>) => {
     const salaryRecord = salaryMap.get(employee.employeeId);
     if (salaryRecord) {
       const fixedTotal =
@@ -368,12 +375,12 @@ export default function DashboardPage() {
   }, []);
 
   const salaryMap = useMemo(() => {
-    const m = new Map<string, Record<string, unknown>>();
-    (salaries || []).forEach((s: Record<string, unknown>) => { if (s?.employeeId) m.set(s.employeeId as string, s); });
+    const m = new Map<string, Salary>();
+    (salaries || []).forEach((s: Salary) => { if (s?.employeeId) m.set(s.employeeId, s); });
     return m;
   }, [salaries]);
 
-  const employeeListMemo = useMemo(() => {
+  const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];
   }, [employees]);
 
@@ -438,7 +445,7 @@ export default function DashboardPage() {
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
-    return apiList.map((d: Record<string, unknown>) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+    return apiList.map((d) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
   }, [deptsData]);
 
   const stats = [
@@ -629,7 +636,6 @@ export default function DashboardPage() {
                           title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedDeptId(dept.id ?? null);
                             handleDeleteDepartment(dept.id, dept.count);
                             setOpenDropdownDept(null);
                           }}

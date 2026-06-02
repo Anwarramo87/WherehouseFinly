@@ -7,13 +7,16 @@ export interface AttendanceDeductionBreakdown {
   // معرّف الموظف
   employeeId: string;
 
-  // أيام الغياب الكاملة
+  // أيام الحضور الفعلية (عدد الأيام التي بصم فيها الموظف)
+  presentDays: number;
+
+  // أيام الغياب = elapsedWorkDays - presentDays
   absentDays: number;
 
   // الخصم المحسوب للغياب
   absenceDeduction: number;
 
-  // إجمالي دقائق التأخير
+  // إجمالي دقائق التأخير للشهر
   delayMinutes: number;
 
   // الخصم المحسوب للتأخير
@@ -21,6 +24,9 @@ export interface AttendanceDeductionBreakdown {
 
   // الإجمالي = غياب + تأخير
   totalAttendanceDeduction: number;
+
+  // عدد أيام العمل التي مضت فعلاً في الفترة (يُحسب حتى اليوم الحالي)
+  elapsedWorkDays: number;
 
   // الفترة الزمنية
   periodStart: string;
