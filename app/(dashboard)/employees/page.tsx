@@ -96,7 +96,7 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: true });
+  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: false });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {

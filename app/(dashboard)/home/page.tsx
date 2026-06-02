@@ -29,7 +29,6 @@ import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
@@ -130,7 +129,7 @@ interface LateEmployeeDetail {
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
-  const { employeesStats, kpis, isLoading } = useDashboard();
+  const { kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees();
   const canViewFinancialRecords = useAuthStore((state) => state.hasAnyRole(["admin"]));
   const router = useRouter();
@@ -146,9 +145,7 @@ export default function DashboardPage() {
   // --- إدارة الأقسام ---
   const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
-  const _queryClientRef = useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
-  const _selectedDeptId = useState<string | null>(null)[0];
 
   // إغلاق القوائم عند الضغط خارجها
   useEffect(() => {

@@ -83,7 +83,7 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 
   // التعديل الأول: إخفاء المستقيلين والمقالين من القائمة الرئيسية
   if (shouldExcludeTerminated) {
-    return employees.filter((employee) => employee.status !== "terminated");
+    return employees.filter((employee) => employee.status !== "terminated" && employee.status !== "resigned");
   }
 
   return employees;

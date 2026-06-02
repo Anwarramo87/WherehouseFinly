@@ -427,7 +427,6 @@ export default function FinancialSettlementModal({
             </button>
           </div>
         </div>
-
       </div>
     </div>,
     document.body

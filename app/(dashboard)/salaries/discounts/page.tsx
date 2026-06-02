@@ -6,6 +6,7 @@ import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, 
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 import { useAdvances } from "@/hooks/useAdvances";
+import type { AdvanceInput } from "@/types/advance";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
@@ -13,7 +14,7 @@ const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { 
 export default function DiscountsPage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts();
-  const { data: _advances = [], createAdvance, updateAdvance } = useAdvances();
+  const { createAdvance, updateAdvance } = useAdvances();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,7 +25,7 @@ export default function DiscountsPage() {
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
-  const [editingAdvance, setEditingAdvance] = useState<Record<string, unknown> | null>(null);
+  const [editingAdvance, setEditingAdvance] = useState<AdvanceInput | null>(null);
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -99,9 +100,9 @@ export default function DiscountsPage() {
     setIsAdvanceModalOpen(true);
   };
 
-  const handleSaveAdvance = (data: Record<string, unknown>) => {
+  const handleSaveAdvance = (data: AdvanceInput) => {
     if (editingAdvance) {
-      updateAdvance.mutate({ id: editingAdvance.id, data }, { onSuccess: () => setIsAdvanceModalOpen(false) });
+      updateAdvance.mutate({ id: String(editingAdvance.employeeId), data }, { onSuccess: () => setIsAdvanceModalOpen(false) });
     } else {
       createAdvance.mutate(data, { onSuccess: () => setIsAdvanceModalOpen(false) });
     }
