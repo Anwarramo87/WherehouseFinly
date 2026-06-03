@@ -102,6 +102,10 @@ const nextConfig: NextConfig = {
         destination: "/api/telemetry/web-vitals",
       },
       {
+        source: "/api/v1/:path*",
+        destination: `${upstreamApiBase}/:path*`,
+      },
+      {
         source: "/api/:path*",
         destination: `${upstreamApiBase}/:path*`,
       },

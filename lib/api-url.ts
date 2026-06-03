@@ -1,5 +1,5 @@
-const PRODUCTION_API_URL = "https://werehouse-production-f4f4.up.railway.app/api";
-const DEVELOPMENT_API_URL = "http://localhost:5001/api";
+const PRODUCTION_API_URL = "https://werehouse-production-f4f4.up.railway.app/api/v1";
+const DEVELOPMENT_API_URL = "http://localhost:5001/api/v1";
 
 export const DEFAULT_API_URL =
   process.env.NODE_ENV === "production" ? PRODUCTION_API_URL : DEVELOPMENT_API_URL;
@@ -27,12 +27,13 @@ export const normalizeApiUrl = (rawUrl?: string, fallback = DEFAULT_API_URL) => 
     const parsed = new URL(withProtocol);
     const cleanPath = trimTrailingSlash(parsed.pathname || "");
 
-    if (!cleanPath || cleanPath === "/") {
-      parsed.pathname = "/api";
-    } else if (!cleanPath.toLowerCase().startsWith("/api")) {
-      parsed.pathname = `${cleanPath}/api`;
-    } else {
+    // If path already contains /api, keep it as-is
+    if (cleanPath.toLowerCase().includes("/api")) {
       parsed.pathname = cleanPath;
+    } else if (!cleanPath || cleanPath === "/") {
+      parsed.pathname = "/api/v1";
+    } else {
+      parsed.pathname = `${cleanPath}/api/v1`;
     }
 
     return trimTrailingSlash(parsed.toString());
