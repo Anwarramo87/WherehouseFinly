@@ -106,7 +106,7 @@ export default function EmployeesPage() {
   }, [salaries]);
   
   const visibleEmployees = useMemo(
-    () => employees || [],
+    () => Array.isArray(employees) ? employees : [],
     [employees],
   );
   
