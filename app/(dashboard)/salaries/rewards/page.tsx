@@ -84,8 +84,12 @@ export default function RewardsPage() {
         : employeesLookup.get(employeeId) || "موظف غير معروف";
       const bonusAmount = resolveAmount(bonus.bonusAmount);
       const assistanceAmount = resolveAssistance(bonus.assistanceAmount);
+      // المكافآت الإجمالية = bonusAmount + assistanceAmount
       const totalAmount = bonusAmount + assistanceAmount;
       const periodDate = bonus.period ? `${bonus.period}-01` : new Date().toISOString();
+
+      // فقط عرض السجلات التي فيها مكافآت
+      if (totalAmount <= 0) return null;
 
       return {
         id: String(rewardId),
@@ -97,7 +101,7 @@ export default function RewardsPage() {
         notes: bonus.bonusReason || "",
         allEmployees: isAll,
       };
-    });
+    }).filter((r): r is RewardRecord => r !== null);
   }, [bonusesData, employeesLookup]);
 
   // تجميع السجلات حسب الموظف

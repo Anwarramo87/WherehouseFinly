@@ -36,12 +36,13 @@ const normalizeError = (error: unknown): string => {
 };
 
 const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
-  if (record.advanceType) {
+  // السجلات من جدول EmployeeAdvance فقط
+  if (record.advanceType || record.totalAmount !== undefined) {
     const advanceType = record.advanceType as string;
     if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
-    if (advanceType === "assistance") return { type: "مساعدة", kind: "assistance" as const };
     return { type: "سلفة", kind: "advance" as const };
   }
+  // السجلات من جدول EmployeePenalty
   if (record.category) {
     return { type: "عقوبة", kind: "penalty" as const };
   }

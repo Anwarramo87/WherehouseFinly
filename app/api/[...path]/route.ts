@@ -1,86 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveApiUrl } from "@/lib/api-url";
 
-// Get the backend API URL from environment
-const BACKEND_API_URL = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api/v1";
 
-/**
- * Proxy all API requests to the backend
- * Handles both local (http://localhost:5001/api) and remote (Railway) backends
- */
 export async function handler(request: NextRequest) {
+  const url = request.nextUrl;
+  const path = url.pathname;
+  
+  // Remove /api prefix from the path
+  const pathParts = path.split("/").filter(Boolean);
+  let apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
+  
+  // Construct the full backend URL
+  // BACKEND_URL already contains /api/v1
+  const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
+  
+  console.log("[API Proxy]", request.method, path, "->", fullUrl);
+
   try {
-    // Extract the path segments after /api
-    const { pathname, search } = request.nextUrl;
-    const pathSegments = pathname.split("/").filter(Boolean);
+    const headers = new Headers();
+    headers.set("Content-Type", "application/json");
     
-    // Remove 'api' from the start and rejoin
-    const apiPath = "/" + pathSegments.slice(1).join("/");
-    
-    // Construct the full backend URL
-    const backendUrl = new URL(BACKEND_API_URL);
-    const backendBasePath = backendUrl.pathname.replace(/\/+$|^\/+/g, "");
-    const forwardedPath = apiPath === "/" ? "" : apiPath;
-    backendUrl.pathname = `/${backendBasePath}${forwardedPath}`;
-    backendUrl.search = search;
-
-    // Prepare headers
-    const headers = new Headers(request.headers);
-    
-    // Remove hop-by-hop headers
-    headers.delete("host");
-    headers.delete("connection");
-    headers.delete("keep-alive");
-    headers.delete("transfer-encoding");
-    headers.delete("upgrade");
-
-    // Forward cookies
-    const cookieHeader = request.headers.get("cookie");
-    if (cookieHeader) {
-      headers.set("cookie", cookieHeader);
+    const cookie = request.headers.get("cookie");
+    if (cookie) {
+      headers.set("Cookie", cookie);
     }
 
-    // Prepare request body for non-GET requests
-    let body: BodyInit | null = null;
+    const auth = request.headers.get("authorization");
+    if (auth) {
+      headers.set("Authorization", auth);
+    }
+
+    let body = null;
     if (request.method !== "GET" && request.method !== "HEAD") {
-      body = await request.arrayBuffer();
+      body = await request.text();
     }
 
-    // Make the request to the backend
-    const backendResponse = await fetch(backendUrl.toString(), {
+    const response = await fetch(fullUrl, {
       method: request.method,
       headers,
       body,
       credentials: "include",
     });
 
-    // Prepare response headers
-    const responseHeaders = new Headers(backendResponse.headers);
-    
-    // Handle CORS
-    responseHeaders.set("Access-Control-Allow-Origin", "*");
-    responseHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    responseHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    const data = await response.text();
 
-    // Return the response
-    return new NextResponse(backendResponse.body, {
-      status: backendResponse.status,
-      statusText: backendResponse.statusText,
-      headers: responseHeaders,
+    return new NextResponse(data, {
+      status: response.status,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
+      },
     });
   } catch (error) {
-    console.error("API proxy error:", error);
+    console.error("[API Proxy] Error:", error);
     return NextResponse.json(
-      { 
-        error: "Failed to proxy request to backend",
-        message: error instanceof Error ? error.message : String(error)
-      },
+      { error: "Backend unreachable", message: error instanceof Error ? error.message : String(error) },
       { status: 502 }
     );
   }
 }
 
-// Handle all HTTP methods
 export const GET = handler;
 export const POST = handler;
 export const PUT = handler;

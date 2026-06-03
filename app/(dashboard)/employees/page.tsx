@@ -166,7 +166,7 @@ export default function EmployeesPage() {
 
   // --- حساب كود الموظف بطريقة آمنة جداً (البحث عن أكبر رقم مستخدم) ---
   const suggestedEmployeeId = useMemo(() => {
-    if (!employees || employees.length === 0) return "EMP00001";
+    if (!Array.isArray(employees) || employees.length === 0) return "EMP00001";
     
     // استخراج كل الأرقام من أكواد الموظفين الموجودة
     const existingIds = employees.map(e => e.employeeId);
