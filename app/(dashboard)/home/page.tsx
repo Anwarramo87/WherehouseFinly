@@ -24,7 +24,6 @@ import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
-import useSalaries from '@/hooks/useSalaries';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
@@ -137,7 +136,7 @@ interface DepartmentEntry {
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
-  const { employeesStats, kpis, isLoading } = useDashboard();
+  const { kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees();
   const canViewFinancialRecords = useAuthStore((state) => state.hasAnyRole(["admin"]));
   const router = useRouter();
@@ -339,7 +338,8 @@ export default function DashboardPage() {
     if (!deptId || count > 0) return;
     if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
     try {
-      await deleteDepartment.mutateAsync(deptId);
+      await apiClient.delete(`/departments/${deptId}`);
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
     } catch (err) {
       console.error(err);
       alert('فشل حذف القسم');
@@ -352,44 +352,6 @@ export default function DashboardPage() {
   }, []);
 
   const employeeList = Array.isArray(employees) ? employees : [];
-  const { data: salaries = [] } = useSalaries();
-
-  
-
-  const resolveDisplayedMonthlySalary = (employee: any, salaryMap: Map<string, any>) => {
-    const salaryRecord = salaryMap.get(employee.employeeId);
-    if (salaryRecord) {
-      const fixedTotal =
-        toNumber(salaryRecord.baseSalary) +
-        toNumber(salaryRecord.lumpSumSalary) +
-        toNumber(salaryRecord.livingAllowance) +
-        toNumber(salaryRecord.responsibilityAllowance) +
-        toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
-        toNumber(salaryRecord.productionIncentive) +
-        toNumber(salaryRecord.transportAllowance);
-
-      if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
-    }
-
-    if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
-      const parsed = toNumber(employee.monthlySalary);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    }
-
-    const hourly = toNumber(employee.hourlyRate);
-    return Math.round(hourly * 8 * 26);
-  };
-
-  const salaryMap = useMemo(() => {
-    const m = new Map<string, any>();
-    (salaries || []).forEach((s: any) => { if (s?.employeeId) m.set(s.employeeId, s); });
-    return m;
-  }, [salaries]);
-
-  const totalSalaries = useMemo(() => {
-    return employeeList.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
-  }, [employeeList, salaryMap]);
-
   const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
   const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
 
@@ -443,7 +405,7 @@ export default function DashboardPage() {
       });
   }, [discounts, employeeList, monthKey]);
 
-  const { data: deptsData, deleteDepartment } = useDepartments();
+  const { data: deptsData } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
@@ -454,7 +416,7 @@ export default function DashboardPage() {
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
-    { title: 'إجمالي المستحقات', value: totalSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: Wallet, clickable: false },
+    { title: 'إجمالي المستحقات', value: kpis.totalDueSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: Wallet, clickable: false },
     { title: 'دقائق التأخير', value: kpis.totalLateMinutesToday, subValue: 'إجمالي تأخير اليوم', icon: Clock, clickable: true, onClick: () => handleCardClick('late') },
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];

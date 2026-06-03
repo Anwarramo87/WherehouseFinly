@@ -23,6 +23,7 @@ export const useDepartments = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 

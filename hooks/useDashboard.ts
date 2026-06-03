@@ -1,10 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
-import { useEmployees } from '@/hooks/useEmployees';
-import { useSalaries } from '@/hooks/useSalaries';
-import { usePayrollSummary } from '@/hooks/usePayroll';
 import { api } from '@/lib/http/api';
-import { queryKeys } from '@/lib/query-keys';
 
 const fallbackEmployeesStats: EmployeesStats = {
   total: 0,
@@ -100,7 +96,6 @@ const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<
 };
 
 export const useDashboard = (opts?: { startDate?: string; endDate?: string }) => {
-  const today = getLocalDateString();
   // Fetch aggregated dashboard payload (reduces multiple /stats calls)
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'home'],
@@ -130,42 +125,34 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
     overtime?: { totalMinutes?: number };
   } | null;
 
-  // Derive attendance summary from aggregated payload (simpler and resilient)
-  const attendanceSummary = {
-    active: dashboard?.attendance?.count ?? 0,
-    absent: dashboard?.absence?.count ?? 0,
-    lateMinutes: dashboard?.lateness?.totalMinutes ?? 0,
-  };
+  const activeToday = dashboard?.attendance?.count ?? 0;
+  const totalEmployees = dashboard?.totalEmployees ?? 0;
+  const totalAbsentToday = dashboard?.absence?.count ?? 0;
+  const totalLateMinutesToday = dashboard?.lateness?.totalMinutes ?? 0;
+  const totalOvertimeMinutesToday = dashboard?.overtime?.totalMinutes ?? 0;
+  const totalDueSalaries = dashboard?.totalDueSalaries ?? 0;
+  const totalReceivedSalaries = dashboard?.totalReceivedSalaries ?? 0;
 
   // Compatibility shims for existing consumers
   const employeesStats: EmployeesStats = {
     ...fallbackEmployeesStats,
-    total: dashboard?.totalEmployees ?? fallbackEmployeesStats.total,
+    total: totalEmployees,
   };
 
   const attendanceStats: AttendanceStats = {
     ...fallbackAttendanceStats,
     summary: {
-      activeEmployees: attendanceSummary.active,
-      absentCount: attendanceSummary.absent,
-      totalLateMinutes: attendanceSummary.lateMinutes,
+      activeEmployees: activeToday,
+      absentCount: totalAbsentToday,
+      totalLateMinutes: totalLateMinutesToday,
     },
   } as AttendanceStats;
 
   const inventoryStats: InventoryStats = fallbackInventoryStats;
 
-  const activeToday = attendanceSummary.active;
-  const totalEmployees = employeesStats.total || 0;
-  const totalAbsentToday = attendanceSummary.absent;
-  const totalLateMinutesToday = attendanceSummary.lateMinutes;
-  const totalOvertimeMinutesToday = dashboard?.overtime?.totalMinutes ?? 0;
-
-  const totalDueSalaries = dashboard?.totalDueSalaries ?? 0;
-  const totalReceivedSalaries = dashboard?.totalReceivedSalaries ?? 0;
-
   const kpis: DashboardKpis = {
     ...fallbackKpis,
-    totalEmployees: dashboard?.totalEmployees ?? totalEmployees,
+    totalEmployees,
     activeToday,
     totalAbsentToday,
     totalDueSalaries,
