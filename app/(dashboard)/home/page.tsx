@@ -1,4 +1,3 @@
-
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
@@ -24,10 +23,13 @@ import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
+import useSalaries from '@/hooks/useSalaries';
+import { Employee } from '@/types/employee';
+import { Salary } from '@/types/salary';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
@@ -126,13 +128,6 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
-interface DepartmentEntry {
-  name: string;
-  manager: string;
-  count: number;
-  originalName?: string;
-}
-
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
@@ -154,7 +149,6 @@ export default function DashboardPage() {
   const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
   const queryClient = useQueryClient();
   const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
-  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
 
   // إغلاق القوائم عند الضغط خارجها
   useEffect(() => {
@@ -275,7 +269,12 @@ export default function DashboardPage() {
           setModalData(overtimeData);
         }
       } else {
-        const alertsRes = await apiClient.get("/attendance/alerts", { params: { date: today } });
+        const alertsRes = await apiClient.get("/attendance/alerts", { 
+          params: { 
+            date: today,
+            lateThresholdMinutes: 15  // تحديد threshold بوضوح (15 دقيقة grace period)
+          } 
+        });
         
         // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
         const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
@@ -328,7 +327,7 @@ export default function DashboardPage() {
   };
 
   // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = async (_data: DeptFormData) => {
+  const handleSaveDepartment = async () => {
     // creation/update handled by modal via API; just close modal and let departments query refresh
     setIsAddDeptModalOpen(false);
     setEditingDept(null);
@@ -341,7 +340,7 @@ export default function DashboardPage() {
       await apiClient.delete(`/departments/${deptId}`);
       queryClient.invalidateQueries({ queryKey: ['departments'] });
     } catch (err) {
-      console.error(err);
+      console.error('Error deleting department:', err);
       alert('فشل حذف القسم');
     }
   };
@@ -352,6 +351,46 @@ export default function DashboardPage() {
   }, []);
 
   const employeeList = Array.isArray(employees) ? employees : [];
+  const { data: salaries = [] } = useSalaries();
+
+  const resolveDisplayedMonthlySalary = useCallback((employee: Employee, salaryMap: Map<string, Salary>) => {
+    const salaryRecord = salaryMap.get(employee.employeeId);
+    if (salaryRecord) {
+      const fixedTotal =
+        toNumber(salaryRecord.baseSalary) +
+        toNumber(salaryRecord.lumpSumSalary) +
+        toNumber(salaryRecord.livingAllowance) +
+        toNumber(salaryRecord.responsibilityAllowance) +
+        toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
+        toNumber(salaryRecord.productionIncentive) +
+        toNumber(salaryRecord.transportAllowance);
+
+      if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
+    }
+
+    if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
+      const parsed = toNumber(employee.monthlySalary);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    const hourly = toNumber(employee.hourlyRate);
+    return Math.round(hourly * 8 * 26);
+  }, []);
+
+  const salaryMap = useMemo(() => {
+    const m = new Map<string, Salary>();
+    (salaries || []).forEach((s: Salary) => { if (s?.employeeId) m.set(s.employeeId, s); });
+    return m;
+  }, [salaries]);
+
+  const employeeListMemo = useMemo<Employee[]>(() => {
+    return Array.isArray(employees) ? employees : [];
+  }, [employees]);
+
+  const totalSalaries = useMemo(() => {
+    return employeeListMemo.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
+  }, [employeeListMemo, salaryMap, resolveDisplayedMonthlySalary]);
+
   const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
   const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
 
@@ -365,7 +404,7 @@ export default function DashboardPage() {
       .sort((a, b) => (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""))
       .slice(0, 6)
       .map((advance) => {
-        const employee = employeeList.find((emp) => emp.employeeId === advance.employeeId);
+        const employee = employeeListMemo.find((emp) => emp.employeeId === advance.employeeId);
         return {
           advanceId: advance.id,
           employeeId: advance.employeeId,
@@ -378,7 +417,7 @@ export default function DashboardPage() {
           avatar: undefined,
         };
       });
-  }, [advances, employeeList, monthKey]);
+  }, [advances, employeeListMemo, monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
     const monthRecords = discounts.filter((record) => (record.date || "").startsWith(monthKey));
@@ -388,7 +427,7 @@ export default function DashboardPage() {
       .sort((a, b) => (b.date || b.createdAt || "").localeCompare(a.date || a.createdAt || ""))
       .slice(0, 6)
       .map((penalty) => {
-        const employee = employeeList.find((emp) => emp.employeeId === penalty.employeeId);
+        const employee = employeeListMemo.find((emp) => emp.employeeId === penalty.employeeId);
         const isAdvance = penalty.kind === "advance" || penalty.backendModel === "advance" || Boolean(penalty.advanceType);
         return {
           penaltyId: penalty.id,
@@ -403,13 +442,13 @@ export default function DashboardPage() {
           avatar: undefined,
         };
       });
-  }, [discounts, employeeList, monthKey]);
+  }, [discounts, employeeListMemo, monthKey]);
 
   const { data: deptsData } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
-    return apiList.map((d: any) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+    return apiList.map((d) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
   }, [deptsData]);
 
   const stats = [
@@ -600,7 +639,6 @@ export default function DashboardPage() {
                           title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedDeptId(dept.id ?? null);
                             handleDeleteDepartment(dept.id, dept.count);
                             setOpenDropdownDept(null);
                           }}

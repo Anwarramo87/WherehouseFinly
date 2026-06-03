@@ -61,7 +61,7 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
   const queryClient = useQueryClient();
 
   const leavesQuery = useQuery<LeaveRequest[]>({
-    queryKey: ["leaves", params?.employeeId || "all", params?.status || "all-statuses", params?.leaveType || "all-types"],
+    queryKey: ["leaves", params?.employeeId || "all", params?.status || "all-statuses", params?.leaveType || "all-types", params?.startDate || "no-start", params?.endDate || "no-end"],
     queryFn: async () => {
       const res = await apiClient.get("/leaves", {
         params: {

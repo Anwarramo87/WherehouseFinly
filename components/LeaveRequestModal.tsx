@@ -7,6 +7,7 @@ import {
   Loader2, Check, Search, Info,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 
@@ -91,6 +92,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // الإعدادات الحالية بناءً على نوع الإجازة المختار
   const currentConfig = useMemo(
@@ -151,7 +153,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (form.employeeIds.length === 0) {
@@ -178,52 +180,64 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         ? form.customReason
         : form.leaveTypeLabel;
 
-    const notes = isHourlyLeave
-      ? `إجازة ساعية من ${form.startTime} إلى ${form.endTime}`
-      : undefined;
+    // نبني قائمة الطلبات لإرسالها دفعة واحدة عبر /leaves/bulk
+    const items = form.employeeIds.map((empId) => ({
+      employeeId: empId,
+      startDate: form.startDate,
+      endDate: isHourlyLeave ? form.startDate : form.endDate,
+      leaveType: currentConfig.backendType,
+      isPaid: currentConfig.isPaidLocked ? currentConfig.isPaidDefault : form.isPaid,
+      reason,
+      status: "APPROVED", // إضافة الحالة الافتراضية
+      // حقول الإجازة الساعية — تُحفظ مباشرة في الجدول بعد migration
+      ...(isHourlyLeave ? {
+        isHourly: true,
+        startTime: form.startTime,
+        endTime: form.endTime,
+      } : {}),
+    }));
 
     try {
-      // نُرسل طلباً لكل موظف — الباك إند لا يدعم bulk create حالياً
-      const results = await Promise.allSettled(
-        form.employeeIds.map((empId) =>
-          apiClient.post("/leaves", {
-            employeeId: empId,
-            startDate: form.startDate,
-            endDate: isHourlyLeave ? form.startDate : form.endDate,
-            leaveType: currentConfig.backendType,
-            isPaid: currentConfig.isPaidLocked ? currentConfig.isPaidDefault : form.isPaid,
-            reason,
-            ...(notes ? { notes } : {}),
-          })
-        )
-      );
+      const res = await apiClient.post("/leaves/bulk", { items });
+      const { succeeded, failed, results: bulkResults } = res.data as {
+        succeeded: number;
+        failed: number;
+        results: Array<{ employeeId: string; success: boolean; error?: string }>;
+      };
 
-      const failed = results.filter((r) => r.status === "rejected");
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
-
-      if (failed.length === 0) {
+      if (failed === 0) {
         toast.success(
-          form.employeeIds.length === 1
+          items.length === 1
             ? "تم حفظ طلب الإجازة بنجاح"
             : `تم حفظ ${succeeded} طلب إجازة بنجاح`
         );
+        // تحديث cache الإجازات حتى تظهر فوراً في التقويم
+        void queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+        void queryClient.invalidateQueries({ queryKey: ["employeeMonthlyLeaves"], exact: false });
         setForm(buildDefaultForm());
         onClose();
       } else {
-        // بعض الطلبات نجحت وبعضها فشل
-        if (succeeded > 0) {
-          toast.success(`نجح ${succeeded} طلب`);
-        }
-        const firstError = failed[0] as PromiseRejectedResult;
-        const msg =
-          (firstError.reason as { response?: { data?: { message?: string | string[] } } })
-            ?.response?.data?.message;
-        toast.error(
-          `فشل ${failed.length} طلب: ${Array.isArray(msg) ? msg.join(" | ") : (msg ?? "خطأ غير معروف")}`
-        );
+        if (succeeded > 0) toast.success(`نجح ${succeeded} طلب`);
+        const firstFailed = bulkResults.find((r) => !r.success);
+        toast.error(`فشل ${failed} طلب: ${firstFailed?.error ?? "خطأ غير معروف"}`);
       }
-    } catch {
-      toast.error("تعذر إرسال الطلب. حاول مرة أخرى.");
+    } catch (err: unknown) {
+      console.error("Leave request error:", err);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string | string[]; error?: { message?: string } } } };
+      const status = axiosErr?.response?.status;
+      const msg = axiosErr?.response?.data?.message || axiosErr?.response?.data?.error?.message;
+
+      if (status === 404) {
+        toast.error("خطأ في الخادم: مسار الإجازات غير مفعّل. تواصل مع المختص التقني.");
+      } else if (status === 403) {
+        toast.error("ليس لديك صلاحية لإنشاء طلبات إجازة.");
+      } else if (status === 400) {
+        toast.error(`بيانات غير صحيحة: ${Array.isArray(msg) ? msg.join(" | ") : (msg ?? "تحقق من البيانات")}`);
+      } else if (status === 500) {
+        toast.error(`خطأ في الخادم: ${typeof msg === 'string' ? msg : "حدث خطأ غير متوقع. تحقق من logs الباك إند."}`);
+      } else {
+        toast.error("تعذر الاتصال بالخادم. تأكد من تشغيل الباك إند.");
+      }
     } finally {
       setIsSubmitting(false);
     }

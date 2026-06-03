@@ -1,17 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/http/api';
 
+interface Department {
+  id: string;
+  name: string;
+  manager?: string;
+  employeeCount?: number;
+}
+
+interface DepartmentsResponse {
+  departments: Department[];
+}
+
 export const useDepartments = () => {
   const queryClient = useQueryClient();
 
   const listQuery = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
-      const data = await api.get<{ departments: { id: string; name: string }[] }>('/departments');
+      const data = await api.get<DepartmentsResponse | Department[]>('/departments');
       // normalize shape
-      if (Array.isArray((data as any).departments)) return data as any;
+      if (Array.isArray((data as DepartmentsResponse).departments)) return data as DepartmentsResponse;
       // fallback: if API returns array directly
-      return { departments: (data as any) ?? [] };
+      return { departments: Array.isArray(data) ? data : [] };
     },
     staleTime: 60_000,
   });

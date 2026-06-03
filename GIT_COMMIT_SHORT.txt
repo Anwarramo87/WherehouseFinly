@@ -1,0 +1,34 @@
+fix: Leave request system - database schema sync & code cleanup
+
+🐛 Critical Fixes:
+- Fixed 500 error when creating/viewing leave requests
+- Synced database schema with Prisma (added isHourly, startTime, endTime columns)
+- Fixed missing columns causing "column does not exist" errors
+
+✨ Improvements:
+- Enhanced error handling in LeaveRequestModal
+- Fixed attendance table column ordering
+- Added automatic status defaulting to "APPROVED"
+- Improved error messages for better debugging
+
+🧹 Code Cleanup:
+- Removed duplicate LeaveRequestModal files (.bak and .worktrees)
+- Added .worktrees/ to .gitignore
+- Cleaned up unused imports and variables
+
+✅ Verified:
+- All leave endpoints working correctly
+- Create/view/update/delete operations functional
+- Hourly and full-day leave types supported
+- Automatic PayrollInput synchronization
+
+📝 Documentation:
+- Added LEAVE_REQUEST_FIX.md
+- Added LEAVE_SYSTEM_STATUS.md
+- Added COMMIT_MESSAGE.md (detailed)
+
+⚠️ Known Issues:
+- xlsx library has non-critical vulnerabilities (no fix available)
+- 48 lint warnings in non-critical files (not affecting functionality)
+
+🚀 Ready for production deployment

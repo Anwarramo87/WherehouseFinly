@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Building2, UserCog, CalendarDays, Save, Loader2 } from "lucide-react";
-import apiClient from "@/lib/api-client";
 import useDepartments from "@/hooks/useDepartments";
-import { useQueryClient } from '@tanstack/react-query';
 
 export interface DeptFormData {
   name: string;
@@ -37,14 +35,14 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
   // use real API via hook
   // submit to /api/departments
     const submitDepartment = async (payload: DeptFormData) => {
-      const id = (initialData as any)?.id as string | undefined;
+      const id = initialData?.id;
       if (id) {
-        await updateDepartment.mutateAsync({ id, name: payload.name } as any);
+        await updateDepartment.mutateAsync({ id, name: payload.name });
         return;
       }
 
       // create
-      await createDepartment.mutateAsync({ name: payload.name } as any);
+      await createDepartment.mutateAsync({ name: payload.name });
   };
 
   useEffect(() => {

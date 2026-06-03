@@ -1,0 +1,60 @@
+fix(timeTable): Fix actual work days, delay minutes, and add earned salary column
+
+## Problems Fixed
+
+### 1. Actual Work Days always showed 26
+Root cause: autoInput.absentDays came from calculate-deductions which counted
+ALL unique dates with any record, not just IN records. So a day with only OUT
+showed as "present", distorting the count.
+
+Fix (attendance.service.ts): Changed to count only dates that have at least
+one IN record — these are truly "attended" days.
+
+### 2. Delay Minutes always showed 0
+Root cause: calculate-deductions only used shiftPair.minutesLate which is only
+populated when attendance pairs are processed by the biometric system. Manual
+check-in records have no shiftPair, so delay was always 0.
+
+Fix (attendance.service.ts): Now calculates delay from actual check-in time vs
+employee scheduledStart when shiftPair.minutesLate is missing. Applies 15-min
+grace period consistently.
+
+Also fetches scheduledStart per employee (was missing from the SELECT).
+
+### 3. Added Earned Salary column to TimeTable
+New column showing estimated salary based on actual attendance:
+
+Formula:
+  dailyRate = grossSalary / 26
+  earnedSalary = (dailyRate × actualWorkDays) - (delayMinutes × minuteRate)
+
+Salary source priority:
+  1. EmployeeSalary record (baseSalary + all allowances summed)
+  2. Employee.baseSalary field
+  3. Employee.hourlyRate × 8h × 26 days
+
+Shows "من X" subtitle when earned < gross (deductions applied).
+Shows "غير محدد" when no salary data available.
+
+## Files Changed
+
+Backend:
+- werehouse/backend-nest/src/attendance/attendance.service.ts
+  • Added scheduledStart to employee SELECT in calculateDeductions
+  • Changed absentDays calculation to use only IN records
+  • Replaced shiftPair-only delay with actual-time fallback calculation
+  • Per-day first-IN aggregation using Map for correct delay counting
+
+Frontend:
+- factory/app/(dashboard)/salaries/timeTable/page.tsx
+  • Added useSalaries import and salaryMap
+  • Added Salary type import
+  • Added toNum(), calcGrossSalary(), calcEarnedSalary() helpers
+  • Added grossSalary and earnedSalary to recordsWithNames
+  • Added "الراتب المستحق" column (8th column, before actions)
+  • Updated colSpan from 7 to 8
+
+## No Breaking Changes
+- All existing payroll input overrides still work
+- Manual inputs still take priority over auto-calculated values
+- Column ordering unchanged except new salary column before actions

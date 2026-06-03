@@ -2,12 +2,15 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Clock, ChevronLeft, Search, Edit2, CalendarDays } from "lucide-react";
+import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2 } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { usePayrollInputs, UpsertPayrollInputPayload, PayrollInputRecord } from "@/hooks/usePayrollInputs";
 import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
+import { useAttendance } from "@/hooks/useAttendance";
+import useSalaries from "@/hooks/useSalaries";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
+import type { Salary } from "@/types/salary";
 
 const EditAttendanceTotalsModal = dynamic(
   () => import("@/components/EditAttendanceTotalsModal"),
@@ -18,8 +21,78 @@ const EmployeeMonthlyCalendarModal = dynamic(
   { loading: () => null }
 );
 
-// عدد أيام العمل المعياري في الشهر — يتطابق مع STANDARD_WORK_DAYS في الباك إند
+// عدد أيام العمل المعياري في الشهر
 const STANDARD_WORK_DAYS = 26;
+const HOURS_PER_DAY = 8;
+
+/** تحويل قيمة Decimal من الباك إند (string | number | {$numberDecimal}) إلى number */
+const toNum = (v: unknown): number => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (v && typeof v === "object" && "$numberDecimal" in (v as Record<string, unknown>)) {
+    return Number((v as { $numberDecimal: string }).$numberDecimal) || 0;
+  }
+  if (typeof v === "string") return Number(v) || 0;
+  return 0;
+};
+
+/**
+ * حساب الراتب الشهري الكامل للموظف من مكونات الراتب
+ * يستخدم سجل salary إن وُجد، وإلا يرجع للـ baseSalary/hourlyRate على الموظف
+ */
+const calcGrossSalary = (
+  emp: { baseSalary?: unknown; hourlyRate?: unknown },
+  salaryRecord: Salary | undefined
+): number => {
+  if (salaryRecord) {
+    const gross =
+      toNum(salaryRecord.baseSalary) +
+      toNum(salaryRecord.lumpSumSalary) +
+      toNum(salaryRecord.livingAllowance) +
+      toNum(salaryRecord.responsibilityAllowance) +
+      toNum(salaryRecord.extraEffortAllowance) +
+      toNum(salaryRecord.productionIncentive) +
+      toNum(salaryRecord.transportAllowance);
+    if (gross > 0) return gross;
+  }
+  const base = toNum(emp.baseSalary) || toNum(emp.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+  return base;
+};
+
+/**
+ * حساب الراتب المستحق بناءً على الدوام الفعلي ودقائق التأخير
+ * الصيغة: (grossSalary / STANDARD_WORK_DAYS) * actualWorkDays - خصم التأخير
+ */
+const calcEarnedSalary = (
+  grossSalary: number,
+  actualWorkDays: number,
+  totalDelayMinutes: number,
+): number => {
+  if (grossSalary <= 0) return 0;
+  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
+  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
+  const salaryFromDays = dailyRate * actualWorkDays;
+  const delayDeduction = totalDelayMinutes * minuteRate;
+  return Math.max(0, salaryFromDays - delayDeduction);
+};
+
+/**
+ * حساب دقائق التأخير لسجل يومي واحد (بالـ local time — نفس منطق صفحة attendance)
+ * بعد طرح فترة السماح (15 دقيقة افتراضياً)
+ */
+const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+  if (!checkIn) return 0;
+  const toMins = (t: string) => {
+    const s = t.slice(0, 5);
+    const [h, m] = s.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  };
+  const ci = toMins(checkIn);
+  const sc = toMins(scheduledStart || "08:00");
+  if (ci === null || sc === null) return 0;
+  const diff = ci - sc - gracePeriod;
+  return diff > 0 ? diff : 0;
+};
 
 export default function TimeTablePage() {
   // FIX: نضمن أن employees دائماً مصفوفة بغض النظر عن شكل الـ response
@@ -49,12 +122,44 @@ export default function TimeTablePage() {
 
   const { data: payrollInputs = [], upsertPayrollInput } = usePayrollInputs(periodStart, periodEnd);
 
-  // FIX #1 — استخدام useAttendanceDeductions hook بدلاً من useQuery المباشر
-  // هذا يضمن مشاركة الـ cache مع أي مكان آخر يستخدم نفس الـ hook
-  const { data: deductionsResponse } = useAttendanceDeductions({
+  const { data: salariesRaw = [] } = useSalaries();
+  const salaryMap = useMemo(() => {
+    const m = new Map<string, typeof salariesRaw[number]>();
+    salariesRaw.forEach((s) => {
+      if (s?.employeeId) m.set(s.employeeId, s);
+    });
+    return m;
+  }, [salariesRaw]);
+
+  const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
     periodStart: periodStart ?? "",
     periodEnd: periodEnd ?? "",
   });
+
+  // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time (نفس منطق صفحة attendance)
+  const { data: monthlyAttendanceData } = useAttendance({
+    startDate: periodStart,
+    endDate: periodEnd,
+    limit: 200,
+  });
+
+  // بناء map: employeeId → مجموع دقائق التأخير الشهرية (محسوبة بـ local time)
+  const localLateMinutesMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      const emp = employees.find((e) => e.employeeId === dr.employeeId);
+      const scheduledStart = emp?.scheduledStart || "08:00";
+      // gracePeriodMinutes قادم من الباك إند لكن غير معرّف في النوع القديم — نستخدم 15 كقيمة افتراضية
+      const gracePeriod: number = (emp as unknown as { gracePeriodMinutes?: number })?.gracePeriodMinutes ?? 15;
+      const lateMin = calcLateMinutes(dr.checkIn, scheduledStart, gracePeriod);
+      if (lateMin > 0) {
+        map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + lateMin);
+      }
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords, employees]);
 
   // نستخرج المصفوفة بأمان من الـ response
   const autoDeductions: AttendanceDeductionBreakdown[] = useMemo(() => {
@@ -66,23 +171,24 @@ export default function TimeTablePage() {
   const recordsWithNames = useMemo(() => {
     return employees.map((emp) => {
       const manualInput = payrollInputs.find((pi) => pi.employeeId === emp.employeeId);
-
-      // FIX #5 — استخدام AttendanceDeductionBreakdown بدلاً من any
       const autoInput = autoDeductions.find(
         (d: AttendanceDeductionBreakdown) => d.employeeId === emp.employeeId
       );
 
-      // FIX #3 — منطق دمج محسّن:
-      // نتحقق من وجود manualInput أصلاً (أي أن المدير سبق وأدخل بيانات يدوية).
-      // إذا وُجد، نأخذ قيمه كاملة. إذا لم يوجد، نأخذ الآلي.
-      // هذا يحل مشكلة الـ ?? مع القيمة 0 — لأننا نقرر بناءً على وجود السجل لا قيمته.
       const hasManualInput = !!manualInput;
+
+      // أيام الغياب: يدوي إن وُجد، وإلا آلي من calculate-deductions
       const absenceDays = hasManualInput
         ? (manualInput.absenceDays ?? 0)
         : (autoInput?.absentDays ?? 0);
-      const lateMinutes = hasManualInput
+
+      // دقائق التأخير:
+      // نستخدم الحساب من الفرونت (local time) لأنه يطابق ما تعرضه صفحة attendance
+      // الإدخال اليدوي يُستخدم فقط إذا كان المدير قد أدخل قيمة صريحة (أكبر من صفر)
+      const autoLateMinutes = localLateMinutesMap.get(emp.employeeId) ?? 0;
+      const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
         ? (manualInput.lateMinutes ?? 0)
-        : (autoInput?.delayMinutes ?? 0);
+        : autoLateMinutes;
 
       const totalLeaves =
         (manualInput?.sickLeaveDays ?? 0) +
@@ -91,21 +197,36 @@ export default function TimeTablePage() {
         (manualInput?.deathLeaveDays ?? 0);
 
       const totalAbsencesLeaves = absenceDays + totalLeaves;
+      const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
 
-      // FIX #4 — استخدام STANDARD_WORK_DAYS ثابت مركزي بدلاً من 26 مبعثرة
-      const actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - totalAbsencesLeaves);
+      // الدوام الفعلي = أيام الحضور الفعلية (بصمات) من الباك إند مباشرة
+      // الإجازات اليدوية لا تُطرح لأنها أيام لم يبصم فيها الموظف أصلاً
+      // null = البيانات لم تصل بعد
+      const actualWorkDays: number | null = autoInput !== undefined
+        ? Math.max(0, autoInput.presentDays)
+        : null;
+
+      // الراتب الكامل
+      const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
+
+      // الراتب المستحق بناءً على الدوام الفعلي
+      const earnedSalary = actualWorkDays !== null
+        ? calcEarnedSalary(grossSalary, actualWorkDays, totalDelayMinutes)
+        : null;
 
       return {
         ...emp,
         payrollInput: manualInput ?? null,
         totalAbsencesLeaves,
         actualWorkDays,
-        totalDelayMinutes: lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0),
+        totalDelayMinutes,
         totalOvertimeMinutes: manualInput?.overtimeRegularMinutes ?? 0,
         totalOvertimeDays: manualInput?.overtimeWeekendDays ?? 0,
+        grossSalary,
+        earnedSalary,
       };
     });
-  }, [employees, payrollInputs, autoDeductions]);
+  }, [employees, payrollInputs, autoDeductions, salaryMap, localLateMinutesMap]);
 
   const filteredRecords = useMemo(() => {
     if (!searchFilter) return recordsWithNames;
@@ -163,7 +284,7 @@ export default function TimeTablePage() {
     });
   };
 
-  const selectedInputData = useMemo((): PayrollInputRecord | null => {
+  const getSelectedInputData = (): PayrollInputRecord | null => {
     if (!selectedEmployeeId || !periodStart || !periodEnd) return null;
 
     // إذا وُجد تعديل يدوي مسبق، نعرضه في المودال كما هو
@@ -181,7 +302,7 @@ export default function TimeTablePage() {
       periodStart: periodStart!,
       periodEnd: periodEnd!,
       absenceDays: Number(autoInput?.absentDays ?? 0),
-      lateMinutes: Number(autoInput?.delayMinutes ?? 0),
+      lateMinutes: localLateMinutesMap.get(selectedEmployeeId) ?? Number(autoInput?.delayMinutes ?? 0),
       earlyLeaveMinutes: 0,
       sickLeaveDays: 0,
       adminLeaveDays: 0,
@@ -193,7 +314,9 @@ export default function TimeTablePage() {
     };
 
     return defaultRecord;
-  }, [selectedEmployeeId, payrollInputs, autoDeductions, periodStart, periodEnd]);
+  };
+
+  const selectedInputData = getSelectedInputData();
 
   return (
     <div
@@ -269,6 +392,7 @@ export default function TimeTablePage() {
                   <th className="px-6 py-5 text-sm font-black text-center">الغياب والإجازات</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي التأخير (دقائق)</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي الإضافي</th>
+                  <th className="px-6 py-5 text-sm font-black text-center">الراتب المستحق</th>
                   <th className="px-6 py-5 text-sm font-black text-center w-24">إجراءات</th>
                 </tr>
               </thead>
@@ -297,9 +421,13 @@ export default function TimeTablePage() {
                       </td>
 
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                          {record.actualWorkDays} يوم
-                        </span>
+                        {deductionsLoading && !record.payrollInput ? (
+                          <Loader2 size={16} className="animate-spin text-[#C89355] mx-auto" />
+                        ) : (
+                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            {record.actualWorkDays !== null ? `${record.actualWorkDays} يوم` : "—"}
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-6 py-4 text-center">
@@ -309,9 +437,13 @@ export default function TimeTablePage() {
                       </td>
 
                       <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold ${record.totalDelayMinutes > 0 ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-slate-100 text-slate-500"}`}>
-                          {record.totalDelayMinutes} دقيقة
-                        </span>
+                        {deductionsLoading && !record.payrollInput ? (
+                          <Loader2 size={16} className="animate-spin text-[#C89355] mx-auto" />
+                        ) : (
+                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold ${record.totalDelayMinutes > 0 ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-slate-100 text-slate-500"}`}>
+                            {record.totalDelayMinutes} دقيقة
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-6 py-4 text-center">
@@ -332,6 +464,27 @@ export default function TimeTablePage() {
                         </div>
                       </td>
 
+                      {/* الراتب المستحق */}
+                      <td className="px-6 py-4 text-center">
+                        {deductionsLoading && !record.payrollInput ? (
+                          <Loader2 size={16} className="animate-spin text-[#C89355] mx-auto" />
+                        ) : record.grossSalary > 0 && record.earnedSalary !== null ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-black bg-[#C89355]/10 text-[#C89355] border border-[#C89355]/30">
+                              <Banknote size={14} />
+                              {Math.round(record.earnedSalary).toLocaleString()} ل.س
+                            </span>
+                            {record.earnedSalary < record.grossSalary && (
+                              <span className="text-[10px] text-slate-400 font-bold">
+                                من {Math.round(record.grossSalary).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm font-bold">غير محدد</span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center">
                           <button
@@ -347,7 +500,7 @@ export default function TimeTablePage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={8} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="p-4 bg-slate-50 rounded-full">
                           <Search className="text-slate-300" size={32} />
