@@ -14,6 +14,7 @@ export async function handler(request: NextRequest) {
   // BACKEND_URL already contains /api/v1
   const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
   
+  console.log("[API Proxy] BACKEND_URL:", BACKEND_URL);
   console.log("[API Proxy]", request.method, path, "->", fullUrl);
 
   try {
