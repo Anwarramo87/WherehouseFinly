@@ -8,7 +8,7 @@ export async function handler(request: NextRequest) {
   
   // Remove /api prefix from the path
   const pathParts = path.split("/").filter(Boolean);
-  let apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
+  const apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
   
   // Construct the full backend URL
   // BACKEND_URL already contains /api/v1

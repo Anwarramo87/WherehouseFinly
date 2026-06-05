@@ -10,16 +10,18 @@ import {
 } from "lucide-react";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
-import { useAdvances } from "@/hooks/useAdvances";
+import { useDiscounts, DiscountRecord } from "@/hooks/useDiscounts";
 import { usePayrollReport } from "@/hooks/usePayrollReport";
 import { usePayroll } from "@/hooks/usePayroll";
-import { useResignedEmployees } from "@/hooks/useEmployees";
+import { useResignedEmployees, useEmployees } from "@/hooks/useEmployees";
+import { usePayrollInputs } from "@/hooks/usePayrollInputs";
+import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
+import { useAttendance } from "@/hooks/useAttendance";
 import RunPayrollModal from "@/components/RunPayrollModal";
 import { toast } from "react-hot-toast";
 
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
-import type { Advance } from "@/types/advance";
 import type { PayrollItem } from "@/types/payroll";
 import type { Employee } from "@/types/employee";
 
@@ -47,6 +49,15 @@ interface AggregatedPayroll {
   roundingDifference: number;
   anomalies: string[];
 
+  // 💰 Earned salary based on actual work days (hoursWorked × hourlyRate) — from attendance
+  earnedSalary: number;
+
+  // 🎁 Total rewards from the rewards page (bonusAmount + assistanceAmount) per employee
+  bonusesTotal: number;
+
+  // ✂️ Total deductions from the discounts/advances page (advances + penalties + other)
+  discountsTotal: number;
+
   // 📋 Visual-only subtotals for the payslip modal
   fixedEarnings: number;
   variableEarnings: number;
@@ -55,7 +66,7 @@ interface AggregatedPayroll {
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
-    advances: Advance[];
+    advances: DiscountRecord[];
     attendance: null;
   };
 }
@@ -85,6 +96,49 @@ const getLocalMonth = (): string => {
   return `${y}-${m}`;
 };
 
+/**
+ * حساب الراتب المستحق من ساعات العمل الفعلية ومعدل الساعة
+ * نفس المنطق المستخدم في صفحة TimeTable
+ */
+// const calcEarnedSalaryFromHours = (
+//   hoursWorked: number,
+//   hourlyRate: number
+// ): number => {
+//   return hoursWorked * hourlyRate;
+// };
+
+
+const STANDARD_WORK_DAYS = 26;
+const HOURS_PER_DAY = 8;
+
+const calcEarnedSalaryTimeTable = (
+  grossSalary: number,
+  actualWorkDays: number,
+  totalDelayMinutes: number,
+): number => {
+  if (grossSalary <= 0) return 0;
+  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
+  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
+  const salaryFromDays = dailyRate * actualWorkDays;
+  const delayDeduction = totalDelayMinutes * minuteRate;
+  return Math.max(0, salaryFromDays - delayDeduction);
+};
+
+const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+  if (!checkIn) return 0;
+  const toMins = (t: string) => {
+    const s = t.slice(0, 5);
+    const [h, m] = s.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  };
+  const ci = toMins(checkIn);
+  const sc = toMins(scheduledStart || "08:00");
+  if (ci === null || sc === null) return 0;
+  const diff = ci - sc - gracePeriod;
+  return diff > 0 ? diff : 0;
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
@@ -96,19 +150,61 @@ export default function PayrollPage() {
   const { calculatePayroll } = usePayroll();
 
   // ── Fetch supporting data (for payslip modal display only) ───────────────────
-  const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
+    const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
-  const { data: advances = [], isLoading: advancesLoading } = useAdvances();
-
-  // ── PRIMARY data source — backend-calculated payroll for the selected month ──
+  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts();
   const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
-
-  // ── Fetch resigned employees pending financial settlement ──
   const { data: allResignedEmployees = [] } = useResignedEmployees();
+  
+  // --- Attendance Hooks for Earned Salary Calculation ---
+  const { data: rawEmployees, isLoading: employeesLoading } = useEmployees({ limit: 500, status: "active" });
+  const employees = useMemo(() => (Array.isArray(rawEmployees) ? rawEmployees : []), [rawEmployees]);
+  
+  const { periodStart, periodEnd } = useMemo(() => {
+    if (!month) return { periodStart: undefined, periodEnd: undefined };
+    const [year, m] = month.split("-");
+    const startDate = `${year}-${m}-01`;
+    const endDay = new Date(Number(year), Number(m), 0).getDate();
+    const endDate = `${year}-${m}-${String(endDay).padStart(2, "0")}`;
+    return { periodStart: startDate, periodEnd: endDate };
+  }, [month]);
 
-  const isLoading =
-    salariesLoading || bonusesLoading || advancesLoading || reportLoading;
+  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
+  
+  const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
+    periodStart: periodStart ?? "",
+    periodEnd: periodEnd ?? "",
+  });
+  
+  const autoDeductions = useMemo(() => {
+    if (!deductionsResponse) return [];
+    if (Array.isArray(deductionsResponse.data)) return deductionsResponse.data;
+    return [];
+  }, [deductionsResponse]);
 
+  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({
+    startDate: periodStart,
+    endDate: periodEnd,
+    limit: 500,
+  });
+
+  const localLateMinutesMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      const emp = employees.find((e) => e.employeeId === dr.employeeId);
+      const scheduledStart = emp?.scheduledStart || "08:00";
+      const gracePeriod = (emp && typeof (emp as { gracePeriodMinutes?: number }).gracePeriodMinutes === 'number') ? (emp as { gracePeriodMinutes: number }).gracePeriodMinutes : 15;
+      const lateMin = calcLateMinutes(dr.checkIn, scheduledStart, gracePeriod);
+      if (lateMin > 0) {
+        map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + lateMin);
+      }
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords, employees]);
+
+  const isLoading = salariesLoading || bonusesLoading || reportLoading || employeesLoading || inputsLoading || deductionsLoading || attendanceLoading || discountsLoading;
   // ── Filter resigned employees pending financial settlement ──
   const resignedPendingSettlement = useMemo<Employee[]>(() => {
     return allResignedEmployees.filter(
@@ -131,81 +227,107 @@ export default function PayrollPage() {
     return reportData.items.map((backendItem: PayrollItem) => {
       const { employeeId, employeeName } = backendItem;
 
-      // Department: authoritative value lives in the payrollItem (from employee.department).
-      // Fall back to salaryConfig.profession only if the backend field is absent.
       const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
       const department =
         (backendItem.department?.trim() || "") ||
         salaryConfig?.profession?.trim() ||
         "أقسام عامة";
 
-      // ── Server-authoritative financial figures ────────────────────────────
       const grossPay = toNumber(backendItem.grossPay);
-      const totalDeductions = toNumber(backendItem.totalDeductions);
-      const netPay = toNumber(backendItem.netPay);
-      const netPayRounded = toNumber(backendItem.netPayRounded);
-      const roundingDifference = toNumber(backendItem.roundingDifference);
       const anomalies: string[] = Array.isArray(backendItem.anomalies)
         ? backendItem.anomalies
         : [];
 
-      // ── Display-only subtotals for the payslip modal ──────────────────────
-      // Bug-fix: include ALL seven salary components that the backend sums into grossPay.
-      // Previously missing: responsibilityAllowance, extraEffortAllowance, productionIncentive.
-      const fixedEarnings = salaryConfig
-        ? toNumber(salaryConfig.baseSalary) +
+      // ── 1. Calculate Earned Salary exactly as TimeTable ──────────────────────
+      let earnedSalary = 0;
+      const emp = employees.find((e) => e.employeeId === employeeId);
+      
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross = toNumber(salaryConfig.baseSalary) +
           toNumber(salaryConfig.lumpSumSalary) +
           toNumber(salaryConfig.livingAllowance) +
           toNumber(salaryConfig.responsibilityAllowance) +
           toNumber(salaryConfig.extraEffortAllowance ?? salaryConfig.extraEffort) +
           toNumber(salaryConfig.productionIncentive) +
-          toNumber(salaryConfig.transportAllowance)
-        : 0;
+          toNumber(salaryConfig.transportAllowance);
+      }
+      if (calcGross <= 0 && emp) {
+        calcGross = toNumber((emp as { baseSalary?: number }).baseSalary) || toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+      }
 
+      if (emp) {
+        const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+        const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
+        const hasManualInput = !!manualInput;
+
+        const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
+        const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+          ? (manualInput.lateMinutes ?? 0)
+          : autoLateMinutes;
+
+        const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+        const actualWorkDays = autoInput !== undefined ? Math.max(0, autoInput.presentDays) : null;
+
+        earnedSalary = actualWorkDays !== null
+          ? calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes)
+          : 0;
+      }
+
+      // ── 2. Bonuses (المكافآت) ────────────────────────────────
       const employeeBonuses = bonuses.filter((b) => b.employeeId === employeeId);
-      // Bug-fix: bonusAmount is an earning; assistanceAmount is treated as a DEDUCTION
-      // by the backend (administrativeDeductions) — do NOT add it to variableEarnings.
-      const variableEarnings = employeeBonuses.reduce(
-        (sum, bonus) => sum + toNumber(bonus.bonusAmount),
-        0,
+      const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
+        const bonusAmt = toNumber(bonus.bonusAmount);
+        const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
+        return sum + bonusAmt + assistAmt;
+      }, 0);
+
+      // ── 3. Deductions (الخصومات) ───────────────────────────────────
+      // Note: useDiscounts hook already includes both advances and penalties/discounts
+      // So we should use either advances + separate discounts, OR just use discounts hook
+      // Let's use the discounts hook which includes all deduction types
+      const employeeDiscounts = discounts.filter((d) => {
+        return d.employeeId === employeeId && d.date.startsWith(month);
+      });
+      
+      const variableDeductions = employeeDiscounts.reduce(
+        (sum, d) => sum + toNumber(d.amount),
+        0
       );
 
-      const employeeAdvances = advances.filter((a) => {
-        if (a.employeeId !== employeeId) return false;
-        const advanceDate = a.issueDate || a.createdAt || "";
-        return advanceDate.startsWith(month);
-      });
-      const advancesDeduction = employeeAdvances.reduce(
-        (sum, adv) =>
-          sum + (toNumber(adv.installmentAmount) || toNumber(adv.remainingAmount)),
-        0,
-      );
+      // ── 4. Apply Formula (الراتب المستحق + المكافآت - الخصومات) ───
+      const netPay = earnedSalary + variableEarnings - variableDeductions;
+      
+      // ── 5. Calculate rounding ──────────────────────────────────────
+      const netPayRounded = Math.ceil(netPay / 1000) * 1000;
+      const roundingDifference = netPayRounded - netPay;
 
       return {
         employeeId,
         employeeName,
         department,
-        // ✅ Server-authoritative
         grossPay,
-        totalDeductions,
+        totalDeductions: variableDeductions,
         netPay,
         netPayRounded,
         roundingDifference,
         anomalies,
-        // 📋 Visual only
-        fixedEarnings,
+        earnedSalary,
+        bonusesTotal: variableEarnings,
+        discountsTotal: variableDeductions,
+        fixedEarnings: calcGross,
         variableEarnings,
         fixedDeductions: toNumber(salaryConfig?.insuranceAmount),
-        variableDeductions: advancesDeduction,
+        variableDeductions,
         details: {
           salaryConfig,
           bonuses: employeeBonuses,
-          advances: employeeAdvances,
+          advances: employeeDiscounts.filter(d => d.kind === 'advance'),
           attendance: null,
         },
       };
     });
-  }, [reportData, salaries, bonuses, advances, month]);
+  }, [reportData, salaries, bonuses, discounts, month, employees, payrollInputs, autoDeductions, localLateMinutesMap]);
 
   // ── Filtering ────────────────────────────────────────────────────────────────
   const filteredPayrollData = useMemo(() => {
@@ -487,18 +609,18 @@ export default function PayrollPage() {
         <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group/table">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/table:border-[#C89355]/50" />
           <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-            <table className="w-full text-right min-w-225 border-collapse">
+            <table className="w-full text-right min-w-[1100px] border-collapse">
               <thead className="bg-[#1a2530] text-white outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-[6px]">
                 <tr>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">كود</th>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الموظف</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الإجمالي (دقيق)</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الخصومات (دقيق)</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الصافي (حسابي)</th>
+                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الراتب المستحق</th>
+                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center text-emerald-300">المكافآت</th>
+                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center text-rose-300">الخصومات</th>
+                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">المجموع</th>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center bg-[#C89355]/20 text-[#C89355] border-b-4 border-[#C89355]/50">
-                    المقبوض (مقرب)
+                    الراتب المقبوض
                   </th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">فرق التقريب</th>
+                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الفرق</th>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">إجراء</th>
                 </tr>
               </thead>
@@ -528,12 +650,11 @@ export default function PayrollPage() {
                           key={item.employeeId}
                           className="bg-white/40 hover:bg-white/90 transition-all duration-300 group/row hover:scale-[1.002] hover:shadow-sm"
                         >
-                          <td className="p-4 text-center font-mono text-sm font-black text-[#263544]/60 group-hover/row:text-[#C89355] transition-colors">
-                            {item.employeeId}
-                          </td>
+                          {/* الموظف: الاسم + الكود + التنبيهات */}
                           <td className="p-4 text-center font-black text-slate-800 group-hover/row:text-[#263544] transition-colors">
                             <div className="flex flex-col items-center">
-                              <span>{item.employeeName}</span>
+                              <span className="text-base">{item.employeeName}</span>
+                              <span className="text-xs text-slate-400 font-mono mt-0.5">{item.employeeId}</span>
                               {item.anomalies.length > 0 && (
                                 <span className="text-[10px] text-amber-500 flex items-center gap-1 mt-1 font-bold">
                                   <AlertTriangle size={10} /> تنبيه حسابي
@@ -541,21 +662,49 @@ export default function PayrollPage() {
                               )}
                             </div>
                           </td>
+
+                          {/* الراتب المستحق — من الدوام (ساعات × معدل الساعة) */}
                           <td className="p-4 text-center font-mono font-black text-[#263544]">
-                            {item.grossPay.toLocaleString()}
+                            <span>{Math.round(item.earnedSalary).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 block">ل.س</span>
                           </td>
-                          <td className="p-4 text-center font-mono font-black text-rose-600 bg-rose-50/30 rounded-xl">
-                            {item.totalDeductions.toLocaleString()}
+
+                          {/* المكافآت — مجموع bonusAmount + assistanceAmount من صفحة المكافآت */}
+                          <td className="p-4 text-center font-mono font-black">
+                            {item.bonusesTotal > 0 ? (
+                              <span className="text-emerald-600">
+                                +{item.bonusesTotal.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
                           </td>
+
+                          {/* الخصومات — مجموع السلف والعقوبات من صفحة الخصومات */}
+                          <td className="p-4 text-center font-mono font-black text-rose-600 bg-rose-50/30">
+                            {item.discountsTotal > 0 ? (
+                              <span>-{item.discountsTotal.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+
+                          {/* المجموع = الراتب المستحق + المكافآت - الخصومات */}
                           <td className="p-4 text-center font-mono font-black text-[#263544]">
                             {item.netPay.toLocaleString()}
                           </td>
-                          <td className="p-4 text-center font-black text-xl text-[#1a2530] bg-linear-to-l from-[#C89355]/10 to-transparent rounded-xl shadow-inner border-l-4 border-l-[#C89355]">
+
+                          {/* الراتب المقبوض — مقرب لأقرب ألف */}
+                          <td className="p-4 text-center font-black text-xl text-[#1a2530] bg-linear-to-l from-[#C89355]/10 to-transparent shadow-inner border-l-4 border-l-[#C89355]">
                             {item.netPayRounded.toLocaleString()}
                           </td>
-                          <td className="p-4 text-center font-mono font-black text-amber-600 bg-amber-50/30 rounded-xl">
+
+                          {/* الفرق = الراتب المقبوض - المجموع */}
+                          <td className="p-4 text-center font-mono font-black text-amber-600 bg-amber-50/30">
                             {item.roundingDifference.toLocaleString()}
                           </td>
+
+                          {/* إجراء */}
                           <td className="p-4 text-center">
                             <button
                               onClick={() => setSelectedPayslip(item)}
@@ -929,17 +1078,14 @@ export default function PayrollPage() {
                       </h3>
                       <div className="space-y-4 text-slate-700 print:text-black">
                         {selectedPayslip.details.advances.map((adv, idx) => {
-                          const amount =
-                            toNumber(adv.installmentAmount) || toNumber(adv.remainingAmount);
+                          // Handle both DiscountRecord and Advance types
+                          const amount = 'amount' in adv ? toNumber(adv.amount) : 
+                            (toNumber((adv as { installmentAmount?: number }).installmentAmount) || toNumber((adv as { remainingAmount?: number }).remainingAmount));
                           return (
                             <div key={idx} className="flex justify-between items-center">
                               <span className="text-sm font-bold">
-                                سلفة{" "}
-                                {adv.advanceType === "salary"
-                                  ? "راتب"
-                                  : adv.advanceType === "clothing"
-                                  ? "ملابس"
-                                  : "أخرى"}
+                                {'type' in adv ? adv.type : 
+                                  `سلفة ${(adv as { advanceType?: string }).advanceType === "salary" ? "راتب" : (adv as { advanceType?: string }).advanceType === "clothing" ? "ملابس" : "أخرى"}`}
                               </span>
                               <span className="text-lg font-black text-rose-600 font-mono print:text-black">
                                 -{amount.toLocaleString()}

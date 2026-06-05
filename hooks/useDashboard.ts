@@ -39,7 +39,7 @@ const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<
   }
 };
 
-export const useDashboard = (opts?: { startDate?: string; endDate?: string }) => {
+export const useDashboard = () => {
   // Fetch aggregated dashboard payload (reduces multiple /stats calls)
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'home'],

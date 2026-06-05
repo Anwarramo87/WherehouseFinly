@@ -6,24 +6,35 @@ import { Printer, Search, Calendar as CalendarIcon, Receipt, Wallet, ChevronLeft
 import { useEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
-import { useAdvances } from "@/hooks/useAdvances";
+import { useDiscounts, DiscountRecord } from "@/hooks/useDiscounts";
+import { usePayrollInputs } from "@/hooks/usePayrollInputs";
+import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
+import { useAttendance } from "@/hooks/useAttendance";
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
-import type { Advance } from "@/types/advance";
 
 // ─── TypeScript Interfaces ─────────────────────────────────────────────────────
 interface AggregatedPayroll {
   employeeId: string;
   employeeName: string;
+  department: string;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+  netPayRounded: number;
+  roundingDifference: number;
+  anomalies: string[];
+  earnedSalary: number;
+  bonusesTotal: number;
+  discountsTotal: number;
   fixedEarnings: number;
   variableEarnings: number;
   fixedDeductions: number;
   variableDeductions: number;
-  netPay: number;
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
-    advances: Advance[];
+    advances: DiscountRecord[];
     attendance: null;
   };
 }
@@ -33,7 +44,8 @@ const toNumber = (value: unknown): number => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
     return Number((value as { $numberDecimal: string }).$numberDecimal || 0);
   }
-  return Number(value || 0);
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 };
 
 const getLocalMonth = () => {
@@ -41,6 +53,37 @@ const getLocalMonth = () => {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
+};
+
+const STANDARD_WORK_DAYS = 26;
+const HOURS_PER_DAY = 8;
+
+const calcEarnedSalaryTimeTable = (
+  grossSalary: number,
+  actualWorkDays: number,
+  totalDelayMinutes: number,
+): number => {
+  if (grossSalary <= 0) return 0;
+  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
+  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
+  const salaryFromDays = dailyRate * actualWorkDays;
+  const delayDeduction = totalDelayMinutes * minuteRate;
+  return Math.max(0, salaryFromDays - delayDeduction);
+};
+
+const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+  if (!checkIn) return 0;
+  const toMins = (t: string) => {
+    const s = t.slice(0, 5);
+    const [h, m] = s.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  };
+  const ci = toMins(checkIn);
+  const sc = toMins(scheduledStart || "08:00");
+  if (ci === null || sc === null) return 0;
+  const diff = ci - sc - gracePeriod;
+  return diff > 0 ? diff : 0;
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -65,12 +108,58 @@ export default function VouchersPage() {
   };
 
   // ─── STEP 1: Raw Data Fetching ───────────────────────────────────────────────
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees({ status: "active", limit: 500 });
+  const { data: rawEmployees, isLoading: employeesLoading } = useEmployees({ status: "active", limit: 500 });
+  const employees = useMemo(() => (Array.isArray(rawEmployees) ? rawEmployees : []), [rawEmployees]);
+  
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
-  const { data: advances = [], isLoading: advancesLoading } = useAdvances();
+  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts();
 
-  const isLoading = employeesLoading || salariesLoading || bonusesLoading || advancesLoading;
+  const { periodStart, periodEnd } = useMemo(() => {
+    if (!month) return { periodStart: undefined, periodEnd: undefined };
+    const [year, m] = month.split("-");
+    const startDate = `${year}-${m}-01`;
+    const endDay = new Date(Number(year), Number(m), 0).getDate();
+    const endDate = `${year}-${m}-${String(endDay).padStart(2, "0")}`;
+    return { periodStart: startDate, periodEnd: endDate };
+  }, [month]);
+
+  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
+  
+  const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
+    periodStart: periodStart ?? "",
+    periodEnd: periodEnd ?? "",
+  });
+  
+  const autoDeductions = useMemo(() => {
+    if (!deductionsResponse) return [];
+    if (Array.isArray(deductionsResponse.data)) return deductionsResponse.data;
+    return [];
+  }, [deductionsResponse]);
+
+  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({
+    startDate: periodStart,
+    endDate: periodEnd,
+    limit: 500,
+  });
+
+  const localLateMinutesMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      const emp = employees.find((e) => e.employeeId === dr.employeeId);
+      const scheduledStart = emp?.scheduledStart || "08:00";
+      const gracePeriod = (emp && typeof (emp as { gracePeriodMinutes?: number }).gracePeriodMinutes === 'number') ? (emp as { gracePeriodMinutes: number }).gracePeriodMinutes : 15;
+      const lateMin = calcLateMinutes(dr.checkIn, scheduledStart, gracePeriod);
+      if (lateMin > 0) {
+        map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + lateMin);
+      }
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords, employees]);
+
+  const isLoading = employeesLoading || salariesLoading || bonusesLoading || discountsLoading || inputsLoading || deductionsLoading || attendanceLoading;
 
   // ─── STEP 1: The Maestro Aggregation ─────────────────────────────────────────
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
@@ -79,51 +168,107 @@ export default function VouchersPage() {
     return employees.map((employee) => {
       const employeeId = employee.employeeId;
       const employeeName = employee.name;
-
+      
       const salaryConfig = salaries.find(s => s.employeeId === employeeId) || null;
-      const baseSalary = salaryConfig
-        ? toNumber(salaryConfig.baseSalary)
-        : toNumber(employee.baseSalary ?? employee.hourlyRate);
-      const lumpSumSalary = salaryConfig ? toNumber(salaryConfig.lumpSumSalary) : 0;
-      const livingAllowance = salaryConfig ? toNumber(salaryConfig.livingAllowance) : 0;
-      const transportAllowance = salaryConfig ? toNumber(salaryConfig.transportAllowance) : 0;
-      const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
+      const department = employee.department || salaryConfig?.profession || "أقسام عامة";
+      
+      // Same calculation as payroll page
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross = toNumber(salaryConfig.baseSalary) +
+          toNumber(salaryConfig.lumpSumSalary) +
+          toNumber(salaryConfig.livingAllowance) +
+          toNumber(salaryConfig.responsibilityAllowance) +
+          toNumber(salaryConfig.extraEffortAllowance ?? salaryConfig.extraEffort) +
+          toNumber(salaryConfig.productionIncentive) +
+          toNumber(salaryConfig.transportAllowance);
+      }
+      if (calcGross <= 0 && employee) {
+        calcGross = toNumber((employee as { baseSalary?: number }).baseSalary) || toNumber((employee as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+      }
 
-      const fixedEarnings = baseSalary + lumpSumSalary + livingAllowance + transportAllowance;
+      // Calculate earned salary from attendance
+      let earnedSalary = 0;
+      if (employee) {
+        const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+        const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
+        const hasManualInput = !!manualInput;
 
+        const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
+        const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+          ? (manualInput.lateMinutes ?? 0)
+          : autoLateMinutes;
+
+        const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+        const actualWorkDays = autoInput !== undefined ? Math.max(0, autoInput.presentDays) : null;
+
+        earnedSalary = actualWorkDays !== null
+          ? calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes)
+          : 0;
+      }
+
+      // Calculate bonuses exactly as payroll page
       const employeeBonuses = bonuses.filter(b => b.employeeId === employeeId);
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
-        return sum + toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount);
+        const bonusAmt = toNumber(bonus.bonusAmount);
+        const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
+        return sum + bonusAmt + assistAmt;
       }, 0);
 
-      const employeeAdvances = advances.filter(a => {
-        if (a.employeeId !== employeeId) return false;
-        const advanceDate = a.issueDate || a.createdAt || "";
-        return advanceDate.startsWith(month);
+      // Calculate deductions exactly as payroll page (using discounts hook only)
+      const employeeDiscounts = discounts.filter((d) => {
+        return d.employeeId === employeeId && d.date.startsWith(month);
       });
       
-      const advancesDeduction = employeeAdvances.reduce((sum, advance) => {
-        return sum + (toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount));
-      }, 0);
+      const variableDeductions = employeeDiscounts.reduce(
+        (sum, d) => sum + toNumber(d.amount),
+        0
+      );
 
-      const attendancePenalty = 0;
-      const fixedDeductions = insuranceAmount;
-      const variableDeductions = advancesDeduction + attendancePenalty;
-      const netPay = (fixedEarnings + variableEarnings) - (fixedDeductions + variableDeductions);
+      const fixedEarnings = calcGross;
+      const fixedDeductions = toNumber(salaryConfig?.insuranceAmount);
+      const grossPay = fixedEarnings + variableEarnings;
+      const totalDeductions = fixedDeductions + variableDeductions;
+      
+      // Apply Formula (الراتب المستحق + المكافآت - الخصومات)
+      const netPay = earnedSalary + variableEarnings - variableDeductions;
+      
+      // Calculate rounding
+      const netPayRounded = Math.ceil(netPay / 1000) * 1000;
+      const roundingDifference = netPayRounded - netPay;
 
       return {
-        employeeId, employeeName, fixedEarnings, variableEarnings,
-        fixedDeductions, variableDeductions, netPay,
-        details: { salaryConfig, bonuses: employeeBonuses, advances: employeeAdvances, attendance: null },
+        employeeId,
+        employeeName,
+        department,
+        grossPay,
+        totalDeductions,
+        netPay,
+        netPayRounded,
+        roundingDifference,
+        anomalies: [],
+        earnedSalary,
+        bonusesTotal: variableEarnings,
+        discountsTotal: variableDeductions,
+        fixedEarnings,
+        variableEarnings,
+        fixedDeductions,
+        variableDeductions,
+        details: {
+          salaryConfig,
+          bonuses: employeeBonuses,
+          advances: employeeDiscounts.filter(d => d.kind === 'advance'),
+          attendance: null,
+        },
       };
     });
-  }, [employees, salaries, bonuses, advances, month]);
+  }, [employees, salaries, bonuses, discounts, month, payrollInputs, autoDeductions, localLateMinutesMap]);
 
   // ─── STEP 1: Filter Vouchers ─────────────────────────────────────────────────
   const filteredVouchers = useMemo(() => {
     let filtered = payrollData.filter(p => {
-      // Do not print if netPay <= 0 AND fixedEarnings === 0
-      if (p.netPay <= 0 && p.fixedEarnings === 0 && p.variableEarnings === 0) return false;
+      // Do not print if netPayRounded <= 0 AND earnedSalary === 0
+      if (p.netPayRounded <= 0 && p.earnedSalary === 0 && p.variableEarnings === 0) return false;
       return true;
     });
 
@@ -272,47 +417,19 @@ export default function VouchersPage() {
             {/* Body - Compact Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 print:p-3 print:gap-3 flex-1">
               
-              {/* Right: Earnings */}
+              {/* Right: Earnings - NOW SHOWS EARNED SALARY (matches جدول الرواتب "الراتب المستحق") */}
               <div className="space-y-3 print:space-y-1.5">
                 <div className="flex items-center gap-2 mb-3 print:mb-1">
                   <Wallet className="text-emerald-600 print:w-4 print:h-4" size={18} />
                   <h3 className="text-lg font-black text-emerald-700 print:text-sm">المستحقات</h3>
                 </div>
 
-                {voucher.fixedEarnings > 0 && (
+                {voucher.earnedSalary > 0 && (
                   <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-200/50 print:p-1.5 print:bg-emerald-50">
-                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1"> الاستحقاقات الثابتة</p>
-                    {voucher.details.salaryConfig && (
-                      <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
-                        {toNumber(voucher.details.salaryConfig.baseSalary) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">الراتب الأساسي</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.baseSalary).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.lumpSumSalary) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">الراتب المقطوع</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.lumpSumSalary).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.livingAllowance) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">بدل المعيشة</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.livingAllowance).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.transportAllowance) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">بدل النقل</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.transportAllowance).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-2 pt-2 border-t border-emerald-300 flex justify-between items-center text-xs print:text-[10px] print:mt-1 print:pt-1">
-                      <span className="font-black text-emerald-900 uppercase">المجموع</span>
-                      <span className="font-black text-emerald-700 font-mono">{voucher.fixedEarnings.toLocaleString()}</span>
+                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1">الراتب المستحق من الدوام</p>
+                    <div className="flex justify-between text-xs print:text-[10px]">
+                      <span className="font-bold text-slate-700">الراتب المستحق</span>
+                      <span className="font-black text-emerald-700 font-mono">{Math.round(voucher.earnedSalary).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -332,7 +449,7 @@ export default function VouchersPage() {
                 )}
               </div>
 
-              {/* Left: Deductions */}
+              {/* Left: Deductions - Updated to match جدول الرواتب */}
               <div className="space-y-3 print:space-y-1.5">
                 <div className="flex items-center gap-2 mb-3 print:mb-1">
                   <Receipt className="text-rose-600 print:w-4 print:h-4" size={18} />
@@ -354,10 +471,15 @@ export default function VouchersPage() {
                     <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">الخصومات المتغيرة</p>
                     <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                       {voucher.details.advances.map((advance, idx) => {
-                        const deductionAmount = toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount);
+                        // Handle both DiscountRecord and Advance types
+                        const deductionAmount = 'amount' in advance ? toNumber(advance.amount) : 
+                          (toNumber((advance as { installmentAmount?: number }).installmentAmount) || toNumber((advance as { remainingAmount?: number }).remainingAmount));
+                        const advanceType = 'type' in advance ? advance.type : 
+                          `سلفة ${(advance as { advanceType?: string }).advanceType === "salary" ? "راتب" : (advance as { advanceType?: string }).advanceType === "clothing" ? "ملابس" : "أخرى"}`;
+                        
                         return (
                           <div key={idx} className="flex justify-between">
-                            <span className="font-bold text-slate-700">سلفة {advance.advanceType === "salary" ? "راتب" : "أخرى"}</span>
+                            <span className="font-bold text-slate-700">{advanceType}</span>
                             <span className="font-black text-rose-700 font-mono">-{deductionAmount.toLocaleString()}</span>
                           </div>
                         );
@@ -378,14 +500,14 @@ export default function VouchersPage() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Footer - Updated to show netPayRounded (matches جدول الرواتب "الراتب المقبوض") */}
             <div className="bg-slate-50 p-6 border-t-2 border-slate-200 print:p-3 mt-auto">
               
-              {/* Massive Net Pay */}
+              {/* Massive Net Pay - Using netPayRounded to match جدول الرواتب */}
               <div className="text-center mb-6 print:mb-3">
-                <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع</p>
+                <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع (مقرب)</p>
                 <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
-                  {voucher.netPay.toLocaleString()}
+                  {voucher.netPayRounded.toLocaleString()}
                   <span className="text-xl mr-2 print:text-sm">ل.س</span>
                 </p>
               </div>
