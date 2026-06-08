@@ -68,7 +68,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-    const normalizedUsername = username.trim();
+  const normalizedUsername = username.trim().replace(/^"+|"+$/g, "");
     const normalizedPassword = password;
 
     if (!normalizedUsername || !normalizedPassword) {
