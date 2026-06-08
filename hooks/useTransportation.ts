@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { getApiErrorMessage as normalizeError } from "@/lib/http/error";
 
 export interface BusResponse {
   id: string;
@@ -36,12 +37,7 @@ export interface BusDetailsResponse extends BusResponse {
   passengers: PassengerResponse[];
 }
 
-const normalizeError = (error: unknown): string => {
-  const err = error as { response?: { data?: { message?: string | string[] } }; message?: string };
-  const message = err?.response?.data?.message || err?.message || "حدث خطأ غير معروف";
-  if (Array.isArray(message)) return message.join(" | ");
-  return message;
-};
+
 
 export function useTransportation() {
   const queryClient = useQueryClient();
@@ -52,8 +48,9 @@ export function useTransportation() {
       const res = await apiClient.get("/transportation/buses");
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.STANDARD,
-    gcTime: QUERY_GC_TIME.RELAXED,
+    staleTime: QUERY_STALE_TIME.FAST, // تقليل stale time لتحديث أسرع
+    gcTime: QUERY_GC_TIME.STANDARD,
+    refetchOnWindowFocus: true, // تحديث تلقائي عند العودة للصفحة
   });
 
   const getBus = async (busId: string): Promise<BusDetailsResponse> => {
@@ -80,7 +77,7 @@ export function useTransportation() {
       toast.success("تم إضافة الباص بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشلت العملية"));
     },
   });
 
@@ -104,7 +101,7 @@ export function useTransportation() {
       toast.success("تم تحديث الباص بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشلت العملية"));
     },
   });
 
@@ -117,7 +114,7 @@ export function useTransportation() {
       toast.success("تم حذف الباص");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشلت العملية"));
     },
   });
 
@@ -136,7 +133,7 @@ export function useTransportation() {
       toast.success("تمت إضافة الموظف للباص");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشلت العملية"));
     },
   });
 
@@ -149,7 +146,7 @@ export function useTransportation() {
       toast.success("تمت إزالة الموظف من الباص");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشلت العملية"));
     },
   });
 

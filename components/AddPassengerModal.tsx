@@ -216,12 +216,10 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
       const bScore = normalize(b.residence || "").includes(normRoute) ? 0 : 1;
       return aScore - bScore;
     });
+    
+    const otherEmployeesLimited = (list: Employee[], limit = 30) => list.slice(0, limit);
     return { matched: matched.slice(0, 50), others: otherEmployeesLimited(others, 50) };
   }, [allEmployees, routeText, existingEmployeeIds]);
-
-  function otherEmployeesLimited(list: Employee[], limit = 30) {
-    return list.slice(0, limit);
-  }
 
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;

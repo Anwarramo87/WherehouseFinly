@@ -1,27 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
-import axios from "axios";
 import apiClient from "@/lib/api-client";
 import { Bonus, BonusInput } from "@/types/bonus";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-
-type ApiErrorBody = {
-  message?: string;
-  error?: { message?: string };
-};
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError<ApiErrorBody>(error)) {
-    const message = error.response?.data?.error?.message ?? error.response?.data?.message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
-};
+import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export const useBonuses = (params?: { employeeId?: string; period?: string }) => {
   const queryClient = useQueryClient();
@@ -35,7 +17,31 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
           period: params?.period,
         },
       });
-      return res.data?.rewards ?? res.data ?? [];
+      
+      const data = res.data;
+      
+      // التحقق من أن البيانات array
+      if (Array.isArray(data)) {
+        return data;
+      }
+      
+      // إذا كانت البيانات في خاصية rewards
+      if (data && Array.isArray(data.rewards)) {
+        return data.rewards;
+      }
+      
+      // إذا كانت البيانات في خاصية bonuses
+      if (data && Array.isArray(data.bonuses)) {
+        return data.bonuses;
+      }
+      
+      // إذا كانت البيانات في خاصية data
+      if (data && Array.isArray(data.data)) {
+        return data.data;
+      }
+      
+      // إرجاع array فارغ كـ fallback
+      return [];
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,

@@ -86,6 +86,8 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Performance optimizations
+  compress: true,
   // تسريع compile time — يقلل الـ tree-shaking لمكتبات كبيرة في dev
   experimental: {
     optimizePackageImports: [
@@ -94,6 +96,8 @@ const nextConfig: NextConfig = {
       "@tanstack/react-query",
       "@tanstack/react-table",
     ],
+    // Optimize server actions and other features
+    optimizeServerReact: true,
   },
   async rewrites() {
     return [
@@ -125,6 +129,11 @@ const nextConfig: NextConfig = {
                 },
               ]
             : []),
+          // Cache static assets
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
     ];

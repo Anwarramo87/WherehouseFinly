@@ -50,7 +50,6 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
       document.body.style.overflow = "hidden";
       // تعبئة البيانات في حال التعديل، أو تفريغها في حال الإضافة
       if (initialData) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setForm(initialData);
       } else {
         setForm({ name: "", manager: "", date: new Date().toISOString().split('T')[0] });

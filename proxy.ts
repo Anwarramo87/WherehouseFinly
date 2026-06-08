@@ -9,13 +9,13 @@ import { DEFAULT_API_URL, normalizeApiUrl } from "@/lib/api-url";
 
 const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL, DEFAULT_API_URL);
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
-// في dev نعطي وقت كافي للباك المحلي، في production نعطي وقت أطول
-const SESSION_CHECK_TIMEOUT_MS = IS_DEVELOPMENT ? 1_500 : 5_000;
-// نزيد الـ cache بشكل كبير — المستخدم المسجل ما يحتاج نتحقق منه كل 10 ثواني
-const SESSION_SUCCESS_CACHE_TTL_MS = 10 * 60 * 1_000; // 10 دقائق
-const SESSION_FAILURE_CACHE_TTL_MS = 3_000;
+// Very short timeout for session checks to not block page loads
+const SESSION_CHECK_TIMEOUT_MS = IS_DEVELOPMENT ? 500 : 1_000;
+// Longer cache for successful sessions
+const SESSION_SUCCESS_CACHE_TTL_MS = 30 * 60 * 1_000; // 30 minutes
+const SESSION_FAILURE_CACHE_TTL_MS = 5_000;
 const SESSION_RATE_LIMIT_CACHE_TTL_MS = 15_000;
-const SESSION_CACHE_MAX_ENTRIES = 128;
+const SESSION_CACHE_MAX_ENTRIES = 512;
 const AUTH_COOKIE_CANDIDATES = [
   process.env.NEXT_PUBLIC_AUTH_COOKIE_NAME,
   "warehouse_access_token",
@@ -259,40 +259,26 @@ const checkSession = async (request: NextRequest): Promise<SessionCheckResult> =
 
 export async function proxy(request: NextRequest) {
   const pathname = normalizePathname(request.nextUrl.pathname);
+
+  // Skip auth checks for login page and API routes
+  if (pathname === "/login" || pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   const isRootRoute = pathname === "/";
-  const isLoginRoute = pathname === "/login";
   const isProtected = isProtectedRoute(pathname);
   const hasHints = hasSessionHints(request);
 
-  // Avoid blocking route prefetch requests with auth round-trips.
+  // Skip prefetch requests
   if (isPrefetchRequest(request)) {
     return NextResponse.next();
   }
 
-  if (!isRootRoute && !isLoginRoute && !isProtected) {
+  // ===== SUPER FAST PATH: Skip all auth checks for protected routes with session hints
+  if (isProtected && hasHints) {
     return NextResponse.next();
   }
-
-  // ===== FAST PATH =====
-  // إذا المستخدم عنده session hints وعم يتنقل بين protected routes
-  // نتحقق من الـ cache أولاً — إذا موجود نمرره فوراً بدون fetch
-  if (isProtected && hasHints) {
-    const cacheKey = getSessionCacheKey(request);
-    const cachedResult = getCachedSessionResult(cacheKey);
-
-    if (cachedResult?.authorized) {
-      // الـ session محفوظة وصالحة — نمرر مباشرة بدون أي fetch
-      const requiredRoles = getRequiredRolesForPath(pathname);
-      if (requiredRoles && requiredRoles.length > 0) {
-        const hasRequiredRole = hasAnyRequiredRole(cachedResult.roles, requiredRoles);
-        if (!hasRequiredRole) {
-          return buildRedirectResponse(request, "/home", { forbidden: "true" });
-        }
-      }
-      return NextResponse.next();
-    }
-  }
-  // ===== END FAST PATH =====
+  // ===== END SUPER FAST PATH =====
 
   if (isRootRoute) {
     if (!hasHints) {
@@ -304,18 +290,6 @@ export async function proxy(request: NextRequest) {
     return session.authorized
       ? buildRedirectResponse(request, "/home")
       : buildRedirectResponse(request, "/login");
-  }
-
-  if (isLoginRoute) {
-    if (!hasHints) {
-      return NextResponse.next();
-    }
-
-    const session = await checkSession(request);
-
-    return session.authorized
-      ? buildRedirectResponse(request, "/home")
-      : NextResponse.next();
   }
 
   if (!hasHints) {

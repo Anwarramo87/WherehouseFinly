@@ -173,16 +173,28 @@ export default function AttendancePage() {
   useEffect(() => {
     const socket = getAttendanceSocket();
     if (!socket) return () => {};
-    const onAttendanceUpdate = (payload: AttendanceRealtimeEventPayload) => {
+      const onAttendanceUpdate = (payload: AttendanceRealtimeEventPayload) => {
       if (!payload?.employeeId) return;
       setLiveAttendanceEvent(payload);
       toast.success(payload.message || "تم تسجيل حضور جديد");
-      void queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
-      void queryClient.refetchQueries({ queryKey: ["attendance"], exact: false });
+
+      // تحديث نفس شريحة البيانات المعروضة بدون Refresh كامل.
+      // useAttendance يبني queryKey على:
+      // ["attendance", employeeIdOrAll, requestDate, resolvedStartDate, resolvedEndDate, page, limit]
+      // هنا requestDate/startDate/endDate = selectedDate، والـ employeeId غير محدد (كل الموظفين)، والصفحة page=1 افتراضيًا.
+      const employeeKey = "all-employees";
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance", employeeKey, selectedDate, selectedDate, selectedDate],
+        exact: false,
+      });
+      void queryClient.refetchQueries({
+        queryKey: ["attendance", employeeKey, selectedDate, selectedDate, selectedDate],
+        exact: false,
+      });
     };
     socket.on("attendanceUpdate", onAttendanceUpdate);
     return () => { socket.off("attendanceUpdate", onAttendanceUpdate); };
-  }, [queryClient]);
+  }, [queryClient, selectedDate]);
 
   const handleOpenTimeModal = (row: AttendanceTableRow, field: "checkIn" | "checkOut") => {
     if (!EMPLOYEE_ID_REGEX.test(row.employeeId)) {

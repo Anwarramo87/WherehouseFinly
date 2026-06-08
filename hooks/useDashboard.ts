@@ -39,7 +39,7 @@ const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<
   }
 };
 
-export const useDashboard = (opts?: { startDate?: string; endDate?: string }) => {
+export const useDashboard = () => {
   // Fetch aggregated dashboard payload (reduces multiple /stats calls)
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'home'],
@@ -56,8 +56,9 @@ export const useDashboard = (opts?: { startDate?: string; endDate?: string }) =>
           totalAbsentToday: 0,
         },
       ),
-    staleTime: 60_000,
+    staleTime: 60_000, // 60 seconds instead of 15
   });
+  
   const dashboard = dashboardQuery.data as {
     totalEmployees?: number;
     attendance?: { count?: number; employees?: unknown[] };

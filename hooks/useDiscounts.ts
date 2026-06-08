@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { getApiErrorMessage as normalizeError } from "@/lib/http/error";
 
 export type DiscountRecord = {
   id: string;
@@ -26,22 +27,16 @@ export type DiscountPayload = {
   notes?: string;
 };
 
-const normalizeError = (error: unknown): string => {
-  const err = error as { response?: { data?: { message?: string | string[] } }; message?: string };
-  const message = err?.response?.data?.message || err?.message || "حدث خطأ غير معروف";
-  if (Array.isArray(message)) {
-    return message.join(" | ");
-  }
-  return message;
-};
+
 
 const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
-  if (record.advanceType) {
+  // السجلات من جدول EmployeeAdvance فقط
+  if (record.advanceType || record.totalAmount !== undefined) {
     const advanceType = record.advanceType as string;
     if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
-    if (advanceType === "assistance") return { type: "مساعدة", kind: "assistance" as const };
     return { type: "سلفة", kind: "advance" as const };
   }
+  // السجلات من جدول EmployeePenalty
   if (record.category) {
     return { type: "عقوبة", kind: "penalty" as const };
   }
@@ -79,8 +74,9 @@ export const useDiscounts = (employeeId?: string, enabled = true) => {
       });
     },
     enabled,
-    staleTime: QUERY_STALE_TIME.STANDARD,
-    gcTime: QUERY_GC_TIME.RELAXED,
+    staleTime: QUERY_STALE_TIME.FAST, // تحديث أسرع
+    gcTime: QUERY_GC_TIME.STANDARD,
+    refetchOnWindowFocus: true, // تحديث تلقائي
   });
 
   const createDiscount = useMutation({
@@ -105,7 +101,7 @@ export const useDiscounts = (employeeId?: string, enabled = true) => {
       toast.success("تم إضافة الخصم بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشل إضافة الخصم"));
     },
   });
 
@@ -134,7 +130,7 @@ export const useDiscounts = (employeeId?: string, enabled = true) => {
       toast.success("تم تحديث الخصم بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشل تحديث الخصم"));
     },
   });
 
@@ -148,7 +144,7 @@ export const useDiscounts = (employeeId?: string, enabled = true) => {
       toast.success("تم حذف الخصم بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error));
+      toast.error(normalizeError(error, "فشل حذف الخصم"));
     },
   });
 

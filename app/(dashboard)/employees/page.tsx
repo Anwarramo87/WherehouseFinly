@@ -97,6 +97,9 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 
 export default function EmployeesPage() {
   const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: false });
+  // Fetch ALL employees (including terminated/resigned) just for ID generation
+  // so we never suggest an ID that already exists in the DB
+  const { data: allEmployeesForId } = useEmployees({ includeTerminated: true });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
@@ -166,10 +169,12 @@ export default function EmployeesPage() {
 
   // --- حساب كود الموظف بطريقة آمنة جداً (البحث عن أكبر رقم مستخدم) ---
   const suggestedEmployeeId = useMemo(() => {
-    if (!employees || employees.length === 0) return "EMP00001";
+    // Use ALL employees (including terminated) to avoid suggesting an already-used ID
+    const allEmps = Array.isArray(allEmployeesForId) ? allEmployeesForId : [];
+    if (allEmps.length === 0) return "EMP00001";
     
     // استخراج كل الأرقام من أكواد الموظفين الموجودة
-    const existingIds = employees.map(e => e.employeeId);
+    const existingIds = allEmps.map(e => e.employeeId);
     let maxNumber = 0;
 
     existingIds.forEach(id => {
@@ -192,7 +197,7 @@ export default function EmployeesPage() {
     }
 
     return nextId;
-  }, [employees]);
+  }, [allEmployeesForId]);
 
   // الإجراءات
   const handleEditClick = (emp: Employee) => {
@@ -241,7 +246,9 @@ export default function EmployeesPage() {
     }
 
     if (!selectedEmployee) {
-      payload.username = formData.username.trim() || normalizedEmployeeId;
+      // Generate a safe username: use trimmed input OR fall back to employeeId (guaranteed unique)
+      const rawUsername = formData.username.trim();
+      payload.username = rawUsername || normalizedEmployeeId;
     }
 
     try {

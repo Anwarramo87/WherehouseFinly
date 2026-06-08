@@ -4,23 +4,38 @@ import { toast } from "react-hot-toast";
 import axios from "axios";
 import { Salary, SalaryInput } from "@/types/salary";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
-type ApiErrorBody = {
-  message?: string;
-  error?: { message?: string };
+const normalizeNumber = (value: unknown): number => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
+    const parsed = Number((value as { $numberDecimal?: string }).$numberDecimal || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 };
 
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError<ApiErrorBody>(error)) {
-    const message = error.response?.data?.error?.message ?? error.response?.data?.message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
+const normalizeSalary = (raw: Record<string, unknown>): Salary => {
+  return {
+    id: String(raw.id ?? ""),
+    employeeId: String(raw.employeeId ?? ""),
+    profession: raw.profession ? String(raw.profession) : undefined,
+    baseSalary: normalizeNumber(raw.baseSalary),
+    lumpSumSalary: raw.lumpSumSalary !== undefined ? normalizeNumber(raw.lumpSumSalary) : undefined,
+    livingAllowance: raw.livingAllowance !== undefined ? normalizeNumber(raw.livingAllowance) : undefined,
+    responsibilityAllowance: normalizeNumber(raw.responsibilityAllowance),
+    extraEffortAllowance: raw.extraEffortAllowance !== undefined ? normalizeNumber(raw.extraEffortAllowance) : undefined,
+    productionIncentive: normalizeNumber(raw.productionIncentive),
+    transportAllowance: normalizeNumber(raw.transportAllowance),
+    insuranceAmount: raw.insuranceAmount !== undefined ? normalizeNumber(raw.insuranceAmount) : undefined,
+    roundingDifference: raw.roundingDifference !== undefined ? normalizeNumber(raw.roundingDifference) : undefined,
+    extraEffort: raw.extraEffort !== undefined ? normalizeNumber(raw.extraEffort) : undefined,
+    insurances: raw.insurances !== undefined ? normalizeNumber(raw.insurances) : undefined,
+  } as Salary;
 };
 
 /**
@@ -41,7 +56,8 @@ export const useSalaries = () => {
     queryFn: async () => {
       const res = await apiClient.get("/salary");
       const data = res.data?.salaries ?? res.data;
-      return Array.isArray(data) ? data : [];
+      const rawArray = Array.isArray(data) ? data : [];
+      return rawArray.map((raw) => normalizeSalary(raw as Record<string, unknown>));
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
@@ -55,7 +71,8 @@ export const useSalaries = () => {
       queryFn: async () => {
         try {
           const res = await apiClient.get(`/salary/${employeeId}`);
-          return res.data ?? null;
+          const raw = res.data;
+          return raw ? normalizeSalary(raw as Record<string, unknown>) : null;
         } catch (error: unknown) {
           const status = axios.isAxiosError(error) ? error.response?.status : undefined;
           // 404/400 means no salary record yet — return null silently
@@ -106,7 +123,6 @@ export const useSalaries = () => {
         payload.transportAllowance = Number(data.transportAllowance);
       }
 
-      console.log(`📤 [PUT] /salary/${employeeId}`, payload);
       return await apiClient.put(`/salary/${employeeId}`, payload);
     },
     onSuccess: (_data, variables) => {
@@ -118,13 +134,7 @@ export const useSalaries = () => {
       toast.success("تم حفظ مكونات الراتب بنجاح ✓");
     },
     onError: (error: unknown) => {
-      const msg = getErrorMessage(error, "فشل حفظ الراتب");
-      toast.error(msg);
-      if (axios.isAxiosError(error)) {
-        console.error("❌ Salary Update Error:", error.response?.data);
-      } else {
-        console.error("❌ Salary Update Error:", error);
-      }
+      toast.error(getErrorMessage(error, "فشل حفظ الراتب"));
     },
   });
 

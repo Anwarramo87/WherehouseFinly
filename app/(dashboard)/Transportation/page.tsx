@@ -307,17 +307,18 @@ export default function TransportationPage() {
   // Merge passenger cache presentation into bus details whenever cache updates
   useEffect(() => {
     if (!passengerCache || Object.keys(passengerCache).length === 0) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBusDetails((prev) => {
-      const next = { ...prev };
-      for (const busId of Object.keys(next)) {
-        const bus = next[busId];
-        if (!bus) continue;
-        const busCache = passengerCache[busId] || {};
-        const mergedPassengers = bus.passengers.map((p) => {
-          const key = p.employeeId;
-          const meta = busCache[key];
-          if (!meta) return p;
+    // Use setTimeout to avoid cascading renders
+    const timer = setTimeout(() => {
+      setBusDetails((prev) => {
+        const next = { ...prev };
+        for (const busId of Object.keys(next)) {
+          const bus = next[busId];
+          if (!bus) continue;
+          const busCache = passengerCache[busId] || {};
+          const mergedPassengers = bus.passengers.map((p) => {
+            const key = p.employeeId;
+            const meta = busCache[key];
+            if (!meta) return p;
           return {
             ...p,
             name: meta.name || p.name,
@@ -329,6 +330,8 @@ export default function TransportationPage() {
       }
       return next;
     });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [passengerCache]);
 
   const safeEmployees = Array.isArray(employees) ? employees : [];
@@ -341,11 +344,20 @@ export default function TransportationPage() {
     return cached?.name || passenger.name || employeeNameMap.get(passenger.employeeId) || passenger.employeeId;
   };
 
-  const resolvePassengerAmount = (busId: string, passenger: Passenger) => {
-    const cached = passengerCache[busId]?.[passenger.employeeId];
-    if (typeof cached?.paidAmount === "number") return cached.paidAmount;
-    if (typeof passenger.paidAmount === "number") return passenger.paidAmount;
-    return undefined;
+  const resolvePassengerAmount = (bus: BusData, passenger: Passenger) => {
+    // If manual, use the paid amount
+    if (passenger.isManual && typeof passenger.paidAmount === "number") {
+      return passenger.paidAmount;
+    }
+
+    // If not manual, calculate equal share
+    const netCost = bus.totalCost - (bus.totalCost * (bus.companyDeductionPct / 100));
+    const totalPassengers = bus.passengers.length;
+    if (totalPassengers === 0) return undefined;
+    
+    // Calculate equal share
+    const share = Number((netCost / totalPassengers).toFixed(2));
+    return share;
   };
 
 
@@ -569,7 +581,7 @@ export default function TransportationPage() {
                             {passengers.map((p) => {
                               const isNew = lastAddedPassengerId && String(lastAddedPassengerId) === String(p.id || p.employeeId);
                               const displayName = resolvePassengerName(bus.id, p);
-                              const displayAmount = resolvePassengerAmount(bus.id, p);
+                              const displayAmount = details ? resolvePassengerAmount(details, p) : undefined;
                               return (
                                 <tr
                                   key={p.id ?? p.employeeId}
@@ -607,6 +619,7 @@ export default function TransportationPage() {
         <PassengerDetailModal
           passenger={modalContext.passenger}
           busId={modalContext.busId}
+          displayAmount={busDetails[modalContext.busId] && busDetails[modalContext.busId] ? resolvePassengerAmount(busDetails[modalContext.busId]!, modalContext.passenger) : undefined}
           onClose={() => setModalContext(null)}
           onRemove={handleRemovePassenger}
         />

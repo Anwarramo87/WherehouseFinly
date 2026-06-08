@@ -1,9 +1,29 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import apiClient from "@/lib/api-client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
-import axios from "axios";
+import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { getApiErrorMessage } from "@/lib/http/error";
+
+/** Re-export for backwards-compat with components that import getErrorMessage from here */
+export const getErrorMessage = getApiErrorMessage;
+
+export const toHourlyRateNumber = (value: Employee["hourlyRate"]) => {
+  if (value && typeof value === "object" && "$numberDecimal" in value) {
+    return Number(value.$numberDecimal || 0);
+  }
+  if (typeof value === "string") {
+    const normalized = value.replace(/,/g, "").trim();
+    return Number(normalized || 0);
+  }
+  return Number(value || 0);
+};
+
+export const assertHourlyRate = (hourlyRate: number) => {
+  if (!Number.isFinite(hourlyRate)) {
+    throw new Error("أجر الساعة يجب أن يكون رقمًا صالحًا");
+  }
+};
 
 export type UseEmployeesOptions = {
   status?: Employee["status"];
@@ -27,53 +47,6 @@ type TerminateEmployeeVariables = {
   data: TerminateEmployeeData;
 };
 
-type ApiErrorBody = {
-  message?: string | string[];
-  error?: { message?: string | string[] };
-};
-
-const normalizeMessage = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value.join(" | ");
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return "";
-};
-
-export const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError<ApiErrorBody>(error)) {
-    const message =
-      normalizeMessage(error.response?.data?.error?.message) ||
-      normalizeMessage(error.response?.data?.message);
-    if (message.trim()) {
-      return message;
-    }
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
-};
-
-export const toHourlyRateNumber = (value: Employee["hourlyRate"]) => {
-  if (value && typeof value === "object" && "$numberDecimal" in value) {
-    return Number(value.$numberDecimal || 0);
-  }
-  if (typeof value === "string") {
-    const normalized = value.replace(/,/g, "").trim();
-    return Number(normalized || 0);
-  }
-  return Number(value || 0);
-};
-
-export const assertHourlyRate = (hourlyRate: number) => {
-  if (!Number.isFinite(hourlyRate)) {
-    throw new Error("أجر الساعة يجب أن يكون رقمًا صالحًا");
-  }
-};
-
 export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmployeesOptions) => {
   const shouldExcludeTerminated = !options?.status && options?.includeTerminated !== true;
 
@@ -92,8 +65,8 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 export const useEmployees = (options?: UseEmployeesOptions) => {
   const queryClient = useQueryClient();
 
-  const safeLimit = Math.min(Math.max(options?.limit ?? 500, 1), 500);
-  const fetchAll = options?.fetchAll ?? true;
+  const safeLimit = Math.min(Math.max(options?.limit ?? 500, 1), 500); // Changed from 200 to 500
+  const fetchAll = options?.fetchAll ?? false;
 
   const shouldExcludeTerminated = !options?.status && options?.includeTerminated !== true;
 
@@ -223,10 +196,46 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         assertHourlyRate(hourlyRate);
       }
 
-      const payload = {
-        ...newEmployee,
-        ...(hourlyRate !== undefined ? { hourlyRate } : {}),
+      // Only send fields accepted by CreateEmployeeDto
+      // forbidNonWhitelisted:true on the backend rejects any unknown fields
+      const payload: Record<string, unknown> = {
+        employeeId:            newEmployee.employeeId,
+        name:                  newEmployee.name,
+username:              (newEmployee as unknown as Record<string, unknown>).username,
+         password:              (newEmployee as unknown as Record<string, unknown>).password,
+        mobile:                newEmployee.mobile,
+        nationalId:            newEmployee.nationalId,
+        dateOfBirth:           newEmployee.dateOfBirth,
+        birthDate:             newEmployee.birthDate,
+        gender:                newEmployee.gender,
+        jobTitle:              newEmployee.jobTitle,
+        profession:            newEmployee.profession,
+        department:            newEmployee.department,
+        hourlyRate:            hourlyRate,
+        baseSalary:            typeof newEmployee.baseSalary === 'object' && newEmployee.baseSalary && '$numberDecimal' in newEmployee.baseSalary
+                                 ? Number((newEmployee.baseSalary as { $numberDecimal: string }).$numberDecimal)
+                                 : newEmployee.baseSalary,
+        lumpSumSalary:         typeof newEmployee.lumpSumSalary === 'object' && newEmployee.lumpSumSalary && '$numberDecimal' in newEmployee.lumpSumSalary
+                                 ? Number((newEmployee.lumpSumSalary as { $numberDecimal: string }).$numberDecimal)
+                                 : newEmployee.lumpSumSalary,
+        livingAllowance:       typeof newEmployee.livingAllowance === 'object' && newEmployee.livingAllowance && '$numberDecimal' in newEmployee.livingAllowance
+                                 ? Number((newEmployee.livingAllowance as { $numberDecimal: string }).$numberDecimal)
+                                 : newEmployee.livingAllowance,
+        roleId:                newEmployee.roleId,
+        scheduledStart:        newEmployee.scheduledStart,
+        scheduledEnd:          newEmployee.scheduledEnd,
+        employmentStartDate:   newEmployee.employmentStartDate,
+        gracePeriodMinutes:    newEmployee.gracePeriodMinutes,
+        workDaysInPeriod:      newEmployee.workDaysInPeriod,
+        hoursPerDay:           newEmployee.hoursPerDay,
+        residence:             newEmployee.residence,
       };
+
+      // Remove undefined values so they don't get sent
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined) delete payload[key];
+      });
+
       return await apiClient.post("/employees", payload);
     },
     onSuccess: () => {
@@ -340,14 +349,16 @@ export const useResignedEmployees = () => {
   const queryClient = useQueryClient();
 
   const query = useQuery<Employee[]>({
-    queryKey: ["resigned-employees"],
+    queryKey: ['resigned-employees'],
     queryFn: async () => {
-      const response = await apiClient.get("/employees/resigned", {
+      const response = await apiClient.get('/employees/resigned', {
         params: { limit: 500, page: 1 },
       });
 
-      // الاستجابة: { success, employees, pagination, statistics }
       const payload = response.data;
+      if (payload && Array.isArray(payload.data)) {
+        return payload.data as Employee[];
+      }
       if (payload && Array.isArray(payload.employees)) {
         return payload.employees as Employee[];
       }

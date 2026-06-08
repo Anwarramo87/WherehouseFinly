@@ -23,13 +23,11 @@ import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
-import useSalaries from '@/hooks/useSalaries';
 import { Employee } from '@/types/employee';
-import { Salary } from '@/types/salary';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
@@ -350,49 +348,12 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  const employeeList = Array.isArray(employees) ? employees : [];
-  const { data: salaries = [] } = useSalaries();
-
-  const resolveDisplayedMonthlySalary = useCallback((employee: Employee, salaryMap: Map<string, Salary>) => {
-    const salaryRecord = salaryMap.get(employee.employeeId);
-    if (salaryRecord) {
-      const fixedTotal =
-        toNumber(salaryRecord.baseSalary) +
-        toNumber(salaryRecord.lumpSumSalary) +
-        toNumber(salaryRecord.livingAllowance) +
-        toNumber(salaryRecord.responsibilityAllowance) +
-        toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
-        toNumber(salaryRecord.productionIncentive) +
-        toNumber(salaryRecord.transportAllowance);
-
-      if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
-    }
-
-    if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
-      const parsed = toNumber(employee.monthlySalary);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    }
-
-    const hourly = toNumber(employee.hourlyRate);
-    return Math.round(hourly * 8 * 26);
-  }, []);
-
-  const salaryMap = useMemo(() => {
-    const m = new Map<string, Salary>();
-    (salaries || []).forEach((s: Salary) => { if (s?.employeeId) m.set(s.employeeId, s); });
-    return m;
-  }, [salaries]);
+  const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
+  const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];
   }, [employees]);
-
-  const totalSalaries = useMemo(() => {
-    return employeeListMemo.reduce((sum, emp) => sum + (resolveDisplayedMonthlySalary(emp, salaryMap) || 0), 0);
-  }, [employeeListMemo, salaryMap, resolveDisplayedMonthlySalary]);
-
-  const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
-  const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
 
   const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
     return advances

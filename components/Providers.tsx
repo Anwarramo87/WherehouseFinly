@@ -1,41 +1,22 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
-
-// تعريف ثوابت الـ cache timing
-const QUERY_STALE_TIME = {
-  STANDARD: 1000 * 60 * 5, // 5 minutes
-  LONG: 1000 * 60 * 30,    // 30 minutes
-  SHORT: 1000 * 60,        // 1 minute
-};
-
-const QUERY_GC_TIME = {
-  STANDARD: 1000 * 60 * 10, // 10 minutes
-  LONG: 1000 * 60 * 60,     // 1 hour
-  SHORT: 1000 * 60 * 5,     // 5 minutes
-};
+import { createQueryClient } from "@/lib/query-client-config";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // نقوم بإنشاء العميل مرة واحدة فقط لتجنب إعادة التحميل غير الضرورية
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: QUERY_STALE_TIME.STANDARD,
-        gcTime: QUERY_GC_TIME.STANDARD,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: 'always',
-        refetchOnMount: true,
-        retry: 1,
-        networkMode: 'offlineFirst',
-      },
-    },
-  }));
+  const [queryClient] = useState(() => createQueryClient());
 
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      {/* React Query DevTools - فقط في development */}
+      {process.env.NODE_ENV === "development" && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      )}
       {/* هنا نزرع مكتبة الإشعارات لتعمل في كل صفحات الموقع */}
       <Toaster 
         position="top-center" 
@@ -43,7 +24,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           style: {
             fontFamily: 'inherit',
             direction: 'rtl',
-          }
+          },
+          duration: 3000,
         }} 
       />
     </QueryClientProvider>

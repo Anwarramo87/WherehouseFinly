@@ -15,11 +15,13 @@ type Passenger = {
 export default function PassengerDetailModal({
   passenger,
   busId,
+  displayAmount,
   onClose,
   onRemove,
 }: {
   passenger: Passenger | null;
   busId: string | null;
+  displayAmount?: number;
   onClose: () => void;
   onRemove: (busId: string, employeeId: string) => void;
 }) {
@@ -33,7 +35,7 @@ export default function PassengerDetailModal({
         <h3 className="text-lg font-black mb-2 text-[#C89355]">تفاصيل المشترك</h3>
         <p className="text-sm text-slate-400 mb-4">الكود: <span className="font-mono text-[#C89355] font-bold">{passenger.employeeId}</span></p>
         <p className="text-sm text-white font-bold mb-2">{passenger.name || passenger.employeeId}</p>
-        <p className="text-sm text-slate-300 mb-4">المبلغ: {typeof passenger.paidAmount === 'number' ? <span className="text-[#C89355] font-bold">{passenger.paidAmount.toLocaleString()} ل.س</span> : '—'}</p>
+        <p className="text-sm text-slate-300 mb-4">المبلغ: {typeof displayAmount === 'number' ? <span className="text-[#C89355] font-bold">{displayAmount.toLocaleString()} ل.س</span> : '—'}</p>
 
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded-lg bg-[#263544] hover:bg-[#2f3f4d] font-bold text-white transition-colors">إغلاق</button>

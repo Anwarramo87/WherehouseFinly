@@ -5,6 +5,7 @@ import apiClient from "@/lib/api-client";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
 import { toLocalDateString } from "@/lib/date-time";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export type AttendanceSource = "manual" | "device";
 export type AttendanceType = "IN" | "OUT";
@@ -113,31 +114,6 @@ const buildTimestampFromDateAndTime = (date: string, hhmm: string) => {
 
 const normalizeSource = (source?: string): AttendanceSource => (source === "device" ? "device" : "manual");
 
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError(error)) {
-    const responseData = error.response?.data as
-      | { message?: string | string[]; error?: { message?: string | string[] } }
-      | undefined;
-
-    const serverMessage = responseData?.error?.message ?? responseData?.message;
-    if (Array.isArray(serverMessage)) {
-      return serverMessage.join(" | ");
-    }
-    if (typeof serverMessage === "string" && serverMessage.trim()) {
-      return serverMessage;
-    }
-    if (typeof error.message === "string" && error.message.trim()) {
-      return error.message;
-    }
-  }
-
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  return fallback;
-};
-
 const inDateRange = (date: string, startDate?: string, endDate?: string) => {
   if (!startDate && !endDate) return true;
   if (startDate && date < startDate) return false;
@@ -192,7 +168,7 @@ const toDailyRecords = (records: AttendanceRecord[], startDate?: string, endDate
 export const useAttendance = (params?: AttendanceQueryParams) => {
   const queryClient = useQueryClient();
   const fallbackToday = toLocalDateString();
-  const safeLimit = Math.min(Math.max(params?.limit ?? 200, 1), 200);
+  const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 
   const singleDayFromRange =
     !params?.date &&
@@ -332,10 +308,12 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         exact: false,
       });
 
-  const attendanceDate = input.date || toLocalDateString();
+      const attendanceDate = input.date || toLocalDateString();
       const source = input.source || "manual";
-          const normalizedCheckIn = normalizeHHmm(input.checkIn);
-          const normalizedCheckOut = normalizeHHmm(input.checkOut);
+
+      const normalizedCheckIn = normalizeHHmm(input.checkIn);
+      const normalizedCheckOut = normalizeHHmm(input.checkOut);
+
 
       queryClient.setQueriesData<AttendanceListResponse>(
         { queryKey: ["attendance"], exact: false },
@@ -452,15 +430,13 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         throw new Error("صيغة checkOut غير صحيحة. استخدم HH:mm");
       }
 
-  const attendanceDate = input.date || toLocalDateString();
+      const attendanceDate = input.date || toLocalDateString();
       const source = input.source || "manual";
 
-      console.log("[Attendance] markAttendance request", {
-        employeeId: input.employeeId,
-        date: attendanceDate,
-      });
+      const existingRes = await apiClient.get(
+        `/attendance/employee/${input.employeeId}/date/${attendanceDate}`
+      );
 
-      const existingRes = await apiClient.get(`/attendance/employee/${input.employeeId}/date/${attendanceDate}`);
       const existingRecords: AttendanceRecord[] = Array.isArray(existingRes.data?.records) ? existingRes.data.records : [];
 
       const inRecords = [...existingRecords]

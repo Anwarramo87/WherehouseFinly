@@ -3,26 +3,7 @@ import { toast } from "react-hot-toast";
 import axios from "axios";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-
-type ApiErrorBody = {
-  message?: string;
-  error?: { message?: string };
-};
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError<ApiErrorBody>(error)) {
-    const message = error.response?.data?.error?.message ?? error.response?.data?.message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
-};
-
-export type InsuranceRecord = {
+import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";export type InsuranceRecord = {
   employeeId: string;
   insuranceSalary: number | string;
   socialSecurityNumber?: string;

@@ -78,7 +78,6 @@ const defaultFormState = {
 };
 
 export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001" }: Props) {
-  const isMounted = typeof document !== "undefined";
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
   const [roleError, setRoleError] = useState("");
@@ -125,40 +124,32 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
 
   const [formData, setFormData] = useState(() => buildFormState(initialData));
 
-  // Reset form data when modal opens or initialData changes
-  useEffect(() => {
-    if (isOpen && !prevIsOpen.current) {
-      // Modal just opened - reset form data and errors
-      setFormData(buildFormState(initialData));
-      setMobileError("");
-      setRoleError("");
-      hasInitializedRole.current = false;
-    }
-    
-    prevIsOpen.current = isOpen;
-  }, [isOpen, initialData, nextSuggestedId, buildFormState]);
-  
-  // Reset step to 1 when modal closes (not when it opens to avoid cascading renders)
-  useEffect(() => {
-    if (!isOpen && prevIsOpen.current) {
-      // Modal just closed - reset step for next time
-      setStep(1);
-    }
-  }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) {
-      hasInitializedRole.current = false;
-      return;
+    if (!isOpen && prevIsOpen.current) {
+      // Use setTimeout to avoid setState during render
+      const timer = setTimeout(() => {
+        setStep(1);
+        hasInitializedRole.current = false;
+      }, 0);
+      return () => clearTimeout(timer);
     }
-    if (!hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
-      setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
-      setRoleError("");
-      hasInitializedRole.current = true;
+    prevIsOpen.current = isOpen;
+  }, [isOpen]);
+
+  // Initialize role when modal opens
+  useEffect(() => {
+    if (isOpen && !hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
+      const timer = setTimeout(() => {
+        setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
+        setRoleError("");
+        hasInitializedRole.current = true;
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, roleOptions, formData.roleId]);
 
-  if (!isOpen || !isMounted) return null;
+
 
   const validateMobile = (number: string) => {
     const isValid = /^09[0-9]{8}$/.test(number);

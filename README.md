@@ -1,5 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Documentation
+
+All project documentation lives in the [`docs/`](./docs/) folder:
+
+- [`docs/MAIN_README.md`](./docs/MAIN_README.md) — Full project overview
+- [`docs/QUICK_START.md`](./docs/QUICK_START.md) — Quick start guide
+- [`docs/QUICK_DEPLOYMENT_GUIDE.md`](./docs/QUICK_DEPLOYMENT_GUIDE.md) — Deployment guide
+- [`docs/BACKEND_API_REQUIREMENTS.md`](./docs/BACKEND_API_REQUIREMENTS.md) — API contract reference
+- [`docs/INTEGRATION_TESTING_GUIDE.md`](./docs/INTEGRATION_TESTING_GUIDE.md) — Integration testing guide
+- [`docs/REFACTORING_RECOMMENDATIONS.md`](./docs/REFACTORING_RECOMMENDATIONS.md) — Code quality notes
+
 ## Getting Started
 
 First, run the development server:
