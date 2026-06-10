@@ -5,36 +5,24 @@ import axios from "axios";
 import { Salary, SalaryInput } from "@/types/salary";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
-
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
-    const parsed = Number((value as { $numberDecimal?: string }).$numberDecimal || 0);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
+import { toNumber } from "@/lib/number-utils";
 
 const normalizeSalary = (raw: Record<string, unknown>): Salary => {
   return {
     id: String(raw.id ?? ""),
     employeeId: String(raw.employeeId ?? ""),
     profession: raw.profession ? String(raw.profession) : undefined,
-    baseSalary: normalizeNumber(raw.baseSalary),
-    lumpSumSalary: raw.lumpSumSalary !== undefined ? normalizeNumber(raw.lumpSumSalary) : undefined,
-    livingAllowance: raw.livingAllowance !== undefined ? normalizeNumber(raw.livingAllowance) : undefined,
-    responsibilityAllowance: normalizeNumber(raw.responsibilityAllowance),
-    extraEffortAllowance: raw.extraEffortAllowance !== undefined ? normalizeNumber(raw.extraEffortAllowance) : undefined,
-    productionIncentive: normalizeNumber(raw.productionIncentive),
-    transportAllowance: normalizeNumber(raw.transportAllowance),
-    insuranceAmount: raw.insuranceAmount !== undefined ? normalizeNumber(raw.insuranceAmount) : undefined,
-    roundingDifference: raw.roundingDifference !== undefined ? normalizeNumber(raw.roundingDifference) : undefined,
-    extraEffort: raw.extraEffort !== undefined ? normalizeNumber(raw.extraEffort) : undefined,
-    insurances: raw.insurances !== undefined ? normalizeNumber(raw.insurances) : undefined,
+    baseSalary: toNumber(raw.baseSalary),
+    lumpSumSalary: raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : undefined,
+    livingAllowance: raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : undefined,
+    responsibilityAllowance: toNumber(raw.responsibilityAllowance),
+    extraEffortAllowance: raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : undefined,
+    productionIncentive: toNumber(raw.productionIncentive),
+    transportAllowance: toNumber(raw.transportAllowance),
+    insuranceAmount: raw.insuranceAmount !== undefined ? toNumber(raw.insuranceAmount) : undefined,
+    roundingDifference: raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,
+    extraEffort: raw.extraEffort !== undefined ? toNumber(raw.extraEffort) : undefined,
+    insurances: raw.insurances !== undefined ? toNumber(raw.insurances) : undefined,
   } as Salary;
 };
 
