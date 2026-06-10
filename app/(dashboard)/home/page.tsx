@@ -16,7 +16,8 @@ import {
   Plus,
   MoreVertical,
   Edit2,
-  Trash2
+  Trash2,
+  HandCoins
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
@@ -416,7 +417,7 @@ export default function DashboardPage() {
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
-    { title: 'إجمالي المستحقات', value: kpis.totalDueSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: Wallet, clickable: false },
+    { title: 'اجمالي المقبوض', value: kpis.totalReceivedSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: HandCoins, clickable: false },
     { title: 'دقائق التأخير', value: kpis.totalLateMinutesToday, subValue: 'إجمالي تأخير اليوم', icon: Clock, clickable: true, onClick: () => handleCardClick('late') },
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];

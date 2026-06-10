@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { DashboardKpis, EmployeesStats, AttendanceStats, InventoryStats } from '@/types/dashboard';
-import { api } from '@/lib/http/api';
+import apiClient from '@/lib/api-client';
 import { toNumber } from '@/lib/number-utils';
 
 const fallbackEmployeesStats: EmployeesStats = {
@@ -46,15 +46,8 @@ export const useDashboard = () => {
     queryKey: ['dashboard', 'home'],
     queryFn: async () => {
       try {
-        const response = await api.get('/dashboard/home') as unknown as { data?: unknown } | unknown;
-        // Handle both cases: response directly is the data OR response has data property
-        let data: unknown;
-        if (response && typeof response === 'object' && 'data' in response) {
-          data = response.data;
-        } else {
-          data = response;
-        }
-        return data ?? {
+        const response = await apiClient.get('/dashboard/home');
+        return response.data ?? {
           totalEmployees: 0,
           totalDueSalaries: 0,
           totalReceivedSalaries: 0,
@@ -63,7 +56,8 @@ export const useDashboard = () => {
           activeToday: 0,
           totalAbsentToday: 0,
         };
-      } catch {
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
         return {
           totalEmployees: 0,
           totalDueSalaries: 0,

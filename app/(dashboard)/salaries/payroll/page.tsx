@@ -258,20 +258,27 @@ export default function PayrollPage() {
 
       if (emp) {
         const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-        const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
-        const hasManualInput = !!manualInput;
+          const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
+          const hasManualInput = !!manualInput;
 
-        const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
-        const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
-          ? (manualInput.lateMinutes ?? 0)
-          : autoLateMinutes;
+          const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
+          const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+            ? (manualInput.lateMinutes ?? 0)
+            : autoLateMinutes;
 
-        const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
-        const actualWorkDays = autoInput !== undefined ? Math.max(0, autoInput.presentDays) : null;
+          const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+          
+          // احسب أيام العمل الفعلية: استخدم الأيام اليدوية أو التلقائية أو الافتراضية (26)
+          let actualWorkDays: number;
+          if (hasManualInput && manualInput.absenceDays !== undefined) {
+            actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
+          } else if (autoInput !== undefined) {
+            actualWorkDays = Math.max(0, autoInput.presentDays);
+          } else {
+            actualWorkDays = STANDARD_WORK_DAYS; // افتراض أيام العمل كاملة
+          }
 
-        earnedSalary = actualWorkDays !== null
-          ? calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes)
-          : 0;
+          earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
       }
 
       // ── 2. Bonuses (المكافآت) ────────────────────────────────

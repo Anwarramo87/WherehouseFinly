@@ -420,9 +420,9 @@ export default function AttendancePage() {
                           </button>
                           <button
                             onClick={() => handleOpenTimeModal(row, "checkOut")}
-                            disabled={markAttendance.isPending || !row.checkIn}
+                            disabled={markAttendance.isPending}
                             className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[#263544] bg-white/80 backdrop-blur-md border border-white hover:bg-white hover:border-[#C89355]/30 text-xs font-black disabled:opacity-50 active:scale-95 transition-all shadow-sm"
-                            title={!row.checkIn ? "يجب تسجيل الدخول أولاً" : "تسجيل/تعديل الخروج"}
+                            title="تسجيل/تعديل الخروج"
                           >
                             <div className="absolute inset-0.5 rounded-lg border border-dashed border-[#263544]/10 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/30" />
                             <LogOut size={15} className="text-[#C89355] group-hover/btn:translate-x-1 transition-transform relative z-10" />

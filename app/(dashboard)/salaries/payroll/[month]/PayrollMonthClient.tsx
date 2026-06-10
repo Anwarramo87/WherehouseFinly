@@ -67,7 +67,7 @@ export default function PayrollMonthClient() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">إجمالي الأجور</p>
           <p className="text-2xl font-bold text-slate-900 mt-1">{toNumber(data?.totals.totalGrossPay).toLocaleString()}</p>
@@ -79,6 +79,12 @@ export default function PayrollMonthClient() {
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">صافي الرواتب</p>
           <p className="text-2xl font-bold text-emerald-700 mt-1">{toNumber(data?.totals.totalNetPay).toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs text-slate-500">إجمالي الراتب المقبض</p>
+          <p className="text-2xl font-bold text-blue-700 mt-1">
+            {(data?.items || []).reduce((sum, item) => sum + toNumber(item.netPayRounded || item.netPay), 0).toLocaleString()}
+          </p>
         </div>
       </div>
 

@@ -139,8 +139,8 @@ const toDailyRecords = (records: AttendanceRecord[], startDate?: string, endDate
   grouped.forEach((events, key) => {
     const sorted = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    const inEvents = sorted.filter((x) => x.type === "IN");
-    const outEvents = sorted.filter((x) => x.type === "OUT");
+    const inEvents = sorted.filter((x) => x.type.toUpperCase() === "IN");
+    const outEvents = sorted.filter((x) => x.type.toUpperCase() === "OUT");
 
     const firstIn = inEvents[0];
     const lastOut = outEvents[outEvents.length - 1];
@@ -220,7 +220,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       try {
         const res = await requestList(requestParams);
         let records: AttendanceRecord[] = Array.isArray(res.data?.records) ? res.data.records : [];
-        const pagination = res.data?.pagination;
+        const pagination = res.data;
 
         // عند عدم تحديد صفحة: حمّل جميع الصفحات لتجنب نقصان السجلات بسبب pagination.
         if (!params?.page && pagination?.pages && pagination.pages > 1) {
@@ -248,8 +248,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           };
 
           const retryRes = await requestList(fallbackParams);
-          let retryRecords: AttendanceRecord[] = Array.isArray(retryRes.data?.records) ? retryRes.data.records : [];
-          const retryPagination = retryRes.data?.pagination;
+          let retryRecords: AttendanceRecord[] = Array.isArray(retryRes.data?.data) ? retryRes.data.data : [];
+          const retryPagination = retryRes.data;
 
           if (!params?.page && retryPagination?.pages && retryPagination.pages > 1) {
             for (let page = 2; page <= retryPagination.pages; page += 1) {
