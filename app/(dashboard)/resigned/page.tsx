@@ -25,6 +25,7 @@ export default function ResignedEmployeesPage() {
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isRehirePending, setIsRehirePending] = useState(false);
   const [isSettlementPending, setIsSettlementPending] = useState(false);
+  const [provisionalSettlement, setProvisionalSettlement] = useState<any>(null);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,9 +231,21 @@ export default function ResignedEmployeesPage() {
   }, [selectedEmployeeForRehire]);
 
   // Handle financial settlement
-  const handleFinancialSettlement = useCallback((employeeId: string) => {
+  const handleFinancialSettlement = useCallback(async (employeeId: string) => {
     const employee = resignedOrTerminated.find(emp => emp.employeeId === employeeId);
     if (employee) {
+      try {
+        const response = await apiClient.get('/payroll/provisional-settlement', {
+          params: {
+            employeeId: employee.employeeId,
+            terminationDate: employee.terminationDate,
+          },
+        });
+        setProvisionalSettlement(response.data);
+      } catch (error) {
+        console.error('Failed to fetch provisional settlement:', error);
+        toast.error('Failed to fetch provisional settlement data.');
+      }
       setSelectedEmployeeForSettlement(employee);
       setIsSettlementModalOpen(true);
     }
@@ -525,6 +538,7 @@ export default function ResignedEmployeesPage() {
             }}
             onConfirm={handleSettlementConfirm}
             isPending={isSettlementPending}
+            initialSettlementData={provisionalSettlement}
           />
         )}
     </div>

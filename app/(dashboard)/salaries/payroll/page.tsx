@@ -363,6 +363,9 @@ export default function PayrollPage() {
     () =>
       filteredPayrollData.reduce(
         (acc, p) => ({
+          totalEarnedSalary: acc.totalEarnedSalary + p.earnedSalary,
+          totalBonuses: acc.totalBonuses + p.bonusesTotal,
+          totalDiscounts: acc.totalDiscounts + p.discountsTotal,
           totalEarnings: acc.totalEarnings + p.grossPay,
           totalNetPay: acc.totalNetPay + p.netPay,
           totalNetPayRounded: acc.totalNetPayRounded + p.netPayRounded,
@@ -370,6 +373,9 @@ export default function PayrollPage() {
           totalDeductions: acc.totalDeductions + p.totalDeductions,
         }),
         {
+          totalEarnedSalary: 0,
+          totalBonuses: 0,
+          totalDiscounts: 0,
           totalEarnings: 0,
           totalNetPay: 0,
           totalNetPayRounded: 0,
@@ -556,46 +562,86 @@ export default function PayrollPage() {
 
         {/* ── KPI cards ────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total gross */}
+          {/* الراتب النهائي (المستحق من الدوام) */}
           <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
             <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)] transition-shadow">
                 <Wallet className="text-[#C89355]" size={22} />
               </div>
-              <p className="font-black text-[#263544] text-sm">إجمالي الاستحقاقات</p>
+              <p className="font-black text-[#263544] text-sm">الراتب النهائي (ل.س) *</p>
             </div>
             <p className="text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm">
-              {globalTotals.totalEarnings.toLocaleString()}
+              {globalTotals.totalEarnedSalary.toLocaleString()}
+            </p>
+            <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
+              * الراتب المستحق من أيام الدوام الفعلية
             </p>
           </div>
 
-          {/* Total net rounded */}
-          <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(200,147,85,0.12)] hover:-translate-y-1 transition-all group">
-            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
+          {/* المكافآت */}
+          <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-emerald-500/30 pointer-events-none transition-colors group-hover:border-emerald-500/50" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
-              <div className="p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)] transition-shadow">
-                <HandCoins className="text-[#C89355]" size={22} />
+              <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-shadow">
+                <HandCoins className="text-emerald-600" size={22} />
               </div>
-              <p className="font-black text-[#263544] text-sm">إجمالي المقبوض (مقرب)</p>
+              <p className="font-black text-[#263544] text-sm">المكافآت (ل.س)</p>
             </div>
-            <p className="text-4xl font-black text-[#C89355] relative z-10 drop-shadow-sm">
-              {globalTotals.totalNetPayRounded.toLocaleString()}
+            <p className="text-4xl font-black text-emerald-600 relative z-10 drop-shadow-sm">
+              +{globalTotals.totalBonuses.toLocaleString()}
+            </p>
+            <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
+              إجمالي المكافآت والبونصات
             </p>
           </div>
 
-          {/* Rounding difference */}
-          <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(245,158,11,0.12)] hover:-translate-y-1 transition-all group">
-            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-amber-300" />
+          {/* الخصومات */}
+          <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(239,68,68,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-rose-500/30 pointer-events-none transition-colors group-hover:border-rose-500/50" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
-              <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-shadow">
-                <Receipt className="text-amber-600" size={22} />
+              <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-shadow">
+                <Receipt className="text-rose-600" size={22} />
               </div>
-              <p className="font-black text-[#263544] text-sm">إجمالي فروقات التقريب</p>
+              <p className="font-black text-[#263544] text-sm">الخصومات (ل.س)</p>
             </div>
-            <p className="text-4xl font-black text-amber-600 relative z-10 drop-shadow-sm">
-              {globalTotals.totalRoundingDifference.toLocaleString()}
+            <p className="text-4xl font-black text-rose-600 relative z-10 drop-shadow-sm">
+              -{globalTotals.totalDiscounts.toLocaleString()}
             </p>
+            <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
+              السلف + العقوبات + الخصومات الأخرى
+            </p>
+          </div>
+        </div>
+
+        {/* بطاقة إجمالية للتصفية */}
+        <div className="mb-8 relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] backdrop-blur-xl border-2 border-[#C89355]/40 rounded-[2.5rem] p-8 shadow-[0_25px_60px_rgba(200,147,85,0.2)] group">
+          <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/40 pointer-events-none transition-colors group-hover:border-[#C89355]/60" />
+          <div className="relative z-10">
+            <h3 className="text-lg font-black text-[#C89355] mb-6 uppercase tracking-wide flex items-center gap-3">
+              <div className="w-2 h-6 bg-[#C89355] rounded-full shadow-lg" />
+              إجمالي التصفية
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center md:text-right">
+                <p className="text-white/60 text-xs font-bold mb-2 uppercase tracking-widest">الراتب النهائي:</p>
+                <p className="text-white text-3xl font-black font-mono">{globalTotals.totalEarnedSalary.toLocaleString()} ل.س</p>
+              </div>
+              <div className="text-center">
+                <p className="text-emerald-300/80 text-xs font-bold mb-2 uppercase tracking-widest">+ المكافآت:</p>
+                <p className="text-emerald-300 text-3xl font-black font-mono">+{globalTotals.totalBonuses.toLocaleString()} ل.س</p>
+              </div>
+              <div className="text-center md:text-left">
+                <p className="text-rose-300/80 text-xs font-bold mb-2 uppercase tracking-widest">- الخصومات:</p>
+                <p className="text-rose-300 text-3xl font-black font-mono">-{globalTotals.totalDiscounts.toLocaleString()} ل.س</p>
+              </div>
+            </div>
+            <div className="mt-6 pt-6 border-t-2 border-dashed border-white/20 flex justify-between items-center">
+              <span className="text-[#C89355] text-sm font-black uppercase tracking-widest">صافي الإجمالي المقبوض (مقرب):</span>
+              <span className="text-[#C89355] text-4xl font-black font-mono drop-shadow-[0_0_20px_rgba(200,147,85,0.5)]">
+                {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
+              </span>
+            </div>
           </div>
         </div>
 

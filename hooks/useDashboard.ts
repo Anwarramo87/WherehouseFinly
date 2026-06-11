@@ -69,7 +69,7 @@ export const useDashboard = () => {
         };
       }
     },
-    staleTime: 60_000, // 60 seconds instead of 15
+    staleTime: 60_000,
   });
   
   const dashboard = dashboardQuery.data as {

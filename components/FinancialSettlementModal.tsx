@@ -19,6 +19,7 @@ interface Props {
   onClose: () => void;
   onConfirm: (data: SettlementData) => void;
   isPending: boolean;
+  initialSettlementData?: any;
 }
 
 const defaultFormState: SettlementData = {
@@ -47,7 +48,8 @@ export default function FinancialSettlementModal({
   isOpen, 
   onClose, 
   onConfirm, 
-  isPending 
+  isPending, 
+  initialSettlementData 
 }: Props) {
   const isMounted = typeof document !== "undefined";
   const [formData, setFormData] = useState<SettlementData>(() => ({
@@ -57,6 +59,18 @@ export default function FinancialSettlementModal({
   const [finalSalaryError, setFinalSalaryError] = useState("");
   const [deductionsError, setDeductionsError] = useState("");
   const [bonusesError, setBonusesError] = useState("");
+
+  useEffect(() => {
+    if (isOpen && initialSettlementData) {
+      setFormData({
+        ...defaultFormState,
+        settlementDate: new Date().toISOString().split('T')[0],
+        finalSalaryAmount: parseFloat(initialSettlementData.earnedSalary) || 0,
+        bonuses: parseFloat(initialSettlementData.bonuses) || 0,
+        deductions: parseFloat(initialSettlementData.deductions) || 0,
+      });
+    }
+  }, [isOpen, initialSettlementData]);
 
   useEffect(() => {
     if (isOpen) {
