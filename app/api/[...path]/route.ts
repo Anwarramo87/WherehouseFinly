@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api/v1";
+const reportDebug = (hypothesisId: string, msg: string, data?: Record<string, unknown>) => {
+  void fetch("http://127.0.0.1:7777/event", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId: "login-500-error",
+      runId: "pre-fix",
+      hypothesisId,
+      location: "app/api/[...path]/route.ts",
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
 
 export async function handler(request: NextRequest) {
   const url = request.nextUrl;
@@ -8,14 +25,20 @@ export async function handler(request: NextRequest) {
   
   // Remove /api prefix from the path
   const pathParts = path.split("/").filter(Boolean);
-  const apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
+  let apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
   
   // Construct the full backend URL
   // BACKEND_URL already contains /api/v1
   const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
-  
-  console.log("[API Proxy] BACKEND_URL:", BACKEND_URL);
-  console.log("[API Proxy]", request.method, path, "->", fullUrl);
+
+  // #region debug-point A:proxy-entry
+  reportDebug("A", "Next API proxy forwarding request", {
+    method: request.method,
+    path,
+    apiPath,
+    fullUrl,
+  });
+  // #endregion
 
   try {
     const headers = new Headers();
@@ -45,6 +68,16 @@ export async function handler(request: NextRequest) {
 
     const data = await response.text();
 
+    // #region debug-point B:proxy-response
+    reportDebug("B", "Next API proxy received upstream response", {
+      method: request.method,
+      path,
+      fullUrl,
+      upstreamStatus: response.status,
+      responsePreview: data.slice(0, 300),
+    });
+    // #endregion
+
     return new NextResponse(data, {
       status: response.status,
       headers: {
@@ -54,7 +87,14 @@ export async function handler(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[API Proxy] Error:", error);
+    // #region debug-point C:proxy-network-error
+    reportDebug("C", "Next API proxy failed before upstream response", {
+      method: request.method,
+      path,
+      fullUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // #endregion
     return NextResponse.json(
       { error: "Backend unreachable", message: error instanceof Error ? error.message : String(error) },
       { status: 502 }

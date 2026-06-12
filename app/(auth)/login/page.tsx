@@ -11,6 +11,23 @@ import { useAuthStore } from "@/stores/auth-store";
 import { clearAuthAccessToken, setAuthAccessToken } from "@/lib/auth-session";
 
 const backendBaseUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const reportDebug = (hypothesisId: string, msg: string, data?: Record<string, unknown>) => {
+  void fetch("http://127.0.0.1:7777/event", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId: "login-500-error",
+      runId: "pre-fix",
+      hypothesisId,
+      location: "app/(auth)/login/page.tsx",
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,8 +85,17 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-  const normalizedUsername = username.trim().replace(/^"+|"+$/g, "");
+    const normalizedUsername = username.trim().replace(/^"+|"+$/g, "");
     const normalizedPassword = password;
+
+    // #region debug-point A:login-submit
+    reportDebug("A", "Login submit started", {
+      backendBaseUrl,
+      usernameLength: normalizedUsername.length,
+      hasPassword: Boolean(normalizedPassword),
+      windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
+    });
+    // #endregion
 
     if (!normalizedUsername || !normalizedPassword) {
       setErrorMessage("يرجى إدخال اسم المستخدم وكلمة المرور.");
@@ -107,6 +133,14 @@ export default function LoginPage() {
           }
         })();
 
+        // #region debug-point B:proxy-error
+        reportDebug("B", "Primary login request failed", {
+          proxyStatus: proxyStatus ?? null,
+          shouldTryDirectFallback,
+          proxyMessage: axios.isAxiosError(proxyError) ? proxyError.message : String(proxyError),
+        });
+        // #endregion
+
         if (shouldTryDirectFallback) {
           response = await axios.post(`${backendBaseUrl}/auth/login`, {
             username: normalizedUsername,
@@ -130,6 +164,13 @@ export default function LoginPage() {
         access_token?: string;
       };
       const token = authResponse.token || authResponse.accessToken || authResponse.access_token;
+      // #region debug-point C:login-success
+      reportDebug("C", "Login request resolved", {
+        responseStatus: response.status,
+        hasToken: Boolean(token),
+        hasUser: Boolean(authResponse.user),
+      });
+      // #endregion
       setAuthAccessToken(token);
       setUser((authResponse.user ?? null) as { name?: string; username?: string; role?: string } | null);
       resetAuthVerificationCache();
@@ -137,7 +178,14 @@ export default function LoginPage() {
       setStatus("authenticated");
       router.replace("/home");
 
-     } catch (error: unknown) {
+    } catch (error: unknown) {
+      // #region debug-point D:login-final-error
+      reportDebug("D", "Login failed after retries", {
+        status: axios.isAxiosError(error) ? error.response?.status ?? null : null,
+        message: axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error),
+        responseData: axios.isAxiosError(error) ? error.response?.data ?? null : null,
+      });
+      // #endregion
       if (axios.isAxiosError<{ message?: string }>(error) && error.response) {
         const status = error.response.status;
         const serverMessage = error.response.data?.message;

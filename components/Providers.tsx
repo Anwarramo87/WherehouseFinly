@@ -2,32 +2,41 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState } from "react";
-import { Toaster } from "react-hot-toast";
+import { useState, useEffect } from "react";
 import { createQueryClient } from "@/lib/query-client-config";
+import dynamic from "next/dynamic";
+
+// Dynamic import to prevent hydration mismatch
+const Toaster = dynamic(() => import("react-hot-toast").then((mod) => mod.Toaster), {
+  ssr: false,
+});
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // نقوم بإنشاء العميل مرة واحدة فقط لتجنب إعادة التحميل غير الضرورية
   const [queryClient] = useState(() => createQueryClient());
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* React Query DevTools - فقط في development */}
-      {process.env.NODE_ENV === "development" && (
+      {process.env.NODE_ENV === "development" && isMounted && (
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
       )}
-      {/* هنا نزرع مكتبة الإشعارات لتعمل في كل صفحات الموقع */}
-      <Toaster 
-        position="top-center" 
-        toastOptions={{
-          style: {
-            fontFamily: 'inherit',
-            direction: 'rtl',
-          },
-          duration: 3000,
-        }} 
-      />
+      {isMounted && (
+        <Toaster 
+          position="top-center" 
+          toastOptions={{
+            style: {
+              fontFamily: 'inherit',
+              direction: 'rtl',
+            },
+            duration: 3000,
+          }} 
+        />
+      )}
     </QueryClientProvider>
   );
 }

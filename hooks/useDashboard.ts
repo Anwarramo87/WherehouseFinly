@@ -1,7 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import type { DashboardKpis, EmployeesStats, AttendanceStats, InventoryStats } from '@/types/dashboard';
-import apiClient from '@/lib/api-client';
-import { toNumber } from '@/lib/number-utils';
+import { useQueries } from '@tanstack/react-query';
+import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useAttendance } from '@/hooks/useAttendance';
+import { useSalaries } from '@/hooks/useSalaries';
+import { usePayrollSummary } from '@/hooks/usePayroll';
+import { calculateAttendanceMetrics } from '@/lib/attendance-metrics';
+import { api } from '@/lib/http/api';
+import { queryKeys } from '@/lib/query-keys';
 
 const fallbackEmployeesStats: EmployeesStats = {
   total: 0,
@@ -26,9 +31,82 @@ const fallbackKpis: DashboardKpis = {
   activeToday: 0,
   totalAbsentToday: 0,
   totalDueSalaries: 0,
-  totalReceivedSalaries: 0,
   totalLateMinutesToday: 0,
   totalOvertimeMinutesToday: 0,
+};
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toNumber = (value: unknown) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const extractAttendanceCounts = (stats: AttendanceStats | undefined) => {
+  if (!stats || typeof stats !== 'object') {
+    return { active: 0, absent: 0, lateMinutes: 0 };
+  }
+
+  const summary = (stats as { summary?: Record<string, unknown> }).summary;
+  const statsRoot = stats as { statistics?: Record<string, unknown> };
+
+  const active = toNumber(
+    summary?.activeEmployees ??
+      summary?.checkedInCount ??
+      summary?.presentCount ??
+      summary?.attendedCount ??
+      summary?.activeToday ??
+      statsRoot.statistics?.activeToday,
+  );
+
+  const absent = toNumber(
+    summary?.absentCount ??
+      summary?.totalAbsent ??
+      summary?.absentToday ??
+      statsRoot.statistics?.totalAbsent,
+  );
+
+  const lateMinutes = toNumber(
+    summary?.totalLateMinutes ??
+      summary?.lateMinutes ??
+      statsRoot.statistics?.totalLateArrivals,
+  );
+
+  return { active, absent, lateMinutes };
+};
+
+const extractPayrollTotal = (summary: unknown) => {
+  if (!summary || typeof summary !== 'object') return null;
+
+  const record = summary as Record<string, unknown>;
+  const totals = (record.totals as Record<string, unknown>) || {};
+
+  const candidates: unknown[] = [
+    totals.totalNetPay,
+    totals.totalNetPayRounded,
+    totals.totalNetPayWithAdvance,
+    record.totalNetPay,
+    record.totalNetPayRounded,
+    record.totalNetPayWithAdvance,
+    record.netPayRounded,
+    record.netPayWithAdvance,
+  ];
+
+  for (const candidate of candidates) {
+    const value = toNumber(candidate);
+    if (value > 0) return value;
+  }
+
+  return null;
 };
 
 const withFallback = async <T>(fetcher: () => Promise<T>, fallback: T): Promise<T> => {
@@ -82,30 +160,28 @@ export const useDashboard = () => {
     overtime?: { totalMinutes?: number };
   } | null;
 
-  const activeToday = toNumber(dashboard?.attendance?.count);
-  const totalEmployees = toNumber(dashboard?.totalEmployees);
-  const totalAbsentToday = toNumber(dashboard?.absence?.count);
-  const totalLateMinutesToday = toNumber(dashboard?.lateness?.totalMinutes);
-  const totalOvertimeMinutesToday = toNumber(dashboard?.overtime?.totalMinutes);
-  const totalDueSalaries = toNumber(dashboard?.totalDueSalaries);
-  const totalReceivedSalaries = toNumber(dashboard?.totalReceivedSalaries);
+  const activeToday = attendanceSummary.active || attendanceMetrics.active;
+  const totalEmployees = attendanceMetrics.totalEmployees || employeesStats.total || 0;
+  const totalAbsentToday = attendanceSummary.absent || attendanceMetrics.absent;
+  const totalLateMinutesToday = attendanceSummary.lateMinutes || attendanceMetrics.totalLateMinutes;
+  const totalOvertimeMinutesToday = attendanceMetrics.totalOvertimeMinutes;
 
-  // Compatibility shims for existing consumers
-  const employeesStats: EmployeesStats = {
-    ...fallbackEmployeesStats,
-    total: totalEmployees,
-  };
+  const salaryByEmployee = new Map(salaries.map((salary) => [salary.employeeId, salary]));
 
-  const attendanceStats: AttendanceStats = {
-    ...fallbackAttendanceStats,
-    summary: {
-      activeEmployees: activeToday,
-      absentCount: totalAbsentToday,
-      totalLateMinutes: totalLateMinutesToday,
-    },
-  } as AttendanceStats;
+  const calculatedDueSalaries = employees.reduce((sum, employee) => {
+    if (!employee?.employeeId || employee.status === 'terminated') return sum;
 
-  const inventoryStats: InventoryStats = fallbackInventoryStats;
+    const salary = salaryByEmployee.get(employee.employeeId);
+    const baseSalary = salary ? toNumber(salary.baseSalary) : toNumber(employee.hourlyRate);
+    const responsibilityAllowance = salary ? toNumber(salary.responsibilityAllowance) : 0;
+    const productionIncentive = salary ? toNumber(salary.productionIncentive) : 0;
+    const transportAllowance = salary ? toNumber(salary.transportAllowance) : 0;
+
+    return sum + baseSalary + responsibilityAllowance + productionIncentive + transportAllowance;
+  }, 0);
+
+  const payrollSummaryTotal = extractPayrollTotal(payrollSummaryQuery.data);
+  const totalDueSalaries = payrollSummaryTotal ?? calculatedDueSalaries;
 
   const kpis: DashboardKpis = {
     ...fallbackKpis,
@@ -113,7 +189,6 @@ export const useDashboard = () => {
     activeToday,
     totalAbsentToday,
     totalDueSalaries,
-    totalReceivedSalaries,
     totalLateMinutesToday,
     totalOvertimeMinutesToday,
   };
@@ -123,8 +198,18 @@ export const useDashboard = () => {
     attendanceStats,
     inventoryStats,
     kpis,
-    isLoading: dashboardQuery.isLoading,
-    isError: Boolean(dashboardQuery.error),
+    isLoading:
+      queries.some((q) => q.isLoading) ||
+      employeesQuery.isLoading ||
+      salariesQuery.isLoading ||
+      attendanceQuery.isLoading ||
+      payrollSummaryQuery.isLoading,
+    isError:
+      queries.some((q) => q.isError) ||
+      Boolean(employeesQuery.error) ||
+      Boolean(salariesQuery.error) ||
+      Boolean(attendanceQuery.error) ||
+      Boolean(payrollSummaryQuery.error),
   };
 };
 
