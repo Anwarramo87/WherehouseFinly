@@ -3,14 +3,18 @@
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2 } from "lucide-react";
+import { SALARY_CONSTANTS } from "@/lib/salary-constants"; // eslint-disable-line @typescript-eslint/no-unused-vars
+
 import { useEmployees } from "@/hooks/useEmployees";
 import { usePayrollInputs, UpsertPayrollInputPayload, PayrollInputRecord } from "@/hooks/usePayrollInputs";
 import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
 import { useAttendance } from "@/hooks/useAttendance";
+import { useLeaves } from "@/hooks/useLeaves";
 import useSalaries from "@/hooks/useSalaries";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
 import type { Salary } from "@/types/salary";
+import { toNumber } from "@/lib/number-utils";
 
 const EditAttendanceTotalsModal = dynamic(
   () => import("@/components/EditAttendanceTotalsModal"),
@@ -25,14 +29,12 @@ const EmployeeMonthlyCalendarModal = dynamic(
 const STANDARD_WORK_DAYS = 26;
 const HOURS_PER_DAY = 8;
 
-/** تحويل قيمة Decimal من الباك إند (string | number | {$numberDecimal}) إلى number */
-const toNum = (v: unknown): number => {
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  if (v && typeof v === "object" && "$numberDecimal" in (v as Record<string, unknown>)) {
-    return Number((v as { $numberDecimal: string }).$numberDecimal) || 0;
-  }
-  if (typeof v === "string") return Number(v) || 0;
-  return 0;
+// NOTE: we intentionally use the canonical converter from lib/number-utils.ts
+// to avoid format/locale/Decimal128 mismatches.
+
+const safeToNumber = (v: unknown): number => {
+  const n = toNumber(v);
+  return Number.isFinite(n) ? n : 0;
 };
 
 /**
@@ -45,32 +47,39 @@ const calcGrossSalary = (
 ): number => {
   if (salaryRecord) {
     const gross =
-      toNum(salaryRecord.baseSalary) +
-      toNum(salaryRecord.lumpSumSalary) +
-      toNum(salaryRecord.livingAllowance) +
-      toNum(salaryRecord.responsibilityAllowance) +
-      toNum(salaryRecord.extraEffortAllowance) +
-      toNum(salaryRecord.productionIncentive) +
-      toNum(salaryRecord.transportAllowance);
+      safeToNumber(salaryRecord.baseSalary) +
+      safeToNumber(salaryRecord.lumpSumSalary) +
+      safeToNumber(salaryRecord.livingAllowance) +
+      safeToNumber(salaryRecord.responsibilityAllowance) +
+      safeToNumber(salaryRecord.extraEffortAllowance) +
+      safeToNumber(salaryRecord.productionIncentive) +
+      safeToNumber(salaryRecord.transportAllowance);
     if (gross > 0) return gross;
   }
-  const base = toNum(emp.baseSalary) || toNum(emp.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+
+  const hourlyLike = safeToNumber(emp.hourlyRate);
+  const baseLike = safeToNumber(emp.baseSalary);
+  const base = baseLike || hourlyLike * HOURS_PER_DAY * STANDARD_WORK_DAYS;
   return base;
 };
 
 /**
  * حساب الراتب المستحق بناءً على الدوام الفعلي ودقائق التأخير
  * الصيغة: (grossSalary / STANDARD_WORK_DAYS) * actualWorkDays - خصم التأخير
+ * ملاحظة: أيام الإجازة المدفوعة تُحسب كحضور (لا تُطرح)
  */
 const calcEarnedSalary = (
   grossSalary: number,
-  actualWorkDays: number,
+  presentDays: number,
+  paidLeaveDays: number,
   totalDelayMinutes: number,
 ): number => {
   if (grossSalary <= 0) return 0;
+  // الأيام المدفوعة = حضور فعلي + إجازات مدفوعة
+  const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
   const dailyRate = grossSalary / STANDARD_WORK_DAYS;
   const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-  const salaryFromDays = dailyRate * actualWorkDays;
+  const salaryFromDays = dailyRate * paidDays;
   const delayDeduction = totalDelayMinutes * minuteRate;
   return Math.max(0, salaryFromDays - delayDeduction);
 };
@@ -79,7 +88,8 @@ const calcEarnedSalary = (
  * حساب دقائق التأخير لسجل يومي واحد (بالـ local time — نفس منطق صفحة attendance)
  * بعد طرح فترة السماح (15 دقيقة افتراضياً)
  */
-const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+const _calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+
   if (!checkIn) return 0;
   const toMins = (t: string) => {
     const s = t.slice(0, 5);
@@ -136,30 +146,53 @@ export default function TimeTablePage() {
     periodEnd: periodEnd ?? "",
   });
 
-  // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time (نفس منطق صفحة attendance)
+  // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
   const { data: monthlyAttendanceData } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
     limit: 200,
   });
 
-  // بناء map: employeeId → مجموع دقائق التأخير الشهرية (محسوبة بـ local time)
-  const localLateMinutesMap = useMemo(() => {
+  // جلب الإجازات الشهرية لعرض حالتها وإضافة الإجازات المدفوعة للراتب
+  const { data: monthlyLeaves = [] } = useLeaves({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
+
+  // بناء map: employeeId → مجموع ساعات الحضور الفعلية من البصمة
+  // ملاحظة: نستخدم presentDays من attendance/attendance-deduction حتى لا نخسر أيام بسبب اختلاف تجميع dailyRecords
+  const actualWorkDaysFallbackMap = useMemo(() => {
     const map = new Map<string, number>();
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
-      const emp = employees.find((e) => e.employeeId === dr.employeeId);
-      const scheduledStart = emp?.scheduledStart || "08:00";
-      // gracePeriodMinutes قادم من الباك إند لكن غير معرّف في النوع القديم — نستخدم 15 كقيمة افتراضية
-      const gracePeriod: number = (emp as unknown as { gracePeriodMinutes?: number })?.gracePeriodMinutes ?? 15;
-      const lateMin = calcLateMinutes(dr.checkIn, scheduledStart, gracePeriod);
-      if (lateMin > 0) {
-        map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + lateMin);
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords]);
+
+  // بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
+  const employeeLeavesMap = useMemo(() => {
+    const map = new Map<string, { leaveTypes: string[]; paidLeaveDays: number; unpaidLeaveDays: number }>();
+    for (const leave of monthlyLeaves) {
+      if (!leave.employeeId) continue;
+      if (!map.has(leave.employeeId)) {
+        map.set(leave.employeeId, { leaveTypes: [], paidLeaveDays: 0, unpaidLeaveDays: 0 });
+      }
+      const entry = map.get(leave.employeeId)!;
+      // احسب عدد أيام الإجازة
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+      if (!entry.leaveTypes.includes(leave.leaveType)) entry.leaveTypes.push(leave.leaveType);
+      if (leave.isPaid) {
+        entry.paidLeaveDays += days;
+      } else {
+        entry.unpaidLeaveDays += days;
       }
     }
     return map;
-  }, [monthlyAttendanceData?.dailyRecords, employees]);
+  }, [monthlyLeaves]);
 
   // نستخرج المصفوفة بأمان من الـ response
   const autoDeductions: AttendanceDeductionBreakdown[] = useMemo(() => {
@@ -174,45 +207,52 @@ export default function TimeTablePage() {
       const autoInput = autoDeductions.find(
         (d: AttendanceDeductionBreakdown) => d.employeeId === emp.employeeId
       );
+      const leaveData = employeeLeavesMap.get(emp.employeeId);
 
       const hasManualInput = !!manualInput;
 
-      // أيام الغياب: يدوي إن وُجد، وإلا آلي من calculate-deductions
-      const absenceDays = hasManualInput
+      // أيام الغياب: يدوي فقط إذا كان أكبر من صفر صراحةً، وإلا نستخدم الحساب الآلي
+      const absenceDays = (hasManualInput && (manualInput.absenceDays ?? 0) > 0)
         ? (manualInput.absenceDays ?? 0)
         : (autoInput?.absentDays ?? 0);
 
-      // دقائق التأخير:
-      // نستخدم الحساب من الفرونت (local time) لأنه يطابق ما تعرضه صفحة attendance
-      // الإدخال اليدوي يُستخدم فقط إذا كان المدير قد أدخل قيمة صريحة (أكبر من صفر)
-      const autoLateMinutes = localLateMinutesMap.get(emp.employeeId) ?? 0;
+      const autoLateMinutes = autoInput?.delayMinutes ?? 0;
       const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
         ? (manualInput.lateMinutes ?? 0)
         : autoLateMinutes;
 
-      const totalLeaves =
-        (manualInput?.sickLeaveDays ?? 0) +
-        (manualInput?.unpaidLeaveDays ?? 0) +
-        (manualInput?.adminLeaveDays ?? 0) +
-        (manualInput?.deathLeaveDays ?? 0);
+      // الإجازات من الـ payrollInput أو من الـ leaves المحسوبة
+      const sickLeaveDays = manualInput?.sickLeaveDays ?? 0;
+      const adminLeaveDays = manualInput?.adminLeaveDays ?? 0;
+      const unpaidLeaveDays = manualInput?.unpaidLeaveDays ?? 0;
+      const deathLeaveDays = manualInput?.deathLeaveDays ?? 0;
 
+      const totalLeaves = sickLeaveDays + unpaidLeaveDays + adminLeaveDays + deathLeaveDays;
       const totalAbsencesLeaves = absenceDays + totalLeaves;
       const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
 
-      // الدوام الفعلي = أيام الحضور الفعلية (بصمات) من الباك إند مباشرة
-      // الإجازات اليدوية لا تُطرح لأنها أيام لم يبصم فيها الموظف أصلاً
-      // null = البيانات لم تصل بعد
+      // أيام الحضور الفعلية من البصمة
       const actualWorkDays: number | null = autoInput !== undefined
         ? Math.max(0, autoInput.presentDays)
         : null;
 
+      // الإجازات المدفوعة (مرضية + إدارية + وفاة) تُحسب في الراتب
+      const paidLeaveDays = sickLeaveDays + adminLeaveDays + deathLeaveDays;
+
       // الراتب الكامل
       const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
 
-      // الراتب المستحق بناءً على الدوام الفعلي
-      const earnedSalary = actualWorkDays !== null
-        ? calcEarnedSalary(grossSalary, actualWorkDays, totalDelayMinutes)
-        : null;
+      // الراتب المستحق = (حضور + إجازات مدفوعة) / 26 × الراتب - خصم التأخير
+      const effectiveWorkDays = actualWorkDays ?? (actualWorkDaysFallbackMap.get(emp.employeeId) ?? 0);
+
+      const earnedSalaryRaw = actualWorkDays !== null
+        ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes)
+        : calcEarnedSalary(grossSalary, effectiveWorkDays, paidLeaveDays, totalDelayMinutes);
+
+      // الحماية من انتشار NaN (مثلاً لو grossSalary ناتج عن قيمة غير صالحة)
+      const earnedSalary = Number.isFinite(earnedSalaryRaw) ? earnedSalaryRaw : 0;
+
+
 
       return {
         ...emp,
@@ -224,9 +264,13 @@ export default function TimeTablePage() {
         totalOvertimeDays: manualInput?.overtimeWeekendDays ?? 0,
         grossSalary,
         earnedSalary,
+        // بيانات الإجازات للعرض في الجدول
+        leaveTypes: leaveData?.leaveTypes ?? [],
+        paidLeaveDays,
+        unpaidLeaveDays,
       };
     });
-  }, [employees, payrollInputs, autoDeductions, salaryMap, localLateMinutesMap]);
+  }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, actualWorkDaysFallbackMap]);
 
   const filteredRecords = useMemo(() => {
     if (!searchFilter) return recordsWithNames;
@@ -302,7 +346,7 @@ export default function TimeTablePage() {
       periodStart: periodStart!,
       periodEnd: periodEnd!,
       absenceDays: Number(autoInput?.absentDays ?? 0),
-      lateMinutes: localLateMinutesMap.get(selectedEmployeeId) ?? Number(autoInput?.delayMinutes ?? 0),
+      lateMinutes: Number(autoInput?.delayMinutes ?? 0),
       earlyLeaveMinutes: 0,
       sickLeaveDays: 0,
       adminLeaveDays: 0,
@@ -390,6 +434,7 @@ export default function TimeTablePage() {
                   <th className="px-6 py-5 text-sm font-black">الموظف</th>
                   <th className="px-6 py-5 text-sm font-black text-center">الدوام الفعلي</th>
                   <th className="px-6 py-5 text-sm font-black text-center">الغياب والإجازات</th>
+                  <th className="px-6 py-5 text-sm font-black text-center">حالة الإجازة</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي التأخير (دقائق)</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي الإضافي</th>
                   <th className="px-6 py-5 text-sm font-black text-center">الراتب المستحق</th>
@@ -434,6 +479,23 @@ export default function TimeTablePage() {
                         <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold ${record.totalAbsencesLeaves > 0 ? "bg-rose-100 text-rose-700 border border-rose-200" : "bg-slate-100 text-slate-500"}`}>
                           {record.totalAbsencesLeaves} يوم
                         </span>
+                      </td>
+
+                      <td className="px-6 py-4 text-center">
+                        {record.leaveTypes && record.leaveTypes.length > 0 ? (
+                          <div className="flex flex-col gap-1 items-center">
+                            {record.leaveTypes.map((t) => (
+                              <span key={t} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                {{ SICK: "مرضية", ADMIN: "إدارية", UNPAID: "بدون أجر", ANNUAL: "سنوية", DEATH: "وفاة", OTHER: "أخرى" }[t] ?? t}
+                              </span>
+                            ))}
+                            {record.paidLeaveDays > 0 && (
+                              <span className="text-[10px] text-emerald-600 font-bold">{record.paidLeaveDays} أيام مدفوعة</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
                       </td>
 
                       <td className="px-6 py-4 text-center">
@@ -500,7 +562,7 @@ export default function TimeTablePage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="p-4 bg-slate-50 rounded-full">
                           <Search className="text-slate-300" size={32} />

@@ -131,7 +131,11 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
   };
 
   const onSubmit = (data: DiscountFormValues) => {
-    onSave(data);
+    // احتسب kind بناءً على type
+    let kind: DiscountPayload["kind"] = "penalty";
+    if (data.type === "سلفة" || data.type === "شراء ملابس") kind = "advance";
+    else if (data.type === "مكافأة" || data.type === "مساعدة") kind = "assistance";
+    onSave({ ...data, kind });
   };
 
   const isEditMode = !!initialData;

@@ -25,7 +25,7 @@ export default function ResignedEmployeesPage() {
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isRehirePending, setIsRehirePending] = useState(false);
   const [isSettlementPending, setIsSettlementPending] = useState(false);
-  const [provisionalSettlement, setProvisionalSettlement] = useState<any>(null);
+  const [provisionalSettlement, setProvisionalSettlement] = useState<Record<string, unknown> | null>(null);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");

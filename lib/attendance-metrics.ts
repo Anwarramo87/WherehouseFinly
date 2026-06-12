@@ -44,12 +44,16 @@ export const calculateAttendanceMetrics = (
   employees: Employee[],
   dailyRecords: DailyRecordInput[],
 ): AttendanceMetrics => {
-  const eligibleEmployees = employees.filter(
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+  const safeDailyRecords = Array.isArray(dailyRecords) ? dailyRecords : [];
+
+  const eligibleEmployees = safeEmployees.filter(
     (employee) =>
       employee?.employeeId &&
       EMPLOYEE_ID_REGEX.test(employee.employeeId) &&
       employee.status !== "terminated",
   );
+
 
   const employeeById = new Map(eligibleEmployees.map((employee) => [employee.employeeId, employee]));
 
@@ -61,7 +65,7 @@ export const calculateAttendanceMetrics = (
   }
 
   const dailyByEmployee = new Map<string, DailyRecordInput>();
-  for (const record of dailyRecords) {
+   for (const record of safeDailyRecords) {
     if (!record?.employeeId || !EMPLOYEE_ID_REGEX.test(record.employeeId)) continue;
     if (!employeeIds.has(record.employeeId)) continue;
     if (!dailyByEmployee.has(record.employeeId)) {

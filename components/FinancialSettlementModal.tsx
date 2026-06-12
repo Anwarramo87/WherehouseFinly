@@ -19,7 +19,7 @@ interface Props {
   onClose: () => void;
   onConfirm: (data: SettlementData) => void;
   isPending: boolean;
-  initialSettlementData?: any;
+  initialSettlementData?: { earnedSalary?: string | number; [key: string]: unknown } | null;
 }
 
 const defaultFormState: SettlementData = {
@@ -55,22 +55,15 @@ export default function FinancialSettlementModal({
   const [formData, setFormData] = useState<SettlementData>(() => ({
     ...defaultFormState,
     settlementDate: new Date().toISOString().split('T')[0],
+    ...(initialSettlementData != null ? {
+      finalSalaryAmount: parseFloat(String(initialSettlementData.earnedSalary ?? 0)) || 0,
+      bonuses: parseFloat(String(initialSettlementData.bonuses ?? 0)) || 0,
+      deductions: parseFloat(String(initialSettlementData.deductions ?? 0)) || 0,
+    } : {}),
   }));
   const [finalSalaryError, setFinalSalaryError] = useState("");
   const [deductionsError, setDeductionsError] = useState("");
   const [bonusesError, setBonusesError] = useState("");
-
-  useEffect(() => {
-    if (isOpen && initialSettlementData) {
-      setFormData({
-        ...defaultFormState,
-        settlementDate: new Date().toISOString().split('T')[0],
-        finalSalaryAmount: parseFloat(initialSettlementData.earnedSalary) || 0,
-        bonuses: parseFloat(initialSettlementData.bonuses) || 0,
-        deductions: parseFloat(initialSettlementData.deductions) || 0,
-      });
-    }
-  }, [isOpen, initialSettlementData]);
 
   useEffect(() => {
     if (isOpen) {
@@ -78,8 +71,8 @@ export default function FinancialSettlementModal({
     } else {
       document.body.style.overflow = "unset";
     }
-    return () => { 
-      document.body.style.overflow = "unset"; 
+    return () => {
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 

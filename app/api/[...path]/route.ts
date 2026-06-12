@@ -25,11 +25,19 @@ export async function handler(request: NextRequest) {
   
   // Remove /api prefix from the path
   const pathParts = path.split("/").filter(Boolean);
-  let apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
-  
-  // Construct the full backend URL
-  // BACKEND_URL already contains /api/v1
+
+  // path مثال: /api/auth/login
+  // نريد apiPath = /auth/login
+  // وليس /api/auth/login أو /api/v1/... مضاعفة
+  const apiPath = "/" + pathParts.slice(1).join("/"); // Remove first segment 'api'
+
+  // BACKEND_URL في المشروع غالبًا يحتوي /api/v1
+  // لذلك لا نُضيف أي /api أو /api/v1 إضافي من apiPath
+  // ملاحظة: لا نطبق replace على مسار /auth/* لأن BACKEND_URL عادة يحتوي /api/v1
+  // والـ apiPath الناتج هو /auth/login فقط.
   const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
+
+
 
   // #region debug-point A:proxy-entry
   reportDebug("A", "Next API proxy forwarding request", {

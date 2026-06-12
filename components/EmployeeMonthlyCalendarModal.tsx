@@ -59,12 +59,12 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
-  // جلب الإجازات للموظف — بدون فلتر تاريخ لأن الفرونت يفلتر حسب الشهر
+  // جلب الإجازات للموظف مع فلتر الشهر الحالي
   const { data: leavesData } = useQuery({
     queryKey: ["employeeMonthlyLeaves", employeeId, currentMonth],
     queryFn: async () => {
       const res = await apiClient.get(`/leaves`, {
-        params: { employeeId }
+        params: { employeeId, startDate, endDate }
       });
       const data = res.data as { leaveRequests?: unknown[] } | unknown[];
       if (Array.isArray(data)) return data;
@@ -225,12 +225,17 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                   let styleClass = "border-slate-800 bg-[#161f29]/30 text-slate-400"; 
                   let statusText = "غائب";
 
-                  if (info?.isPresent) {
-                    styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
-                    statusText = info.isLate ? "متأخر" : "حاضر";
-                  } else if (info?.leaveType) {
+                  if (info?.leaveType && !info?.isPresent) {
+                    // غائب + إجازة → إجازة
                     styleClass = "border-amber-500/30 bg-amber-500/10 text-amber-400";
                     statusText = `إجازة ${LEAVE_TYPE_LABELS[info.leaveType] || info.leaveType}`;
+                  } else if (info?.isPresent && info?.leaveType) {
+                    // حاضر + إجازة جزئية
+                    styleClass = "border-teal-500/30 bg-teal-500/10 text-teal-400";
+                    statusText = `حاضر / إجازة`;
+                  } else if (info?.isPresent) {
+                    styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
+                    statusText = info.isLate ? "متأخر" : "حاضر";
                   }
 
                   return (

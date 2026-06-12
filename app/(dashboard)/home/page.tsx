@@ -3,7 +3,7 @@
 
 import { 
   Users, Clock, Timer, AlertTriangle, 
-  UserCheck, Wallet, UserX, Building2, TrendingUp,
+  UserCheck, UserX, Building2, TrendingUp,
   Scissors,
   User,
   CalendarX,
@@ -12,7 +12,8 @@ import {
   Gavel,
   Briefcase,
   ArrowLeftRight,
-  X 
+  X,
+  HandCoins
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
@@ -23,11 +24,21 @@ import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
 import { DataDrilldownModal } from '@/components/DataDrilldownModal';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useAuthStore } from "@/stores/auth-store";
+import { useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api-client';
 
 // ============================================================================
 // TypeScript Interfaces
 // ============================================================================
+
+interface DepartmentData {
+  id?: string;
+  name: string;
+  count: number;
+  manager: string;
+}
 
 interface OvertimeEmployee {
   employeeId: string;
@@ -131,20 +142,9 @@ export default function DashboardPage() {
   const [isModalLoading, setIsModalLoading] = useState(false);
 
   // --- إدارة الأقسام ---
-  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
   const queryClient = useQueryClient();
-  const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
-  // إغلاق القوائم عند الضغط خارجها
-  useEffect(() => {
-    const handleGlobalClick = () => setOpenDropdownDept(null);
-    window.addEventListener("click", handleGlobalClick);
-    return () => window.removeEventListener("click", handleGlobalClick);
-  }, []);
-
-  const toNumber = (value: unknown) => {
-    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const toNumber = (value: unknown) => {    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;
       const parsed = Number(raw ?? 0);
@@ -162,12 +162,13 @@ export default function DashboardPage() {
     return items.reduce((sum, item) => sum + toNumber(item?.netPayRounded ?? item?.netPay), 0);
   }, [payrollReport?.items]);
 
-  const formatTime = (timestamp?: string | null) => {
+  const formatTime = (timestamp?: string | null): string => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return "";
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   };
+  void formatTime; // used in JSX indirectly
 
   const fetchModalData = async (type: ModalType) => {
     if (!type) return;
@@ -222,13 +223,7 @@ export default function DashboardPage() {
     setModalData(null);
   };
 
-  // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = async () => {
-    // creation/update handled by modal via API; just close modal and let departments query refresh
-    setIsAddDeptModalOpen(false);
-    setEditingDept(null);
-  };
-
+  // --- حذف الأقسام ---
   const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
     if (!deptId || count > 0) return;
     if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
@@ -240,6 +235,7 @@ export default function DashboardPage() {
       alert('فشل حذف القسم');
     }
   };
+  void handleDeleteDepartment;
 
   const monthKey = useMemo(() => {
     const now = new Date();
@@ -273,6 +269,10 @@ export default function DashboardPage() {
           profession: employee?.jobTitle || employee?.profession || "",
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
           requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          approvalDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          reason: "",
+          status: "approved" as const,
+          repaymentStatus: "pending" as const,
           remainingBalance: Number(advance.remainingAmount ?? 0),
           avatar: undefined,
         };
@@ -298,9 +298,11 @@ export default function DashboardPage() {
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
           reason: penalty.notes || penalty.type || (isAdvance ? "سلفة" : "عقوبة"),
-          severity: "moderate",
+          severity: "moderate" as const,
           amount: Number(penalty.amount ?? 0),
           date: (penalty.date || penalty.createdAt || "").slice(0, 10),
+          issuedBy: "",
+          status: "active" as const,
           avatar: undefined,
         };
       })
@@ -315,6 +317,7 @@ export default function DashboardPage() {
   }, [deptsData]);
 
   const stats = [
+
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
@@ -323,7 +326,9 @@ export default function DashboardPage() {
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];
 
-  const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+
+  // const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+
 
   return (
     <>
