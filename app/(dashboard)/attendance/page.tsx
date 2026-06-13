@@ -101,6 +101,15 @@ export default function AttendancePage() {
     startDate: selectedDate,
     endDate: selectedDate,
   });
+
+  const isDayInsideLeave = (leave: { startDate: string; endDate: string }, day: string) => {
+    // بعد إصلاح useLeaves، التواريخ دائماً YYYY-MM-DD — string comparison آمن وسريع
+    const start = leave.startDate?.slice(0, 10);
+    const end = leave.endDate?.slice(0, 10);
+    const d = day?.slice(0, 10);
+    if (!start || !end || !d) return false;
+    return d >= start && d <= end;
+  };
   const { data, isLoading, isFetching, isError, error, markAttendance } = useAttendance({
     date: selectedDate,
     startDate: selectedDate,
@@ -140,13 +149,13 @@ export default function AttendancePage() {
       dailyMap.set(dr.key, { checkIn: dr.checkIn || "", checkOut: dr.checkOut || "", source: dr.source });
     });
 
-    // بناء خريطة الإجازات — نشمل كل الحالات (APPROVED + PENDING)
+    // بناء خريطة الإجازات — نفكك نطاق الإجازة ونُسند فقط للإجازات التي تغطي selectedDate
     const leavesMap = new Map<string, string[]>();
     (leaves || []).forEach((leave) => {
-      if (leave.employeeId && leave.leaveType) {
-        if (!leavesMap.has(leave.employeeId)) leavesMap.set(leave.employeeId, []);
-        leavesMap.get(leave.employeeId)?.push(leave.leaveType);
-      }
+      if (!leave.employeeId || !leave.leaveType) return;
+      if (!isDayInsideLeave(leave, selectedDate)) return;
+      if (!leavesMap.has(leave.employeeId)) leavesMap.set(leave.employeeId, []);
+      leavesMap.get(leave.employeeId)?.push(leave.leaveType);
     });
 
     const tableRows: AttendanceTableRow[] = [];

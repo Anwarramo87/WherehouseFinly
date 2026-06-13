@@ -8,9 +8,29 @@ import axios from "axios";
 import { resetAuthVerificationCache, verifyAuthSession } from "@/lib/auth-verify";
 import { useAuthStore } from "@/stores/auth-store";
 import { clearAuthAccessToken, setAuthAccessToken } from "@/lib/auth-session";
+import { resolveApiUrl } from "@/lib/api-url";
 
-// Safe debug helper — no-op in production
-const reportDebug = (..._args: any[]) => {};
+// Safe debug logger - no-op if not defined
+const reportDebug = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === "development") {
+    console.debug("[Login Debug]", ...args);
+  }
+};
+
+const backendBaseUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+
+// Safe navigation helper that handles HMR router initialization errors
+const safeNavigate = (router: ReturnType<typeof useRouter>, path: string) => {
+  try {
+    router.replace(path);
+  } catch (e) {
+    // Fallback to window.location if router fails (HMR race condition)
+    if (typeof window !== "undefined") {
+      window.location.href = path;
+    }
+  }
+};
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,7 +44,7 @@ export default function LoginPage() {
     let active = true;
 
     if (authStatus === "authenticated") {
-      router.replace("/home");
+      safeNavigate(router, "/home");
       return () => {
         active = false;
       };
@@ -39,7 +59,7 @@ export default function LoginPage() {
 
       if (result.authorized) {
         setStatus("authenticated");
-        router.replace("/home");
+        safeNavigate(router, "/home");
         return;
       }
 
@@ -112,7 +132,7 @@ export default function LoginPage() {
       resetAuthVerificationCache();
 
       setStatus("authenticated");
-      router.replace("/home");
+      safeNavigate(router, "/home");
 
     } catch (error: unknown) {
       // #region debug-point D:login-final-error
