@@ -1,294 +1,3 @@
-// "use client";
-
-// import { useState, useMemo, useEffect } from "react";
-// import { createPortal } from "react-dom";
-// import { X, ChevronRight, ChevronLeft, Calendar, Clock, Loader2 } from "lucide-react";
-// import { useQuery } from "@tanstack/react-query";
-// import apiClient from "@/lib/api-client";
-// import { QUERY_STALE_TIME, QUERY_GC_TIME } from "@/lib/query-cache";
-
-// interface Props {
-//   isOpen: boolean;
-//   onClose: () => void;
-//   employeeId: string;
-//   employeeName: string;
-//   initialMonth: string; // صيغة YYYY-MM
-// }
-
-// // أيام الأسبوع لترتيب شبكة التقويم المخصصة للمعمل
-// const WEEK_DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
-
-// interface DayMapEntry {
-//   isPresent: boolean;
-//   isLate: boolean;
-//   overtimeMin: number;
-//   leaveType: string | null;
-// }
-
-// interface AttendanceRecord {
-//   date: string;
-//   type: "IN" | "OUT";
-//   shiftPair?: {
-//     minutesLate?: number;
-//     hoursWorked?: number;
-//   };
-// }
-
-// interface LeaveRecord {
-//   startDate: string;
-//   endDate: string;
-//   leaveType: string;
-// }
-
-// export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employeeId, employeeName, initialMonth }: Props) {
-//   const isBrowser = typeof window !== "undefined";
-//   const [currentMonth, setCurrentMonth] = useState(initialMonth);
-
-//   // حساب نطاق التواريخ الكامل للشهر المختار لإرساله بالفيتش
-//   const { startDate, endDate, daysInMonth, year, month } = useMemo(() => {
-//     const [y, m] = currentMonth.split("-").map(Number);
-//     const firstDay = `${currentMonth}-01`;
-//     const lastDayNum = new Date(y, m, 0).getDate();
-//     const lastDay = `${currentMonth}-${String(lastDayNum).padStart(2, "0")}`;
-    
-//     // توليد قائمة بكافة تواريخ أيام الشهر
-//     const days = [];
-//     for (let i = 1; i <= lastDayNum; i++) {
-//       days.push(`${currentMonth}-${String(i).padStart(2, "0")}`);
-//     }
-
-//     return { startDate: firstDay, endDate: lastDay, daysInMonth: days, year: y, month: m };
-//   }, [currentMonth]);
-
-//   // الفيتش المستقر والآمن لجلب سجلات الحضور الخاصة بالموظف من الباك إند لهذا الشهر
-//   const { data: attendanceData, isLoading, isError: isAttendanceError, error: attendanceError, refetch: refetchAttendance } = useQuery({
-//     queryKey: ["employeeMonthlyAttendance", employeeId, currentMonth],
-//     queryFn: async () => {
-//       const res = await apiClient.get(`/attendance`, {
-//         params: { employeeId, startDate, endDate, limit: 200 }
-//       });
-//       return Array.isArray(res.data?.records) ? res.data.records : [];
-//     },
-//     enabled: isOpen && !!employeeId,
-//     staleTime: QUERY_STALE_TIME.FAST,
-//     gcTime: QUERY_GC_TIME.RELAXED,
-//   });
-
-//   // الفيتش الإضافي لجلب الإجازات المعتمدة للموظف لمطابقتها في أيام الغياب
-//   const { data: leavesData, isError: isLeavesError, error: leavesError, refetch: refetchLeaves } = useQuery({
-//     queryKey: ["employeeMonthlyLeaves", employeeId, currentMonth],
-//     queryFn: async () => {
-//       const res = await apiClient.get(`/leave-requests`, {
-//         params: { employeeId, status: "APPROVED" }
-//       });
-//       return Array.isArray(res.data) ? res.data : [];
-//     },
-//     enabled: isOpen && !!employeeId,
-//     staleTime: QUERY_STALE_TIME.STANDARD,
-//   });
-
-//   // منع التمرير الخلفي للشاشة عند فتح المودال
-//   useEffect(() => {
-//     if (isOpen) document.body.style.overflow = "hidden";
-//     else document.body.style.overflow = "";
-//     return () => { document.body.style.overflow = ""; };
-//   }, [isOpen]);
-
-//   // معالجة وتجميع البيانات لربطها بكل يوم من أيام التقويم شهرياً
-//   const mappedDays = useMemo(() => {
-//     const dayMap = new Map<string, DayMapEntry>();
-
-//     // 1. معالجة بصمات الحضور وتجميع الدخول والخروج والإضافي
-//     if (Array.isArray(attendanceData)) {
-//       attendanceData.forEach((rec: AttendanceRecord) => {
-//         const dateKey = rec.date;
-//         if (!dayMap.has(dateKey)) {
-//           dayMap.set(dateKey, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
-//         }
-//         const current = dayMap.get(dateKey)!;
-//         if (rec.type === "IN") {
-//           current.isPresent = true;
-//           // فحص التأخير بناءً على حقل الدقائق في الـ shiftPair الموثق بالباك إند
-//           if (rec.shiftPair?.minutesLate && rec.shiftPair.minutesLate > 0) current.isLate = true;
-//         }
-//         if (rec.shiftPair?.hoursWorked && rec.shiftPair.hoursWorked > 8) {
-//           current.overtimeMin += (rec.shiftPair.hoursWorked - 8) * 60;
-//         }
-//       });
-//     }
-
-//     // 2. معالجة الإجازات المعتمدة وصبها في الأيام المناسبة
-//     if (Array.isArray(leavesData)) {
-//       leavesData.forEach((leave: LeaveRecord) => {
-//         const start = new Date(leave.startDate);
-//         const end = new Date(leave.endDate);
-//         daysInMonth.forEach(dayStr => {
-//           const currentDay = new Date(dayStr);
-//           if (currentDay >= start && currentDay <= end) {
-//             if (!dayMap.has(dayStr)) {
-//               dayMap.set(dayStr, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
-//             }
-//             const entry = dayMap.get(dayStr)!;
-//             entry.leaveType = leave.leaveType;
-//           }
-//         });
-//       });
-//     }
-
-//     return dayMap;
-//   }, [attendanceData, leavesData, daysInMonth]);
-
-//   // حساب الإزاحة لليوم الأول من الشهر لضبط اصطفاف الأعمدة في التقويم
-//   const firstDayPadding = useMemo(() => {
-//     const firstDayInstance = new Date(year, month - 1, 1);
-//     const jsDay = firstDayInstance.getDay(); // 0 (الأحد) إلى 6 (السبت)
-//     // تحويل الإزاحة لتناسب ترتيبنا العربي (السبت هو العمود 0)
-//     const mapping: Record<number, number> = { 6: 0, 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
-//     return mapping[jsDay] || 0;
-//   }, [year, month]);
-
-//   if (!isOpen || !isBrowser) return null;
-
-//   // دوال التنقل بين الأشهر
-// // دالة الرجوع شهراً واحداً إلى الخلف بدقة
-//   const handlePrevMonth = () => {
-//     const [y, m] = currentMonth.split("-").map(Number);
-//     // في الـ Date Object، لتغيير الشهر نمرر الشهر الحالي ناقص 1 مع مراعاة الـ Index المعتمد (0-11)
-//     const prevDate = new Date(Date.UTC(y, m - 2, 1));
-//     if (!isNaN(prevDate.getTime())) {
-//       setCurrentMonth(prevDate.toISOString().slice(0, 7));
-//     }
-//   };
-
-//   // دالة التقدم شهماً واحداً إلى الأمام بدقة
-//   const handleNextMonth = () => {
-//     const [y, m] = currentMonth.split("-").map(Number);
-//     // نمرر الترتيب المباشر للشهر التالي ليعالجه كائن التاريخ بسلاسة
-//     const nextDate = new Date(Date.UTC(y, m, 1));
-//     if (!isNaN(nextDate.getTime())) {
-//       setCurrentMonth(nextDate.toISOString().slice(0, 7));
-//     }
-//   };
-
-//   return createPortal(
-//     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md" dir="rtl">
-//       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.2)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in zoom-in-95 duration-200">
-        
-//         {/* Header */}
-//         <div className="p-6 sm:p-8 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1a2530]/80">
-//           <div className="flex items-center gap-4">
-//             <div className="bg-[#C89355]/10 p-3 rounded-2xl border border-[#C89355]/20 shadow-[0_0_20px_rgba(200,147,85,0.15)]">
-//               <Calendar className="text-[#C89355]" size={26} />
-//             </div>
-//             <div>
-//               <h2 className="text-xl font-black text-white tracking-wide">التقرير التقويمي للموظف</h2>
-//               <p className="text-sm font-bold text-[#C89355] font-mono mt-0.5">{employeeName} ({employeeId})</p>
-//             </div>
-//           </div>
-
-//           {/* أزرار التنقل بين الأشهر */}
-//           <div className="flex items-center gap-2 bg-[#101720] border border-[#263544] p-1.5 rounded-xl self-center sm:self-auto shadow-inner">
-//             <button type="button" onClick={handlePrevMonth} className="p-2 text-slate-400 hover:text-[#C89355] bg-[#263544]/50 hover:bg-[#263544] rounded-lg transition-all">
-//               <ChevronRight size={18} />
-//             </button>
-//             <span className="text-sm font-mono font-black text-white px-4 min-w-22.5 text-center">{currentMonth}</span>
-//             <button type="button" onClick={handleNextMonth} className="p-2 text-slate-400 hover:text-[#C89355] bg-[#263544]/50 hover:bg-[#263544] rounded-lg transition-all">
-//               <ChevronLeft size={18} />
-//             </button>
-//           </div>
-
-//           <button type="button" onClick={onClose} className="absolute left-6 top-6 sm:static text-slate-500 hover:text-rose-400 bg-[#263544] p-2 rounded-xl transition-all">
-//             <X size={20} />
-//           </button>
-//         </div>
-
-//         {/* Calendar Body */}
-//         <div className="overflow-y-auto custom-scrollbar flex-1 p-6 sm:p-8 bg-[#101720]">
-//           {isLoading ? (
-//             <div className="py-24 flex flex-col items-center justify-center gap-3">
-//               <Loader2 className="animate-spin text-[#C89355]" size={36} />
-//               <span className="text-xs text-slate-400 font-bold">جاري معالجة بيانات الموظف التقويمية...</span>
-//             </div>
-//           ) : (isAttendanceError || isLeavesError) ? (
-//             <div className="py-12 flex flex-col items-center justify-center gap-3">
-//               <div className="rounded-2xl border border-rose-200 bg-rose-50/90 px-6 py-4 text-sm font-bold text-rose-700 text-center">
-//                 حدث خطأ أثناء جلب بيانات الحضور أو الإجازات.
-//                 <div className="mt-2 text-xs text-rose-600">
-//                   {isAttendanceError && (attendanceError as Error)?.message ? <div>حضور: {(attendanceError as Error).message}</div> : null}
-//                   {isLeavesError && (leavesError as Error)?.message ? <div>إجازات: {(leavesError as Error).message}</div> : null}
-//                 </div>
-//               </div>
-//               <div className="flex gap-3 mt-4">
-//                 <button onClick={() => { void refetchAttendance(); void refetchLeaves(); }} className="px-4 py-2 rounded-xl bg-[#1a2530] text-[#C89355] font-black">حاول مرة أخرى</button>
-//                 <button onClick={onClose} className="px-4 py-2 rounded-xl bg-white text-[#263544] font-black border">إغلاق</button>
-//               </div>
-//             </div>
-//           ) : (
-//             <div className="space-y-6">
-//               {/* ترويسة أيام الأسبوع */}
-//               <div className="grid grid-cols-7 gap-2 text-center">
-//                 {WEEK_DAYS.map(day => (
-//                   <div key={day} className="text-xs font-black text-[#C89355] bg-[#1a2530]/50 py-2.5 rounded-xl border border-white/5 shadow-sm">
-//                     {day}
-//                   </div>
-//                 ))}
-//               </div>
-
-//               {/* شبكة الأيام الحية */}
-//               <div className="grid grid-cols-7 gap-2 grid-rows-5">
-//                 {/* خلايا الحشو لضبط انطلاقة أول يوم بالشهر */}
-//                 {Array.from({ length: firstDayPadding }).map((_, index) => (
-//                   <div key={`pad-${index}`} className="bg-transparent opacity-0 pointer-events-none" />
-//                 ))}
-
-//                 {/* خلايا أيام الشهر الفعلية مصبوغة بالكامل حسب طلبك */}
-//                 {daysInMonth.map(dayStr => {
-//                   const dayNum = parseInt(dayStr.split("-")[2]);
-//                   const info = mappedDays.get(dayStr);
-                  
-//                   let styleClass = "border-slate-800 bg-[#161f29]/30 text-slate-400"; // افتراضي غياب غير مبرر
-//                   let statusText = "غائب";
-
-//                   if (info?.isPresent) {
-//                     styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
-//                     statusText = info.isLate ? "متأخر" : "حاضر";
-//                   } else if (info?.leaveType) {
-//                     styleClass = "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.05)]";
-//                     statusText = `إجازة ${info.leaveType}`;
-//                   } else {
-//                     styleClass = "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.05)]";
-//                     statusText = "غائب";
-//                   }
-
-//                   return (
-//                     <div key={dayStr} className={`min-h-22.5 p-3 rounded-2xl border flex flex-col justify-between transition-all hover:scale-102 hover:border-[#C89355]/40 group relative overflow-hidden ${styleClass}`}>
-//                       <div className="absolute inset-0 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h10v10H0z' fill='none'/%3E%3Cpath d='M0 0h1v1H0z' fill='%23fff'/%3E%3C/svg%3E")` }} />
-                      
-//                       <div className="flex justify-between items-start">
-//                         <span className="font-mono font-black text-base">{dayNum}</span>
-//                         <span className="text-[9px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md border border-white/5">{statusText}</span>
-//                       </div>
-
-//                       {/* عرض الساعات الإضافية إن وجدت باليوم */}
-//                       {info && info.overtimeMin > 0 && (
-//                         <div className="mt-2 flex items-center gap-1 text-[10px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded-lg w-fit">
-//                           <Clock size={10} />
-//                           <span>+{Math.round(info.overtimeMin)} د إضافي</span>
-//                         </div>
-//                       )}
-//                     </div>
-//                   );
-//                 })}
-//               </div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>,
-//     document.body
-//   );
-// }
-
 
 
 "use client";
@@ -350,12 +59,12 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
-  // جلب الإجازات للموظف — بدون فلتر تاريخ لأن الفرونت يفلتر حسب الشهر
+  // جلب الإجازات للموظف مع فلتر الشهر الحالي
   const { data: leavesData } = useQuery({
     queryKey: ["employeeMonthlyLeaves", employeeId, currentMonth],
     queryFn: async () => {
       const res = await apiClient.get(`/leaves`, {
-        params: { employeeId }
+        params: { employeeId, startDate, endDate }
       });
       const data = res.data as { leaveRequests?: unknown[] } | unknown[];
       if (Array.isArray(data)) return data;
@@ -516,12 +225,17 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                   let styleClass = "border-slate-800 bg-[#161f29]/30 text-slate-400"; 
                   let statusText = "غائب";
 
-                  if (info?.isPresent) {
-                    styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
-                    statusText = info.isLate ? "متأخر" : "حاضر";
-                  } else if (info?.leaveType) {
+                  if (info?.leaveType && !info?.isPresent) {
+                    // غائب + إجازة → إجازة
                     styleClass = "border-amber-500/30 bg-amber-500/10 text-amber-400";
                     statusText = `إجازة ${LEAVE_TYPE_LABELS[info.leaveType] || info.leaveType}`;
+                  } else if (info?.isPresent && info?.leaveType) {
+                    // حاضر + إجازة جزئية
+                    styleClass = "border-teal-500/30 bg-teal-500/10 text-teal-400";
+                    statusText = `حاضر / إجازة`;
+                  } else if (info?.isPresent) {
+                    styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
+                    statusText = info.isLate ? "متأخر" : "حاضر";
                   }
 
                   return (

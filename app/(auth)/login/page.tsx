@@ -65,8 +65,17 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-  const normalizedUsername = username.trim().replace(/^"+|"+$/g, "");
+    const normalizedUsername = username.trim().replace(/^"+|"+$/g, "");
     const normalizedPassword = password;
+
+    // #region debug-point A:login-submit
+    reportDebug("A", "Login submit started", {
+      backendBaseUrl,
+      usernameLength: normalizedUsername.length,
+      hasPassword: Boolean(normalizedPassword),
+      windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
+    });
+    // #endregion
 
     if (!normalizedUsername || !normalizedPassword) {
       setErrorMessage("يرجى إدخال اسم المستخدم وكلمة المرور.");
@@ -89,6 +98,13 @@ export default function LoginPage() {
         access_token?: string;
       };
       const token = authResponse.token || authResponse.accessToken || authResponse.access_token;
+      // #region debug-point C:login-success
+      reportDebug("C", "Login request resolved", {
+        responseStatus: response.status,
+        hasToken: Boolean(token),
+        hasUser: Boolean(authResponse.user),
+      });
+      // #endregion
       setAuthAccessToken(token);
       setUser((authResponse.user ?? null) as { name?: string; username?: string; role?: string } | null);
       resetAuthVerificationCache();
@@ -96,7 +112,14 @@ export default function LoginPage() {
       setStatus("authenticated");
       router.replace("/home");
 
-     } catch (error: unknown) {
+    } catch (error: unknown) {
+      // #region debug-point D:login-final-error
+      reportDebug("D", "Login failed after retries", {
+        status: axios.isAxiosError(error) ? error.response?.status ?? null : null,
+        message: axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error),
+        responseData: axios.isAxiosError(error) ? error.response?.data ?? null : null,
+      });
+      // #endregion
       if (axios.isAxiosError<{ message?: string }>(error) && error.response) {
         const status = error.response.status;
         const serverMessage = error.response.data?.message;

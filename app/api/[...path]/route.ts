@@ -84,7 +84,14 @@ export async function handler(request: NextRequest) {
       headers: buildResponseHeaders(response, request),
     });
   } catch (error) {
-    console.error("[API Proxy] Error:", error);
+    // #region debug-point C:proxy-network-error
+    reportDebug("C", "Next API proxy failed before upstream response", {
+      method: request.method,
+      path,
+      fullUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // #endregion
     return NextResponse.json(
       { error: "Backend unreachable", message: error instanceof Error ? error.message : String(error) },
       {
@@ -101,3 +108,4 @@ export const PUT = handler;
 export const DELETE = handler;
 export const PATCH = handler;
 export const OPTIONS = handler;
+

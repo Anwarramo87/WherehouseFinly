@@ -145,24 +145,31 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
 
   return (
     <aside
-      className={`h-full relative bg-[#101720]/80 backdrop-blur-3xl border-y border-l border-white/5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] rounded-l-[2.5rem] flex flex-col transition-all duration-300 ease-out z-9999 overflow-visible ${isCollapsed ? 'w-20' : 'w-72'}`}
+      className={`h-full relative bg-[#101720]/80 backdrop-blur-3xl border-y border-l border-white/5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] rounded-l-[2.5rem] flex flex-col transition-all duration-300 ease-out overflow-visible ${isCollapsed ? 'w-20' : 'w-72'}`}
       dir="rtl"
     >
-      {/* زر إغلاق للموبايل فقط */}
-      <button
-        onClick={onClose}
-        className="lg:hidden absolute top-6 left-4 p-2 bg-[#1a2530] text-slate-400 hover:text-[#C89355] rounded-xl border border-[#C89355]/30 z-99999 transition-colors"
-      >
-        <X size={18} />
-      </button>
+      {/* ── زر إغلاق للموبايل ── */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          aria-label="إغلاق القائمة"
+          className="lg:hidden absolute top-5 left-4 z-50 p-2 bg-[#263544] text-slate-400 hover:text-rose-400 rounded-xl border border-white/10 transition-colors"
+        >
+          <X size={18} />
+        </button>
+      )}
 
-      {/* زر الطي العائم للديسكتوب فقط */}
+      {/* ── زر الطي للديسكتوب — يغير الأيقونة حسب الحالة ── */}
       {toggleCollapse && (
         <button
           onClick={toggleCollapse}
-          className="hidden lg:flex absolute -left-4 top-10 bg-[#1a2530] border border-[#C89355]/30 shadow-[0_0_15px_rgba(200,147,85,0.15)] p-2.5 rounded-full text-slate-400 hover:text-[#C89355] hover:scale-110 transition-all duration-300 z-99999 group"
+          aria-label={isCollapsed ? 'توسيع القائمة' : 'طي القائمة'}
+          className="hidden lg:flex absolute -left-4 top-10 bg-[#1a2530] border border-[#C89355]/30 shadow-[0_0_15px_rgba(200,147,85,0.15)] p-2.5 rounded-full text-slate-400 hover:text-[#C89355] hover:scale-110 transition-all duration-300 z-50"
         >
-          <ChevronsRight size={18} className={`transition-transform duration-500 ease-out ${isCollapsed ? 'rotate-180 text-[#C89355]' : ''}`} />
+          <ChevronsRight
+            size={18}
+            className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180 text-[#C89355]' : 'text-slate-400'}`}
+          />
         </button>
       )}
 

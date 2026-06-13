@@ -6,7 +6,7 @@ import {
   X, Save, Search, Wallet, FileText, AlertOctagon, 
   Coins, Calendar, Edit3, Shirt, Banknote , Loader2 , ChevronDown
 } from "lucide-react";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Employee } from "@/types/employee";
@@ -40,11 +40,6 @@ const formatWithCommas = (value: string | number) => {
   return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
 };
 
-const normalizeDateValue = (value?: string | null) => {
-  if (!value) return new Date().toISOString().split("T")[0];
-  return value.includes("T") ? value.split("T")[0] : value;
-};
-
 export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, employees = [], initialData }: Props) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -55,6 +50,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
     handleSubmit,
     setValue,
     reset,
+    watch,
     control, // تم إضافة control للـ Controller
     formState: { errors }
   } = useForm<DiscountFormValues>({
@@ -64,12 +60,12 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
       employeeId: "",
       type: "سلفة",
       amount: undefined,
-        date: normalizeDateValue(),
+      date: new Date().toISOString().split('T')[0],
       notes: "",
     }
   });
 
-  const currentType = useWatch({ control, name: "type" });
+  const currentType = watch("type");
 
   useEffect(() => {
     if (initialData) {
@@ -81,7 +77,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
           employeeId: initialData.employeeId,
           type: initialData.type,
           amount: initialData.amount,
-          date: normalizeDateValue(initialData.date),
+          date: initialData.date,
           notes: initialData.notes || "",
         });
         setSearchQuery(newQuery);
@@ -92,14 +88,14 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
           employeeId: "",
           type: "سلفة",
           amount: undefined,
-          date: normalizeDateValue(),
+          date: new Date().toISOString().split('T')[0],
           notes: "",
         });
         setSearchQuery("");
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialData?.employeeId, initialData?.type, initialData?.date]);
+  }, [initialData?.employeeId, initialData?.type]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -135,9 +131,11 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
   };
 
   const onSubmit = (data: DiscountFormValues) => {
-    const kind: "advance" | "penalty" | "assistance" = 
-      data.type === "سلفة" ? "advance" : "assistance";
-    onSave({ ...data, date: normalizeDateValue(data.date), kind });
+    // احتسب kind بناءً على type
+    let kind: DiscountPayload["kind"] = "penalty";
+    if (data.type === "سلفة" || data.type === "شراء ملابس") kind = "advance";
+    else if (data.type === "مكافأة" || data.type === "مساعدة") kind = "assistance";
+    onSave({ ...data, kind });
   };
 
   const isEditMode = !!initialData;

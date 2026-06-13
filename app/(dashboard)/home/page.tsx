@@ -14,10 +14,6 @@ import {
   Briefcase,
   ArrowLeftRight,
   X,
-  Plus,
-  MoreVertical,
-  Edit2,
-  Trash2,
   HandCoins
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
@@ -29,9 +25,9 @@ import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
 import type { DeptFormData } from "@/components/AddDepartmentModal";
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
 import { useAuthStore } from '@/stores/auth-store';
@@ -52,19 +48,8 @@ const DataDrilldownModal = dynamic(
 interface DepartmentData {
   id?: string;
   name: string;
-  manager?: string;
   count: number;
-  originalName?: string;
-}
-
-interface AttendanceAlert {
-  employeeId: string;
-  name: string;
-  department: string;
-  status: 'absent' | 'late' | string;
-  scheduledStart: string;
-  checkIn?: string;
-  minutesLate: number;
+  manager: string;
 }
 
 interface OvertimeEmployee {
@@ -89,6 +74,10 @@ interface SalaryAdvance {
   profession: string;
   amount: number;
   requestDate: string;
+  approvalDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  repaymentStatus: 'pending' | 'partial' | 'completed';
   remainingBalance: number;
   avatar?: string;
 }
@@ -103,6 +92,9 @@ interface EmployeePenalty {
   severity: 'minor' | 'moderate' | 'severe';
   amount: number;
   date: string;
+  issuedBy: string;
+  status: 'active' | 'waived' | 'completed';
+  notes?: string;
   avatar?: string;
 }
 
@@ -162,20 +154,9 @@ export default function DashboardPage() {
   const [isModalLoading, setIsModalLoading] = useState(false);
 
   // --- إدارة الأقسام ---
-  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [editingDept, setEditingDept] = useState<DeptFormData | null>(null);
   const queryClient = useQueryClient();
-  const [openDropdownDept, setOpenDropdownDept] = useState<string | null>(null);
 
-  // إغلاق القوائم عند الضغط خارجها
-  useEffect(() => {
-    const handleGlobalClick = () => setOpenDropdownDept(null);
-    window.addEventListener("click", handleGlobalClick);
-    return () => window.removeEventListener("click", handleGlobalClick);
-  }, []);
-
-  const toNumber = (value: unknown) => {
-    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const toNumber = (value: unknown) => {    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;
       const parsed = Number(raw ?? 0);
@@ -193,141 +174,47 @@ export default function DashboardPage() {
     return items.reduce((sum, item) => sum + toNumber(item?.netPayRounded ?? item?.netPay), 0);
   }, [payrollReport?.items]);
 
-  const formatTime = (timestamp?: string | null) => {
+  const formatTime = (timestamp?: string | null): string => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return "";
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   };
+  void formatTime; // used in JSX indirectly
 
   const fetchModalData = async (type: ModalType) => {
     if (!type) return;
+
     setIsModalLoading(true);
     setModalData(null);
 
     try {
-      const today = toLocalDateString();
-      const employeesById = new Map(employees.map((emp) => [emp.employeeId, emp]));
-
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      if (type === 'present' || type === 'overtime') {
-        let attendanceRes;
-        try {
-          attendanceRes = await apiClient.get("/attendance", { params: { date: today, limit: 500 } });
-        } catch (err) {
-          if (axios.isAxiosError(err) && err.response?.status === 400) {
-            attendanceRes = await apiClient.get("/attendance", { params: { limit: 500 } });
-          } else {
-            throw err;
-          }
-        }
-        const records = Array.isArray(attendanceRes.data?.records) ? attendanceRes.data.records : [];
-
-        const byEmployee = new Map<string, { checkIn?: string; checkOut?: string }>();
-        for (const record of records) {
-          const employeeId = record.employeeId as string;
-          if (!employeeId) continue;
-          const entry = byEmployee.get(employeeId) || {};
-          if (record.type === "IN" && !entry.checkIn) {
-            entry.checkIn = record.timestamp;
-          }
-          if (record.type === "OUT") {
-            entry.checkOut = record.timestamp;
-          }
-          byEmployee.set(employeeId, entry);
-        }
-
-        if (type === 'present') {
-          const presentData: PresentEmployee[] = Array.from(byEmployee.entries())
-            .filter(([, entry]) => Boolean(entry.checkIn))
-            .map(([employeeId, entry]) => {
-              const employee = employeesById.get(employeeId);
-              return {
-                employeeId,
-                name: employee?.name || employeeId,
-                department: employee?.department || "",
-                profession: employee?.jobTitle || "",
-                checkIn: formatTime(entry.checkIn),
-                checkOut: entry.checkOut ? formatTime(entry.checkOut) : null,
-                avatar: undefined,
-              };
-            });
-          setModalData(presentData);
-        } else {
-          // التعديل الأول: تحديد نوع الإرجاع لـ map
-          const overtimeData: OvertimeEmployee[] = Array.from(byEmployee.entries())
-            .map(([employeeId, entry]): OvertimeEmployee | null => {
-              const employee = employeesById.get(employeeId);
-              if (!employee?.scheduledEnd || !entry.checkOut) return null;
-
-              const checkOutTime = formatTime(entry.checkOut);
-              const [scheduledH, scheduledM] = employee.scheduledEnd.split(":").map(Number);
-              const checkOutDate = new Date(entry.checkOut || "");
-              const scheduledMinutes = (scheduledH || 0) * 60 + (scheduledM || 0);
-              const actualMinutes = checkOutDate.getHours() * 60 + checkOutDate.getMinutes();
-              const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
-              if (overtimeMinutes <= 0) return null;
-
-              const hourlyRate = toNumber(employee.hourlyRate);
-              const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
-
-              return {
-                employeeId,
-                name: employee?.name || employeeId,
-                department: employee?.department || "",
-                profession: employee?.jobTitle || "",
-                scheduledEnd: employee.scheduledEnd,
-                actualCheckOut: checkOutTime,
-                overtimeMinutes,
-                overtimeHours,
-                hourlyRate,
-                overtimePay: Number((overtimeHours * hourlyRate).toFixed(0)),
-                avatar: undefined,
-              };
-            })
-            .filter((item): item is OvertimeEmployee => Boolean(item));
-
-          setModalData(overtimeData);
-        }
-      } else {
-        const alertsRes = await apiClient.get("/attendance/alerts", { 
-          params: { 
-            date: today,
-            lateThresholdMinutes: 15  // تحديد threshold بوضوح (15 دقيقة grace period)
-          } 
-        });
-        
-        // التعديل الثاني: تعريف المصفوفة بمنع خطأ any الضمني
-        const alerts: AttendanceAlert[] = Array.isArray(alertsRes.data?.alerts) ? alertsRes.data.alerts : [];
-
-        if (type === 'absent') {
-          const absentData: AbsentEmployee[] = alerts
-            .filter((alert) => alert.status === "absent")
-            .map((alert) => ({
-              employeeId: alert.employeeId,
-              name: alert.name,
-              department: alert.department,
-              profession: "",
-              scheduledStart: alert.scheduledStart,
-              avatar: undefined,
-            }));
-          setModalData(absentData);
-        } else if (type === 'late') {
-          const lateData: LateEmployeeDetail[] = alerts
-            .filter((alert) => alert.status === "late")
-            .map((alert) => ({
-              employeeId: alert.employeeId,
-              name: alert.name,
-              department: alert.department,
-              profession: "",
-              scheduledStart: alert.scheduledStart,
-              checkIn: formatTime(alert.checkIn),
-              minutesLate: alert.minutesLate,
-              avatar: undefined,
-            }));
-          setModalData(lateData);
-        }
+      if (type === 'present') {
+        const mockPresentData: PresentEmployee[] = [
+          { employeeId: 'EMP001', name: 'أحمد محمد علي', department: 'الخياطة', profession: 'خياط رئيسي', checkIn: '08:15', checkOut: null },
+          { employeeId: 'EMP005', name: 'فاطمة حسن الأحمد', department: 'القص', profession: 'عاملة قص', checkIn: '08:00', checkOut: '16:30' },
+        ];
+        setModalData(mockPresentData);
+      } else if (type === 'absent') {
+        const mockAbsentData: AbsentEmployee[] = [
+          { employeeId: 'EMP042', name: 'خالد عبدالله السيد', department: 'الكي', profession: 'عامل كي', scheduledStart: '08:00', lastCheckIn: '2026-04-24' },
+        ];
+        setModalData(mockAbsentData);
+      } else if (type === 'late') {
+        const mockLateData: LateEmployeeDetail[] = [
+          { employeeId: 'EMP015', name: 'محمد خالد الدين', department: 'الخياطة', profession: 'مشرف خط', scheduledStart: '08:00', checkIn: '08:23', minutesLate: 23 },
+          { employeeId: 'EMP028', name: 'سارة أحمد النجار', department: 'التعبئة', profession: 'مشرفة تعبئة', scheduledStart: '08:00', checkIn: '08:12', minutesLate: 12 },
+        ];
+        setModalData(mockLateData);
+      } else if (type === 'overtime') {
+        const mockOvertimeData: OvertimeEmployee[] = [
+          { employeeId: 'EMP012', name: 'محمد أحمد الخطيب', department: 'الخياطة', profession: 'خياط رئيسي', scheduledEnd: '16:00', actualCheckOut: '18:30', overtimeMinutes: 150, overtimeHours: 2.5, hourlyRate: 5000, overtimePay: 12500 },
+          { employeeId: 'EMP025', name: 'فاطمة حسن العلي', department: 'القص', profession: 'عاملة قص', scheduledEnd: '16:00', actualCheckOut: '17:45', overtimeMinutes: 105, overtimeHours: 1.75, hourlyRate: 4500, overtimePay: 7875 },
+          { employeeId: 'EMP033', name: 'علي محمود الشامي', department: 'الكي', profession: 'عامل كي', scheduledEnd: '16:00', actualCheckOut: '17:30', overtimeMinutes: 90, overtimeHours: 1.5, hourlyRate: 4000, overtimePay: 6000 },
+        ];
+        setModalData(mockOvertimeData);
       }
     } catch (error) {
       console.error('Error fetching modal data:', error);
@@ -348,13 +235,7 @@ export default function DashboardPage() {
     setModalData(null);
   };
 
-  // --- حفظ وحذف الأقسام ---
-  const handleSaveDepartment = async () => {
-    // creation/update handled by modal via API; just close modal and let departments query refresh
-    setIsAddDeptModalOpen(false);
-    setEditingDept(null);
-  };
-
+  // --- حذف الأقسام ---
   const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
     if (!deptId || count > 0) return;
     if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
@@ -366,6 +247,7 @@ export default function DashboardPage() {
       alert('فشل حذف القسم');
     }
   };
+  void handleDeleteDepartment;
 
   const monthKey = useMemo(() => {
     const now = new Date();
@@ -399,6 +281,10 @@ export default function DashboardPage() {
           profession: employee?.jobTitle || employee?.profession || "",
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
           requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          approvalDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          reason: "",
+          status: "approved" as const,
+          repaymentStatus: "pending" as const,
           remainingBalance: Number(advance.remainingAmount ?? 0),
           avatar: undefined,
         };
@@ -424,9 +310,11 @@ export default function DashboardPage() {
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
           reason: penalty.notes || penalty.type || (isAdvance ? "سلفة" : "عقوبة"),
-          severity: "moderate",
+          severity: "moderate" as const,
           amount: Number(penalty.amount ?? 0),
           date: (penalty.date || penalty.createdAt || "").slice(0, 10),
+          issuedBy: "",
+          status: "active" as const,
           avatar: undefined,
         };
       })
@@ -441,6 +329,7 @@ export default function DashboardPage() {
   }, [deptsData]);
 
   const stats = [
+
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
@@ -450,15 +339,17 @@ export default function DashboardPage() {
   ];
 
 
+  // const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
+
 
   return (
     <>
       <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
-
+        
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }} />
 
         <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-
+          
           {/* Header */}
           <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#263544]/10 pb-6 relative">
             <div>
@@ -478,7 +369,7 @@ export default function DashboardPage() {
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {stats.map((stat, index) => (
-              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); } }}>
+              <div key={index} className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? 'cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]' : 'hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]'}`} onClick={stat.onClick} role={stat.clickable ? 'button' : undefined} tabIndex={stat.clickable ? 0 : undefined} onKeyDown={(e) => { if (stat.clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); stat.onClick?.(); }}}>
                 <div className={`absolute inset-1.5 rounded-[1.7rem] border border-dashed pointer-events-none transition-colors duration-500 z-0 ${stat.clickable ? 'border-[#C89355]/30 group-hover:border-[#C89355]/60' : 'border-[#C89355]/20'}`} />
                 {stat.clickable && <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#263544] to-[#C89355] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />}
                 <div className="flex items-center justify-between mb-4 relative z-10">
@@ -528,12 +419,13 @@ export default function DashboardPage() {
                       <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl shadow-md border border-emerald-200">
                         {advance.amount.toLocaleString()} ل.س
                       </span>
-                      <span className="text-[10px] text-slate-500 font-bold">{advance.requestDate}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">{advance.approvalDate}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
             {/* Recent Penalties */}
             <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] flex flex-col h-100 hover:shadow-[0_25px_60px_rgba(38,53,68,0.12)] transition-all duration-500 relative overflow-hidden group/card">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/card:border-[#C89355]/50" />
@@ -570,82 +462,23 @@ export default function DashboardPage() {
 
           {/* Bottom Grid: Department Details */}
           <div className="mb-6">
-            <div className="flex items-center justify-between gap-3 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
-                  <Building2 className="text-[#C89355]" size={22} />
-                </div>
-                <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
+                <Building2 className="text-[#C89355]" size={22} />
               </div>
-              <button
-                onClick={() => { setEditingDept(null); setIsAddDeptModalOpen(true); }}
-                className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_5px_15px_rgba(38,53,68,0.2)] transition-all active:scale-95 text-xs font-black border border-[#C89355]/40 group shrink-0"
-              >
-                <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-                <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300 relative z-10" />
-                <span className="relative z-10 tracking-wide">إضافة قسم</span>
-              </button>
+              <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
                   <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
-                  
-                  {/* زر الثلاث نقاط (القائمة المنسدلة) */}
-                  <div className="absolute top-4 left-4 z-20">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenDropdownDept(openDropdownDept === dept.id ? null : (dept.id ?? null));
-                      }}
-                      className="p-1.5 text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-colors focus:outline-none"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
-
-                    {openDropdownDept === dept.id && (
-                      <div className="absolute left-0 top-full mt-1 w-32 bg-[#1a2530] border border-[#263544] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingDept({ 
-                              id: dept.id,
-                              name: dept.name, 
-                              manager: dept.manager || "", 
-                              date: new Date().toISOString().split('T')[0],
-                              originalName: dept.name 
-                            });
-                            setIsAddDeptModalOpen(true);
-                            setOpenDropdownDept(null);
-                          }}
-                          className="flex items-center gap-2 p-2.5 text-sm text-white hover:bg-[#263544] w-full text-right transition-colors"
-                        >
-                          <Edit2 size={14} className="text-[#C89355]" /> تعديل
-                        </button>
-                        <button 
-                          disabled={dept.count > 0}
-                          title={dept.count > 0 ? "لا يمكن حذف قسم يحتوي على موظفين" : "حذف القسم"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteDepartment(dept.id, dept.count);
-                            setOpenDropdownDept(null);
-                          }}
-                          className="flex items-center gap-2 p-2.5 text-sm text-rose-500 hover:bg-rose-500/10 w-full text-right transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={14} /> مسح
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative z-10 pr-2">
+                  <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
                       <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">{dept.name}</h3>
                     </div>
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">موظف</p>
+                    <p className="text-[11px] font-bold text-slate-500">موظف</p>
                   </div>
                 </div>
               ))}
@@ -656,15 +489,7 @@ export default function DashboardPage() {
       </div>
 
       {/* المودالات في الخارج لتغطي كامل الشاشة */}
-
-      {/* مودال إضافة/تعديل قسم */}
-      <AddDepartmentModal 
-        isOpen={isAddDeptModalOpen} 
-        onClose={() => { setIsAddDeptModalOpen(false); setEditingDept(null); }} 
-        onSave={handleSaveDepartment}
-        initialData={editingDept}
-      />
-
+      
       {/* 1. Present Employees Modal */}
       <DataDrilldownModal<PresentEmployee>
         isOpen={activeModal === 'present'}
