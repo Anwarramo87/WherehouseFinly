@@ -30,7 +30,6 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
-import { useAuthStore } from '@/stores/auth-store';
 
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   loading: () => null,

@@ -539,7 +539,7 @@ export default function EmployeesPage() {
                 <div className="p-5">
                   <div className="bg-rose-500/5 border border-rose-500/10 p-3 rounded-xl flex items-start gap-3 mb-4">
                     <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-rose-200 leading-relaxed font-bold">
+                      <p className="text-xs text-rose-200 leading-relaxed font-bold">
                       أنت على وشك إنهاء خدمة **جميع الموظفين النشطين** في قسم "{selectedDept}". هذا الإجراء لا يمكن التراجع عنه. يرجى التأكد قبل المتابعة.
                     </p>
                   </div>

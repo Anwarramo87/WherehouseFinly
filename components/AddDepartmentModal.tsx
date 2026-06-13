@@ -29,35 +29,38 @@ const buildDefaultForm = (data?: DeptFormData | null): DeptFormData => (
 function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
-    const { createDepartment, updateDepartment } = useDepartments();
+  const [form, setForm] = useState<DeptFormData>(() => buildDefaultForm(initialData));
+  const { createDepartment, updateDepartment } = useDepartments();
 
   // use real API via hook
   // submit to /api/departments
-    const submitDepartment = async (payload: DeptFormData) => {
-      const id = initialData?.id;
-      if (id) {
-        await updateDepartment.mutateAsync({ id, name: payload.name });
-        return;
-      }
+  const submitDepartment = async (payload: DeptFormData) => {
+    const id = initialData?.id;
+    if (id) {
+      await updateDepartment.mutateAsync({ id, name: payload.name });
+      return;
+    }
 
-      // create
-      await createDepartment.mutateAsync({ name: payload.name });
+    // create
+    await createDepartment.mutateAsync({ name: payload.name });
   };
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      // تعبئة البيانات في حال التعديل، أو تفريغها في حال الإضافة
-      if (initialData) {
-        setForm(initialData);
-      } else {
-        setForm({ name: "", manager: "", date: new Date().toISOString().split('T')[0] });
-      }
-    } else {
+    if (!isOpen) {
       document.body.style.overflow = "unset";
+      return;
     }
-    return () => { document.body.style.overflow = "unset"; };
+
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    // Ensure form state reflects the modal content
+    setForm(buildDefaultForm(initialData));
   }, [isOpen, initialData]);
 
   if (!isOpen || typeof document === "undefined") return null;

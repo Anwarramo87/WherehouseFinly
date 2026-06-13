@@ -49,11 +49,6 @@ export default function BiometricDashboard() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  // Load device status
-  useEffect(() => {
-    fetchDeviceStatus();
-  }, []);
-
   const fetchDeviceStatus = async () => {
     try {
       setLoading(true);
@@ -66,6 +61,11 @@ export default function BiometricDashboard() {
       setLoading(false);
     }
   };
+
+  // Load device status
+  useEffect(() => {
+    fetchDeviceStatus();
+  }, []);
 
   const handleSync = async () => {
     try {

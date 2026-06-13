@@ -9,6 +9,9 @@ import { resetAuthVerificationCache, verifyAuthSession } from "@/lib/auth-verify
 import { useAuthStore } from "@/stores/auth-store";
 import { clearAuthAccessToken, setAuthAccessToken } from "@/lib/auth-session";
 
+// Safe debug helper — no-op in production
+const reportDebug = (..._args: any[]) => {};
+
 export default function LoginPage() {
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
@@ -69,8 +72,7 @@ export default function LoginPage() {
     const normalizedPassword = password;
 
     // #region debug-point A:login-submit
-    reportDebug("A", "Login submit started", {
-      backendBaseUrl,
+    reportDebug?.("A", "Login submit started", {
       usernameLength: normalizedUsername.length,
       hasPassword: Boolean(normalizedPassword),
       windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
@@ -99,7 +101,7 @@ export default function LoginPage() {
       };
       const token = authResponse.token || authResponse.accessToken || authResponse.access_token;
       // #region debug-point C:login-success
-      reportDebug("C", "Login request resolved", {
+      reportDebug?.("C", "Login request resolved", {
         responseStatus: response.status,
         hasToken: Boolean(token),
         hasUser: Boolean(authResponse.user),
@@ -114,7 +116,7 @@ export default function LoginPage() {
 
     } catch (error: unknown) {
       // #region debug-point D:login-final-error
-      reportDebug("D", "Login failed after retries", {
+      reportDebug?.("D", "Login failed after retries", {
         status: axios.isAxiosError(error) ? error.response?.status ?? null : null,
         message: axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error),
         responseData: axios.isAxiosError(error) ? error.response?.data ?? null : null,
