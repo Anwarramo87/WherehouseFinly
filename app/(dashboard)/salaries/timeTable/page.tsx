@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2 } from "lucide-react";
+import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2, CalendarPlus } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { SALARY_CONSTANTS } from "@/lib/salary-constants"; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 import { useEmployees } from "@/hooks/useEmployees";
@@ -122,6 +123,66 @@ export default function TimeTablePage() {
   const [calendarEmployeeId, setCalendarEmployeeId] = useState("");
   const [calendarEmployeeName, setCalendarEmployeeName] = useState("");
 
+  // ── إضافة يوم دوام يدوي (للأشهر السابقة أو الحالية) ──
+  const [isAddDayOpen, setIsAddDayOpen] = useState(false);
+  const [addDayEmployeeId, setAddDayEmployeeId] = useState("");
+  const [addDayEmployeeName, setAddDayEmployeeName] = useState("");
+  const [addDayStartDate, setAddDayStartDate] = useState("");
+  const [addDayEndDate, setAddDayEndDate] = useState("");
+  const [addDayCheckIn, setAddDayCheckIn] = useState("08:00");
+  const [addDayCheckOut, setAddDayCheckOut] = useState("16:00");
+  const [skipFridays, setSkipFridays] = useState(true);
+
+  const handleAddDaySubmit = () => {
+    if (!addDayEmployeeId || !addDayStartDate || !addDayEndDate) {
+      toast.error("يرجى اختيار الموظف وتاريخ البداية والنهاية");
+      return;
+    }
+    const start = new Date(addDayStartDate);
+    const end = new Date(addDayEndDate);
+    if (start > end) {
+      toast.error("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+      return;
+    }
+
+    let addedCount = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      const dateStr = current.toISOString().slice(0, 10);
+      const dayOfWeek = current.getDay(); // 5 = Friday
+
+      if (skipFridays && dayOfWeek === 5) {
+        current.setDate(current.getDate() + 1);
+        continue;
+      }
+
+      markAttendance?.mutate({
+        employeeId: addDayEmployeeId,
+        date: dateStr,
+        checkIn: addDayCheckIn,
+        checkOut: addDayCheckOut,
+        source: "manual",
+      });
+      addedCount++;
+      current.setDate(current.getDate() + 1);
+    }
+
+    toast.success(`تم تسجيل ${addedCount} يوم دوام للموظف ${addDayEmployeeName}`);
+    setIsAddDayOpen(false);
+  };
+
+  const openAddDayModal = (employeeId: string, employeeName: string) => {
+    setAddDayEmployeeId(employeeId);
+    setAddDayEmployeeName(employeeName);
+    // افتراضي: من اليوم الأول لآخر يوم في الشهر المختار
+    setAddDayStartDate(periodStart || "");
+    setAddDayEndDate(periodEnd || "");
+    setAddDayCheckIn("08:00");
+    setAddDayCheckOut("16:00");
+    setSkipFridays(true);
+    setIsAddDayOpen(true);
+  };
+
   const { periodStart, periodEnd } = useMemo(() => {
     if (!selectedMonth) return { periodStart: undefined, periodEnd: undefined };
     const [year, month] = selectedMonth.split("-");
@@ -148,7 +209,7 @@ export default function TimeTablePage() {
   });
 
   // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
-  const { data: monthlyAttendanceData } = useAttendance({
+  const { data: monthlyAttendanceData, markAttendance } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
     limit: 200,
@@ -548,7 +609,14 @@ export default function TimeTablePage() {
                       </td>
 
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => openAddDayModal(record.employeeId, record.name)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all hover:scale-110 active:scale-95"
+                            title="إضافة يوم دوام"
+                          >
+                            <CalendarPlus size={18} />
+                          </button>
                           <button
                             onClick={() => handleOpenEditModal(record.employeeId)}
                             className="p-2 text-[#C89355] hover:bg-[#C89355]/10 rounded-xl transition-all hover:scale-110 active:scale-95"
@@ -598,6 +666,100 @@ export default function TimeTablePage() {
           employeeName={calendarEmployeeName}
           initialMonth={selectedMonth}
         />
+      )}
+
+      {/* ── Add Attendance Day Modal ── */}
+      {isAddDayOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
+          <div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-md overflow-hidden relative" dir="rtl">
+            <div className="p-6 relative z-10">
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="text-lg font-black text-[#263544] flex items-center gap-2">
+                  <CalendarPlus size={20} className="text-emerald-600" />
+                  إضافة يوم دوام
+                </h3>
+                <button onClick={() => setIsAddDayOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors text-xl leading-none">×</button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1">الموظف</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={addDayEmployeeName}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-[#263544]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1">من تاريخ</label>
+                    <input
+                      type="date"
+                      value={addDayStartDate}
+                      onChange={(e) => setAddDayStartDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-[#263544] focus:border-[#C89355] focus:ring-1 focus:ring-[#C89355]/30 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1">إلى تاريخ</label>
+                    <input
+                      type="date"
+                      value={addDayEndDate}
+                      onChange={(e) => setAddDayEndDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-[#263544] focus:border-[#C89355] focus:ring-1 focus:ring-[#C89355]/30 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1">وقت الدخول</label>
+                    <input
+                      type="time"
+                      value={addDayCheckIn}
+                      onChange={(e) => setAddDayCheckIn(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-[#263544] focus:border-[#C89355] focus:ring-1 focus:ring-[#C89355]/30 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1">وقت الخروج</label>
+                    <input
+                      type="time"
+                      value={addDayCheckOut}
+                      onChange={(e) => setAddDayCheckOut(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-[#263544] focus:border-[#C89355] focus:ring-1 focus:ring-[#C89355]/30 outline-none"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipFridays}
+                    onChange={(e) => setSkipFridays(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-xs font-bold text-slate-600">تجاوز يوم الجمعة</span>
+                </label>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleAddDaySubmit}
+                  disabled={markAttendance?.isPending}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black disabled:opacity-50 transition-all active:scale-95"
+                >
+                  {markAttendance?.isPending ? "جاري الحفظ..." : "حفظ"}
+                </button>
+                <button
+                  onClick={() => setIsAddDayOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-black transition-all active:scale-95"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
