@@ -140,7 +140,14 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
     try { await apiClient.post('/auth/logout'); } catch { }
     clear();
     resetAuthVerificationCache();
-    router.replace('/login');
+    // Safe navigation to avoid HMR race condition
+    try {
+      router.replace('/login');
+    } catch {
+      if (typeof window !== "undefined") {
+        window.location.href = '/login';
+      }
+    }
   };
 
   return (

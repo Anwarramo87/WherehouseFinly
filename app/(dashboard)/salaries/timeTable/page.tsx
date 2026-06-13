@@ -164,20 +164,41 @@ export default function TimeTablePage() {
   // سيتم عرض presentDays/absentDays فقط القادمة من backend عبر useAttendanceDeductions
   // لتوحيد منطق CalendarModal مع جدول الدوام.
 
-  // بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
+  /**
+   * بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
+   * نفكك الـ Range ونحسب فقط الأيام التي تقع داخل حدود الشهر المحدد (periodStart..periodEnd)
+   * التواريخ كلها YYYY-MM-DD بعد إصلاح useLeaves — نستخدم string comparison
+   */
   const employeeLeavesMap = useMemo(() => {
     const map = new Map<string, { leaveTypes: string[]; paidLeaveDays: number; unpaidLeaveDays: number }>();
+    if (!periodStart || !periodEnd) return map;
+
     for (const leave of monthlyLeaves) {
-      if (!leave.employeeId) continue;
+      if (!leave.employeeId || !leave.leaveType) continue;
+
+      const leaveStart = leave.startDate?.slice(0, 10);
+      const leaveEnd = leave.endDate?.slice(0, 10);
+      if (!leaveStart || !leaveEnd) continue;
+
+      // intersection: نطاق الإجازة يجب أن يتقاطع مع الشهر
+      const effectiveStart = leaveStart < periodStart ? periodStart : leaveStart;
+      const effectiveEnd = leaveEnd > periodEnd ? periodEnd : leaveEnd;
+
+      // لا تقاطع مع الشهر
+      if (effectiveStart > effectiveEnd) continue;
+
+      // حساب عدد الأيام الفعلية داخل الشهر
+      const startMs = new Date(effectiveStart).getTime();
+      const endMs = new Date(effectiveEnd).getTime();
+      const days = Math.round((endMs - startMs) / 86400000) + 1;
+      if (days <= 0) continue;
+
       if (!map.has(leave.employeeId)) {
         map.set(leave.employeeId, { leaveTypes: [], paidLeaveDays: 0, unpaidLeaveDays: 0 });
       }
       const entry = map.get(leave.employeeId)!;
-      // احسب عدد أيام الإجازة
-      const start = new Date(leave.startDate);
-      const end = new Date(leave.endDate);
-      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
       if (!entry.leaveTypes.includes(leave.leaveType)) entry.leaveTypes.push(leave.leaveType);
+
       if (leave.isPaid) {
         entry.paidLeaveDays += days;
       } else {
@@ -185,7 +206,7 @@ export default function TimeTablePage() {
       }
     }
     return map;
-  }, [monthlyLeaves]);
+  }, [monthlyLeaves, periodStart, periodEnd]);
 
   // نستخرج المصفوفة بأمان من الـ response
   const autoDeductions: AttendanceDeductionBreakdown[] = useMemo(() => {
@@ -205,23 +226,46 @@ export default function TimeTablePage() {
 
       const hasManualInput = !!manualInput;
 
-      // أيام الغياب: يدوي فقط إذا كان أكبر من صفر صراحةً، وإلا نستخدم الحساب الآلي
-      const absenceDays = (hasManualInput && (manualInput.absenceDays ?? 0) > 0)
+      // ── الإجازات من leaves API (المصدر الحقيقي) ──
+      // إذا وُجد إدخال يدوي يستخدمه المدير، نأخذ منه — وإلا نأخذ من الـ leaves المحسوبة آلياً
+      const sickLeaveDays = (hasManualInput && (manualInput.sickLeaveDays ?? 0) > 0)
+        ? (manualInput.sickLeaveDays ?? 0)
+        : 0; // الإجازة المرضية تأتي يدوياً فقط من payrollInput
+
+      const adminLeaveDays = (hasManualInput && (manualInput.adminLeaveDays ?? 0) > 0)
+        ? (manualInput.adminLeaveDays ?? 0)
+        : 0;
+
+      const deathLeaveDays = (hasManualInput && (manualInput.deathLeaveDays ?? 0) > 0)
+        ? (manualInput.deathLeaveDays ?? 0)
+        : 0;
+
+      const unpaidLeaveDays = (hasManualInput && (manualInput.unpaidLeaveDays ?? 0) > 0)
+        ? (manualInput.unpaidLeaveDays ?? 0)
+        : (leaveData?.unpaidLeaveDays ?? 0); // بدون أجر: نأخذ من leaves API إن لم يوجد إدخال يدوي
+
+      // الإجازات المدفوعة من leaves API (SICK+ADMIN+DEATH+PAID) تُستخدم في حساب الراتب
+      // نأخذ أكبر قيمة بين اليدوي والآلي لتجنب الخصم المزدوج
+      const paidLeaveDaysFromAPI = leaveData?.paidLeaveDays ?? 0;
+      const paidLeaveDaysManual = sickLeaveDays + adminLeaveDays + deathLeaveDays;
+      const paidLeaveDays = Math.max(paidLeaveDaysManual, paidLeaveDaysFromAPI);
+
+      // أيام الغياب الصافية: نطرح الإجازات المدفوعة من القادمة من الباك إند
+      // لأن backend قد يحسب أيام الإجازة كـ "absent" إذا لم يسجل الموظف بصمة
+      const rawAbsentDays = (hasManualInput && (manualInput.absenceDays ?? 0) > 0)
         ? (manualInput.absenceDays ?? 0)
         : (autoInput?.absentDays ?? 0);
+
+      // الغياب الصافي = مجموع الغياب - الإجازات المدفوعة (لا نخصم مرتين)
+      const absenceDays = Math.max(0, rawAbsentDays - paidLeaveDays);
 
       const autoLateMinutes = autoInput?.delayMinutes ?? 0;
       const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
         ? (manualInput.lateMinutes ?? 0)
         : autoLateMinutes;
 
-      // الإجازات من الـ payrollInput أو من الـ leaves المحسوبة
-      const sickLeaveDays = manualInput?.sickLeaveDays ?? 0;
-      const adminLeaveDays = manualInput?.adminLeaveDays ?? 0;
-      const unpaidLeaveDays = manualInput?.unpaidLeaveDays ?? 0;
-      const deathLeaveDays = manualInput?.deathLeaveDays ?? 0;
-
       const totalLeaves = sickLeaveDays + unpaidLeaveDays + adminLeaveDays + deathLeaveDays;
+      // إجمالي الغياب والإجازات للعرض — نستخدم الغياب الصافي
       const totalAbsencesLeaves = absenceDays + totalLeaves;
       const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
 
@@ -229,9 +273,6 @@ export default function TimeTablePage() {
       const actualWorkDays: number | null = autoInput !== undefined
         ? Math.max(0, autoInput.presentDays)
         : null;
-
-      // الإجازات المدفوعة (مرضية + إدارية + وفاة) تُحسب في الراتب
-      const paidLeaveDays = sickLeaveDays + adminLeaveDays + deathLeaveDays;
 
       // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
       const autoOvertimeMinutes = autoInput?.overtimeMinutes ?? 0;
@@ -248,10 +289,10 @@ export default function TimeTablePage() {
       // الراتب الكامل
       const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
 
-       // الراتب المستحق بناءً على الدوام الفعلي
-       const earnedSalary = actualWorkDays !== null
-         ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes, totalOvertimeMinutes)
-         : null;
+      // الراتب المستحق بناءً على الدوام الفعلي + الإجازات المدفوعة
+      const earnedSalary = actualWorkDays !== null
+        ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes, totalOvertimeMinutes)
+        : null;
 
       return {
         ...emp,
@@ -263,7 +304,7 @@ export default function TimeTablePage() {
         totalOvertimeDays,
         grossSalary,
         earnedSalary,
-        // بيانات الإجازات للعرض في الجدول
+        // بيانات الإجازات للعرض في الجدول — من leaves API
         leaveTypes: leaveData?.leaveTypes ?? [],
         paidLeaveDays,
         unpaidLeaveDays,

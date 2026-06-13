@@ -35,10 +35,6 @@ export type LeaveInput = {
   status?: string;
 };
 
-type LeaveListResponse = {
-  leaveRequests: LeaveRequest[];
-};
-
 export const useLeaves = (params?: { employeeId?: string; status?: string; leaveType?: string; startDate?: string; endDate?: string }) => {
   const queryClient = useQueryClient();
 
@@ -52,10 +48,27 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
           leaveType: params?.leaveType,
           startDate: params?.startDate,
           endDate: params?.endDate,
+          limit: 500,
         },
       });
-      const data = res.data as LeaveListResponse | undefined;
-      return data?.leaveRequests ?? [];
+      const raw = res.data;
+      // الباك إند يعيد { data: [...], total, page, ... } عبر paginatedResponse
+      // LeaveListResponse القديم (leaveRequests) لم يعد مستخدماً
+      const list: LeaveRequest[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw?.leaveRequests)
+          ? raw.leaveRequests
+          : Array.isArray(raw)
+            ? raw
+            : [];
+
+      // توحيد صيغة التواريخ: الباك إند يعيد ISO datetime (2026-06-10T00:00:00.000Z)
+      // نحوّلها إلى YYYY-MM-DD لضمان عمل مقارنات النطاق بشكل صحيح
+      return list.map((leave) => ({
+        ...leave,
+        startDate: leave.startDate?.slice(0, 10) ?? leave.startDate,
+        endDate: leave.endDate?.slice(0, 10) ?? leave.endDate,
+      }));
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,

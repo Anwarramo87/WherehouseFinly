@@ -25,8 +25,9 @@ import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
 import type { DeptFormData } from "@/components/AddDepartmentModal";
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/auth-store';
 import { useState, useMemo } from 'react';
-import { useAuthStore } from "@/stores/auth-store";
+
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
@@ -133,7 +134,7 @@ type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 export default function DashboardPage() {
   const { kpis, isLoading } = useDashboard();
   const { data: employees = [] } = useEmployees({ includeTerminated: true, fetchAll: true, limit: 500 });
-  const canViewFinancialRecords = useAuthStore((state) => state.hasAnyRole(["admin"]));
+  const canViewFinancialRecords = useAuthStore((state: { hasAnyRole: (roles: string[]) => boolean }) => state.hasAnyRole(["admin"]));
   const router = useRouter();
   const currentPayrollMonth = useMemo(() => {
     const now = new Date();
