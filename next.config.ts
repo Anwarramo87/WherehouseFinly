@@ -5,6 +5,7 @@ import { resolveApiUrl } from "./lib/api-url";
 const isProduction = process.env.NODE_ENV === "production";
 const upstreamApiBase = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
 const apiUrl = upstreamApiBase;
+
 const apiOrigin = (() => {
   if (!apiUrl) return "";
   try {
@@ -50,34 +51,15 @@ const cspDirectives = [
 ];
 
 const securityHeaders = [
-  {
-    key: "Content-Security-Policy",
-    value: cspDirectives.join("; "),
-  },
-  {
-    key: "X-Frame-Options",
-    value: "DENY",
-  },
-  {
-    key: "X-Content-Type-Options",
-    value: "nosniff",
-  },
-  {
-    key: "Referrer-Policy",
-    value: "strict-origin-when-cross-origin",
-  },
-  {
-    key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
-  },
-  {
-    key: "Cross-Origin-Opener-Policy",
-    value: "same-origin",
-  },
-  {
-    key: "Cross-Origin-Resource-Policy",
-    value: "same-origin",
-  },
+  { key: "Content-Security-Policy", value: cspDirectives.join("; ") },
+  { key: "X-Frame-Options", value: "DENY" }, // DENY أقوى من SAMEORIGIN
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "X-DNS-Prefetch-Control", value: "on" },
+  { key: "X-XSS-Protection", value: "1; mode=block" },
 ];
 
 const withBundleAnalyzer = bundleAnalyzer({
@@ -85,10 +67,26 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  reactStrictMode: true,
   poweredByHeader: false,
-  // Performance optimizations
   compress: true,
-  // تسريع compile time — يقلل الـ tree-shaking لمكتبات كبيرة في dev
+  productionBrowserSourceMaps: false,
+
+  // إعدادات الصور
+  images: {
+    remotePatterns: [
+      { protocol: "http", hostname: "localhost", port: "3000", pathname: "/**" },
+      { protocol: "https", hostname: "localhost", port: "3000", pathname: "/**" },
+    ],
+    formats: ["image/webp", "image/avif"],
+  },
+
+  // تحسينات المترجم
+  compiler: {
+    removeConsole: isProduction,
+  },
+
+  // تحسين أداء بيئة التطوير وتقليل استهلاك الـ RAM
   experimental: {
     optimizePackageImports: [
       "lucide-react",
@@ -96,32 +94,49 @@ const nextConfig: NextConfig = {
       "@tanstack/react-query",
       "@tanstack/react-table",
     ],
-    // Optimize server actions and other features
     optimizeServerReact: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: "/api/telemetry/web-vitals",
-        destination: "/api/telemetry/web-vitals",
-      },
-      {
-        source: "/api/v1/:path*",
-        destination: `${upstreamApiBase}/:path*`,
-      },
-      {
-        source: "/api/:path*",
-        destination: `${upstreamApiBase}/:path*`,
-      },
-    ];
+
+  // تحسينات Webpack لبيئة الإنتاج
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+            vendor: {
+              name: 'vendor',
+              chunks: 'all',
+              test: /node_modules/,
+              priority: 20,
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              chunks: 'all',
+              priority: 10,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+          },
+        },
+      };
+    }
+    return config;
   },
+
   async headers() {
     return [
       {
+        // تطبيق مسار الحماية على كل الصفحات
         source: "/:path*",
         headers: [
           ...securityHeaders,
-          ...(process.env.NODE_ENV === "production"
+          ...(isProduction
             ? [
                 {
                   key: "Strict-Transport-Security",
@@ -129,7 +144,13 @@ const nextConfig: NextConfig = {
                 },
               ]
             : []),
-          // Cache static assets
+        ],
+      },
+      {
+        // تم التصحيح: تطبيق الـ Cache على الملفات الثابتة فقط لتجنب تخزين الـ API أو الصفحات الديناميكية
+        source: "/:all*(svg|jpg|png|webp|avif)",
+        locale: false,
+        headers: [
           {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",

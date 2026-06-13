@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   Download, FileSpreadsheet, Wallet, Receipt,
   HandCoins, Calendar as CalendarIcon,
@@ -17,13 +18,25 @@ import { useResignedEmployees, useEmployees } from "@/hooks/useEmployees";
 import { usePayrollInputs } from "@/hooks/usePayrollInputs";
 import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
 import { useAttendance } from "@/hooks/useAttendance";
-import RunPayrollModal from "@/components/RunPayrollModal";
 import { toast } from "react-hot-toast";
+
+import { useVirtualizer, VirtualItem } from '@tanstack/react-virtual';
+import PayrollRow from '@/components/PayrollRow';
 
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
 import type { PayrollItem } from "@/types/payroll";
 import type { Employee } from "@/types/employee";
+
+// Lazy load heavy components
+const RunPayrollModal = dynamic(() => import("@/components/RunPayrollModal"), {
+  loading: () => <div className="text-center py-4">جاري التحميل...</div>,
+  ssr: false,
+});
+
+const PayslipModal = dynamic(() => import("@/components/PayslipModal"), {
+  ssr: false,
+});
 
 // ─── TypeScript Interfaces ────────────────────────────────────────────────────
 
@@ -218,30 +231,18 @@ export default function PayrollPage() {
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
    * Each row is driven by a payrollItem returned from GET /api/payroll/report/:month.
-   * If no payroll run exists for the selected month `reportData.items` is empty
-   * and the table shows the "no run" empty-state — NOT zeros.
+   * If no payroll run exists, we'll generate preview data from active employees.
    */
-  const payrollData = useMemo<AggregatedPayroll[]>(() => {
-    if (!reportData?.items?.length) return [];
-
-    return reportData.items.map((backendItem: PayrollItem) => {
-      const { employeeId, employeeName } = backendItem;
-
-      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
-      const department =
-        (backendItem.department?.trim() || "") ||
-        salaryConfig?.profession?.trim() ||
-        "أقسام عامة";
-
-      const grossPay = toNumber(backendItem.grossPay);
-      const anomalies: string[] = Array.isArray(backendItem.anomalies)
-        ? backendItem.anomalies
-        : [];
-
-      // ── 1. Calculate Earned Salary exactly as TimeTable ──────────────────────
-      let earnedSalary = 0;
-      const emp = employees.find((e) => e.employeeId === employeeId);
+  const previewData = useMemo<AggregatedPayroll[]>(() => {
+    // Generate preview data from active employees when no report exists
+    return employees.filter(e => e.status === 'active').map((emp) => {
+      const employeeId = emp.employeeId;
+      const employeeName = emp.name;
       
+      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+      const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
+
+      // Calculate gross salary
       let calcGross = 0;
       if (salaryConfig) {
         calcGross = toNumber(salaryConfig.baseSalary) +
@@ -252,36 +253,35 @@ export default function PayrollPage() {
           toNumber(salaryConfig.productionIncentive) +
           toNumber(salaryConfig.transportAllowance);
       }
-      if (calcGross <= 0 && emp) {
+      if (calcGross <= 0) {
         calcGross = toNumber((emp as { baseSalary?: number }).baseSalary) || toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
       }
 
-      if (emp) {
-        const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-          const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
-          const hasManualInput = !!manualInput;
+      // Calculate earned salary
+      let earnedSalary = 0;
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+      const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
+      const hasManualInput = !!manualInput;
 
-          const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
-          const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
-            ? (manualInput.lateMinutes ?? 0)
-            : autoLateMinutes;
+      const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
+      const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+        ? (manualInput.lateMinutes ?? 0)
+        : autoLateMinutes;
 
-          const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
-          
-          // احسب أيام العمل الفعلية: استخدم الأيام اليدوية أو التلقائية أو الافتراضية (26)
-          let actualWorkDays: number;
-          if (hasManualInput && manualInput.absenceDays !== undefined) {
-            actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
-          } else if (autoInput !== undefined) {
-            actualWorkDays = Math.max(0, autoInput.presentDays);
-          } else {
-            actualWorkDays = STANDARD_WORK_DAYS; // افتراض أيام العمل كاملة
-          }
-
-          earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
+      const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+      
+      let actualWorkDays: number;
+      if (hasManualInput && manualInput.absenceDays !== undefined) {
+        actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
+      } else if (autoInput !== undefined) {
+        actualWorkDays = Math.max(0, autoInput.presentDays);
+      } else {
+        actualWorkDays = STANDARD_WORK_DAYS;
       }
 
-      // ── 2. Bonuses (المكافآت) ────────────────────────────────
+      earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
+
+      // Bonuses
       const employeeBonuses = bonuses.filter((b) => b.employeeId === employeeId);
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
         const bonusAmt = toNumber(bonus.bonusAmount);
@@ -289,10 +289,7 @@ export default function PayrollPage() {
         return sum + bonusAmt + assistAmt;
       }, 0);
 
-      // ── 3. Deductions (الخصومات) ───────────────────────────────────
-      // Note: useDiscounts hook already includes both advances and penalties/discounts
-      // So we should use either advances + separate discounts, OR just use discounts hook
-      // Let's use the discounts hook which includes all deduction types
+      // Deductions
       const employeeDiscounts = discounts.filter((d) => {
         return d.employeeId === employeeId && d.date.startsWith(month);
       });
@@ -302,10 +299,7 @@ export default function PayrollPage() {
         0
       );
 
-      // ── 4. Apply Formula (الراتب المستحق + المكافآت - الخصومات) ───
       const netPay = earnedSalary + variableEarnings - variableDeductions;
-      
-      // ── 5. Calculate rounding ──────────────────────────────────────
       const netPayRounded = Math.ceil(netPay / 1000) * 1000;
       const roundingDifference = netPayRounded - netPay;
 
@@ -313,12 +307,12 @@ export default function PayrollPage() {
         employeeId,
         employeeName,
         department,
-        grossPay,
+        grossPay: calcGross,
         totalDeductions: variableDeductions,
         netPay,
         netPayRounded,
         roundingDifference,
-        anomalies,
+        anomalies: [],
         earnedSalary,
         bonusesTotal: variableEarnings,
         discountsTotal: variableDeductions,
@@ -334,7 +328,120 @@ export default function PayrollPage() {
         },
       };
     });
-  }, [reportData, salaries, bonuses, discounts, month, employees, payrollInputs, autoDeductions, localLateMinutesMap]);
+  }, [employees, salaries, bonuses, discounts, month, payrollInputs, autoDeductions, localLateMinutesMap]);
+
+  const payrollData = useMemo<AggregatedPayroll[]>(() => {
+    // If we have a payroll run, use backend data
+    if (reportData?.items?.length) {
+      return reportData.items.map((backendItem: PayrollItem) => {
+        const { employeeId, employeeName } = backendItem;
+
+        const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+        const department =
+          (backendItem.department?.trim() || "") ||
+          salaryConfig?.profession?.trim() ||
+          "أقسام عامة";
+
+        const grossPay = toNumber(backendItem.grossPay);
+        const totalDeductions = toNumber(backendItem.totalDeductions);
+        const netPay = toNumber(backendItem.netPay);
+        const netPayRounded = toNumber(backendItem.netPayRounded);
+        const roundingDifference = toNumber(backendItem.roundingDifference);
+        const netPayWithAdvance = toNumber(backendItem.netPayWithAdvance);
+        
+        const anomalies: string[] = Array.isArray(backendItem.anomalies)
+          ? backendItem.anomalies
+          : [];
+
+        // ── 1. Calculate Earned Salary exactly as TimeTable ──────────────────────
+        let earnedSalary = 0;
+        const emp = employees.find((e) => e.employeeId === employeeId);
+        
+        let calcGross = 0;
+        if (salaryConfig) {
+          calcGross = toNumber(salaryConfig.baseSalary) +
+            toNumber(salaryConfig.lumpSumSalary) +
+            toNumber(salaryConfig.livingAllowance) +
+            toNumber(salaryConfig.responsibilityAllowance) +
+            toNumber(salaryConfig.extraEffortAllowance ?? salaryConfig.extraEffort) +
+            toNumber(salaryConfig.productionIncentive) +
+            toNumber(salaryConfig.transportAllowance);
+        }
+        if (calcGross <= 0 && emp) {
+          calcGross = toNumber((emp as { baseSalary?: number }).baseSalary) || toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+        }
+
+        if (emp) {
+          const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+          const autoInput = autoDeductions.find((d: { employeeId: string }) => d.employeeId === employeeId);
+          const hasManualInput = !!manualInput;
+
+          const autoLateMinutes = localLateMinutesMap.get(employeeId) ?? 0;
+          const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+            ? (manualInput.lateMinutes ?? 0)
+            : autoLateMinutes;
+
+          const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+          
+          let actualWorkDays: number;
+          if (hasManualInput && manualInput.absenceDays !== undefined) {
+            actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
+          } else if (autoInput !== undefined) {
+            actualWorkDays = Math.max(0, autoInput.presentDays);
+          } else {
+            actualWorkDays = STANDARD_WORK_DAYS;
+          }
+
+          earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
+        }
+
+        const employeeBonuses = bonuses.filter((b) => b.employeeId === employeeId);
+        const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
+          const bonusAmt = toNumber(bonus.bonusAmount);
+          const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
+          return sum + bonusAmt + assistAmt;
+        }, 0);
+
+        const employeeDiscounts = discounts.filter((d) => {
+          return d.employeeId === employeeId && d.date.startsWith(month);
+        });
+        
+        const variableDeductions = employeeDiscounts.reduce(
+          (sum, d) => sum + toNumber(d.amount),
+          0
+        );
+
+        // ✅ Use backend authoritative values - these are already calculated correctly
+        return {
+          employeeId,
+          employeeName,
+          department,
+          grossPay,
+          totalDeductions,
+          netPay: netPayWithAdvance, // ✅ Use the actual value from backend (381,000)
+          netPayRounded,
+          roundingDifference,
+          anomalies,
+          earnedSalary,
+          bonusesTotal: variableEarnings,
+          discountsTotal: variableDeductions,
+          fixedEarnings: calcGross,
+          variableEarnings,
+          fixedDeductions: toNumber(salaryConfig?.insuranceAmount),
+          variableDeductions,
+          details: {
+            salaryConfig,
+            bonuses: employeeBonuses,
+            advances: employeeDiscounts.filter(d => d.kind === 'advance'),
+            attendance: null,
+          },
+        };
+      });
+    }
+    
+    // ✅ NEW: If no payroll run, use the generated preview data
+    return previewData;
+  }, [reportData, salaries, bonuses, discounts, month, employees, payrollInputs, autoDeductions, localLateMinutesMap, previewData]);
 
   // ── Filtering ────────────────────────────────────────────────────────────────
   const filteredPayrollData = useMemo(() => {
@@ -348,15 +455,34 @@ export default function PayrollPage() {
     );
   }, [payrollData, searchTerm]);
 
-  // ── Group by department ───────────────────────────────────────────────────────
-  const groupedPayrollData = useMemo(() => {
-    const groups: Record<string, AggregatedPayroll[]> = {};
-    filteredPayrollData.forEach((item) => {
-      if (!groups[item.department]) groups[item.department] = [];
-      groups[item.department].push(item);
+  // Flatten the data for virtualization, including department headers
+  const allRows = useMemo(() => {
+    const rows: (AggregatedPayroll | { isHeader: true; department: string; count: number })[] = [];
+    const grouped = filteredPayrollData.reduce<Record<string, AggregatedPayroll[]>>((acc, item) => {
+      const key = item.department || 'أقسام عامة';
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(item);
+      return acc;
+    }, {});
+
+    Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).forEach(([department, items]) => {
+      rows.push({ isHeader: true, department, count: items.length });
+      rows.push(...items);
     });
-    return Object.fromEntries(Object.entries(groups).sort());
+
+    return rows;
   }, [filteredPayrollData]);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: allRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index: number) => (allRows[index] as any).isHeader ? 48 : 96, // Estimate header height and row height
+    overscan: 5,
+  });
 
   // ── Grand totals (server figures only) ───────────────────────────────────────
   const globalTotals = useMemo(
@@ -499,11 +625,14 @@ export default function PayrollPage() {
             {/* Month picker */}
             <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-2 shadow-sm transition-all duration-300 hover:shadow-md group focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20">
               <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 group-focus-within:border-[#C89355]/50" />
+              <label htmlFor="month-picker" className="sr-only">اختر الشهر</label>
               <CalendarIcon size={18} className="text-[#C89355] group-hover:scale-110 transition-transform relative z-10 ml-2" />
               <input
+                id="month-picker"
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
+                aria-label="اختيار شهر التقرير"
                 className="bg-transparent border-none outline-none font-mono text-sm font-black text-[#263544] w-full cursor-pointer focus:ring-0 relative z-10"
               />
             </div>
@@ -512,6 +641,7 @@ export default function PayrollPage() {
               type="button"
               onClick={handleExportExcel}
               disabled={!filteredPayrollData.length}
+              aria-label="تنزيل تقرير الرواتب بصيغة Excel"
               className="relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600/90 backdrop-blur-md text-white font-black text-sm hover:bg-emerald-700 transition-all shadow-[0_10px_20px_rgba(5,150,105,0.3)] active:scale-95 border border-emerald-500 group disabled:opacity-50 disabled:pointer-events-none"
             >
               <div className="absolute inset-1 rounded-xl border border-dashed border-white/30 pointer-events-none" />
@@ -530,6 +660,7 @@ export default function PayrollPage() {
             <button
               type="button"
               onClick={() => setPayrollModalOpen(true)}
+              aria-label="فتح نافذة حساب المسير الشهري"
               className="relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#263544] backdrop-blur-md text-white font-black text-sm hover:bg-[#1a2530] transition-all shadow-sm active:scale-95 group"
             >
               <div className="absolute inset-1 rounded-xl border border-dashed border-white/20 pointer-events-none" />
@@ -660,10 +791,9 @@ export default function PayrollPage() {
 
         {/* ── Payroll table ─────────────────────────────────────────────────────── */}
         <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group/table">
-          <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/table:border-[#C89355]/50" />
-          <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-            <table className="w-full text-right min-w-[1100px] border-collapse">
-              <thead className="bg-[#1a2530] text-white outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-[6px]">
+          <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '800px' }}>
+            <table className="w-full text-right min-w-[1100px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+              <thead className="bg-[#1a2530] text-white outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-[6px] sticky top-0 z-10">
                 <tr>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الموظف</th>
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الراتب المستحق</th>
@@ -677,116 +807,35 @@ export default function PayrollPage() {
                   <th className="p-5 font-black text-xs uppercase tracking-wider text-center">إجراء</th>
                 </tr>
               </thead>
-
-              <tbody className="divide-y divide-slate-200/50">
-                {Object.keys(groupedPayrollData).length ? (
-                  Object.entries(groupedPayrollData).map(([dept, items]) => (
-                    <React.Fragment key={dept}>
-                      {/* Department header row */}
-                      <tr className="bg-slate-100/80 hover:bg-slate-200/60 transition-colors border-y border-slate-300">
+              <tbody style={{ position: 'relative' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualItem: VirtualItem) => {
+                  const row = allRows[virtualItem.index] as any;
+                  if (row.isHeader) {
+                    return (
+                      <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100/80 hover:bg-slate-200/60 transition-colors border-y border-slate-300">
                         <td colSpan={8} className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-2 h-5 bg-[#C89355] rounded-full shadow-sm" />
                             <span className="font-black text-[#263544] text-sm uppercase tracking-wide">
-                              {dept}
+                              {row.department}
                             </span>
                             <span className="text-xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm">
-                              {items.length} موظف
+                              {row.count} موظف
                             </span>
                           </div>
                         </td>
                       </tr>
-
-                      {/* Employee rows */}
-                      {items.map((item) => (
-                        <tr
-                          key={item.employeeId}
-                          className="bg-white/40 hover:bg-white/90 transition-all duration-300 group/row hover:scale-[1.002] hover:shadow-sm"
-                        >
-                          {/* الموظف: الاسم + الكود + التنبيهات */}
-                          <td className="p-4 text-center font-black text-slate-800 group-hover/row:text-[#263544] transition-colors">
-                            <div className="flex flex-col items-center">
-                              <span className="text-base">{item.employeeName}</span>
-                              <span className="text-xs text-slate-400 font-mono mt-0.5">{item.employeeId}</span>
-                              {item.anomalies.length > 0 && (
-                                <span className="text-[10px] text-amber-500 flex items-center gap-1 mt-1 font-bold">
-                                  <AlertTriangle size={10} /> تنبيه حسابي
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* الراتب المستحق — من الدوام (ساعات × معدل الساعة) */}
-                          <td className="p-4 text-center font-mono font-black text-[#263544]">
-                            <span>{Math.round(item.earnedSalary).toLocaleString()}</span>
-                            <span className="text-[10px] text-slate-400 block">ل.س</span>
-                          </td>
-
-                          {/* المكافآت — مجموع bonusAmount + assistanceAmount من صفحة المكافآت */}
-                          <td className="p-4 text-center font-mono font-black">
-                            {item.bonusesTotal > 0 ? (
-                              <span className="text-emerald-600">
-                                +{item.bonusesTotal.toLocaleString()}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-
-                          {/* الخصومات — مجموع السلف والعقوبات من صفحة الخصومات */}
-                          <td className="p-4 text-center font-mono font-black text-rose-600 bg-rose-50/30">
-                            {item.discountsTotal > 0 ? (
-                              <span>-{item.discountsTotal.toLocaleString()}</span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-
-                          {/* المجموع = الراتب المستحق + المكافآت - الخصومات */}
-                          <td className="p-4 text-center font-mono font-black text-[#263544]">
-                            {item.netPay.toLocaleString()}
-                          </td>
-
-                          {/* الراتب المقبوض — مقرب لأقرب ألف */}
-                          <td className="p-4 text-center font-black text-xl text-[#1a2530] bg-linear-to-l from-[#C89355]/10 to-transparent shadow-inner border-l-4 border-l-[#C89355]">
-                            {item.netPayRounded.toLocaleString()}
-                          </td>
-
-                          {/* الفرق = الراتب المقبوض - المجموع */}
-                          <td className="p-4 text-center font-mono font-black text-amber-600 bg-amber-50/30">
-                            {item.roundingDifference.toLocaleString()}
-                          </td>
-
-                          {/* إجراء */}
-                          <td className="p-4 text-center">
-                            <button
-                              onClick={() => setSelectedPayslip(item)}
-                              className="flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded-xl bg-white text-[#C89355] hover:bg-[#C89355] hover:text-white font-bold text-xs transition-all shadow-sm border border-[#C89355]/30 active:scale-95 group/btn"
-                            >
-                              <Receipt size={16} className="group-hover/btn:scale-110 transition-transform" />
-                              عرض الوصل
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="p-16 text-center" colSpan={8}>
-                      <div className="flex flex-col items-center justify-center gap-3 animate-in fade-in zoom-in duration-500">
-                        <div className="p-4 bg-white/50 rounded-full border-2 border-dashed border-slate-300">
-                          <Search size={32} className="text-slate-400" />
-                        </div>
-                        <p className="text-[#263544]/60 font-black text-lg">
-                          {searchTerm
-                            ? "لا توجد نتائج مطابقة للبحث"
-                            : "لا توجد بيانات رواتب لهذا الشهر"}
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
+                    );
+                  }
+                  return (
+                    <PayrollRow
+                      key={virtualItem.index}
+                      item={row}
+                      onSelectPayslip={() => setSelectedPayslip(row)}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
+                    />
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -913,332 +962,11 @@ export default function PayrollPage() {
 
       {/* ─── Payslip Modal ────────────────────────────────────────────────────── */}
       {selectedPayslip && (
-        <div
-          className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
-          dir="rtl"
-        >
-          <div className="payslip-container bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in fade-in zoom-in-95 duration-200">
-
-            {/* Modal header */}
-            <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10 print:bg-transparent print:border-b-2 print:border-slate-800">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl border shadow-[0_0_20px_rgba(200,147,85,0.15)] bg-[#C89355]/10 border-[#C89355]/20 print:hidden">
-                  <Receipt className="text-[#C89355]" size={28} />
-                </div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide print:text-slate-900">
-                    تفاصيل وصل الراتب
-                  </h2>
-                  <p className="text-xs text-slate-400 font-bold mt-1 print:text-slate-500">
-                    KU&amp;M JEANS — إدارة الموارد البشرية
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-left bg-black/20 p-3 rounded-xl border border-white/10 backdrop-blur-sm print:bg-transparent print:border-slate-300">
-                  <p className="text-white/60 text-xs font-bold mb-1 uppercase tracking-widest print:text-slate-500">
-                    فترة الاستحقاق
-                  </p>
-                  <p className="text-[#C89355] text-xl font-black font-mono print:text-slate-800">
-                    {month}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedPayslip(null)}
-                  className="text-slate-500 hover:text-rose-400 bg-[#263544] p-2.5 rounded-2xl border border-transparent hover:border-rose-400/30 transition-all hover:rotate-90 active:scale-90 print:hidden"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal body */}
-            <div className="overflow-y-auto custom-scrollbar flex-1 bg-slate-50 p-6 sm:p-10 relative print:p-4 print:overflow-visible">
-
-              {/* Employee info card */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8 print:border-none print:shadow-none print:p-0 print:mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <div className="sm:col-span-2">
-                    <p className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-widest print:text-black">
-                      اسم الموظف
-                    </p>
-                    <p className="text-slate-800 text-2xl font-black print:text-black wrap-break-word">
-                      {selectedPayslip.employeeName}
-                    </p>
-                    <p className="text-slate-400 text-sm font-bold mt-1">
-                      {selectedPayslip.department}
-                    </p>
-                  </div>
-                  <div className="text-right sm:text-left">
-                    <p className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-widest print:text-black">
-                      كود الموظف
-                    </p>
-                    <p className="text-[#C89355] text-2xl font-black font-mono print:text-black">
-                      {selectedPayslip.employeeId}
-                    </p>
-                  </div>
-                </div>
-                {selectedPayslip.anomalies.length > 0 && (
-                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm font-bold print:hidden">
-                    <strong>ملاحظات النظام: </strong>
-                    <ul className="list-disc list-inside ms-4 mt-1">
-                      {selectedPayslip.anomalies.map((an, idx) => (
-                        <li key={idx}>{an}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Earnings / Deductions grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 print:gap-4 print:grid-cols-2">
-
-                {/* ── Earnings column ──────────────────────────────────────── */}
-                <div className="space-y-6 print:space-y-4">
-                  <div className="flex items-center gap-3 border-b-2 border-emerald-100 pb-4 print:border-emerald-200">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-200 print:bg-transparent">
-                      <Wallet className="text-emerald-600 print:text-black" size={20} />
-                    </div>
-                    <h2 className="text-xl font-black text-emerald-800 tracking-tight print:text-black">
-                      التفاصيل المالية (المستحقات)
-                    </h2>
-                  </div>
-
-                  {/* Fixed salary components (display-only) */}
-                  {selectedPayslip.details.salaryConfig ? (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-slate-300">
-                      <h3 className="text-sm font-black text-slate-500 mb-4 uppercase tracking-widest print:text-black">
-                        الأجور الثابتة
-                      </h3>
-                      <div className="space-y-4 text-slate-700 print:text-black">
-                        {(
-                          [
-                            { label: "الراتب الأساسي",          value: toNumber(selectedPayslip.details.salaryConfig.baseSalary) },
-                            { label: "الراتب المقطوع",           value: toNumber(selectedPayslip.details.salaryConfig.lumpSumSalary) },
-                            { label: "بدل المعيشة",              value: toNumber(selectedPayslip.details.salaryConfig.livingAllowance) },
-                            { label: "تعويض المسؤولية",          value: toNumber(selectedPayslip.details.salaryConfig.responsibilityAllowance) },
-                            {
-                              label: "تعويض الجهد الإضافي",
-                              value: toNumber(
-                                selectedPayslip.details.salaryConfig.extraEffortAllowance ??
-                                selectedPayslip.details.salaryConfig.extraEffort,
-                              ),
-                            },
-                            { label: "حوافز الإنتاجية",          value: toNumber(selectedPayslip.details.salaryConfig.productionIncentive) },
-                            { label: "بدل النقل",                value: toNumber(selectedPayslip.details.salaryConfig.transportAllowance) },
-                          ] as { label: string; value: number }[]
-                        )
-                          .filter((row) => row.value > 0)
-                          .map((row) => (
-                            <div key={row.label} className="flex justify-between items-center">
-                              <span className="text-sm font-bold">{row.label}</span>
-                              <span className="text-lg font-black text-emerald-600 font-mono print:text-black">
-                                {row.value.toLocaleString()}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                      <div className="mt-5 pt-4 border-t border-slate-200 border-dashed flex justify-between items-center print:border-slate-400">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest print:text-black">
-                          مجموع الثوابت (واجهة)
-                        </span>
-                        <span className="text-xl font-black text-emerald-600 font-mono print:text-black">
-                          {selectedPayslip.fixedEarnings.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic print:text-black">
-                      لا يوجد راتب ثابت مضبوط للموظف
-                    </p>
-                  )}
-
-                  {/* Bonuses */}
-                  {selectedPayslip.details.bonuses.length > 0 && (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-slate-300">
-                      <h3 className="text-sm font-black text-[#C89355] mb-4 uppercase tracking-widest print:text-black">
-                        المكافآت
-                      </h3>
-                      <div className="space-y-4 text-slate-700 print:text-black">
-                        {selectedPayslip.details.bonuses.map((bonus, idx) => (
-                          <div key={idx} className="flex justify-between items-center">
-                            <span className="text-sm font-bold">
-                              {bonus.bonusReason || "مكافأة غير مسماة"}
-                            </span>
-                            <span className="text-lg font-black text-[#C89355] font-mono print:text-black">
-                              +{toNumber(bonus.bonusAmount).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-5 pt-4 border-t border-slate-200 border-dashed flex justify-between items-center print:border-slate-400">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest print:text-black">
-                          مجموع المكافآت
-                        </span>
-                        <span className="text-xl font-black text-[#C89355] font-mono print:text-black">
-                          {selectedPayslip.variableEarnings.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Authoritative gross (from backend) */}
-                  <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 shadow-sm print:shadow-none print:border-slate-400 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-2 h-full bg-emerald-500" />
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-black text-emerald-800 uppercase tracking-widest print:text-black">
-                        إجمالي الاستحقاق الدقيق (حسب النظام)
-                      </span>
-                      <span className="text-2xl font-black text-emerald-600 font-mono print:text-black">
-                        {selectedPayslip.grossPay.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Deductions column ────────────────────────────────────── */}
-                <div className="space-y-6 print:space-y-4">
-                  <div className="flex items-center gap-3 border-b-2 border-rose-100 pb-4 print:border-slate-300 print:pb-2">
-                    <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center border border-rose-200 print:hidden">
-                      <Receipt className="text-rose-600" size={20} />
-                    </div>
-                    <h2 className="text-xl font-black text-rose-800 tracking-tight print:text-black print:text-lg">
-                      الاقتطاعات والخصومات
-                    </h2>
-                  </div>
-
-                  {/* Insurance (fixed deduction) */}
-                  {selectedPayslip.fixedDeductions > 0 && (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-slate-300">
-                      <h3 className="text-sm font-black text-slate-500 mb-4 uppercase tracking-widest print:text-black">
-                        اقتطاعات ثابتة
-                      </h3>
-                      <div className="flex justify-between items-center text-slate-700 print:text-black">
-                        <span className="text-sm font-bold">مؤسسة التأمينات الاجتماعية</span>
-                        <span className="text-lg font-black text-rose-600 font-mono print:text-black">
-                          -{selectedPayslip.fixedDeductions.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Advances */}
-                  {selectedPayslip.details.advances.length > 0 && (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-slate-300">
-                      <h3 className="text-sm font-black text-slate-500 mb-4 uppercase tracking-widest print:text-black">
-                        سلف وعقوبات (مستردة)
-                      </h3>
-                      <div className="space-y-4 text-slate-700 print:text-black">
-                        {selectedPayslip.details.advances.map((adv, idx) => {
-                          // Handle both DiscountRecord and Advance types
-                          const amount = 'amount' in adv ? toNumber(adv.amount) : 
-                            (toNumber((adv as { installmentAmount?: number }).installmentAmount) || toNumber((adv as { remainingAmount?: number }).remainingAmount));
-                          return (
-                            <div key={idx} className="flex justify-between items-center">
-                              <span className="text-sm font-bold">
-                                {'type' in adv ? adv.type : 
-                                  `سلفة ${(adv as { advanceType?: string }).advanceType === "salary" ? "راتب" : (adv as { advanceType?: string }).advanceType === "clothing" ? "ملابس" : "أخرى"}`}
-                              </span>
-                              <span className="text-lg font-black text-rose-600 font-mono print:text-black">
-                                -{amount.toLocaleString()}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-5 pt-4 border-t border-slate-200 border-dashed flex justify-between items-center print:border-slate-400">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest print:text-black">
-                          مجموع السلف
-                        </span>
-                        <span className="text-xl font-black text-rose-600 font-mono print:text-black">
-                          -{selectedPayslip.variableDeductions.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Authoritative total deductions (from backend) */}
-                  <div className="bg-rose-50 rounded-2xl p-6 border border-rose-200 shadow-sm print:shadow-none print:border-slate-400 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-2 h-full bg-rose-500" />
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-black text-rose-800 uppercase tracking-widest print:text-black">
-                        إجمالي الخصم الدقيق (حسب النظام)
-                      </span>
-                      <span className="text-2xl font-black text-rose-600 font-mono print:text-black">
-                        {selectedPayslip.totalDeductions.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedPayslip.totalDeductions === 0 && (
-                    <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center shadow-sm print:shadow-none print:border-slate-300">
-                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100 print:hidden">
-                        <HandCoins className="text-slate-400" size={28} />
-                      </div>
-                      <p className="text-slate-500 font-bold text-base print:text-black">
-                        لا توجد أي خصومات مالية مسجلة لهذا الشهر.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Print signature row */}
-              <div className="hidden print:flex justify-between items-end w-full mt-8 pt-4 border-t-2 border-slate-800">
-                <div className="text-center w-1/3">
-                  <p className="text-black font-bold text-xs mb-6">توقيع المحاسب</p>
-                  <div className="border-b border-dashed border-slate-400 w-full" />
-                </div>
-                <div className="text-center">
-                  <p className="text-black text-xs font-black uppercase mb-1">الصافي للدفع</p>
-                  <p className="text-black text-2xl font-black font-mono">
-                    {selectedPayslip.netPayRounded.toLocaleString()}{" "}
-                    <span className="text-sm">ل.س</span>
-                  </p>
-                </div>
-                <div className="text-center w-1/3">
-                  <p className="text-black font-bold text-xs mb-6">توقيع الموظف المستلم</p>
-                  <div className="border-b border-dashed border-slate-400 w-full" />
-                </div>
-              </div>
-            </div>
-
-            {/* Modal footer */}
-            <div className="p-6 sm:p-8 bg-[#1a2530]/90 backdrop-blur-md border-t border-white/5 flex flex-col md:flex-row items-center justify-between shrink-0 relative z-10 print:hidden">
-              <div className="text-right mb-6 md:mb-0">
-                <p className="text-[#C89355] font-black text-sm uppercase tracking-widest mb-1">
-                  صافي المبلغ المستحق للدفع
-                </p>
-                <p className="text-white text-5xl font-black font-mono drop-shadow-md">
-                  {selectedPayslip.netPayRounded.toLocaleString()}
-                  <span className="text-2xl mr-3 opacity-80">ل.س</span>
-                </p>
-                <p className="text-slate-400 text-xs font-bold mt-2">
-                  (الصافي الدقيق: {selectedPayslip.netPay.toLocaleString()} | فرق تقريب:{" "}
-                  {selectedPayslip.roundingDifference > 0 ? "+" : ""}
-                  {selectedPayslip.roundingDifference.toLocaleString()})
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => window.print()}
-                  className="relative overflow-hidden inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/10 backdrop-blur-md text-white font-black text-sm hover:bg-white/20 transition-all border border-white/20 active:scale-95 group"
-                >
-                  <Download size={18} className="group-hover:-translate-y-0.5 transition-transform" />
-                  طباعة الوصل
-                </button>
-                <button
-                  onClick={() => setSelectedPayslip(null)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#C89355] text-[#1a2530] font-black text-sm hover:bg-[#d4a472] transition-all border border-[#C89355]/50 active:scale-95"
-                >
-                  إغلاق
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PayslipModal
+          payslip={selectedPayslip}
+          month={month}
+          onClose={() => setSelectedPayslip(null)}
+        />
       )}
     </div>
   );

@@ -297,7 +297,6 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
   // 5. إقالة أو استقالة موظف
   const terminateMutation = useMutation<unknown, unknown, TerminateEmployeeVariables>({
     mutationFn: async ({ id, data }) => {
-      // terminationType مطلوب من الـ DTO — يُشتق من حقل status
       const terminationType = data.status === "resigned" ? "resignation" : "termination";
       const payload = {
         terminationDate: data.terminationDate,
@@ -316,6 +315,28 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل في إنهاء الخدمة"));
     }
+  });
+
+  const bulkTerminateDepartmentMutation = useMutation({
+    mutationFn: async (payload: { department: string; status: "terminated" | "resigned"; terminationDate: string; terminationReason?: string; notes?: string }) => {
+      const terminationType = payload.status === "resigned" ? "resignation" : "termination";
+      return await apiClient.post("/employees/bulk-terminate-department", {
+        department: payload.department,
+        terminationDate: payload.terminationDate,
+        terminationType,
+        terminationReason: payload.terminationReason,
+        terminationNotes: payload.notes,
+      });
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      const message = (response as unknown as { data?: { message?: string } }).data?.message || "تم الإقالة الجماعية بنجاح";
+      toast.success(message);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "فشل في الإقالة الجماعية"));
+    },
   });
 
   // التعديل الثاني: تصفية مستحقات موظف (للمحاسب)
@@ -339,6 +360,7 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     updateEmployee: updateMutation, 
     deleteEmployee: deleteMutation,
     terminateEmployee: terminateMutation,
+    bulkTerminateDepartment: bulkTerminateDepartmentMutation,
     settleEmployee: settleMutation
   };
 };

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   Users, Clock, Timer, AlertTriangle,
   UserCheck, Wallet, UserX, Building2, TrendingUp,
@@ -26,8 +27,7 @@ import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
 import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
-import { DataDrilldownModal } from '@/components/DataDrilldownModal';
-import AddDepartmentModal, { type DeptFormData } from "@/components/AddDepartmentModal"; 
+import type { DeptFormData } from "@/components/AddDepartmentModal";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,6 +35,15 @@ import axios from 'axios';
 import apiClient from '@/lib/api-client';
 import { toLocalDateString } from '@/lib/date-time';
 import { useAuthStore } from '@/stores/auth-store';
+
+const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
+  loading: () => null,
+});
+
+const DataDrilldownModal = dynamic(
+  () => import("@/components/DataDrilldownModal").then((module) => module.DataDrilldownModal),
+  { loading: () => null },
+);
 
 // ============================================================================
 // TypeScript Interfaces

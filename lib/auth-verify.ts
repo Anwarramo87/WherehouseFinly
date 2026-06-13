@@ -1,6 +1,5 @@
 import axios from "axios";
 import apiClient from "@/lib/api-client";
-import { resolveApiUrl } from "@/lib/api-url";
 
 const SUCCESS_TTL_MS = 10_000;
 const FAILURE_TTL_MS = 1_500;
@@ -19,7 +18,6 @@ let cacheExpiresAt = 0;
 let blockedUntil = 0;
 let cacheGeneration = 0;
 let latestVerificationId = 0;
-const backendBaseUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
 const AUTH_COOKIE_CANDIDATES = [
   process.env.NEXT_PUBLIC_AUTH_COOKIE_NAME,
   "warehouse_access_token",
@@ -97,30 +95,6 @@ export const verifyAuthSession = async (options?: { force?: boolean }) => {
       return { authorized: true };
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-
-      if (status && status >= 500) {
-        try {
-          await axios.get(`${backendBaseUrl}/auth/me`, {
-            withCredentials: true,
-            headers: {
-              "Cache-Control": "no-cache",
-              Pragma: "no-cache",
-            },
-            timeout: 15_000,
-          });
-
-          if (generationAtStart === cacheGeneration) {
-            cachedResult = { authorized: true };
-            cacheExpiresAt = now() + SUCCESS_TTL_MS;
-            blockedUntil = 0;
-          }
-
-          return { authorized: true };
-        } catch {
-          // keep original failure handling below
-        }
-      }
-
 
       if (generationAtStart === cacheGeneration) {
         cachedResult = { authorized: false, status };

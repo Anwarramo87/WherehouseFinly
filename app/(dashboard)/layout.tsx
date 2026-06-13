@@ -1,4 +1,8 @@
-import Sidebar from "@/components/Sidebar";
+import dynamic from "next/dynamic";
+
+const Sidebar = dynamic(() => import("@/components/Sidebar"), {
+  loading: () => <aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />,
+});
 
 export default function DashboardLayout({
   children,

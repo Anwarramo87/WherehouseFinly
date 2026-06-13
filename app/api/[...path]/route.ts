@@ -1,63 +1,96 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveApiUrl } from "@/lib/api-url";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api/v1";
+const BACKEND_URL = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const HOP_BY_HOP_HEADERS = new Set([
+  "accept-encoding",
+  "connection",
+  "content-encoding",
+  "content-length",
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+const buildCorsHeaders = (request: NextRequest) => {
+  const origin = request.headers.get("origin") || "*";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    "Access-Control-Allow-Headers":
+      request.headers.get("access-control-request-headers") || "Content-Type, Authorization, Cookie",
+    Vary: "Origin",
+  };
+};
+
+const buildUpstreamHeaders = (request: NextRequest) => {
+  const headers = new Headers();
+
+  request.headers.forEach((value, key) => {
+    if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
+    headers.set(key, value);
+  });
+
+  return headers;
+};
+
+const buildResponseHeaders = (response: Response, request: NextRequest) => {
+  const headers = new Headers();
+
+  response.headers.forEach((value, key) => {
+    if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
+    headers.append(key, value);
+  });
+
+  const corsHeaders = buildCorsHeaders(request);
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+
+  return headers;
+};
 
 export async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
-  
-  // Remove /api prefix from the path
   const pathParts = path.split("/").filter(Boolean);
-  const apiPath = "/" + pathParts.slice(1).join("/"); // Remove 'api'
-  
-  // Construct the full backend URL
-  // BACKEND_URL already contains /api/v1
+  const apiPath = "/" + pathParts.slice(1).join("/");
   const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
-  
-  console.log("[API Proxy] BACKEND_URL:", BACKEND_URL);
-  console.log("[API Proxy]", request.method, path, "->", fullUrl);
+
+  if (request.method === "OPTIONS") {
+    return new NextResponse(null, {
+      status: 204,
+      headers: buildCorsHeaders(request),
+    });
+  }
 
   try {
-    const headers = new Headers();
-    headers.set("Content-Type", "application/json");
-    
-    const cookie = request.headers.get("cookie");
-    if (cookie) {
-      headers.set("Cookie", cookie);
-    }
-
-    const auth = request.headers.get("authorization");
-    if (auth) {
-      headers.set("Authorization", auth);
-    }
-
-    let body = null;
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      body = await request.text();
-    }
-
     const response = await fetch(fullUrl, {
       method: request.method,
-      headers,
-      body,
-      credentials: "include",
+      headers: buildUpstreamHeaders(request),
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
+      redirect: "manual",
+      cache: "no-store",
     });
 
-    const data = await response.text();
-
-    return new NextResponse(data, {
+    return new NextResponse(response.body, {
       status: response.status,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
-      },
+      headers: buildResponseHeaders(response, request),
     });
   } catch (error) {
     console.error("[API Proxy] Error:", error);
     return NextResponse.json(
       { error: "Backend unreachable", message: error instanceof Error ? error.message : String(error) },
-      { status: 502 }
+      {
+        status: 502,
+        headers: buildCorsHeaders(request),
+      },
     );
   }
 }

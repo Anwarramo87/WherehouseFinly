@@ -20,12 +20,12 @@ const envLocalPath = path.join(__dirname, '..', '.env.local');
 const BACKENDS = {
   local: {
     name: 'Local Backend',
-    url: 'http://localhost:5001/api',
+    url: 'http://localhost:5001/api/v1',
     description: 'Using local backend at http://localhost:5001'
   },
   remote: {
     name: 'Remote Backend (Railway)',
-    url: 'https://werehouse-production-f4f4.up.railway.app/api',
+    url: 'https://werehouse-production-f4f4.up.railway.app/api/v1',
     description: 'Using Railway production backend'
   }
 };

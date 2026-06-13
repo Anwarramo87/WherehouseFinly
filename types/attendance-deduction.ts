@@ -25,6 +25,12 @@ export interface AttendanceDeductionBreakdown {
   // الإجمالي = غياب + تأخير
   totalAttendanceDeduction: number;
 
+  // دقائق الإضافي المحسوبة من وقت الخروج مقارنةً بـ scheduledEnd
+  overtimeMinutes: number;
+
+  // أيام إضافي العطلة (الجمعة) المحسوبة تلقائياً
+  overtimeWeekendDays: number;
+
   // عدد أيام العمل التي مضت فعلاً في الفترة (يُحسب حتى اليوم الحالي)
   elapsedWorkDays: number;
 

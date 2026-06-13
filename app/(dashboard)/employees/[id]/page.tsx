@@ -41,7 +41,7 @@ const toMinutes = (time?: string) => {
 
 const formatMoney = (value: number) => Math.round(value).toLocaleString("en-US");
 
-const toDateKey = (value?: string | Date) => {
+const toDateKey = (value?: string | Date | null | undefined) => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -52,7 +52,7 @@ const daysBetweenInclusive = (start: string, end: string) => {
   const startDate = new Date(`${start}T00:00:00`);
   const endDate = new Date(`${end}T00:00:00`);
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
-    return 1;
+    return 0;
   }
   const diff = Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
   return diff + 1;
@@ -134,11 +134,19 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   }, [employeeId, salaries]);
 
   const attendanceRange = useMemo(() => {
-    const startFromEmployee = toDateKey(employee?.createdAt) || today;
-    const tentativeEnd = employee?.status === "terminated" ? toDateKey(employee?.updatedAt) || today : today;
-    const end = tentativeEnd < startFromEmployee ? startFromEmployee : tentativeEnd;
-    return { startDate: startFromEmployee, endDate: end, totalDays: daysBetweenInclusive(startFromEmployee, end) };
-  }, [employee?.createdAt, employee?.status, employee?.updatedAt, today]);
+    const startFromMonth = month.start;
+    const terminationEnd =
+      toDateKey(employee?.terminationDate) ||
+      (employee?.status === "terminated" ? toDateKey(employee?.updatedAt) : "");
+    const tentativeEnd = terminationEnd || today;
+    const end = tentativeEnd < startFromMonth ? startFromMonth : tentativeEnd;
+
+    return {
+      startDate: startFromMonth,
+      endDate: end,
+      totalDays: daysBetweenInclusive(startFromMonth, end),
+    };
+  }, [employee?.status, employee?.terminationDate, employee?.updatedAt, month.start, today]);
 
   const { data: attendanceData, isLoading: isAttendanceLoading } = useAttendance({
     employeeId, startDate: attendanceRange.startDate, endDate: attendanceRange.endDate, limit: 200,

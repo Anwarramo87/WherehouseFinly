@@ -59,20 +59,22 @@ const calcGrossSalary = (
 };
 
 /**
- * حساب الراتب المستحق بناءً على الدوام الفعلي ودقائق التأخير
- * الصيغة: (grossSalary / STANDARD_WORK_DAYS) * actualWorkDays - خصم التأخير
+ * حساب الراتب المستحق بناءً على الدوام الفعلي ودقائق التأخير والإضافي
+ * الصيغة: (grossSalary / 26) * actualWorkDays - خصم التأخير + أجر الإضافي
  */
 const calcEarnedSalary = (
   grossSalary: number,
   actualWorkDays: number,
   totalDelayMinutes: number,
+  overtimeMinutes = 0,
 ): number => {
   if (grossSalary <= 0) return 0;
   const dailyRate = grossSalary / STANDARD_WORK_DAYS;
   const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
   const salaryFromDays = dailyRate * actualWorkDays;
   const delayDeduction = totalDelayMinutes * minuteRate;
-  return Math.max(0, salaryFromDays - delayDeduction);
+  const overtimePay = overtimeMinutes * minuteRate * 1.5; // معامل 1.5× للإضافي
+  return Math.max(0, salaryFromDays - delayDeduction + overtimePay);
 };
 
 /**
@@ -206,12 +208,24 @@ export default function TimeTablePage() {
         ? Math.max(0, autoInput.presentDays)
         : null;
 
+      // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
+      const autoOvertimeMinutes = autoInput?.overtimeMinutes ?? 0;
+      const totalOvertimeMinutes = (hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0)
+        ? (manualInput.overtimeRegularMinutes ?? 0)
+        : autoOvertimeMinutes;
+
+      // أيام إضافي العطلة (الجمعة): يدوي إن وُجد، وإلا آلي
+      const autoWeekendDays = autoInput?.overtimeWeekendDays ?? 0;
+      const totalOvertimeDays = (hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0)
+        ? (manualInput.overtimeWeekendDays ?? 0)
+        : autoWeekendDays;
+
       // الراتب الكامل
       const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
 
-      // الراتب المستحق بناءً على الدوام الفعلي
+      // الراتب المستحق بناءً على الدوام الفعلي + الإضافي
       const earnedSalary = actualWorkDays !== null
-        ? calcEarnedSalary(grossSalary, actualWorkDays, totalDelayMinutes)
+        ? calcEarnedSalary(grossSalary, actualWorkDays, totalDelayMinutes, totalOvertimeMinutes)
         : null;
 
       return {
@@ -220,8 +234,8 @@ export default function TimeTablePage() {
         totalAbsencesLeaves,
         actualWorkDays,
         totalDelayMinutes,
-        totalOvertimeMinutes: manualInput?.overtimeRegularMinutes ?? 0,
-        totalOvertimeDays: manualInput?.overtimeWeekendDays ?? 0,
+        totalOvertimeMinutes,
+        totalOvertimeDays,
         grossSalary,
         earnedSalary,
       };
@@ -309,8 +323,8 @@ export default function TimeTablePage() {
       unpaidLeaveDays: 0,
       deathLeaveDays: 0,
       unpaidHours: 0,
-      overtimeRegularMinutes: 0,
-      overtimeWeekendDays: 0,
+      overtimeRegularMinutes: Number(autoInput?.overtimeMinutes ?? 0),
+      overtimeWeekendDays: Number(autoInput?.overtimeWeekendDays ?? 0),
     };
 
     return defaultRecord;

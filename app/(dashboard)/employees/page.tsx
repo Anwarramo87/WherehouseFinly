@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
@@ -10,7 +10,7 @@ import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
 import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
 import type { Salary } from "@/types/salary";
-import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye } from "lucide-react";
+import { Plus, Edit2, Loader2, ChevronLeft, Users, Scissors, UserMinus, Eye, AlertTriangle, X } from "lucide-react";
 
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
@@ -96,7 +96,7 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 };
 
 export default function EmployeesPage() {
-  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee } = useEmployees({ includeTerminated: false });
+  const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee, bulkTerminateDepartment } = useEmployees({ includeTerminated: false });
   // Fetch ALL employees (including terminated/resigned) just for ID generation
   // so we never suggest an ID that already exists in the DB
   const { data: allEmployeesForId } = useEmployees({ includeTerminated: true });
@@ -118,6 +118,10 @@ export default function EmployeesPage() {
   
   const [isFireModalOpen, setIsFireModalOpen] = useState(false);
   const [employeeToFire, setEmployeeToFire] = useState<Employee | null>(null);
+
+  const [isBulkTerminateModalOpen, setIsBulkTerminateModalOpen] = useState(false);
+  const [bulkTerminateDept, setBulkTerminateDept] = useState("");
+  const [bulkTerminateReason, setBulkTerminateReason] = useState("");
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
@@ -280,13 +284,33 @@ export default function EmployeesPage() {
           terminationDate: new Date(fireData.fireDate).toISOString(),
           terminationReason: fireData.reason,
           notes: fireData.notes,
-          status: fireData.status as "terminated" | "resigned" // إرسال حالة الاستقالة أو الإقالة
+          status: fireData.status as "terminated" | "resigned"
         }
       });
       setIsFireModalOpen(false);
       setEmployeeToFire(null);
     } catch (err) {
       console.error("Error firing employee:", err);
+    }
+  };
+
+  const handleBulkTerminateDepartment = async () => {
+    if (!bulkTerminateDept || bulkTerminateDept === "الكل") {
+      toast.error("يرجى اختيار قسم محدد");
+      return;
+    }
+
+    try {
+      await bulkTerminateDepartment.mutateAsync({
+        department: bulkTerminateDept,
+        status: "terminated",
+        terminationDate: new Date().toISOString(),
+        terminationReason: "إقالة جماعية",
+      });
+      setIsBulkTerminateModalOpen(false);
+      setBulkTerminateDept("");
+    } catch (err) {
+      console.error("Error bulk terminating department:", err);
     }
   };
 
@@ -345,6 +369,16 @@ export default function EmployeesPage() {
                   <span className="relative z-10 tracking-wide">إضافة موظف</span>
                 </button>
               </div>
+
+              {selectedDept !== "الكل" && (
+                <button
+                  onClick={() => setIsBulkTerminateModalOpen(true)}
+                  className="relative overflow-hidden bg-rose-600 hover:bg-rose-700 text-white px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(225,29,72,0.3)] transition-all active:scale-95 text-sm font-black border border-rose-500/40 group"
+                >
+                  <UserMinus size={18} className="relative z-10" />
+                  <span className="relative z-10 tracking-wide">إقالة جميع موظفي {selectedDept}</span>
+                </button>
+              )}
             </div>
           </header>
 
@@ -482,6 +516,75 @@ export default function EmployeesPage() {
                onConfirm={handleConfirmFire}
                isPending={terminateEmployee.isPending}
             />
+          )}
+
+          {isBulkTerminateModalOpen && (
+            <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" dir="rtl">
+              <div className="bg-[#101720] rounded-[2rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-lg border border-rose-500/20">
+                <div className="p-5 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+                      <AlertTriangle className="text-rose-500" size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-white">إقالة جماعية للقسم</h2>
+                      <p className="text-xs font-bold text-slate-400 mt-0.5">القسم: {bulkTerminateDept || selectedDept}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsBulkTerminateModalOpen(false)} className="text-slate-500 hover:text-white bg-[#263544] p-2 rounded-xl transition-all">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5">
+                  <div className="bg-rose-500/5 border border-rose-500/10 p-3 rounded-xl flex items-start gap-3 mb-4">
+                    <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-rose-200 leading-relaxed font-bold">
+                      أنت على وشك إنهاء خدمة **جميع الموظفين النشطين** في قسم "{selectedDept}". هذا الإجراء لا يمكن التراجع عنه. يرجى التأكد قبل المتابعة.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-black text-[#E7C873] mb-1.5 uppercase">القسم</label>
+                      <select
+                        value={bulkTerminateDept || selectedDept}
+                        onChange={(e) => setBulkTerminateDept(e.target.value)}
+                        className="w-full p-3 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 outline-none text-white font-bold text-sm"
+                      >
+                        {departments.filter(d => d !== "الكل").map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black text-[#E7C873] mb-1.5 uppercase">سبب الإقالة الجماعية</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: إعادة هيكلة القسم..."
+                        className="w-full p-3 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 outline-none text-white font-bold text-sm placeholder:text-slate-600"
+                        id="bulk-terminate-reason"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 border-t border-white/5 flex justify-between shrink-0">
+                  <button type="button" onClick={() => setIsBulkTerminateModalOpen(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 bg-[#263544] hover:text-white transition-all active:scale-95">
+                    إلغاء
+                  </button>
+                  <button
+                    disabled={bulkTerminateDepartment.isPending}
+                    onClick={handleBulkTerminateDepartment}
+                    className="bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {bulkTerminateDepartment.isPending ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}
+                    تأكيد الإقالة الجماعية
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
         </div>
