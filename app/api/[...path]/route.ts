@@ -56,6 +56,10 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
   return headers;
 };
 
+// reportDebug is referenced in older versions of this proxy file.
+// If it isn't available in the current codebase, keep compilation working.
+const reportDebug: undefined | ((...args: any[]) => void) = undefined;
+
 export async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
@@ -85,7 +89,7 @@ export async function handler(request: NextRequest) {
     });
   } catch (error) {
     // #region debug-point C:proxy-network-error
-    reportDebug("C", "Next API proxy failed before upstream response", {
+    reportDebug?.("C", "Next API proxy failed before upstream response", {
       method: request.method,
       path,
       fullUrl,
@@ -108,4 +112,5 @@ export const PUT = handler;
 export const DELETE = handler;
 export const PATCH = handler;
 export const OPTIONS = handler;
+
 

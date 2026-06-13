@@ -248,10 +248,10 @@ export default function TimeTablePage() {
       // الراتب الكامل
       const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
 
-      // الراتب المستحق بناءً على الدوام الفعلي
-      const earnedSalary = actualWorkDays !== null
-        ? calcEarnedSalary(grossSalary, actualWorkDays, totalDelayMinutes)
-        : null;
+       // الراتب المستحق بناءً على الدوام الفعلي
+       const earnedSalary = actualWorkDays !== null
+         ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes, totalOvertimeMinutes)
+         : null;
 
       return {
         ...emp,
