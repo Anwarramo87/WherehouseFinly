@@ -242,6 +242,24 @@ export default function AttendancePage() {
     setTimeModal({ isOpen: false, row: null, field: null, value: "" });
   };
 
+  // إضافة يوم كامل (IN + OUT) بوقت الدوام المجدول — للاختبار
+  const handleAddFullDay = (row: AttendanceTableRow) => {
+    if (!EMPLOYEE_ID_REGEX.test(row.employeeId)) {
+      toast.error(`رقم الموظف غير صالح: ${row.employeeId}`);
+      return;
+    }
+    const scheduledStart = employeeScheduleMap.get(row.employeeId) || "08:00";
+    const scheduledEnd = "16:00"; // fallback — يمكن قراءته من Employee لاحقاً
+    markAttendance.mutate({
+      employeeId: row.employeeId,
+      date: row.date,
+      checkIn: scheduledStart,
+      checkOut: scheduledEnd,
+      source: "manual",
+    });
+    toast.success(`تم تسجيل يوم كامل للموظف ${row.employeeName}`);
+  };
+
   if (isLoading || employeesLoading || leavesLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
@@ -461,6 +479,18 @@ export default function AttendancePage() {
                               <LogOut size={15} className="text-[#C89355] relative z-10" />
                               <span className="relative z-10">{row.checkOut ? "تعديل خروج" : "تسجيل خروج"}</span>
                             </button>
+                            {/* زر إضافة يوم كامل — يظهر إذا ما في IN أو OUT */}
+                            {(!row.checkIn || !row.checkOut) && (
+                              <button
+                                onClick={() => handleAddFullDay(row)}
+                                disabled={markAttendance.isPending}
+                                className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-xs font-black disabled:opacity-50 active:scale-95 transition-all"
+                              >
+                                <div className="absolute inset-0.5 rounded-lg border border-dashed border-emerald-300/50 pointer-events-none" />
+                                <CalendarPlus size={15} className="relative z-10" />
+                                <span className="relative z-10">يوم كامل</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
