@@ -159,17 +159,9 @@ export default function TimeTablePage() {
     endDate: periodEnd,
   });
 
-  // بناء map: employeeId → مجموع ساعات الحضور الفعلية من البصمة
-  // ملاحظة: نستخدم presentDays من attendance/attendance-deduction حتى لا نخسر أيام بسبب اختلاف تجميع dailyRecords
-  const actualWorkDaysFallbackMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
-    for (const dr of dailyRecords) {
-      if (!dr.checkIn) continue;
-      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
-    }
-    return map;
-  }, [monthlyAttendanceData?.dailyRecords]);
+  // NOTE: تم إلغاء أي fallback عشوائي لحساب أيام الدوام.
+  // سيتم عرض presentDays/absentDays فقط القادمة من backend عبر useAttendanceDeductions
+  // لتوحيد منطق CalendarModal مع جدول الدوام.
 
   // بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
   const employeeLeavesMap = useMemo(() => {
@@ -202,6 +194,7 @@ export default function TimeTablePage() {
   }, [deductionsResponse]);
 
   const recordsWithNames = useMemo(() => {
+
     return employees.map((emp) => {
       const manualInput = payrollInputs.find((pi) => pi.employeeId === emp.employeeId);
       const autoInput = autoDeductions.find(
@@ -243,11 +236,14 @@ export default function TimeTablePage() {
       const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
 
       // الراتب المستحق = (حضور + إجازات مدفوعة) / 26 × الراتب - خصم التأخير
-      const effectiveWorkDays = actualWorkDays ?? (actualWorkDaysFallbackMap.get(emp.employeeId) ?? 0);
+      // لا نستخدم أي fallback لحساب أيام الدوام.
+      // إن لم يتوفر data آلياً من backend سيبقى actualWorkDays = null وسيتم حساب الراتب حسب effectiveWorkDays = 0.
+      const effectiveWorkDays = actualWorkDays ?? 0;
 
       const earnedSalaryRaw = actualWorkDays !== null
         ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes)
         : calcEarnedSalary(grossSalary, effectiveWorkDays, paidLeaveDays, totalDelayMinutes);
+
 
       // الحماية من انتشار NaN (مثلاً لو grossSalary ناتج عن قيمة غير صالحة)
       const earnedSalary = Number.isFinite(earnedSalaryRaw) ? earnedSalaryRaw : 0;
@@ -270,7 +266,8 @@ export default function TimeTablePage() {
         unpaidLeaveDays,
       };
     });
-  }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, actualWorkDaysFallbackMap]);
+  }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap]);
+
 
   const filteredRecords = useMemo(() => {
     if (!searchFilter) return recordsWithNames;
