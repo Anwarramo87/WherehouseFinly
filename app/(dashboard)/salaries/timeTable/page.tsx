@@ -66,24 +66,42 @@ const calcGrossSalary = (
 
 /**
  * حساب الراتب المستحق بناءً على الدوام الفعلي ودقائق التأخير
- * الصيغة: (grossSalary / STANDARD_WORK_DAYS) * actualWorkDays - خصم التأخير
+ * الصيغة:
+ *   (grossSalary / STANDARD_WORK_DAYS) * paidDays
+ *   + إضافي عادي (دقائق × 1.5×)
+ *   + إضافي جمعة (أيام × dailyRate × 1.5×)
+ *   - خصم التأخير (دقائق)
+ *   - خصم الخروج المبكر (دقائق)
  */
 const calcEarnedSalary = (
   grossSalary: number,
   presentDays: number,
   paidLeaveDays: number,
-  totalDelayMinutes: number,
+  lateMinutes: number,
+  earlyLeaveMinutes = 0,
   overtimeMinutes = 0,
+  overtimeWeekendDays = 0,
 ): number => {
   if (grossSalary <= 0) return 0;
-  // الأيام المدفوعة = حضور فعلي + إجازات مدفوعة
+  // الأيام المدفوعة = حضور فعلي + إجازات مدفوعة (لا تتجاوز أيام الشهر المعياري)
   const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
   const dailyRate = grossSalary / STANDARD_WORK_DAYS;
   const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
   const salaryFromDays = dailyRate * paidDays;
-  const delayDeduction = totalDelayMinutes * minuteRate;
-  const overtimePay = overtimeMinutes * minuteRate * 1.5; // معامل 1.5× للإضافي
-  return Math.max(0, salaryFromDays - delayDeduction + overtimePay);
+  // خصومات الوقت
+  const lateDeduction = lateMinutes * minuteRate;
+  const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
+  // مكافآت الإضافي
+  const overtimePay = overtimeMinutes * minuteRate * 1.5;         // إضافي عادي
+  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5; // إضافي جمعة
+  return Math.max(
+    0,
+    salaryFromDays
+    - lateDeduction
+    - earlyLeaveDeduction
+    + overtimePay
+    + weekendOvertimePay,
+  );
 };
 
 /**
@@ -352,7 +370,15 @@ export default function TimeTablePage() {
 
       // الراتب المستحق بناءً على الدوام الفعلي + الإجازات المدفوعة
       const earnedSalary = actualWorkDays !== null
-        ? calcEarnedSalary(grossSalary, actualWorkDays, paidLeaveDays, totalDelayMinutes, totalOvertimeMinutes)
+        ? calcEarnedSalary(
+            grossSalary,
+            actualWorkDays,
+            paidLeaveDays,
+            lateMinutes,                              // دقائق التأخير فقط
+            manualInput?.earlyLeaveMinutes ?? 0,      // دقائق الخروج المبكر
+            totalOvertimeMinutes,                     // إضافي عادي (دقائق)
+            totalOvertimeDays,                        // إضافي جمعة (أيام)
+          )
         : null;
 
       return {
@@ -612,14 +638,14 @@ export default function TimeTablePage() {
 
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          {record.totalOvertimeDays > 0 && (
-                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                              {record.totalOvertimeDays} أيام عطلة
-                            </span>
-                          )}
                           {record.totalOvertimeMinutes > 0 && (
                             <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700 border border-teal-200">
-                              {record.totalOvertimeMinutes} دقيقة عادي
+                              {record.totalOvertimeMinutes} د. عادي
+                            </span>
+                          )}
+                          {record.totalOvertimeDays > 0 && (
+                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                              {record.totalOvertimeDays * HOURS_PER_DAY * 60} د. جمعة
                             </span>
                           )}
                           {record.totalOvertimeDays === 0 && record.totalOvertimeMinutes === 0 && (
