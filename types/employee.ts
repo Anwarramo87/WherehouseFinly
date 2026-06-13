@@ -5,20 +5,28 @@ export interface Employee {
   employeeId: string; // مثل EMP001
   name: string;
   email?: string;
-  phone?: string; // Legacy alias kept for backward compatibility.
   mobile?: string | null;
   nationalId?: string | null;
   employmentStartDate?: string | null;
   terminationDate?: string | null;
-  birthDate?: string | null;       // legacy — قد لا يُرسله الباك إند
-  dateOfBirth?: string | null;     // الاسم الفعلي في قاعدة البيانات
+  dateOfBirth?: string | null;
   gender?: string | null;
   department?: string;
   profession?: string;
   jobTitle?: string;
   roleId?: string;
   status?: 'active' | 'inactive' | 'terminated' | 'resigned';
-  isSettled?: boolean; // تم تصفية حقوق الموظف (للموظفين المقالين/المستقيلين)
+  isSettled?: boolean;
+  residence?: string | null;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  gracePeriodMinutes?: number;
+  workDaysInPeriod?: number;
+  hoursPerDay?: number;
+  avatar?: string;
+  currency?: string;
+  createdAt?: string;
+  updatedAt?: string;
   
   // ============================================================================
   // Resignation Management Fields
@@ -63,21 +71,8 @@ export interface Employee {
   // Salary and Financial Fields
   // ============================================================================
   
-  // الراتب يأتي من الباك إند كـ Decimal، وغالباً يصل للفرونت كـ string أو كائن
   hourlyRate?: number | string | { $numberDecimal: string };
   baseSalary?: number | string | { $numberDecimal: string } | null;
   lumpSumSalary?: number | string | { $numberDecimal: string } | null;
-  monthlySalary?: number | string;
   livingAllowance?: number | string | null;
-  insurances?: number | string;
-  residence?: string | null;
-  scheduledStart?: string;
-  scheduledEnd?: string;
-  gracePeriodMinutes?: number;
-  workDaysInPeriod?: number;
-  hoursPerDay?: number;
-  avatar?: string;
-  currency?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }

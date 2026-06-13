@@ -195,7 +195,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
         toNumber(salary.lumpSumSalary) +
         toNumber(salary.livingAllowance) +
         toNumber(salary.responsibilityAllowance) +
-        toNumber(salary.extraEffortAllowance ?? salary.extraEffort) +
+        toNumber(salary.extraEffortAllowance) +
         toNumber(salary.productionIncentive) +
         toNumber(salary.transportAllowance)
       : baseSalary;
@@ -277,10 +277,10 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   if (isEmployeeError) return <div className="flex items-center justify-center min-h-[85vh] text-rose-600 font-black" dir="rtl">حدث خطأ أثناء التحميل</div>;
   if (!employee) return <div className="flex items-center justify-center min-h-[85vh] text-[#263544]/60 font-black" dir="rtl">الموظف غير موجود</div>;
 
-  const contactPhone = employee.mobile || employee.phone || "—";
+  const contactPhone = employee.mobile || "—";
   const modalConfig = getModalConfig();
   // يقرأ dateOfBirth (الاسم الفعلي في الباك إند) أو birthDate كـ fallback
-  const age = calculateAge(employee.dateOfBirth ?? employee.birthDate);
+  const age = calculateAge(employee.dateOfBirth);
 
   return (
     <>

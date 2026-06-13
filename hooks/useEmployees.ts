@@ -206,7 +206,6 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
         mobile:                newEmployee.mobile,
         nationalId:            newEmployee.nationalId,
         dateOfBirth:           newEmployee.dateOfBirth,
-        birthDate:             newEmployee.birthDate,
         gender:                newEmployee.gender,
         jobTitle:              newEmployee.jobTitle,
         profession:            newEmployee.profession,

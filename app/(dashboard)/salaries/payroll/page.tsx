@@ -249,7 +249,7 @@ export default function PayrollPage() {
           toNumber(salaryConfig.lumpSumSalary) +
           toNumber(salaryConfig.livingAllowance) +
           toNumber(salaryConfig.responsibilityAllowance) +
-          toNumber(salaryConfig.extraEffortAllowance ?? salaryConfig.extraEffort) +
+          toNumber(salaryConfig.extraEffortAllowance) +
           toNumber(salaryConfig.productionIncentive) +
           toNumber(salaryConfig.transportAllowance);
       }
@@ -363,7 +363,7 @@ export default function PayrollPage() {
             toNumber(salaryConfig.lumpSumSalary) +
             toNumber(salaryConfig.livingAllowance) +
             toNumber(salaryConfig.responsibilityAllowance) +
-            toNumber(salaryConfig.extraEffortAllowance ?? salaryConfig.extraEffort) +
+            toNumber(salaryConfig.extraEffortAllowance) +
             toNumber(salaryConfig.productionIncentive) +
             toNumber(salaryConfig.transportAllowance);
         }

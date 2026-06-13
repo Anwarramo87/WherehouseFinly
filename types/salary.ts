@@ -36,11 +36,8 @@ export interface Salary {
   /** فرق التقريب (إختياري) - الفرق بين صافي الراتب المحسوب وصافي الراتب المقرب */
   roundingDifference?: number;
 
-  // --------------- Deprecated aliases kept for backward compatibility ---------------
-  /** @deprecated Use extraEffortAllowance */
-  extraEffort?: number;
-  /** @deprecated Use insuranceAmount */
-  insurances?: number;
+  /** الراتب الشهري المحسوب من الباك إند (baseSalary + livingAllowance + allowances) */
+  monthlySalary?: number;
 }
 
 /**

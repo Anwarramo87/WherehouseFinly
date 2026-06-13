@@ -93,7 +93,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         name: employee.name || "",
         username: employee.username || employee.name || "",
         mobile: employee.mobile || "",
-        birthDate: normalizeDateValue(employee.birthDate || employee.dateOfBirth),
+        birthDate: normalizeDateValue(employee.dateOfBirth || employee.birthDate),
         gender: employee.gender || "male",
         jobTitle: employee.jobTitle || employee.profession || "",
         department: employee.department || "قسم القص",

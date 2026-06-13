@@ -56,15 +56,12 @@ const toNumber = (value: unknown) => {
 };
 
 type EmployeeRow = Employee & {
-  monthlySalary?: number | string;
+  BaseSalary?: number | string;
   jobTitle?: string;
 };
 
 type ModalInitialEmployee = Employee & {
   username?: string | null;
-  birthDate?: string | null;
-  dateOfBirth?: string | null;
-  gender?: string | null;
   jobTitle?: string | null;
   baseSalary?: number | string | null;
   lumpSumSalary?: number | string | null;
@@ -79,16 +76,16 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
       toNumber(salaryRecord.lumpSumSalary) +
       toNumber(salaryRecord.livingAllowance) +
       toNumber(salaryRecord.responsibilityAllowance) +
-      toNumber(salaryRecord.extraEffortAllowance ?? salaryRecord.extraEffort) +
+      toNumber(salaryRecord.extraEffortAllowance) +
       toNumber(salaryRecord.productionIncentive) +
       toNumber(salaryRecord.transportAllowance);
 
     if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
-  }
 
-  if (employee.monthlySalary !== undefined && employee.monthlySalary !== null && employee.monthlySalary !== "") {
-    const parsed = toNumber(employee.monthlySalary);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    // Fallback: use backend-computed monthlySalary from salary record
+    if (salaryRecord.monthlySalary && Number.isFinite(salaryRecord.monthlySalary) && salaryRecord.monthlySalary > 0) {
+      return salaryRecord.monthlySalary;
+    }
   }
 
   const hourly = toNumber(employee.hourlyRate);
@@ -144,7 +141,7 @@ export default function EmployeesPage() {
     return {
       ...selectedEmployee,
       username: (selectedEmployee as Employee & { username?: string | null }).username || selectedEmployee.name,
-      birthDate: selectedEmployee.birthDate || (selectedEmployee as Employee & { dateOfBirth?: string | null }).dateOfBirth || null,
+      birthDate: selectedEmployee.dateOfBirth || null,
       baseSalary: normalizeDecimal(selectedEmployee.baseSalary),
       lumpSumSalary: normalizeDecimal((selectedEmployee as Employee & { lumpSumSalary?: number | string | null }).lumpSumSalary ?? salary?.lumpSumSalary),
       livingAllowance: normalizeDecimal(selectedEmployee.livingAllowance ?? salary?.livingAllowance),

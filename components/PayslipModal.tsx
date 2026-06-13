@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Wallet, Receipt, HandCoins, ChevronLeft, Download } from 'lucide-react';
+import type { Bonus } from '@/types/bonus';
+import type { DiscountRecord } from '@/hooks/useDiscounts';
 
 // Define types directly in the component for simplicity
 // In a real app, these would be imported from a central types file
@@ -10,26 +12,9 @@ type Salary = {
   livingAllowance?: any;
   responsibilityAllowance?: any;
   extraEffortAllowance?: any;
-  extraEffort?: any;
   productionIncentive?: any;
   transportAllowance?: any;
   insuranceAmount?: any;
-};
-
-type Bonus = {
-  bonusReason?: string;
-  bonusAmount?: any;
-  assistanceAmount?: any;
-};
-
-type DiscountRecord = {
-  kind: 'advance' | 'penalty' | 'other';
-  date: string;
-  amount: any;
-  type?: string;
-  advanceType?: 'salary' | 'clothing' | 'other';
-  installmentAmount?: any;
-  remainingAmount?: any;
 };
 
 interface AggregatedPayroll {
@@ -184,8 +169,7 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                         {
                           label: "تعويض الجهد الإضافي",
                           value: toNumber(
-                            payslip.details.salaryConfig.extraEffortAllowance ??
-                            payslip.details.salaryConfig.extraEffort,
+                            payslip.details.salaryConfig.extraEffortAllowance,
                           ),
                         },
                         { label: "حوافز الإنتاجية",          value: toNumber(payslip.details.salaryConfig.productionIncentive) },
