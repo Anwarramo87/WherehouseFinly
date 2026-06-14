@@ -217,6 +217,16 @@ export default function PayrollPage() {
     return map;
   }, [monthlyAttendanceData?.dailyRecords, employees]);
 
+  const localPresentDaysMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords]);
+
   const isLoading = salariesLoading || bonusesLoading || reportLoading || employeesLoading || inputsLoading || deductionsLoading || attendanceLoading || discountsLoading;
   // ── Filter resigned employees pending financial settlement ──
   const resignedPendingSettlement = useMemo<Employee[]>(() => {
@@ -273,10 +283,10 @@ export default function PayrollPage() {
       let actualWorkDays: number;
       if (hasManualInput && manualInput.absenceDays !== undefined) {
         actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
-      } else if (autoInput !== undefined) {
-        actualWorkDays = Math.max(0, autoInput.presentDays);
       } else {
-        actualWorkDays = STANDARD_WORK_DAYS;
+        const backendPresent = autoInput?.presentDays ?? 0;
+        const localPresent = localPresentDaysMap.get(employeeId) ?? 0;
+        actualWorkDays = Math.max(backendPresent, localPresent);
       }
 
       earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
@@ -386,10 +396,10 @@ export default function PayrollPage() {
           let actualWorkDays: number;
           if (hasManualInput && manualInput.absenceDays !== undefined) {
             actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
-          } else if (autoInput !== undefined) {
-            actualWorkDays = Math.max(0, autoInput.presentDays);
           } else {
-            actualWorkDays = STANDARD_WORK_DAYS;
+            const backendPresent = autoInput?.presentDays ?? 0;
+            const localPresent = localPresentDaysMap.get(employeeId) ?? 0;
+            actualWorkDays = Math.max(backendPresent, localPresent);
           }
 
           earnedSalary = calcEarnedSalaryTimeTable(calcGross, actualWorkDays, totalDelayMinutes);
