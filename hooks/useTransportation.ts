@@ -119,12 +119,10 @@ export function useTransportation() {
   });
 
   const addPassenger = useMutation({
-    mutationFn: async ({ busId, payload }: { busId: string; payload: { employeeId: string; name?: string; paidAmount?: number; isManual?: boolean } }) => {
-      // Send optional presentation fields if present; backend may ignore them but frontends that accept them will persist
+    mutationFn: async ({ busId, payload }: { busId: string; payload: { employeeId: string; name?: string; subscriptionDate?: string } }) => {
       const body: Record<string, unknown> = { employeeId: payload.employeeId };
       if (payload.name !== undefined) body.name = payload.name;
-      if (payload.paidAmount !== undefined) body.paidAmount = payload.paidAmount;
-      if (payload.isManual !== undefined) body.isManual = payload.isManual;
+      if (payload.subscriptionDate !== undefined) body.subscriptionDate = payload.subscriptionDate;
       const res = await apiClient.post(`/transportation/buses/${busId}/passengers`, body);
       return res.data;
     },

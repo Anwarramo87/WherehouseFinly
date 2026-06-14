@@ -1,15 +1,29 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
-import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
-export const usePenalties = (params?: { employeeId?: string; startDate?: string; endDate?: string; enabled?: boolean }) => {
-  const queryClient = useQueryClient();
+export interface PenaltyRecord {
+  id: string;
+  employeeId: string;
+  category: string;
+  amount: number;
+  reason?: string | null;
+  issueDate: string;
+  createdAt?: string;
+}
 
-  const penaltiesQuery = useQuery<Penalty[]>({
-    queryKey: ["penalties", params?.employeeId || "all", params?.startDate || "no-start", params?.endDate || "no-end"],
+export const usePenalties = (params?: {
+  employeeId?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  return useQuery<PenaltyRecord[]>({
+    queryKey: [
+      "penalties",
+      params?.employeeId || "all",
+      params?.startDate || "all-start",
+      params?.endDate || "all-end",
+    ],
     queryFn: async () => {
       const res = await apiClient.get("/penalties", {
         params: {
@@ -18,55 +32,22 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
           endDate: params?.endDate,
         },
       });
-      return Array.isArray(res.data) ? res.data : [];
+      const data = res.data;
+      if (!Array.isArray(data)) return [];
+      return data.map((r: Record<string, unknown>) => ({
+        id: String(r.id ?? ""),
+        employeeId: String(r.employeeId ?? ""),
+        category: String(r.category ?? ""),
+        amount: Number(r.amount || 0),
+        reason: (r.reason as string) || null,
+        issueDate: String(r.issueDate ?? "").split("T")[0],
+        createdAt: String(r.createdAt ?? ""),
+      }));
     },
-    enabled: params?.enabled ?? true,
-    staleTime: QUERY_STALE_TIME.RELAXED,
-    gcTime: QUERY_GC_TIME.RELAXED,
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
+    refetchOnWindowFocus: true,
   });
-
-  const createPenalty = useMutation({
-    mutationFn: async (payload: Omit<Penalty, "id">) => {
-      const data = {
-        employeeId: payload.employeeId,
-        category: payload.category,
-        amount: Number(payload.amount || 0),
-        reason: payload.reason,
-        issueDate: payload.issueDate,
-      };
-      return await apiClient.post("/penalties", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
-      toast.success("تمت إضافة العقوبة بنجاح");
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "فشل إضافة العقوبة"));
-    },
-  });
-
-  const updatePenalty = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Omit<Penalty, "id">> }) => {
-      const payload = {
-        category: data.category,
-        amount: data.amount !== undefined ? Number(data.amount) : undefined,
-        reason: data.reason,
-        issueDate: data.issueDate,
-      };
-      return await apiClient.put(`/penalties/${id}`, payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
-      toast.success("تم تحديث العقوبة");
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "فشل تحديث العقوبة"));
-    },
-  });
-
-  return {
-    ...penaltiesQuery,
-    createPenalty,
-    updatePenalty,
-  };
 };
+
+export default usePenalties;

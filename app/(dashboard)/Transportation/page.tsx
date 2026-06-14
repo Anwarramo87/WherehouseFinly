@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Plus, Bus, ChevronLeft } from "lucide-react";
+import { Plus, Bus, ChevronLeft, Edit2, Scissors, Trash2 } from "lucide-react";
 import useTransportation, { type BusDetailsResponse } from "@/hooks/useTransportation";
 import { useEmployees } from "@/hooks/useEmployees";
 
@@ -14,8 +14,7 @@ export interface Passenger {
   id?: string;
   employeeId: string;
   name?: string;
-  paidAmount?: number;
-  isManual?: boolean;
+  subscriptionDate?: string;
 }
 
 export interface BusData {
@@ -32,8 +31,6 @@ export interface BusData {
   passengers: Passenger[];
 }
 
-
-
 type BusPayload = {
   id?: string;
   driverName: string;
@@ -45,16 +42,6 @@ type BusPayload = {
   companyDeductionPct: number;
   employeeDeductionPct: number;
 };
-
-type PassengerDisplayMeta = {
-  id?: string;
-  employeeId: string;
-  name?: string;
-  paidAmount?: number;
-  isManual?: boolean;
-};
-
-type PassengerCache = Record<string, Record<string, PassengerDisplayMeta>>;
 
 function normalizeBusDetails(details: BusDetailsResponse): BusData {
   return {
@@ -72,82 +59,32 @@ function normalizeBusDetails(details: BusDetailsResponse): BusData {
       id: passenger.id,
       employeeId: passenger.employeeId,
       name: passenger.name || passenger.employeeId,
-      paidAmount: passenger.paidAmount === undefined ? undefined : passenger.paidAmount,
-      isManual: passenger.isManual ?? false,
+      subscriptionDate: (passenger as any).subscriptionDate ?? passenger.joinDate,
     })),
   };
 }
 
-function mergePassengerPresentation(bus: BusData, passenger: Passenger): BusData {
-  const nextPassengers = [...bus.passengers];
-  const existingIndex = nextPassengers.findIndex(
-    (item) => item.id === passenger.id || item.employeeId === passenger.employeeId,
-  );
-
-  const normalizedPassenger: Passenger = {
-    ...passenger,
-    name: passenger.name || nextPassengers[existingIndex]?.name || passenger.employeeId,
-    paidAmount: passenger.paidAmount ?? nextPassengers[existingIndex]?.paidAmount ?? 0,
-    isManual: passenger.isManual ?? nextPassengers[existingIndex]?.isManual ?? false,
-  };
-
-  if (existingIndex >= 0) {
-    nextPassengers[existingIndex] = {
-      ...nextPassengers[existingIndex],
-      ...normalizedPassenger,
-    };
-  } else {
-    nextPassengers.push(normalizedPassenger);
-  }
-
-  return {
-    ...bus,
-    passengers: nextPassengers,
-  };
-}
-
-function loadPassengerCache(): PassengerCache {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem("transportationPassengerCache");
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as PassengerCache;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePassengerCache(cache: PassengerCache) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("transportationPassengerCache", JSON.stringify(cache));
-  } catch {
-    // ignore storage failures
-  }
-}
-
 function CostCard({ label, value, isGold }: { label: string; value: string | number; isGold: boolean }) {
   return (
-    <div className="bg-[#101720]/60 p-3 rounded-xl border border-[#263544]">
-      <span className="text-[9px] font-black text-slate-500 block mb-1 uppercase">{label}</span>
-      <span className={`text-sm font-mono font-black ${isGold ? 'text-[#C89355]' : 'text-white'}`}>
+    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+      <span className="text-[10px] font-black text-slate-400 block mb-1.5 uppercase tracking-wider">{label}</span>
+      <span className={`text-base font-mono font-black ${isGold ? 'text-[#C89355]' : 'text-[#1a2530]'}`}>
         {typeof value === 'number' ? value.toLocaleString() : value}
-        {typeof value === 'number' && <span className="text-[8px] mr-1">ل.س</span>}
+        {typeof value === 'number' && <span className="text-[9px] mr-1 text-slate-400 font-bold">ل.س</span>}
       </span>
     </div>
   );
 }
 
 export default function TransportationPage() {
-  const { data: buses = [], createBus, updateBus, addPassenger, removePassenger, getBus } = useTransportation();
+  const { data: buses = [], createBus, updateBus, deleteBus, addPassenger, removePassenger, getBus } = useTransportation();
   const { data: employees = [] } = useEmployees({ fetchAll: true });
   const [busDetails, setBusDetails] = useState<Record<string, BusData | null>>({});
-  const [passengerCache, setPassengerCache] = useState<PassengerCache>(() => loadPassengerCache());
   const [modalContext, setModalContext] = useState<{ busId: string; passenger: Passenger } | null>(null);
   const [isAddBusOpen, setIsAddBusOpen] = useState(false);
   const [isAddPassengerOpen, setIsAddPassengerOpen] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusData | null>(null);
+  const [editingBus, setEditingBus] = useState<BusData | null>(null);
   const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -157,63 +94,51 @@ export default function TransportationPage() {
     }
   });
 
-  // Merge passenger cache presentation into bus details whenever cache updates
-  useEffect(() => {
-    if (!passengerCache || Object.keys(passengerCache).length === 0) return;
-    // Use setTimeout to avoid cascading renders
-    const timer = setTimeout(() => {
-      setBusDetails((prev) => {
-        const next = { ...prev };
-        for (const busId of Object.keys(next)) {
-          const bus = next[busId];
-          if (!bus) continue;
-          const busCache = passengerCache[busId] || {};
-          const mergedPassengers = bus.passengers.map((p) => {
-            const key = p.employeeId;
-            const meta = busCache[key];
-            if (!meta) return p;
-          return {
-            ...p,
-            name: meta.name || p.name,
-            paidAmount: typeof meta.paidAmount === 'number' ? meta.paidAmount : p.paidAmount,
-            isManual: typeof meta.isManual === 'boolean' ? meta.isManual : p.isManual,
-          };
-        });
-        next[busId] = { ...bus, passengers: mergedPassengers };
-      }
-      return next;
-    });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [passengerCache]);
-
   const safeEmployees = Array.isArray(employees) ? employees : [];
   const employeeNameMap = new Map(
     safeEmployees.map((employee: { employeeId: string; name: string }) => [employee.employeeId, employee.name])
   );
 
-  const resolvePassengerName = (busId: string, passenger: Passenger) => {
-    const cached = passengerCache[busId]?.[passenger.employeeId];
-    return cached?.name || passenger.name || employeeNameMap.get(passenger.employeeId) || passenger.employeeId;
+  const resolvePassengerName = (passenger: Passenger) => {
+    return passenger.name || employeeNameMap.get(passenger.employeeId) || passenger.employeeId;
   };
 
-  const resolvePassengerAmount = (bus: BusData, passenger: Passenger) => {
-    // If manual, use the paid amount
-    if (passenger.isManual && typeof passenger.paidAmount === "number") {
-      return passenger.paidAmount;
+  // Global Pooling Logic
+  const { totalFleetCost, totalSubscribers, baseShare } = useMemo(() => {
+    let totalCost = 0;
+    let totalSubs = 0;
+    let netCost = 0;
+
+    Object.values(busDetails).forEach(bus => {
+      if (!bus) return;
+      totalCost += Number(bus.totalCost) || 0;
+      totalSubs += bus.passengers.length;
+      netCost += (Number(bus.totalCost) || 0) * (1 - (Number(bus.companyDeductionPct) || 0) / 100);
+    });
+
+    const share = totalSubs > 0 ? Number((netCost / totalSubs).toFixed(2)) : 0;
+
+    return {
+      totalFleetCost: totalCost,
+      totalSubscribers: totalSubs,
+      baseShare: share,
+    };
+  }, [busDetails]);
+
+  const handleDeleteBus = async (busId: string, route: string) => {
+    if (!confirm(`هل أنت متأكد من حذف الباص "${route}"؟\nسيتم حذف جميع اشتراكات الموظفين المرتبطة بهذا الباص.`)) return;
+    try {
+      await deleteBus.mutateAsync(busId);
+      // Remove cached details
+      setBusDetails((prev) => {
+        const next = { ...prev };
+        delete next[busId];
+        return next;
+      });
+    } catch {
+      // handled by hook
     }
-
-    // If not manual, calculate equal share
-    const netCost = bus.totalCost - (bus.totalCost * (bus.companyDeductionPct / 100));
-    const totalPassengers = bus.passengers.length;
-    if (totalPassengers === 0) return undefined;
-    
-    // Calculate equal share
-    const share = Number((netCost / totalPassengers).toFixed(2));
-    return share;
   };
-
-
 
   const handleSaveBus = async (newBus: BusPayload) => {
     try {
@@ -226,10 +151,9 @@ export default function TransportationPage() {
       // handled by hook
     } finally {
       setIsAddBusOpen(false);
+      setEditingBus(null);
     }
   };
-
-
 
   const handleSavePassenger = async (passengerData: Passenger) => {
     if (!selectedBus) return;
@@ -239,34 +163,16 @@ export default function TransportationPage() {
         payload: {
           employeeId: passengerData.employeeId,
           name: passengerData.name,
-          paidAmount: passengerData.paidAmount,
-          isManual: passengerData.isManual,
+          subscriptionDate: passengerData.subscriptionDate,
         },
       });
-      const refreshedBus = await getBus(selectedBus.id);
-      const refreshedWithPresentation = mergePassengerPresentation(
-        normalizeBusDetails(refreshedBus),
-        passengerData,
-      );
-      setBusDetails((prev) => ({ ...prev, [selectedBus.id]: refreshedWithPresentation }));
-      const cacheEntry: PassengerDisplayMeta = {
-        employeeId: passengerData.employeeId,
-        name: passengerData.name || employeeNameMap.get(passengerData.employeeId) || passengerData.employeeId,
-        paidAmount: passengerData.paidAmount,
-        isManual: passengerData.isManual,
-      };
-      setPassengerCache((prev) => {
-        const next = {
-          ...prev,
-          [selectedBus.id]: {
-            ...(prev[selectedBus.id] || {}),
-            [cacheEntry.employeeId]: cacheEntry,
-          },
-        };
-        savePassengerCache(next);
+      // Clear cached details so useEffect re-fetches on buses refetch
+      setBusDetails((prev) => {
+        const next = { ...prev };
+        delete next[selectedBus.id];
         return next;
       });
-      // store employeeId as lastAdded marker for reliable highlight
+      
       const newId = passengerData.employeeId;
       try {
         sessionStorage.setItem("lastAddedPassengerId", String(newId));
@@ -284,15 +190,11 @@ export default function TransportationPage() {
   const handleRemovePassenger = async (busId: string, passengerId: string) => {
     if (!confirm("هل أنت متأكد من إزالة هذا الموظف من الباص؟")) return;
     try {
-      // passengerId here may be composite in UI; assume employeeId is the employee code
       await removePassenger.mutateAsync({ busId, employeeId: passengerId });
-      const refreshedBus = await getBus(busId);
-      setBusDetails((prev) => ({ ...prev, [busId]: normalizeBusDetails(refreshedBus) }));
-      setPassengerCache((prev) => {
-        const busCache = { ...(prev[busId] || {}) };
-        delete busCache[passengerId];
-        const next = { ...prev, [busId]: busCache };
-        savePassengerCache(next);
+      // Clear cached details so useEffect re-fetches on buses refetch
+      setBusDetails((prev) => {
+        const next = { ...prev };
+        delete next[busId];
         return next;
       });
     } catch {
@@ -300,7 +202,6 @@ export default function TransportationPage() {
     }
   };
 
-  // Fetch bus details (with passengers) for display
   useEffect(() => {
     if (!buses || buses.length === 0) return;
     buses.forEach((b) => {
@@ -308,155 +209,216 @@ export default function TransportationPage() {
       (async () => {
         try {
           const details = await getBus(b.id as string);
-          // normalize then merge any cached presentation (session) immediately
-          const normalized = normalizeBusDetails(details);
-          const busCache = passengerCache[b.id] || {};
-          normalized.passengers = normalized.passengers.map((p) => {
-            const key = p.employeeId;
-            const meta = busCache[key];
-            if (!meta) return p;
-            return {
-              ...p,
-              name: meta.name || p.name,
-              paidAmount: typeof meta.paidAmount === 'number' ? meta.paidAmount : p.paidAmount,
-              isManual: typeof meta.isManual === 'boolean' ? meta.isManual : p.isManual,
-            };
-          });
-          setBusDetails((prev) => ({ ...prev, [b.id as string]: normalized }));
+          setBusDetails((prev) => ({ ...prev, [b.id as string]: normalizeBusDetails(details) }));
         } catch {
-          // ignore per-bus failure
           setBusDetails((prev) => ({ ...prev, [b.id as string]: null }));
         }
       })();
     });
-  }, [buses, getBus, busDetails, passengerCache]);
+  }, [buses, getBus, busDetails]);
 
   return (
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-[#101720]/80 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)] border border-white/5 flex flex-col overflow-hidden" dir="rtl">
-      <div
-        className="absolute inset-0 opacity-[0.06] pointer-events-none z-0"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23C89355' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }}
-      />
-
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex flex-col overflow-hidden" dir="rtl">
       <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-        <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-400 bg-[#1a2530]/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/5 shadow-sm group">
-          <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-          <span className="text-white relative z-10">إدارة الخدمات</span>
-          <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
-          <span className="text-white relative z-10">نقل الموظفين</span>
+
+        {/* ─── Breadcrumb ─── */}
+        <nav className="mb-6 flex items-center gap-2 text-xs font-black text-slate-500 bg-white w-fit px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm">
+          <span className="hover:text-[#1a2530] cursor-pointer transition-colors">إدارة الخدمات</span>
+          <ChevronLeft size={14} className="text-[#C89355]" />
+          <span className="text-[#1a2530]">نقل الموظفين</span>
         </nav>
 
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-6">
+        {/* ─── Header ─── */}
+        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <div className="flex items-center gap-4 mb-2">
-              <div className="p-3 bg-[#1a2530] rounded-2xl shadow-lg border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4">
+              <div className="p-3.5 bg-[#1a2530] rounded-2xl shadow-[0_12px_24px_rgba(26,37,48,0.35)] border border-[#C89355]/30">
                 <Bus size={24} className="text-[#C89355]" strokeWidth={2.5} />
               </div>
-              <h1 className="text-3xl font-black text-white tracking-tight">مواصلات الموظفين</h1>
+              <div>
+                <h1 className="text-3xl font-black text-[#1a2530] tracking-tight">مواصلات الموظفين</h1>
+                <p className="text-slate-500 text-sm font-bold mt-1 flex items-center gap-1.5">
+                  <Scissors size={13} className="text-[#C89355]" />
+                  إدارة الباصات، الاشتراكات، وتكاليف النقل
+                </p>
+              </div>
             </div>
           </div>
 
-          <button onClick={() => { setSelectedBus(null); setIsAddBusOpen(true); }} className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-6 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(0,0,0,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group">
-            <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-            <Plus size={18} className="group-hover:animate-spin relative z-10" />
-            <span className="relative z-10">إضافة حافلة</span>
+          <button
+            onClick={() => { setEditingBus(null); setIsAddBusOpen(true); }}
+            className="bg-[#1a2530] hover:bg-[#263544] text-white px-6 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_8px_20px_rgba(26,37,48,0.3)] transition-all active:scale-[0.97] text-sm font-black group"
+          >
+            <Plus size={18} className="group-hover:rotate-90 transition-transform duration-200" />
+            <span>إضافة حافلة</span>
           </button>
         </header>
 
-        {buses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="bg-[#1a2530]/60 p-6 rounded-full mb-4 shadow-sm border border-white/5">
-              <Bus size={48} className="text-slate-300" />
+        {/* ─── Summary Cards ─── */}
+        {buses.length > 0 && (
+          <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_4px_20px_rgba(38,53,68,0.08)]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-[#1a2530] flex items-center justify-center">
+                  <span className="text-[#C89355] text-lg font-black">$</span>
+                </div>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">إجمالي تكلفة الأسطول</h3>
+              </div>
+              <p className="text-2xl font-mono font-black text-[#1a2530]">{totalFleetCost.toLocaleString()} <span className="text-sm text-slate-400 font-bold">ل.س</span></p>
             </div>
-            <h3 className="text-xl font-black text-slate-200 mb-2">لا يوجد باصات مسجلة</h3>
-            <p className="text-slate-400 font-bold mb-6">قم بإضافة باص جديد للبدء بتسجيل اشتراكات الموظفين.</p>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_4px_20px_rgba(38,53,68,0.08)]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-[#1a2530] flex items-center justify-center">
+                  <Bus size={16} className="text-[#C89355]" />
+                </div>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">إجمالي المشتركين</h3>
+              </div>
+              <p className="text-2xl font-mono font-black text-[#1a2530]">{totalSubscribers} <span className="text-sm text-slate-400 font-bold">موظف</span></p>
+            </div>
+            <div className="bg-[#1a2530] p-6 rounded-2xl shadow-[0_8px_30px_rgba(26,37,48,0.3)] border border-[#C89355]/20 relative overflow-hidden">
+              <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-[#C89355]/10 blur-2xl pointer-events-none" />
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-[#C89355]/20 flex items-center justify-center">
+                  <span className="text-[#C89355] text-lg font-black">÷</span>
+                </div>
+                <h3 className="text-xs font-black text-[#C89355]/80 uppercase tracking-wider">الحصة الأساسية للموظف</h3>
+              </div>
+              <p className="text-2xl font-mono font-black text-[#C89355]">{baseShare.toLocaleString()} <span className="text-sm text-[#C89355]/60 font-bold">ل.س</span></p>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Empty State ─── */}
+        {buses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+            <div className="bg-[#1a2530] p-6 rounded-full mb-5 shadow-[0_12px_24px_rgba(26,37,48,0.3)]">
+              <Bus size={40} className="text-[#C89355]" />
+            </div>
+            <h3 className="text-2xl font-black text-[#1a2530] mb-2">لا يوجد باصات مسجلة</h3>
+            <p className="text-slate-500 font-bold mb-8 max-w-md">قم بإضافة باص جديد للبدء بتسجيل اشتراكات الموظفين وتتبع تكاليف النقل.</p>
             <button
-              onClick={() => setIsAddBusOpen(true)}
-              className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(0,0,0,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group"
+              onClick={() => { setEditingBus(null); setIsAddBusOpen(true); }}
+              className="bg-[#1a2530] hover:bg-[#263544] text-white px-6 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_8px_20px_rgba(26,37,48,0.3)] transition-all active:scale-[0.97] text-sm font-black group"
             >
-              <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-              <Plus size={18} className="group-hover:animate-spin relative z-10" />
-              <span className="relative z-10">إضافة باص</span>
+              <Plus size={18} className="group-hover:rotate-90 transition-transform duration-200" />
+              <span>إضافة باص</span>
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
             {buses.map((bus) => {
               const details = busDetails[bus.id];
               const passengers = details?.passengers ?? [];
               const currentPassengers = passengers.length || (bus.activePassengers ?? 0);
               const isFull = currentPassengers >= bus.capacity;
-              const netCost = bus.totalCost - (bus.totalCost * (bus.companyDeductionPct / 100));
 
               return (
-                <div key={bus.id} className="relative bg-[#1a2530]/40 backdrop-blur-2xl rounded-[2.5rem] shadow-sm border-2 border-[#263544] p-6 sm:p-8 overflow-hidden">
-                  <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/20 pointer-events-none z-0" />
+                <div key={bus.id} className="bg-white rounded-3xl shadow-[0_8px_30px_rgba(38,53,68,0.1)] border border-slate-200/80 overflow-hidden flex flex-col">
 
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex justify-between items-start mb-6 border-b border-white/5 pb-5">
-                      <div>
-                        <h2 className="text-xl font-black text-white mb-1">{bus.route}</h2>
-                        <p className="text-sm font-bold text-slate-400">السائق: {bus.driverName} | {bus.plateNumber}</p>
-                      </div>
-                      <div style={{ minWidth: 70 }} className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border ${isFull ? 'bg-rose-500/10 border-rose-500/30' : 'bg-[#101720] border-[#C89355]/30'}`}>
+                  {/* ── Dark Navy Card Header ── */}
+                  <div className="bg-[#1a2530] px-6 py-5 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-black text-white">{bus.route}</h2>
+                      <p className="text-sm text-slate-400 mt-0.5 font-bold">{bus.driverName} &middot; {bus.plateNumber}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const busData: BusData = details ?? { ...bus, passengers: [], companyDeductionPct: Number(bus.companyDeductionPct) || 0, employeeDeductionPct: Number(bus.employeeDeductionPct) || 0 };
+                          setEditingBus(busData);
+                          setIsAddBusOpen(true);
+                        }}
+                        className="p-2.5 rounded-xl bg-white/10 hover:bg-[#C89355]/20 border border-white/10 hover:border-[#C89355]/40 text-slate-300 hover:text-[#C89355] transition-all active:scale-95"
+                        title="تعديل بيانات الباص"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBus(bus.id, bus.route)}
+                        className="p-2.5 rounded-xl bg-white/10 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-300 hover:text-rose-400 transition-all active:scale-95"
+                        title="حذف الباص"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Gold Accent Bar ── */}
+                  <div className="h-1 bg-gradient-to-l from-[#C89355] via-[#C89355]/80 to-transparent" />
+
+                  {/* ── Card Body ── */}
+                  <div className="p-6 flex flex-col flex-1">
+                    {/* Stats Row */}
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className={`flex-1 flex items-center justify-between p-3.5 rounded-2xl border ${isFull ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">الركاب</span>
                         <div className="flex items-baseline gap-1 dir-ltr">
-                          <span className={`text-xl font-black ${isFull ? 'text-rose-500' : 'text-[#C89355]'}`}>{currentPassengers}</span>
-                          <span className="text-slate-500 text-sm font-bold">/{bus.capacity}</span>
+                          <span className={`text-2xl font-black ${isFull ? 'text-rose-500' : 'text-[#1a2530]'}`}>{currentPassengers}</span>
+                          <span className="text-slate-400 text-sm font-bold">/{bus.capacity}</span>
                         </div>
-                        <span className="text-[9px] font-bold text-slate-400">الركاب</span>
+                      </div>
+                      <div className="flex-1">
+                        <CostCard label="التكلفة الكلية" value={Number(bus.totalCost) || 0} isGold={false} />
+                      </div>
+                      <div className="flex-1">
+                        <CostCard label="حسم الشركة" value={`${bus.companyDeductionPct}%`} isGold={false} />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <CostCard label="التكلفة الكلية" value={bus.totalCost} isGold={false} />
-                      <CostCard label="حسم الشركة" value={`${bus.companyDeductionPct}%`} isGold={false} />
-                      <CostCard label="الصافي للركاب" value={netCost} isGold={true} />
-                    </div>
-
-                    {/* قائمة الركاب */}
-                    <div className="mb-6">
-                      <div className="flex justify-between items-end mb-3 px-2">
-                        <h3 className="font-black text-[#263544]">قائمة المشتركين بالباص</h3>
-                        <span className="text-sm text-slate-500">{passengers.length} مشترك</span>
+                    {/* Passenger List */}
+                    <div className="mb-5 flex-1">
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="font-black text-[#1a2530] text-sm">قائمة المشتركين</h3>
+                        <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2.5 py-1 rounded-lg">{passengers.length} مشترك</span>
                       </div>
 
-                      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                        <table className="w-full text-right">
-                          <thead className="bg-slate-50 border-b border-slate-100">
-                            <tr>
-                              <th className="p-4 text-slate-500 font-black text-xs uppercase text-center w-24">الكود</th>
-                              <th className="p-4 text-slate-500 font-black text-xs uppercase text-right pr-2">الاسم</th>
-                              <th className="p-4 text-slate-500 font-black text-xs uppercase text-center">المبلغ</th>
-                              <th className="p-4 text-slate-500 font-black text-xs uppercase text-center w-28">إجراء</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {passengers.map((p) => {
-                              const isNew = lastAddedPassengerId && String(lastAddedPassengerId) === String(p.id || p.employeeId);
-                              const displayName = resolvePassengerName(bus.id, p);
-                              const displayAmount = details ? resolvePassengerAmount(details, p) : undefined;
-                              return (
-                                <tr
-                                  key={p.id ?? p.employeeId}
-                                  onClick={() => setModalContext({ busId: bus.id, passenger: p })}
-                                  className={`cursor-pointer ${isNew ? 'bg-emerald-50 ring-2 ring-emerald-200' : ''}`}
-                                >
-                                  <td className="p-4 text-center font-mono text-sm">{p.employeeId}</td>
-                                  <td className="p-4 text-right font-bold">{displayName}</td>
-                                  <td className="p-4 text-center text-sm">{typeof displayAmount === 'number' ? displayAmount.toLocaleString() : '—'}</td>
-                                  <td className="p-4 text-center">
-                                    <button onClick={(e) => { e.stopPropagation(); handleRemovePassenger(bus.id, p.employeeId); }} className="text-rose-600 font-black text-xs">إزالة</button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                      {passengers.length > 0 ? (
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                          <table className="w-full text-right">
+                            <thead className="bg-[#1a2530]/[0.03]">
+                              <tr className="border-b border-slate-100">
+                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">الكود</th>
+                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-right pr-3 tracking-wider">الاسم</th>
+                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">إجراء</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {passengers.map((p) => {
+                                const isNew = lastAddedPassengerId && String(lastAddedPassengerId) === String(p.id || p.employeeId);
+                                const displayName = resolvePassengerName(p);
+                                return (
+                                  <tr
+                                    key={p.id ?? p.employeeId}
+                                    onClick={() => setModalContext({ busId: bus.id, passenger: p })}
+                                    className={`cursor-pointer transition-colors ${isNew ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'hover:bg-slate-50'}`}
+                                  >
+                                    <td className="p-3 text-center font-mono text-xs text-[#1a2530] font-bold">{p.employeeId}</td>
+                                    <td className="p-3 text-right font-bold text-[#1a2530] text-sm">{displayName}</td>
+                                    <td className="p-3 text-center">
+                                      <button onClick={(e) => { e.stopPropagation(); handleRemovePassenger(bus.id, p.employeeId); }} className="text-rose-500 hover:text-rose-600 font-black text-[11px] bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg transition-all">إزالة</button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-slate-200 rounded-2xl">
+                          <Bus size={24} className="text-slate-300 mb-2" />
+                          <p className="text-slate-400 text-sm font-bold">لا يوجد مشتركين حالياً</p>
+                        </div>
+                      )}
                     </div>
 
-                    <button onClick={() => { setSelectedBus(busDetails[bus.id] ?? { ...bus, passengers: [], companyDeductionPct: bus.companyDeductionPct, employeeDeductionPct: bus.employeeDeductionPct ?? 0 }); setIsAddPassengerOpen(true); }} disabled={isFull} className="w-full bg-[#C89355] hover:bg-[#b07d45] text-[#101720] py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-[0_5px_15px_rgba(200,147,85,0.2)] transition-all font-black text-sm disabled:opacity-50">
-                      <Plus size={18} strokeWidth={3} /> إضافة موظف للباص
+                    {/* Add Passenger Button */}
+                    <button
+                      onClick={() => { setSelectedBus(busDetails[bus.id] ?? { ...bus, passengers: [], companyDeductionPct: Number(bus.companyDeductionPct) || 0, employeeDeductionPct: Number(bus.employeeDeductionPct) || 0 }); setIsAddPassengerOpen(true); }}
+                      disabled={isFull}
+                      className="w-full bg-[#1a2530] hover:bg-[#263544] text-white py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-[0_6px_16px_rgba(26,37,48,0.2)] transition-all font-black text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+                    >
+                      <Plus size={18} strokeWidth={3} />
+                      إضافة موظف للباص
                     </button>
                   </div>
                 </div>
@@ -466,13 +428,13 @@ export default function TransportationPage() {
         )}
       </div>
 
-      {isAddBusOpen && <AddBusModal isOpen={isAddBusOpen} onClose={() => setIsAddBusOpen(false)} onSave={handleSaveBus} initialData={selectedBus ?? undefined} />}
+      {isAddBusOpen && <AddBusModal isOpen={isAddBusOpen} onClose={() => { setIsAddBusOpen(false); setEditingBus(null); }} onSave={handleSaveBus} initialData={editingBus ?? undefined} />}
       {isAddPassengerOpen && selectedBus && <AddPassengerModal isOpen={isAddPassengerOpen} onClose={() => setIsAddPassengerOpen(false)} onSave={handleSavePassenger} busData={selectedBus} />}
       {modalContext && (
         <PassengerDetailModal
           passenger={modalContext.passenger}
           busId={modalContext.busId}
-          displayAmount={busDetails[modalContext.busId] && busDetails[modalContext.busId] ? resolvePassengerAmount(busDetails[modalContext.busId]!, modalContext.passenger) : undefined}
+          displayAmount={baseShare}
           onClose={() => setModalContext(null)}
           onRemove={handleRemovePassenger}
         />

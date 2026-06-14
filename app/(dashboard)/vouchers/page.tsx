@@ -6,15 +6,16 @@ import { Printer, Search, Calendar as CalendarIcon, Receipt, Wallet, ChevronLeft
 import { useEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
-import { useAdvances } from "@/hooks/useAdvances";
+import { useDiscounts, DiscountRecord } from "@/hooks/useDiscounts";
+import { usePenalties, PenaltyRecord } from "@/hooks/usePenalties";
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
-import type { Advance } from "@/types/advance";
 
 // ─── TypeScript Interfaces ─────────────────────────────────────────────────────
-interface AggregatedPayroll {
+interface VoucherData {
   employeeId: string;
   employeeName: string;
+  department: string;
   fixedEarnings: number;
   variableEarnings: number;
   fixedDeductions: number;
@@ -23,8 +24,7 @@ interface AggregatedPayroll {
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
-    advances: Advance[];
-    attendance: null;
+    deductions: (DiscountRecord | PenaltyRecord)[];
   };
 }
 
@@ -33,7 +33,8 @@ const toNumber = (value: unknown): number => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
     return Number((value as { $numberDecimal: string }).$numberDecimal || 0);
   }
-  return Number(value || 0);
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 };
 
 const getLocalMonth = () => {
@@ -64,16 +65,29 @@ export default function VouchersPage() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  // ─── STEP 1: Raw Data Fetching ───────────────────────────────────────────────
+  // ─── Data Fetching ─────────────────────────────────────────────────────────
   const { data: employees = [], isLoading: employeesLoading } = useEmployees({ status: "active", limit: 500 });
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
-  const { data: advances = [], isLoading: advancesLoading } = useAdvances();
+  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts();
 
-  const isLoading = employeesLoading || salariesLoading || bonusesLoading || advancesLoading;
+  const { periodStart, periodEnd } = useMemo(() => {
+    const [year, m] = month.split("-");
+    const startDate = `${year}-${m}-01`;
+    const endDay = new Date(Number(year), Number(m), 0).getDate();
+    const endDate = `${year}-${m}-${String(endDay).padStart(2, "0")}`;
+    return { periodStart: startDate, periodEnd: endDate };
+  }, [month]);
 
-  // ─── STEP 1: The Maestro Aggregation ─────────────────────────────────────────
-  const payrollData = useMemo<AggregatedPayroll[]>(() => {
+  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
+
+  const isLoading = employeesLoading || salariesLoading || bonusesLoading || discountsLoading || penaltiesLoading;
+
+  // ─── Aggregation ───────────────────────────────────────────────────────────
+  const voucherData = useMemo<VoucherData[]>(() => {
     if (!employees.length) return [];
 
     return employees.map((employee) => {
@@ -87,57 +101,76 @@ export default function VouchersPage() {
       const lumpSumSalary = salaryConfig ? toNumber(salaryConfig.lumpSumSalary) : 0;
       const livingAllowance = salaryConfig ? toNumber(salaryConfig.livingAllowance) : 0;
       const transportAllowance = salaryConfig ? toNumber(salaryConfig.transportAllowance) : 0;
+      const responsibilityAllowance = salaryConfig ? toNumber(salaryConfig.responsibilityAllowance) : 0;
+      const extraEffortAllowance = salaryConfig ? toNumber(salaryConfig.extraEffortAllowance) : 0;
+      const productionIncentive = salaryConfig ? toNumber(salaryConfig.productionIncentive) : 0;
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
 
-      const fixedEarnings = baseSalary + lumpSumSalary + livingAllowance + transportAllowance;
+      const fixedEarnings = baseSalary + lumpSumSalary + livingAllowance + transportAllowance +
+        responsibilityAllowance + extraEffortAllowance + productionIncentive;
 
+      // Bonuses (earnings)
       const employeeBonuses = bonuses.filter(b => b.employeeId === employeeId);
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
         return sum + toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount);
       }, 0);
 
-      const employeeAdvances = advances.filter(a => {
-        if (a.employeeId !== employeeId) return false;
-        const advanceDate = a.issueDate || a.createdAt || "";
-        return advanceDate.startsWith(month);
-      });
-      
-      const advancesDeduction = employeeAdvances.reduce((sum, advance) => {
-        return sum + (toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount));
-      }, 0);
+      // Deductions: advances (kind='advance' only) + penalties
+      const employeeAdvances = discounts.filter(d =>
+        d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month)
+      );
+      const employeePenalties = penalties.filter(p =>
+        p.employeeId === employeeId && p.issueDate.startsWith(month)
+      );
 
-      const attendancePenalty = 0;
+      const advancesDeduction = employeeAdvances.reduce(
+        (sum, d) => sum + toNumber(d.amount), 0
+      );
+      const penaltiesDeduction = employeePenalties.reduce(
+        (sum, p) => sum + toNumber(p.amount), 0
+      );
+
       const fixedDeductions = insuranceAmount;
-      const variableDeductions = advancesDeduction + attendancePenalty;
+      const variableDeductions = advancesDeduction + penaltiesDeduction;
       const netPay = (fixedEarnings + variableEarnings) - (fixedDeductions + variableDeductions);
 
       return {
-        employeeId, employeeName, fixedEarnings, variableEarnings,
-        fixedDeductions, variableDeductions, netPay,
-        details: { salaryConfig, bonuses: employeeBonuses, advances: employeeAdvances, attendance: null },
+        employeeId,
+        employeeName,
+        department: employee.department || salaryConfig?.profession?.trim() || "أقسام عامة",
+        fixedEarnings,
+        variableEarnings,
+        fixedDeductions,
+        variableDeductions,
+        netPay,
+        details: {
+          salaryConfig,
+          bonuses: employeeBonuses,
+          deductions: [...employeeAdvances, ...employeePenalties],
+        },
       };
     });
-  }, [employees, salaries, bonuses, advances, month]);
+  }, [employees, salaries, bonuses, discounts, penalties, month]);
 
-  // ─── STEP 1: Filter Vouchers ─────────────────────────────────────────────────
+  // ─── Filter Vouchers ───────────────────────────────────────────────────────
   const filteredVouchers = useMemo(() => {
-    let filtered = payrollData.filter(p => {
-      // Do not print if netPay <= 0 AND fixedEarnings === 0
+    let filtered = voucherData.filter(p => {
       if (p.netPay <= 0 && p.fixedEarnings === 0 && p.variableEarnings === 0) return false;
       return true;
     });
 
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      filtered = filtered.filter(p => 
-        p.employeeName.toLowerCase().includes(query) || 
-        p.employeeId.toLowerCase().includes(query)
+      filtered = filtered.filter(p =>
+        p.employeeName.toLowerCase().includes(query) ||
+        p.employeeId.toLowerCase().includes(query) ||
+        p.department.toLowerCase().includes(query)
       );
     }
     return filtered;
-  }, [payrollData, searchTerm]);
+  }, [voucherData, searchTerm]);
 
-  // ─── Loading State ───────────────────────────────────────────────────────────
+  // ─── Loading State ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="relative min-h-[85vh] w-full flex items-center justify-center">
@@ -151,23 +184,21 @@ export default function VouchersPage() {
 
   return (
     <div className="relative z-10 w-full min-h-screen bg-slate-50" dir="rtl">
-      
-      {/* ─── STEP 2: Dashboard UI (Screen View) ──────────────────────────────────── */}
+
+      {/* ─── Dashboard UI ───────────────────────────────────────────────────── */}
       <div className="print:hidden relative z-10 w-full max-w-7xl mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 p-6 md:p-10 mb-8 mt-8">
-        
+
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`, backgroundSize: '24px 24px' }} />
 
-        {/* ─── مسار التنقل مع زر الرجوع ─── */}
+        {/* Breadcrumb */}
         <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
           <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-          
-          <button 
-            onClick={() => router.back()} 
+          <button
+            onClick={() => router.back()}
             className="hover:text-[#263544] cursor-pointer transition-colors relative z-10 active:scale-95"
           >
             الرجوع للسابق
           </button>
-          
           <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
           <span className="text-[#263544] relative z-10">طباعة القسائم المجمعة</span>
         </nav>
@@ -180,7 +211,7 @@ export default function VouchersPage() {
               </div>
               <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">قسائم القبض المجمعة</h1>
             </div>
-            <p className="text-slate-600 text-sm font-bold pr-14 mt-1">جاهزة للطباعة المباشرة بصيغة PDF أو على الورق المباشر (قسيمتان لكل صفحة A4)</p>
+            <p className="text-slate-600 text-sm font-bold pr-14 mt-1">جاهزة للطباعة المباشرة — قسيمة لكل موظف مع تفاصيل الرواتب والخصومات</p>
           </div>
 
           <div className="mt-4 xl:mt-0 flex flex-wrap items-center justify-start xl:justify-end gap-3 w-full xl:w-auto">
@@ -217,7 +248,7 @@ export default function VouchersPage() {
           <Search size={20} className="text-[#C89355] ml-3 relative z-10" />
           <input
             type="text"
-            placeholder="البحث عن موظف بالاسم أو الكود (لطباعة قسيمة مخصصة)..."
+            placeholder="البحث عن موظف بالاسم أو الكود أو القسم..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-transparent border-none outline-none font-bold text-sm text-[#263544] w-full focus:ring-0 relative z-10 placeholder:text-slate-400"
@@ -234,7 +265,7 @@ export default function VouchersPage() {
         )}
       </div>
 
-      {/* ─── STEP 3: The Bulk Vouchers Layout (The Masterpiece) ─────────────────── */}
+      {/* ─── Vouchers Grid ──────────────────────────────────────────────────── */}
       <div className="vouchers-grid max-w-7xl mx-auto px-4 pb-8 grid grid-cols-1 gap-6 print:gap-0 print:px-0 print:pb-0">
         {filteredVouchers.map((voucher) => (
           <article
@@ -253,13 +284,17 @@ export default function VouchersPage() {
                   <p className="text-[#C89355] text-xl font-black font-mono print:text-base">{month}</p>
                 </div>
               </div>
-              
+
               {/* Employee Info */}
               <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 print:p-2 print:mt-2">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">اسم الموظف</p>
                     <p className="text-white text-lg font-black print:text-sm">{voucher.employeeName}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">القسم</p>
+                    <p className="text-white/90 text-sm font-bold print:text-xs">{voucher.department}</p>
                   </div>
                   <div className="text-left">
                     <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">كود الموظف</p>
@@ -269,9 +304,9 @@ export default function VouchersPage() {
               </div>
             </div>
 
-            {/* Body - Compact Grid */}
+            {/* Body */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 print:p-3 print:gap-3 flex-1">
-              
+
               {/* Right: Earnings */}
               <div className="space-y-3 print:space-y-1.5">
                 <div className="flex items-center gap-2 mb-3 print:mb-1">
@@ -281,33 +316,27 @@ export default function VouchersPage() {
 
                 {voucher.fixedEarnings > 0 && (
                   <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-200/50 print:p-1.5 print:bg-emerald-50">
-                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1"> الاستحقاقات الثابتة</p>
+                    <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1">الاستحقاقات الثابتة</p>
                     {voucher.details.salaryConfig && (
                       <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
-                        {toNumber(voucher.details.salaryConfig.baseSalary) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">الراتب الأساسي</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.baseSalary).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.lumpSumSalary) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">الراتب المقطوع</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.lumpSumSalary).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.livingAllowance) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">بدل المعيشة</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.livingAllowance).toLocaleString()}</span>
-                          </div>
-                        )}
-                        {toNumber(voucher.details.salaryConfig.transportAllowance) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="font-bold text-slate-700">بدل النقل</span>
-                            <span className="font-black text-emerald-700 font-mono">{toNumber(voucher.details.salaryConfig.transportAllowance).toLocaleString()}</span>
-                          </div>
-                        )}
+                        {(
+                          [
+                            { label: "الراتب الأساسي", value: toNumber(voucher.details.salaryConfig.baseSalary) },
+                            { label: "الراتب المقطوع", value: toNumber(voucher.details.salaryConfig.lumpSumSalary) },
+                            { label: "بدل المعيشة", value: toNumber(voucher.details.salaryConfig.livingAllowance) },
+                            { label: "بدل النقل", value: toNumber(voucher.details.salaryConfig.transportAllowance) },
+                            { label: "تعويض المسؤولية", value: toNumber(voucher.details.salaryConfig.responsibilityAllowance) },
+                            { label: "تعويض الجهد الإضافي", value: toNumber(voucher.details.salaryConfig.extraEffortAllowance) },
+                            { label: "حوافز الإنتاجية", value: toNumber(voucher.details.salaryConfig.productionIncentive) },
+                          ] as { label: string; value: number }[]
+                        )
+                          .filter((row) => row.value > 0)
+                          .map((row) => (
+                            <div key={row.label} className="flex justify-between">
+                              <span className="font-bold text-slate-700">{row.label}</span>
+                              <span className="font-black text-emerald-700 font-mono">{row.value.toLocaleString()}</span>
+                            </div>
+                          ))}
                       </div>
                     )}
                     <div className="mt-2 pt-2 border-t border-emerald-300 flex justify-between items-center text-xs print:text-[10px] print:mt-1 print:pt-1">
@@ -327,6 +356,10 @@ export default function VouchersPage() {
                           <span className="font-black text-[#C89355] font-mono">+{(toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount)).toLocaleString()}</span>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-[#C89355]/40 flex justify-between items-center text-xs print:text-[10px] print:mt-1 print:pt-1">
+                      <span className="font-black text-[#C89355] uppercase">المجموع</span>
+                      <span className="font-black text-[#C89355] font-mono">+{voucher.variableEarnings.toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -353,12 +386,16 @@ export default function VouchersPage() {
                   <div className="bg-rose-100/50 rounded-xl p-3 border border-rose-300/50 print:p-1.5 print:bg-rose-50">
                     <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">الخصومات المتغيرة</p>
                     <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
-                      {voucher.details.advances.map((advance, idx) => {
-                        const deductionAmount = toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount);
+                      {voucher.details.deductions.map((ded, idx) => {
+                        const isDiscount = 'kind' in ded;
+                        const amount = toNumber(ded.amount);
+                        const label = isDiscount
+                          ? (ded as DiscountRecord).type
+                          : `عقوبة: ${(ded as PenaltyRecord).category || (ded as PenaltyRecord).reason || 'عقوبة'}`;
                         return (
                           <div key={idx} className="flex justify-between">
-                            <span className="font-bold text-slate-700">سلفة {advance.advanceType === "salary" ? "راتب" : "أخرى"}</span>
-                            <span className="font-black text-rose-700 font-mono">-{deductionAmount.toLocaleString()}</span>
+                            <span className="font-bold text-slate-700">{label}</span>
+                            <span className="font-black text-rose-700 font-mono">-{amount.toLocaleString()}</span>
                           </div>
                         );
                       })}
@@ -369,7 +406,7 @@ export default function VouchersPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {voucher.fixedDeductions === 0 && voucher.variableDeductions === 0 && (
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-center print:p-2">
                     <p className="text-slate-500 font-bold text-xs print:text-[10px]">لا توجد اقتطاعات</p>
@@ -378,10 +415,8 @@ export default function VouchersPage() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Footer — Net Pay */}
             <div className="bg-slate-50 p-6 border-t-2 border-slate-200 print:p-3 mt-auto">
-              
-              {/* Massive Net Pay */}
               <div className="text-center mb-6 print:mb-3">
                 <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع</p>
                 <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
@@ -412,7 +447,7 @@ export default function VouchersPage() {
         ))}
       </div>
 
-      {/* ─── STEP 4: Advanced Print CSS ──────────────────────────────────────────── */}
+      {/* ─── Print CSS ──────────────────────────────────────────────────────── */}
       <style jsx global>{`
         @page {
           size: A4 portrait;
@@ -420,16 +455,9 @@ export default function VouchersPage() {
         }
 
         @media print {
-          /* Hide dashboard UI elements */
           .print\\:hidden { display: none !important; }
-          
-          /* Reset body */
           body { background: white !important; margin: 0; padding: 0; }
-
-          /* Vouchers grid optimization */
           .vouchers-grid { display: block !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
-
-          /* Voucher card constraints */
           .voucher-card {
             page-break-inside: avoid !important;
             page-break-after: auto !important;
@@ -440,35 +468,19 @@ export default function VouchersPage() {
             box-shadow: none !important;
             border-width: 2px !important;
           }
-
-          /* Force 2 per page */
           .voucher-card:nth-child(2n) { page-break-after: always !important; }
-
-          /* Colors & Backgrounds */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-          .bg-gradient-to-br, .bg-emerald-50, .bg-rose-50, .bg-slate-50, [class*="bg-"] {
-            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-          }
-
-          /* Layout fixes */
           .grid { display: grid !important; }
           .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
           .flex { display: flex !important; }
           .justify-between { justify-content: space-between !important; }
-          
-          /* Typography optimizations */
           * { line-height: 1.3 !important; font-family: system-ui, -apple-system, sans-serif !important; }
           .font-black { font-weight: 900 !important; }
           .font-bold { font-weight: 700 !important; }
-
-          /* Remove visual fluff */
           .backdrop-blur-sm, [class*="backdrop-blur"], [class*="shadow-"] { backdrop-filter: none !important; box-shadow: none !important; }
           *, *::before, *::after { animation: none !important; transition: none !important; transform: none !important; }
-          
-          /* SVG Icons */
           svg { width: 1rem !important; height: 1rem !important; }
-          
-          /* Signatures */
           .border-dashed { border-style: dashed !important; }
         }
       `}</style>

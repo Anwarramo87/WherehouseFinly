@@ -12,6 +12,7 @@ import {
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useDiscounts, DiscountRecord } from "@/hooks/useDiscounts";
+import { usePenalties, PenaltyRecord } from "@/hooks/usePenalties";
 import { usePayrollReport } from "@/hooks/usePayrollReport";
 import { usePayroll } from "@/hooks/usePayroll";
 import { useResignedEmployees, useEmployees } from "@/hooks/useEmployees";
@@ -79,7 +80,7 @@ interface AggregatedPayroll {
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
-    advances: DiscountRecord[];
+    deductions: (DiscountRecord | PenaltyRecord)[];
     attendance: null;
   };
 }
@@ -182,6 +183,11 @@ export default function PayrollPage() {
     return { periodStart: startDate, periodEnd: endDate };
   }, [month]);
 
+  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
+
   const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
   
   const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
@@ -217,7 +223,7 @@ export default function PayrollPage() {
     return map;
   }, [monthlyAttendanceData?.dailyRecords, employees]);
 
-  const isLoading = salariesLoading || bonusesLoading || reportLoading || employeesLoading || inputsLoading || deductionsLoading || attendanceLoading || discountsLoading;
+  const isLoading = salariesLoading || bonusesLoading || reportLoading || employeesLoading || inputsLoading || deductionsLoading || attendanceLoading || discountsLoading || penaltiesLoading;
   // ── Filter resigned employees pending financial settlement ──
   const resignedPendingSettlement = useMemo<Employee[]>(() => {
     return allResignedEmployees.filter(
@@ -289,13 +295,19 @@ export default function PayrollPage() {
         return sum + bonusAmt + assistAmt;
       }, 0);
 
-      // Deductions
-      const employeeDiscounts = discounts.filter((d) => {
-        return d.employeeId === employeeId && d.date.startsWith(month);
+      // Deductions — only advances (kind='advance') from discounts + penalties
+      const employeeAdvances = discounts.filter((d) => {
+        return d.employeeId === employeeId && d.kind === 'advance' && d.date.startsWith(month);
+      });
+      const employeePenalties = penalties.filter((p) => {
+        return p.employeeId === employeeId && p.issueDate.startsWith(month);
       });
       
-      const variableDeductions = employeeDiscounts.reduce(
+      const variableDeductions = employeeAdvances.reduce(
         (sum, d) => sum + toNumber(d.amount),
+        0
+      ) + employeePenalties.reduce(
+        (sum, p) => sum + toNumber(p.amount),
         0
       );
 
@@ -308,7 +320,7 @@ export default function PayrollPage() {
         employeeName,
         department,
         grossPay: calcGross,
-        totalDeductions: variableDeductions,
+        totalDeductions: variableDeductions + toNumber(salaryConfig?.insuranceAmount),
         netPay,
         netPayRounded,
         roundingDifference,
@@ -323,12 +335,12 @@ export default function PayrollPage() {
         details: {
           salaryConfig,
           bonuses: employeeBonuses,
-          advances: employeeDiscounts.filter(d => d.kind === 'advance'),
+          deductions: [...employeeAdvances, ...employeePenalties],
           attendance: null,
         },
       };
     });
-  }, [employees, salaries, bonuses, discounts, month, payrollInputs, autoDeductions, localLateMinutesMap]);
+  }, [employees, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localLateMinutesMap]);
 
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
     // If we have a payroll run, use backend data
@@ -402,12 +414,19 @@ export default function PayrollPage() {
           return sum + bonusAmt + assistAmt;
         }, 0);
 
-        const employeeDiscounts = discounts.filter((d) => {
-          return d.employeeId === employeeId && d.date.startsWith(month);
+        // Deductions — only advances (kind='advance') + penalties
+        const employeeAdvancesDisc = discounts.filter((d) => {
+          return d.employeeId === employeeId && d.kind === 'advance' && d.date.startsWith(month);
+        });
+        const employeePenaltiesDisc = penalties.filter((p) => {
+          return p.employeeId === employeeId && p.issueDate.startsWith(month);
         });
         
-        const variableDeductions = employeeDiscounts.reduce(
+        const variableDeductions = employeeAdvancesDisc.reduce(
           (sum, d) => sum + toNumber(d.amount),
+          0
+        ) + employeePenaltiesDisc.reduce(
+          (sum, p) => sum + toNumber(p.amount),
           0
         );
 
@@ -432,7 +451,7 @@ export default function PayrollPage() {
           details: {
             salaryConfig,
             bonuses: employeeBonuses,
-            advances: employeeDiscounts.filter(d => d.kind === 'advance'),
+            deductions: [...employeeAdvancesDisc, ...employeePenaltiesDisc],
             attendance: null,
           },
         };
@@ -441,7 +460,7 @@ export default function PayrollPage() {
     
     // ✅ NEW: If no payroll run, use the generated preview data
     return previewData;
-  }, [reportData, salaries, bonuses, discounts, month, employees, payrollInputs, autoDeductions, localLateMinutesMap, previewData]);
+  }, [reportData, salaries, bonuses, discounts, penalties, month, employees, payrollInputs, autoDeductions, localLateMinutesMap, previewData]);
 
   // ── Filtering ────────────────────────────────────────────────────────────────
   const filteredPayrollData = useMemo(() => {
@@ -790,21 +809,21 @@ export default function PayrollPage() {
         </div>
 
         {/* ── Payroll table ─────────────────────────────────────────────────────── */}
-        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group/table">
-          <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '800px' }}>
-            <table className="w-full text-right min-w-[1100px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
-              <thead className="bg-[#1a2530] text-white outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-[6px] sticky top-0 z-10">
+        <div className="relative bg-white rounded-3xl shadow-[0_10px_40px_rgba(38,53,68,0.08)] border border-slate-200 overflow-hidden group/table">
+          <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '75vh', minHeight: '500px' }}>
+            <table className="w-full text-center min-w-[1000px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+              <thead className="bg-[#1a2530] text-white sticky top-0 z-10">
                 <tr>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الموظف</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الراتب المستحق</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center text-emerald-300">المكافآت</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center text-rose-300">الخصومات</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">المجموع</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center bg-[#C89355]/20 text-[#C89355] border-b-4 border-[#C89355]/50">
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الموظف</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الراتب المستحق</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-emerald-300">المكافآت</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-rose-300">الخصومات</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">المجموع</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider bg-[#C89355]/20 text-[#C89355] border-b-3 border-[#C89355]/50">
                     الراتب المقبوض
                   </th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">الفرق</th>
-                  <th className="p-5 font-black text-xs uppercase tracking-wider text-center">إجراء</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الفرق</th>
+                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">إجراء</th>
                 </tr>
               </thead>
               <tbody style={{ position: 'relative' }}>
@@ -812,14 +831,14 @@ export default function PayrollPage() {
                   const row = allRows[virtualItem.index] as any;
                   if (row.isHeader) {
                     return (
-                      <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100/80 hover:bg-slate-200/60 transition-colors border-y border-slate-300">
-                        <td colSpan={8} className="px-6 py-4">
+                      <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100 border-y border-slate-200">
+                        <td colSpan={8} className="px-6 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-2 h-5 bg-[#C89355] rounded-full shadow-sm" />
-                            <span className="font-black text-[#263544] text-sm uppercase tracking-wide">
+                            <div className="w-1.5 h-4 bg-[#C89355] rounded-full" />
+                            <span className="font-black text-[#263544] text-sm">
                               {row.department}
                             </span>
-                            <span className="text-xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm">
+                            <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
                               {row.count} موظف
                             </span>
                           </div>
