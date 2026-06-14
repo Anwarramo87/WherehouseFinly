@@ -59,7 +59,7 @@ function normalizeBusDetails(details: BusDetailsResponse): BusData {
       id: passenger.id,
       employeeId: passenger.employeeId,
       name: passenger.name || passenger.employeeId,
-      subscriptionDate: (passenger as any).subscriptionDate ?? passenger.joinDate,
+      subscriptionDate: (passenger as { subscriptionDate?: string }).subscriptionDate ?? passenger.joinDate,
     })),
   };
 }

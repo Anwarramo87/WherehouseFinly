@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Save, UserPlus, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Check, AlertCircle, Bus as BusIcon } from "lucide-react";
+import { X, Save, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Check, AlertCircle, Bus as BusIcon } from "lucide-react";
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/page";
 import type { Employee } from "@/types/employee";
 import { useEmployees } from "@/hooks/useEmployees";
@@ -27,9 +27,10 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsClosing(false);
       setTimeout(() => searchInputRef.current?.focus(), 100);
-      // Fetch active subscribers to disable already-subscribed employees
+      // Fetch active subscribers to disable already-subscribed employees  
       apiClient.get("/transportation/active-subscribers")
         .then(res => setActiveSubscribers(res.data ?? {}))
         .catch(() => setActiveSubscribers({}));
@@ -41,7 +42,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
 
   const routeText = useMemo(() => busData?.route?.trim() || "", [busData]);
   const { data: rawEmployees = [], isLoading } = useEmployees({ fetchAll: true });
-  const allEmployees = Array.isArray(rawEmployees) ? rawEmployees : [];
+  const allEmployees = useMemo(() => (Array.isArray(rawEmployees) ? rawEmployees : []), [rawEmployees]);
   
   // Employees already subscribed to THIS bus
   const existingEmployeeIds = useMemo(
@@ -259,7 +260,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                     {isSubscribedElsewhere && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
                         <BusIcon size={10} />
-                        مشترك بباص "{subInfo?.route}" ({subInfo?.plateNumber})
+                        مشترك بباص &ldquo;{subInfo?.route}&rdquo; ({subInfo?.plateNumber})
                       </span>
                     )}
                   </div>
@@ -373,7 +374,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                     {searchQuery ? (
                       <>
                         <AlertCircle className="mx-auto text-slate-500 mb-2" size={32} />
-                        <p className="text-slate-400">لا توجد نتائج مطابقة لـ "{searchQuery}"</p>
+                        <p className="text-slate-400">لا توجد نتائج مطابقة لـ &ldquo;{searchQuery}&rdquo;</p>
                       </>
                     ) : (
                       <>

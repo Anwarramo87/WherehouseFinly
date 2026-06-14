@@ -57,9 +57,10 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
     };
   }, [isOpen]);
 
+  // Reset form when modal opens or initialData changes
   useEffect(() => {
     if (!isOpen) return;
-    // Ensure form state reflects the modal content
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(buildDefaultForm(initialData));
   }, [isOpen, initialData]);
 

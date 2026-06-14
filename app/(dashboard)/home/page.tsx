@@ -4,7 +4,7 @@
 import dynamic from "next/dynamic";
 import {
   Users, Clock, Timer, AlertTriangle,
-  UserCheck, Wallet, UserX, Building2, TrendingUp,
+  UserCheck, UserX, Building2, TrendingUp,
   Scissors,
   User,
   CalendarX,
@@ -23,16 +23,14 @@ import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
 import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
-import type { DeptFormData } from "@/components/AddDepartmentModal";
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useState, useMemo } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
-import { toLocalDateString } from '@/lib/date-time';
 
-const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
+const _AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   loading: () => null,
 });
 

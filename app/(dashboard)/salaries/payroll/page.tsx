@@ -356,7 +356,7 @@ export default function PayrollPage() {
 
         const grossPay = toNumber(backendItem.grossPay);
         const totalDeductions = toNumber(backendItem.totalDeductions);
-        const netPay = toNumber(backendItem.netPay);
+        const _netPay = toNumber(backendItem.netPay);
         const netPayRounded = toNumber(backendItem.netPayRounded);
         const roundingDifference = toNumber(backendItem.roundingDifference);
         const netPayWithAdvance = toNumber(backendItem.netPayWithAdvance);
@@ -499,7 +499,10 @@ export default function PayrollPage() {
   const rowVirtualizer = useVirtualizer({
     count: allRows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: (index: number) => (allRows[index] as any).isHeader ? 48 : 96, // Estimate header height and row height
+    estimateSize: (index: number) => {
+      const row = allRows[index] as { isHeader?: boolean } | undefined;
+      return row?.isHeader ? 48 : 96;
+    },
     overscan: 5,
   });
 
@@ -828,8 +831,9 @@ export default function PayrollPage() {
               </thead>
               <tbody style={{ position: 'relative' }}>
                 {rowVirtualizer.getVirtualItems().map((virtualItem: VirtualItem) => {
-                  const row = allRows[virtualItem.index] as any;
-                  if (row.isHeader) {
+                  const row = allRows[virtualItem.index];
+                  const isHeaderRow = (r: typeof row): r is { isHeader: true; department: string; count: number } => 'isHeader' in r;
+                  if (isHeaderRow(row)) {
                     return (
                       <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100 border-y border-slate-200">
                         <td colSpan={8} className="px-6 py-3">
@@ -850,7 +854,7 @@ export default function PayrollPage() {
                     <PayrollRow
                       key={virtualItem.index}
                       item={row}
-                      onSelectPayslip={() => setSelectedPayslip(row)}
+                      onSelectPayslip={() => setSelectedPayslip(row as AggregatedPayroll)}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
                     />
                   );

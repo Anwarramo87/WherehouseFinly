@@ -58,7 +58,7 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
 
 // reportDebug is referenced in older versions of this proxy file.
 // If it isn't available in the current codebase, keep compilation working.
-const reportDebug: undefined | ((...args: any[]) => void) = undefined;
+const reportDebug: undefined | ((...args: unknown[]) => void) = undefined;
 
 export async function handler(request: NextRequest) {
   const url = request.nextUrl;
