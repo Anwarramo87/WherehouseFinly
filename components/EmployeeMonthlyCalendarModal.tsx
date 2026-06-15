@@ -5,9 +5,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronRight, ChevronLeft, Calendar, Clock, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { QUERY_STALE_TIME, QUERY_GC_TIME } from "@/lib/query-cache";
+import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModal";
 
 interface Props {
   isOpen: boolean;
@@ -24,12 +25,15 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   ADMIN: "إدارية",
   UNPAID: "بدون أجر",
   DEATH: "وفاة",
+  PAID: "مأجورة",
   OTHER: "أخرى",
 };
 
 export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employeeId, employeeName, initialMonth }: Props) {
   const isBrowser = typeof window !== "undefined";
   const [currentMonth, setCurrentMonth] = useState(initialMonth);
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
+  const queryClient = useQueryClient();
 
   const { startDate, endDate, daysInMonth, year, month } = useMemo(() => {
     const [y, m] = currentMonth.split("-").map(Number);
@@ -66,12 +70,17 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
       const res = await apiClient.get(`/leaves`, {
         params: { employeeId, startDate, endDate }
       });
-      const data = res.data as { leaveRequests?: unknown[] } | unknown[];
-      if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object' && 'leaveRequests' in data) {
-        return (data as { leaveRequests: unknown[] }).leaveRequests ?? [];
+      const data = res.data as { data?: unknown[]; leaveRequests?: unknown[] } | unknown[];
+      if (Array.isArray(data)) return data as LeaveRecord[];
+      if (data && typeof data === 'object') {
+        if ('data' in data && Array.isArray((data as { data: unknown[] }).data)) {
+          return (data as { data: LeaveRecord[] }).data;
+        }
+        if ('leaveRequests' in data && Array.isArray((data as { leaveRequests: unknown[] }).leaveRequests)) {
+          return (data as { leaveRequests: LeaveRecord[] }).leaveRequests;
+        }
       }
-      return [];
+      return [] as LeaveRecord[];
     },
     enabled: isOpen && !!employeeId,
     staleTime: QUERY_STALE_TIME.STANDARD,
@@ -83,28 +92,26 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  // معالجة البيانات وتصفيتها بدقة وحمايتها من الـ Timezone
+  // معالجة البيانات — نخزن كائنات الإجازات الكاملة لكل يوم
   const mappedDays = useMemo(() => {
     interface DayRecord {
       isPresent: boolean;
       isLate: boolean;
       overtimeMin: number;
-      leaveType: string | null;
+      leaves: LeaveRecord[];
     }
     const dayMap = new Map<string, DayRecord>();
 
     if (Array.isArray(attendanceData)) {
       attendanceData.forEach((rec: Record<string, unknown>) => {
-        // قراءة التاريخ النصي المباشر لمنع قفز التواريخ بسبب الـ Timezone
         const dateKey = (typeof rec.date === 'string' ? rec.date.split("T")[0] : String(rec.date)) || '';
         
         if (!dayMap.has(dateKey)) {
-          dayMap.set(dateKey, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
+          dayMap.set(dateKey, { isPresent: false, isLate: false, overtimeMin: 0, leaves: [] });
         }
         const current = dayMap.get(dateKey)!;
         current.isPresent = true;
 
-        // دعم قراءة حقل minutesLate سواء كان مباشراً أو متداخلاً في shiftPair حسب تقرير الـ API
         const recData = rec as Record<string, unknown>;
         const minutesLate = Number(recData.minutesLate ?? (recData.shiftPair as Record<string, unknown>)?.minutesLate ?? 0);
         if (minutesLate > 0) current.isLate = true;
@@ -116,22 +123,24 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
       });
     }
 
+    // نضيف كائنات الإجازات الكاملة — نتجنب إضافة نفس الإجازة مرتين لنفس اليوم
     if (Array.isArray(leavesData)) {
       leavesData.forEach((leave) => {
-        const leaveRecord = leave as Record<string, unknown>;
-        const startStr = (typeof leaveRecord.startDate === 'string' ? leaveRecord.startDate.split("T")[0] : String(leaveRecord.startDate ?? ''));
-        const endStr = (typeof leaveRecord.endDate === 'string' ? leaveRecord.endDate.split("T")[0] : String(leaveRecord.endDate ?? ''));
-        const start = new Date(startStr);
-        const end = new Date(endStr);
+        const leaveRecord = leave as LeaveRecord;
+        const startStr = leaveRecord.startDate?.slice(0, 10) ?? '';
+        const endStr   = leaveRecord.endDate?.slice(0, 10) ?? '';
+        if (!startStr || !endStr) return;
 
         daysInMonth.forEach(dayStr => {
-          const currentDay = new Date(dayStr);
-          if (currentDay >= start && currentDay <= end) {
+          if (dayStr >= startStr && dayStr <= endStr) {
             if (!dayMap.has(dayStr)) {
-              dayMap.set(dayStr, { isPresent: false, isLate: false, overtimeMin: 0, leaveType: null });
+              dayMap.set(dayStr, { isPresent: false, isLate: false, overtimeMin: 0, leaves: [] });
             }
             const dayEntry = dayMap.get(dayStr)!;
-            dayEntry.leaveType = (leaveRecord.leaveType as string | null) ?? dayEntry.leaveType;
+            // لا نضيف نفس الإجازة مرتين
+            if (!dayEntry.leaves.find(l => l.id === leaveRecord.id)) {
+              dayEntry.leaves.push(leaveRecord);
+            }
           }
         });
       });
@@ -147,7 +156,6 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
     return mapping[jsDay] || 0;
   }, [year, month]);
 
-  // إصلاح رياضيات التنقل الآمن بين الأشهر خطوة بخطوة
   const handlePrevMonth = () => {
     const [y, m] = currentMonth.split("-").map(Number);
     const prevDate = new Date(Date.UTC(y, m - 2, 1));
@@ -167,6 +175,7 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
   if (!isOpen || !isBrowser) return null;
 
   return createPortal(
+    <>
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md" dir="rtl">
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.2)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in zoom-in-95 duration-200">
         
@@ -221,18 +230,17 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                 {daysInMonth.map(dayStr => {
                   const dayNum = parseInt(dayStr.split("-")[2]);
                   const info = mappedDays.get(dayStr);
+                  const hasLeaves = (info?.leaves?.length ?? 0) > 0;
                   
                   let styleClass = "border-slate-800 bg-[#161f29]/30 text-slate-400"; 
                   let statusText = "غائب";
 
-                  if (info?.leaveType && !info?.isPresent) {
-                    // غائب + إجازة → إجازة
+                  if (hasLeaves && !info?.isPresent) {
                     styleClass = "border-amber-500/30 bg-amber-500/10 text-amber-400";
-                    statusText = `إجازة ${LEAVE_TYPE_LABELS[info.leaveType] || info.leaveType}`;
-                  } else if (info?.isPresent && info?.leaveType) {
-                    // حاضر + إجازة جزئية
+                    statusText = "إجازة";
+                  } else if (info?.isPresent && hasLeaves) {
                     styleClass = "border-teal-500/30 bg-teal-500/10 text-teal-400";
-                    statusText = `حاضر / إجازة`;
+                    statusText = "حاضر / إجازة";
                   } else if (info?.isPresent) {
                     styleClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
                     statusText = info.isLate ? "متأخر" : "حاضر";
@@ -245,8 +253,24 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
                         <span className="text-[9px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md border border-white/5">{statusText}</span>
                       </div>
 
+                      {/* أزرار الإجازات — قابلة للنقر لفتح LeaveManageModal */}
+                      {hasLeaves && (
+                        <div className="mt-1 flex flex-col gap-0.5">
+                          {info!.leaves.map((l) => (
+                            <button
+                              key={l.id}
+                              onClick={() => setSelectedLeave({ ...l, employee: { name: employeeName, employeeId } })}
+                              className="w-full text-[8px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/20 hover:border-amber-400/50 transition-all text-right truncate active:scale-95"
+                              title={`${LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType} — اضغط للتعديل أو الحذف`}
+                            >
+                              {LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {(info?.overtimeMin ?? 0) > 0 && (
-                        <div className="mt-2 flex items-center gap-1 text-[10px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded-lg w-fit">
+                        <div className="mt-1 flex items-center gap-1 text-[10px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded-lg w-fit">
                           <Clock size={10} />
                           <span>+{Math.round(info?.overtimeMin ?? 0)} د إضافي</span>
                         </div>
@@ -259,7 +283,21 @@ export default function EmployeeMonthlyCalendarModal({ isOpen, onClose, employee
           )}
         </div>
       </div>
-    </div>,
+    </div>
+
+    {/* LeaveManageModal — يفتح عند النقر على بادج الإجازة */}
+    {selectedLeave && (
+      <LeaveManageModal
+        isOpen={!!selectedLeave}
+        leave={selectedLeave}
+        onClose={() => setSelectedLeave(null)}
+        onUpdated={() => {
+          void queryClient.invalidateQueries({ queryKey: ["employeeMonthlyLeaves", employeeId, currentMonth] });
+          void queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+        }}
+      />
+    )}
+    </>,
     document.body
   );
 }

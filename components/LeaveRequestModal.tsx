@@ -758,7 +758,6 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         toast.error(`فشل ${failed} طلب: ${firstFailed?.error ?? "خطأ غير معروف"}`);
       }
     } catch (err: unknown) {
-      console.error("Leave request error:", err);
       const axiosErr = err as { response?: { status?: number; data?: { message?: string | string[]; error?: { message?: string } } } };
       const status = axiosErr?.response?.status;
       const msg = axiosErr?.response?.data?.message || axiosErr?.response?.data?.error?.message;
@@ -768,7 +767,15 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       } else if (status === 403) {
         toast.error("ليس لديك صلاحية لإنشاء طلبات إجازة.");
       } else if (status === 400) {
-        toast.error(`بيانات غير صحيحة: ${Array.isArray(msg) ? msg.join(" | ") : (msg ?? "تحقق من البيانات")}`);
+        // عرض رسالة الخطأ من الباك إند بشكل واضح ولطيف
+        const errorMessage = Array.isArray(msg) ? msg.join("\n") : (msg ?? "تحقق من البيانات");
+        
+        // إذا كانت الرسالة تحتوي على كلمة "تداخل" نعرض رسالة أكثر ودية
+        if (typeof errorMessage === 'string' && errorMessage.includes('تداخل')) {
+          toast.error("⚠️ الموظف لديه إجازة بالفعل في هذه التواريخ. يرجى اختيار تواريخ مختلفة.", { duration: 5000 });
+        } else {
+          toast.error(errorMessage, { duration: 5000 });
+        }
       } else if (status === 500) {
         toast.error(`خطأ في الخادم: ${typeof msg === 'string' ? msg : "حدث خطأ غير متوقع. تحقق من logs الباك إند."}`);
       } else {

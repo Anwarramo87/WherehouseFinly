@@ -17,6 +17,7 @@ import {
   getAttendanceSocket,
   type AttendanceRealtimeEventPayload,
 } from "@/lib/realtime/attendance-socket";
+import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModal";
 
 const LeaveRequestModal = dynamic(
   () => import("@/components/LeaveRequestModal"),
@@ -80,6 +81,7 @@ interface AttendanceTableRow {
   source: "manual" | "device";
   status: TableStatus;
   leaveStatus?: string[];
+  leaveObjects?: LeaveRecord[];
 }
 
 export default function AttendancePage() {
@@ -88,6 +90,7 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
 
   const [timeModal, setTimeModal] = useState<{
     isOpen: boolean;
@@ -151,11 +154,18 @@ export default function AttendancePage() {
 
     // بناء خريطة الإجازات — نفكك نطاق الإجازة ونُسند فقط للإجازات التي تغطي selectedDate
     const leavesMap = new Map<string, string[]>();
+    const leavesObjectMap = new Map<string, LeaveRecord[]>();
     (leaves || []).forEach((leave) => {
       if (!leave.employeeId || !leave.leaveType) return;
       if (!isDayInsideLeave(leave, selectedDate)) return;
       if (!leavesMap.has(leave.employeeId)) leavesMap.set(leave.employeeId, []);
+      if (!leavesObjectMap.has(leave.employeeId)) leavesObjectMap.set(leave.employeeId, []);
       leavesMap.get(leave.employeeId)?.push(leave.leaveType);
+      const leaveObj = leave as LeaveRecord;
+      // لا نضيف نفس الإجازة مرتين
+      if (!leavesObjectMap.get(leave.employeeId)?.find(l => l.id === leaveObj.id)) {
+        leavesObjectMap.get(leave.employeeId)?.push(leaveObj);
+      }
     });
 
     const tableRows: AttendanceTableRow[] = [];
@@ -181,6 +191,7 @@ export default function AttendancePage() {
         source: entry?.source ?? "manual",
         status: effectiveStatus,
         leaveStatus,
+        leaveObjects: leavesObjectMap.get(employeeId),
       });
     }
     return tableRows.sort((a, b) =>
@@ -438,7 +449,20 @@ export default function AttendancePage() {
                         </td>
                         {/* حالة الإجازة — تظهر "إجازة" بدلاً من "غائب" */}
                         <td className="p-4 text-center">
-                          {row.leaveStatus && row.leaveStatus.length > 0 ? (
+                          {row.leaveObjects && row.leaveObjects.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 justify-center">
+                              {row.leaveObjects.map((leaveObj) => (
+                                <button
+                                  key={leaveObj.id}
+                                  onClick={() => setSelectedLeave({ ...leaveObj, employee: { name: row.employeeName, employeeId: row.employeeId } })}
+                                  className="px-4 py-1.5 rounded-xl text-[11px] font-black border text-blue-700 bg-blue-50 border-blue-200 shadow-sm hover:bg-blue-100 hover:border-blue-300 transition-all cursor-pointer"
+                                  title="اضغط للتعديل أو الحذف"
+                                >
+                                  {LEAVE_TYPE_LABELS[leaveObj.leaveType] || leaveObj.leaveType}
+                                </button>
+                              ))}
+                            </div>
+                          ) : row.leaveStatus && row.leaveStatus.length > 0 ? (
                             <span className="px-4 py-1.5 rounded-xl text-[11px] font-black border text-blue-700 bg-blue-50 border-blue-200 shadow-sm">
                               {row.leaveStatus.map((t) => LEAVE_TYPE_LABELS[t] || t).join("، ")}
                             </span>
@@ -590,6 +614,18 @@ export default function AttendancePage() {
         onClose={() => setIsLeaveModalOpen(false)}
         employees={employeeList}
       />
+
+      {/* Leave Manage Modal — يفتح عند النقر على بادج الإجازة */}
+      {selectedLeave && (
+        <LeaveManageModal
+          isOpen={!!selectedLeave}
+          leave={selectedLeave}
+          onClose={() => setSelectedLeave(null)}
+          onUpdated={() => {
+            void queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+          }}
+        />
+      )}
     </>
   );
 }
