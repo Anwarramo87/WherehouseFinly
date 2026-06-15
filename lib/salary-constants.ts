@@ -55,5 +55,5 @@ export const calculateDelayDeduction = (
   workingHoursPerDay: number = SALARY_CONSTANTS.WORKING_HOURS_PER_DAY
 ): number => {
   const minuteRate = calculateMinuteRate(baseSalary, workingHoursPerDay);
-  return delayMinutes * minuteRate;
+  return delayMinutes * minuteRate * 1.5;
 };

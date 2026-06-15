@@ -91,7 +91,7 @@ const calcEarnedSalary = (
   const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
   const salaryFromDays = dailyRate * paidDays;
   // خصومات الوقت
-  const lateDeduction = lateMinutes * minuteRate;
+  const lateDeduction = lateMinutes * minuteRate * 1.5;
   const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
   // مكافآت الإضافي
   const overtimePay = overtimeMinutes * minuteRate * 1.5;         // إضافي عادي
@@ -110,7 +110,7 @@ const calcEarnedSalary = (
  * حساب دقائق التأخير لسجل يومي واحد (بالـ local time — نفس منطق صفحة attendance)
  * بعد طرح فترة السماح (15 دقيقة افتراضياً)
  */
-const _calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+const _calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 5): number => {
 
   if (!checkIn) return 0;
   const toMins = (t: string) => {

@@ -166,7 +166,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
       daysAttended += 1;
 
       const checkInMinutes = toMinutes(record.checkIn);
-      if (checkInMinutes !== null && scheduledStartMinutes !== null && checkInMinutes > scheduledStartMinutes + 15) {
+      if (checkInMinutes !== null && scheduledStartMinutes !== null && checkInMinutes > scheduledStartMinutes + 5) {
         lateMinutes += checkInMinutes - scheduledStartMinutes;
       }
 

@@ -35,7 +35,7 @@ export const getStatus = (checkIn?: string, scheduledStart?: string): TableStatu
   const scheduledMinutes = toMinutes(scheduledStart || "08:00");
 
   if (checkInMinutes === null || scheduledMinutes === null) return "present";
-  if (checkInMinutes > (scheduledMinutes + 15)) return "late";
+  if (checkInMinutes > (scheduledMinutes + 5)) return "late";
 
   return "present";
 };
@@ -91,7 +91,7 @@ export const calculateAttendanceMetrics = (
     if (
       checkInMinutes !== null &&
       scheduledStartMinutes !== null &&
-      checkInMinutes > (scheduledStartMinutes + 15)
+      checkInMinutes > (scheduledStartMinutes + 5)
     ) {
       totalLateMinutes += Math.max(0, checkInMinutes - scheduledStartMinutes);
     }

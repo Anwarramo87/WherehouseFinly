@@ -134,11 +134,11 @@ const calcEarnedSalaryTimeTable = (
   const dailyRate = grossSalary / STANDARD_WORK_DAYS;
   const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
   const salaryFromDays = dailyRate * actualWorkDays;
-  const delayDeduction = totalDelayMinutes * minuteRate;
+  const delayDeduction = totalDelayMinutes * minuteRate * 1.5;
   return Math.max(0, salaryFromDays - delayDeduction);
 };
 
-const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 15): number => {
+const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 5): number => {
   if (!checkIn) return 0;
   const toMins = (t: string) => {
     const s = t.slice(0, 5);
@@ -214,7 +214,7 @@ export default function PayrollPage() {
       if (!dr.checkIn) continue;
       const emp = employees.find((e) => e.employeeId === dr.employeeId);
       const scheduledStart = emp?.scheduledStart || "08:00";
-      const gracePeriod = (emp && typeof (emp as { gracePeriodMinutes?: number }).gracePeriodMinutes === 'number') ? (emp as { gracePeriodMinutes: number }).gracePeriodMinutes : 15;
+      const gracePeriod = (emp && typeof (emp as { gracePeriodMinutes?: number }).gracePeriodMinutes === 'number') ? (emp as { gracePeriodMinutes: number }).gracePeriodMinutes : 5;
       const lateMin = calcLateMinutes(dr.checkIn, scheduledStart, gracePeriod);
       if (lateMin > 0) {
         map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + lateMin);
