@@ -321,7 +321,7 @@ export default function AttendancePage() {
             <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="p-3 bg-[#1a2530] rounded-2xl border border-[#C89355]/40 outline outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4">
+                  <div className="p-3 bg-[#1a2530] rounded-2xl border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4">
                     <ClipboardCheck size={22} className="text-[#C89355]" strokeWidth={2.5} />
                   </div>
                   <h1 className="text-3xl font-black text-[#263544] tracking-tight">سجل الحضور والانصراف</h1>
@@ -398,7 +398,7 @@ export default function AttendancePage() {
           <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
             <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0" />
             <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-              <table className="w-full text-right border-collapse min-w-[900px]">
+              <table className="w-full text-right border-collapse min-w-225">
                 <thead>
                   <tr className="bg-white/40 border-b border-white/80">
                     <th className="p-5 text-xs font-black text-[#263544] uppercase tracking-wider text-center">الموظف</th>
@@ -545,7 +545,7 @@ export default function AttendancePage() {
 
       {/* ── Time Modal — خارج كل الـ containers حتى لا يتأثر بالـ scroll ── */}
       {timeModal.isOpen && timeModal.row && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
           <div
             className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_30px_80px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-lg overflow-hidden flex flex-col md:flex-row relative"
             dir="rtl"
