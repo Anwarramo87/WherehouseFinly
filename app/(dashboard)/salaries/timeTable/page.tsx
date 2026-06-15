@@ -3,7 +3,9 @@
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2, CalendarPlus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import apiClient from "@/lib/api-client";
 import { SALARY_CONSTANTS } from "@/lib/salary-constants"; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 import { useEmployees } from "@/hooks/useEmployees";
@@ -125,6 +127,7 @@ const _calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod =
 };
 
 export default function TimeTablePage() {
+  const queryClient = useQueryClient();
   // FIX: نضمن أن employees دائماً مصفوفة بغض النظر عن شكل الـ response
   const { data: rawEmployees } = useEmployees({ limit: 200, status: "active" });
   const employees = useMemo(
@@ -151,7 +154,19 @@ export default function TimeTablePage() {
   const [addDayCheckOut, setAddDayCheckOut] = useState("16:00");
   const [skipFridays, setSkipFridays] = useState(true);
 
-  const handleAddDaySubmit = () => {
+  const [isAddingDay, setIsAddingDay] = useState(false);
+
+  const buildTimestamp = (date: string, hhmm: string) => {
+    const localDateTime = new Date(`${date}T${hhmm}:00`);
+    const offsetMinutes = -localDateTime.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absOffset = Math.abs(offsetMinutes);
+    const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, "0");
+    const offsetMins = String(absOffset % 60).padStart(2, "0");
+    return `${date}T${hhmm}:00${sign}${offsetHours}:${offsetMins}`;
+  };
+
+  const handleAddDaySubmit = async () => {
     if (!addDayEmployeeId || !addDayStartDate || !addDayEndDate) {
       toast.error("يرجى اختيار الموظف وتاريخ البداية والنهاية");
       return;
@@ -163,29 +178,54 @@ export default function TimeTablePage() {
       return;
     }
 
+    setIsAddingDay(true);
     let addedCount = 0;
+    let failedCount = 0;
     const current = new Date(start);
+
     while (current <= end) {
       const dateStr = current.toISOString().slice(0, 10);
-      const dayOfWeek = current.getDay(); // 5 = Friday
+      const dayOfWeek = current.getDay();
 
       if (skipFridays && dayOfWeek === 5) {
         current.setDate(current.getDate() + 1);
         continue;
       }
 
-      markAttendance?.mutate({
-        employeeId: addDayEmployeeId,
-        date: dateStr,
-        checkIn: addDayCheckIn,
-        checkOut: addDayCheckOut,
-        source: "manual",
-      });
-      addedCount++;
+      try {
+        const checkInTs = buildTimestamp(dateStr, addDayCheckIn);
+        const checkOutTs = buildTimestamp(dateStr, addDayCheckOut);
+
+        await apiClient.post("/attendance", {
+          employeeId: addDayEmployeeId,
+          timestamp: checkInTs,
+          type: "IN",
+          source: "manual",
+        });
+
+        await apiClient.post("/attendance", {
+          employeeId: addDayEmployeeId,
+          timestamp: checkOutTs,
+          type: "OUT",
+          source: "manual",
+        });
+
+        addedCount++;
+      } catch {
+        failedCount++;
+      }
       current.setDate(current.getDate() + 1);
     }
 
-    toast.success(`تم تسجيل ${addedCount} يوم دوام للموظف ${addDayEmployeeName}`);
+    await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+    await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"], exact: false });
+
+    setIsAddingDay(false);
+    if (failedCount > 0) {
+      toast.success(`تم تسجيل ${addedCount} يوم وفشل ${failedCount} يوم للموظف ${addDayEmployeeName}`);
+    } else {
+      toast.success(`تم تسجيل ${addedCount} يوم دوام للموظف ${addDayEmployeeName}`);
+    }
     setIsAddDayOpen(false);
   };
 
@@ -242,6 +282,17 @@ export default function TimeTablePage() {
   // NOTE: تم إلغاء أي fallback عشوائي لحساب أيام الدوام.
   // سيتم عرض presentDays/absentDays فقط القادمة من backend عبر useAttendanceDeductions
   // لتوحيد منطق CalendarModal مع جدول الدوام.
+
+  // حساب أيام الحضور الفعلية مباشرة من سجلات البصمة (بديل عن backend calculate-deductions)
+  const localPresentDaysMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords]);
 
   /**
    * بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
@@ -348,9 +399,12 @@ export default function TimeTablePage() {
       const totalAbsencesLeaves = absenceDays + totalLeaves;
       const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
 
-      // أيام الحضور الفعلية من البصمة
-      const actualWorkDays: number | null = autoInput !== undefined
-        ? Math.max(0, autoInput.presentDays)
+      // أيام الحضور الفعلية من البصمة — نحسبها من السجلات مباشرة
+      // نستخدم الأكبر بين local و backend لتجنب فقدان بيانات
+      const backendPresentDays = autoInput?.presentDays ?? 0;
+      const localPresentDays = localPresentDaysMap.get(emp.employeeId) ?? 0;
+      const actualWorkDays: number | null = Math.max(backendPresentDays, localPresentDays) > 0
+        ? Math.max(backendPresentDays, localPresentDays)
         : null;
 
       // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
@@ -366,10 +420,14 @@ export default function TimeTablePage() {
         : autoWeekendDays;
 
       // الراتب الكامل
-      const grossSalary = calcGrossSalary(emp, salaryMap.get(emp.employeeId));
+      const salaryRec = salaryMap.get(emp.employeeId);
+      const grossSalary = calcGrossSalary(emp, salaryRec);
 
-      // الراتب المستحق بناءً على الدوام الفعلي + الإجازات المدفوعة
-      const earnedSalary = actualWorkDays !== null
+      // قيمة التأمينات الشهرية (خصم ثابت)
+      const insuranceAmount = salaryRec ? safeToNumber(salaryRec.insuranceAmount) : 0;
+
+      // الراتب المستحق بناءً على الدوام الفعلي + الإجازات المدفوعة - التأمينات
+      const rawEarned = actualWorkDays !== null
         ? calcEarnedSalary(
             grossSalary,
             actualWorkDays,
@@ -379,6 +437,11 @@ export default function TimeTablePage() {
             totalOvertimeMinutes,                     // إضافي عادي (دقائق)
             totalOvertimeDays,                        // إضافي جمعة (أيام)
           )
+        : null;
+
+      // طرح التأمينات من الراتب المستحق
+      const earnedSalary = rawEarned !== null
+        ? Math.max(0, rawEarned - insuranceAmount)
         : null;
 
       return {
@@ -391,13 +454,14 @@ export default function TimeTablePage() {
         totalOvertimeDays,
         grossSalary,
         earnedSalary,
+        insuranceAmount,
         // بيانات الإجازات للعرض في الجدول — من leaves API
         leaveTypes: leaveData?.leaveTypes ?? [],
         paidLeaveDays,
         unpaidLeaveDays,
       };
     });
-  }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap]);
+    }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, localPresentDaysMap]);
 
 
   const filteredRecords = useMemo(() => {
@@ -812,10 +876,10 @@ export default function TimeTablePage() {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={handleAddDaySubmit}
-                  disabled={markAttendance?.isPending}
+                  disabled={isAddingDay}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {markAttendance?.isPending ? "جاري الحفظ..." : "حفظ"}
+                  {isAddingDay ? "جاري الحفظ..." : "حفظ"}
                 </button>
                 <button
                   onClick={() => setIsAddDayOpen(false)}
