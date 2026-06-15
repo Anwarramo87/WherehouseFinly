@@ -8,14 +8,14 @@ import type { PenaltyRecord } from '@/hooks/usePenalties';
 // Define types directly in the component for simplicity
 // In a real app, these would be imported from a central types file
 type Salary = {
-  baseSalary?: number | { $numberDecimal: string };
-  lumpSumSalary?: number | { $numberDecimal: string };
-  livingAllowance?: number | { $numberDecimal: string };
-  responsibilityAllowance?: number | { $numberDecimal: string };
-  extraEffortAllowance?: number | { $numberDecimal: string };
-  productionIncentive?: number | { $numberDecimal: string };
-  transportAllowance?: number | { $numberDecimal: string };
-  insuranceAmount?: number | { $numberDecimal: string };
+  baseSalary?: number | string;
+  lumpSumSalary?: number | string;
+  livingAllowance?: number | string;
+  responsibilityAllowance?: number | string;
+  extraEffortAllowance?: number | string;
+  productionIncentive?: number | string;
+  transportAllowance?: number | string;
+  insuranceAmount?: number | string;
 };
 
 interface AggregatedPayroll {

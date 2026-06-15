@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Plus, Bus, ChevronLeft, Edit2, Scissors, Trash2 } from "lucide-react";
 import useTransportation, { type BusDetailsResponse } from "@/hooks/useTransportation";
@@ -103,16 +103,16 @@ export default function TransportationPage() {
     return passenger.name || employeeNameMap.get(passenger.employeeId) || passenger.employeeId;
   };
 
-  // Global Pooling Logic
+  // Global Pooling Logic — compute from buses directly (available immediately)
   const { totalFleetCost, totalSubscribers, baseShare } = useMemo(() => {
     let totalCost = 0;
     let totalSubs = 0;
     let netCost = 0;
 
-    Object.values(busDetails).forEach(bus => {
-      if (!bus) return;
+    const safeBuses = Array.isArray(buses) ? buses : [];
+    safeBuses.forEach(bus => {
       totalCost += Number(bus.totalCost) || 0;
-      totalSubs += bus.passengers.length;
+      totalSubs += bus.activePassengers ?? 0;
       netCost += (Number(bus.totalCost) || 0) * (1 - (Number(bus.companyDeductionPct) || 0) / 100);
     });
 
@@ -123,7 +123,7 @@ export default function TransportationPage() {
       totalSubscribers: totalSubs,
       baseShare: share,
     };
-  }, [busDetails]);
+  }, [buses]);
 
   const handleDeleteBus = async (busId: string, route: string) => {
     if (!confirm(`هل أنت متأكد من حذف الباص "${route}"؟\nسيتم حذف جميع اشتراكات الموظفين المرتبطة بهذا الباص.`)) return;
@@ -202,20 +202,29 @@ export default function TransportationPage() {
     }
   };
 
+  // Fetch detailed bus data (passengers) for each bus
+  const fetchingRef = useRef<Set<string>>(new Set());
+  const stableGetBus = useCallback((busId: string) => getBus(busId), [getBus]);
+
   useEffect(() => {
     if (!buses || buses.length === 0) return;
     buses.forEach((b) => {
-      if (busDetails[b.id as string] !== undefined) return;
-      (async () => {
-        try {
-          const details = await getBus(b.id as string);
-          setBusDetails((prev) => ({ ...prev, [b.id as string]: normalizeBusDetails(details) }));
-        } catch {
-          setBusDetails((prev) => ({ ...prev, [b.id as string]: null }));
-        }
-      })();
+      const id = b.id as string;
+      if (busDetails[id] !== undefined) return;       // already fetched
+      if (fetchingRef.current.has(id)) return;          // already fetching
+      fetchingRef.current.add(id);
+      stableGetBus(id)
+        .then((details) => {
+          setBusDetails((prev) => ({ ...prev, [id]: normalizeBusDetails(details) }));
+        })
+        .catch(() => {
+          setBusDetails((prev) => ({ ...prev, [id]: null }));
+        })
+        .finally(() => {
+          fetchingRef.current.delete(id);
+        });
     });
-  }, [buses, getBus, busDetails]);
+  }, [buses, stableGetBus]);
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex flex-col overflow-hidden" dir="rtl">

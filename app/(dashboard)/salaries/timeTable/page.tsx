@@ -267,7 +267,7 @@ export default function TimeTablePage() {
   });
 
   // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
-  const { data: _monthlyAttendanceData, markAttendance } = useAttendance({
+  const { data: monthlyAttendanceData, markAttendance } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
     limit: 200,

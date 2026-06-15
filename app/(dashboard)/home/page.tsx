@@ -2,6 +2,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { DataDrilldownModal } from "@/components/DataDrilldownModal";
 import {
   Users, Clock, Timer, AlertTriangle,
   UserCheck, UserX, Building2, TrendingUp,
@@ -33,11 +34,6 @@ import apiClient from '@/lib/api-client';
 const _AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   loading: () => null,
 });
-
-const DataDrilldownModal = dynamic(
-  () => import("@/components/DataDrilldownModal").then((module) => module.DataDrilldownModal),
-  { loading: () => null },
-);
 
 // ============================================================================
 // TypeScript Interfaces

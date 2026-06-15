@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -53,10 +54,10 @@ export function useTransportation() {
     refetchOnWindowFocus: true, // تحديث تلقائي عند العودة للصفحة
   });
 
-  const getBus = async (busId: string): Promise<BusDetailsResponse> => {
+  const getBus = useCallback(async (busId: string): Promise<BusDetailsResponse> => {
     const res = await apiClient.get(`/transportation/buses/${busId}`);
     return res.data;
-  };
+  }, []);
 
   const createBus = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
