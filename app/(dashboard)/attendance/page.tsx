@@ -52,7 +52,7 @@ const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
   const ci = toMinutes(checkIn);
   const sc = toMinutes(scheduledStart || "08:00");
   if (ci === null || sc === null) return "present";
-  return ci > sc + 15 ? "late" : "present";
+  return ci > sc + 5 ? "late" : "present";
 };
 
 const statusUi: Record<TableStatus, { label: string; classes: string }> = {
@@ -529,7 +529,7 @@ export default function AttendancePage() {
           <div className="mt-8 bg-white/60 backdrop-blur-xl p-5 rounded-3xl border border-white/80 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
             <div className="text-xs text-[#263544] font-black flex items-center gap-2.5">
               <Clock3 size={16} className="text-[#C89355]" />
-              يعتبر الموظف متأخراً إذا تجاوز وقت الدخول وقت الدوام المجدول + 15 دقيقة.
+              يعتبر الموظف متأخراً إذا تجاوز وقت الدخول وقت الدوام المجدول + 5 دقائق.
             </div>
             <div className="text-xs text-[#263544] font-black flex items-center gap-2.5">
               <Fingerprint size={16} className="text-[#C89355]" />
