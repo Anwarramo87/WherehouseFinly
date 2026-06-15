@@ -111,7 +111,7 @@ export function useTransportation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["buses"] });
-      toast.success("تم حذف الباص");
+      toast.success("تم نقل الباص إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(normalizeError(error, "فشلت العملية"));

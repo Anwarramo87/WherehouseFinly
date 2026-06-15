@@ -206,7 +206,7 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"], exact: false });
-      toast.success("تم حذف الصنف");
+      toast.success("تم نقل الصنف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(extractMessage(error, "الحذف غير مدعوم حالياً من الخادم"));

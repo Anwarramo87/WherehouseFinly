@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -19,6 +20,7 @@ import { usePayrollInputs } from "@/hooks/usePayrollInputs";
 import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
 import { useAttendance } from "@/hooks/useAttendance";
 import { toast } from "react-hot-toast";
+import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 
 import { useVirtualizer, VirtualItem } from '@tanstack/react-virtual';
 import PayrollRow from '@/components/PayrollRow';
@@ -155,7 +157,9 @@ const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
-  const [month, setMonth] = useState(getLocalMonth());
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [month, setMonth] = useState(searchParams.get("period") || getLocalMonth());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPayslip, setSelectedPayslip] = useState<AggregatedPayroll | null>(null);
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
@@ -165,7 +169,7 @@ export default function PayrollPage() {
   // ── Fetch supporting data (for payslip modal display only) ───────────────────
     const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
-  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts();
+  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts(undefined, month);
   const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
   const { data: allResignedEmployees = [] } = useResignedEmployees();
   
@@ -196,8 +200,7 @@ export default function PayrollPage() {
   }, [deductionsResponse]);
 
   const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({
-    startDate: periodStart,
-    endDate: periodEnd,
+    period: month,
     limit: 500,
   });
 
@@ -632,20 +635,17 @@ export default function PayrollPage() {
           </div>
 
           <div className="mt-4 xl:mt-0 flex flex-wrap items-center justify-start xl:justify-end gap-3 w-full xl:w-auto">
-            {/* Month picker */}
-            <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-2 shadow-sm transition-all duration-300 hover:shadow-md group focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20">
-              <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 group-focus-within:border-[#C89355]/50" />
-              <label htmlFor="month-picker" className="sr-only">اختر الشهر</label>
-              <CalendarIcon size={18} className="text-[#C89355] group-hover:scale-110 transition-transform relative z-10 ml-2" />
-              <input
-                id="month-picker"
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                aria-label="اختيار شهر التقرير"
-                className="bg-transparent border-none outline-none font-mono text-sm font-black text-[#263544] w-full cursor-pointer focus:ring-0 relative z-10"
-              />
-            </div>
+            {/* Month Period Selector */}
+            <MonthPeriodSelector
+              value={month}
+              onChange={(newMonth) => {
+                setMonth(newMonth);
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("period", newMonth);
+                router.replace(`?${params.toString()}`);
+              }}
+              className="flex-1 sm:flex-none"
+            />
 
             <button
               type="button"

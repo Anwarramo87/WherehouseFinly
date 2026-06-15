@@ -134,7 +134,7 @@ export const useSalaries = () => {
       if (employeeId) {
         queryClient.invalidateQueries({ queryKey: ["salary", employeeId] });
       }
-      toast.success("تم حذف بيانات الراتب");
+      toast.success("تم نقل بيانات الراتب إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف الراتب"));

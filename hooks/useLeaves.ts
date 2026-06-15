@@ -106,7 +106,7 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
-      toast.success("تم حذف طلب الإجازة");
+      toast.success("تم نقل طلب الإجازة إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف طلب الإجازة"));

@@ -164,7 +164,7 @@ export default function SalariesSettingClient() {
   };
 
   const handleDelete = (employeeId: string) => {
-    if (!confirm(`هل تريد حذف بيانات الراتب للموظف ${employeeId}؟`)) return;
+    if (!confirm(`هل تريد نقل بيانات الراتب للموظف ${employeeId} إلى سلة المهملات؟`)) return;
     deleteSalary.mutate(employeeId);
   };
 

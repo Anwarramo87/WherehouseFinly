@@ -285,7 +285,7 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
-      toast.success("تم حذف الموظف بنجاح!");
+      toast.success("تم نقل الموظف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف الموظف"));

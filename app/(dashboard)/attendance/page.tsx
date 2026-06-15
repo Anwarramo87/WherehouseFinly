@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAttendance } from "@/hooks/useAttendance";
+import { useAttendanceDailyView } from "@/hooks/useAttendanceDailyView";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useLeaves } from "@/hooks/useLeaves";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
@@ -17,6 +19,7 @@ import {
   getAttendanceSocket,
   type AttendanceRealtimeEventPayload,
 } from "@/lib/realtime/attendance-socket";
+import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 
 const LeaveRequestModal = dynamic(
   () => import("@/components/LeaveRequestModal"),
@@ -83,9 +86,12 @@ interface AttendanceTableRow {
 }
 
 export default function AttendancePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const today = getToday();
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(today);
+  const [period, setPeriod] = useState(searchParams.get("period") || new Date().toISOString().slice(0, 7));
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
@@ -110,12 +116,8 @@ export default function AttendancePage() {
     if (!start || !end || !d) return false;
     return d >= start && d <= end;
   };
-  const { data, isLoading, isFetching, isError, error, markAttendance } = useAttendance({
-    date: selectedDate,
-    startDate: selectedDate,
-    endDate: selectedDate,
-    limit: 200,
-  });
+  const { data: dailyView, isLoading: dailyViewLoading, isFetching: dailyViewFetching, isError: dailyViewError, error: dailyViewErrorObj } = useAttendanceDailyView(selectedDate);
+  const { markAttendance } = useAttendance({ period, limit: 200 });
 
   const employeeList = useMemo(
     () => (Array.isArray(employees) ? employees : []),
@@ -144,12 +146,11 @@ export default function AttendancePage() {
       if (e?.employeeId && EMPLOYEE_ID_REGEX.test(e.employeeId)) employeeIds.add(e.employeeId);
     }
 
-    const dailyMap = new Map<string, { checkIn: string; checkOut: string; source: "manual" | "device" }>();
-    (data?.dailyRecords || []).forEach((dr) => {
-      dailyMap.set(dr.key, { checkIn: dr.checkIn || "", checkOut: dr.checkOut || "", source: dr.source });
+    const dvMap = new Map<string, import("@/hooks/useAttendanceDailyView").DailyViewEmployee>();
+    (dailyView?.employees || []).forEach((emp) => {
+      dvMap.set(emp.employeeId, emp);
     });
 
-    // بناء خريطة الإجازات — نفكك نطاق الإجازة ونُسند فقط للإجازات التي تغطي selectedDate
     const leavesMap = new Map<string, string[]>();
     (leaves || []).forEach((leave) => {
       if (!leave.employeeId || !leave.leaveType) return;
@@ -161,24 +162,23 @@ export default function AttendancePage() {
     const tableRows: AttendanceTableRow[] = [];
     for (const employeeId of Array.from(employeeIds).sort()) {
       const key = `${employeeId}-${selectedDate}`;
-      const entry = dailyMap.get(key);
-      const checkIn = entry?.checkIn || "";
-      const checkOut = entry?.checkOut || "";
-      const scheduledStart = employeeScheduleMap.get(employeeId) || "08:00";
+      const dv = dvMap.get(employeeId);
+      const checkIn = dv?.checkIn || "";
+      const checkOut = dv?.checkOut || "";
+      const scheduledStart = dv?.scheduledStart || employeeScheduleMap.get(employeeId) || "08:00";
       const leaveStatus = leavesMap.get(employeeId);
 
-      // إذا كان الموظف في إجازة → نعرض حالة "إجازة" بدلاً من "غائب"
-      const rawStatus = getStatus(checkIn, scheduledStart);
+      const rawStatus: TableStatus = dv?.status === "late" ? "late" : dv?.status === "present" ? "present" : "absent";
       const effectiveStatus: TableStatus =
         rawStatus === "absent" && leaveStatus && leaveStatus.length > 0
-          ? "present" // نُخفي "غائب" إذا كان في إجازة (يُعرض في عمود الإجازة)
+          ? "present"
           : rawStatus;
 
       tableRows.push({
         key, employeeId,
-        employeeName: employeeNameMap.get(employeeId) || employeeId,
+        employeeName: employeeNameMap.get(employeeId) || dv?.name || employeeId,
         date: selectedDate, checkIn, checkOut, scheduledStart,
-        source: entry?.source ?? "manual",
+        source: (dv?.source === "biometric" ? "device" : "manual"),
         status: effectiveStatus,
         leaveStatus,
       });
@@ -186,7 +186,7 @@ export default function AttendancePage() {
     return tableRows.sort((a, b) =>
       `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`)
     );
-  }, [data?.dailyRecords, employeeList, selectedDate, employeeNameMap, employeeScheduleMap, leaves]);
+  }, [dailyView?.employees, employeeList, selectedDate, employeeNameMap, employeeScheduleMap, leaves]);
 
   const stats = useMemo(() =>
     rows.reduce(
@@ -201,10 +201,8 @@ export default function AttendancePage() {
       if (!payload?.employeeId) return;
       setLiveAttendanceEvent(payload);
       toast.success(payload.message || "تم تسجيل حضور جديد");
-      const employeeKey = "all-employees";
       void queryClient.invalidateQueries({
-        queryKey: ["attendance", employeeKey, selectedDate, selectedDate, selectedDate],
-        exact: false,
+        queryKey: ["attendance", "daily-view", selectedDate],
       });
     };
     socket.on("attendanceUpdate", onAttendanceUpdate);
@@ -260,7 +258,7 @@ export default function AttendancePage() {
     toast.success(`تم تسجيل يوم كامل للموظف ${row.employeeName}`);
   };
 
-  if (isLoading || employeesLoading || leavesLoading) return (
+  if (employeesLoading || leavesLoading || dailyViewLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
         <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin" />
@@ -269,9 +267,9 @@ export default function AttendancePage() {
     </div>
   );
 
-  if (isError) return (
+  if (dailyViewError) return (
     <div className="p-8 text-center text-red-600 font-bold bg-rose-50/50 mt-10 rounded-2xl mx-10 border border-rose-200">
-      حدث خطأ في تحميل الحضور: {(error as Error)?.message || "خطأ غير معروف"}
+      حدث خطأ في تحميل الحضور: {(dailyViewErrorObj as Error)?.message || "خطأ غير معروف"}
     </div>
   );
 
@@ -349,6 +347,25 @@ export default function AttendancePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                {/* Month + Day Selector — موحد */}
+                <MonthPeriodSelector
+                  value={period}
+                  onChange={(newPeriod) => {
+                    setPeriod(newPeriod);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set("period", newPeriod);
+                    router.replace(`?${params.toString()}`);
+                    const [y, m] = newPeriod.split("-").map(Number);
+                    const maxDay = new Date(y, m, 0).getDate();
+                    const day = Math.min(parseInt(selectedDate.split("-")[2], 10) || 1, maxDay);
+                    const clamped = `${newPeriod}-${String(day).padStart(2, "0")}`;
+                    setSelectedDate(clamped);
+                  }}
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  className="flex-1 sm:flex-none"
+                />
+
                 <div className="relative overflow-hidden flex flex-wrap items-center gap-3 bg-white/60 backdrop-blur-xl p-4 rounded-2xl border border-white/80 shadow-sm group">
                   <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
                   <span className="relative z-10 bg-[#1a2530] text-[#C89355] px-4 py-1.5 rounded-xl text-xs font-black border border-[#C89355]/30">حاضر: {stats.present}</span>
@@ -356,25 +373,11 @@ export default function AttendancePage() {
                   <span className="relative z-10 bg-red-50 text-red-600 px-4 py-1.5 rounded-xl text-xs font-black border border-red-100">غائب: {stats.absent}</span>
                   <div className="w-px h-6 bg-[#263544]/20 mx-1 hidden md:block relative z-10" />
                   <span className="relative z-10 text-[#263544] px-3 py-1 text-xs font-black">
-                    {isFetching
+                    {dailyViewFetching
                       ? <span className="flex items-center gap-2"><Loader2 size={12} className="animate-spin text-[#C89355]" /> تحديث...</span>
                       : <span className="font-mono">{selectedDate}</span>
                     }
                   </span>
-                </div>
-
-                <div className="relative overflow-hidden bg-white/60 backdrop-blur-2xl border border-white/80 rounded-2xl p-2.5 shadow-sm group min-w-40">
-                  <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-                  <div className="flex items-center gap-2 relative z-10 px-2">
-                    <CalendarIcon size={16} className="text-[#C89355]" />
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      max={today}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-[#263544] font-mono font-bold text-sm cursor-pointer"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
