@@ -1,5 +1,5 @@
 const PRODUCTION_API_URL = "https://werehouse-production-f4f4.up.railway.app/api/v1";
-const DEVELOPMENT_API_URL = "http://localhost:5001/api/v1";
+const DEVELOPMENT_API_URL = "http://localhost:5003/api/v1";
 
 export const DEFAULT_API_URL =
   process.env.NODE_ENV === "production" ? PRODUCTION_API_URL : DEVELOPMENT_API_URL;

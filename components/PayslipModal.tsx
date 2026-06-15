@@ -3,18 +3,19 @@ import React from 'react';
 import { Wallet, Receipt, HandCoins, ChevronLeft, Download } from 'lucide-react';
 import type { Bonus } from '@/types/bonus';
 import type { DiscountRecord } from '@/hooks/useDiscounts';
+import type { PenaltyRecord } from '@/hooks/usePenalties';
 
 // Define types directly in the component for simplicity
 // In a real app, these would be imported from a central types file
 type Salary = {
-  baseSalary?: any;
-  lumpSumSalary?: any;
-  livingAllowance?: any;
-  responsibilityAllowance?: any;
-  extraEffortAllowance?: any;
-  productionIncentive?: any;
-  transportAllowance?: any;
-  insuranceAmount?: any;
+  baseSalary?: number | string;
+  lumpSumSalary?: number | string;
+  livingAllowance?: number | string;
+  responsibilityAllowance?: number | string;
+  extraEffortAllowance?: number | string;
+  productionIncentive?: number | string;
+  transportAllowance?: number | string;
+  insuranceAmount?: number | string;
 };
 
 interface AggregatedPayroll {
@@ -34,7 +35,7 @@ interface AggregatedPayroll {
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
-    advances: DiscountRecord[];
+    deductions: (DiscountRecord | PenaltyRecord)[];
     attendance: null;
   };
 }
@@ -270,23 +271,23 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </div>
               )}
 
-              {/* Advances */}
-              {payslip.details.advances.length > 0 && (
+              {/* Advances / Penalties */}
+              {payslip.details.deductions.length > 0 && (
                 <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-slate-300">
                   <h3 className="text-sm font-black text-slate-500 mb-4 uppercase tracking-widest print:text-black">
                     سلف وعقوبات (مستردة)
                   </h3>
                   <div className="space-y-4 text-slate-700 print:text-black">
-                    {payslip.details.advances.map((adv, idx) => {
-                      // Handle both DiscountRecord and Advance types
-                      const amount = 'amount' in adv ? toNumber(adv.amount) : 
-                        (toNumber((adv as { installmentAmount?: number }).installmentAmount) || toNumber((adv as { remainingAmount?: number }).remainingAmount));
+                    {payslip.details.deductions.map((ded, idx) => {
+                      // Handle DiscountRecord (advances) and PenaltyRecord
+                      const isDiscount = 'kind' in ded;
+                      const amount = isDiscount ? toNumber(ded.amount) : toNumber(ded.amount);
+                      const label = isDiscount
+                        ? (ded as DiscountRecord).type
+                        : `عقوبة: ${(ded as PenaltyRecord).category || (ded as PenaltyRecord).reason || 'عقوبة'}`;
                       return (
                         <div key={idx} className="flex justify-between items-center">
-                          <span className="text-sm font-bold">
-                            {'type' in adv ? adv.type : 
-                              `سلفة ${(adv as { advanceType?: string }).advanceType === "salary" ? "راتب" : (adv as { advanceType?: string }).advanceType === "clothing" ? "ملابس" : "أخرى"}`}
-                          </span>
+                          <span className="text-sm font-bold">{label}</span>
                           <span className="text-lg font-black text-rose-600 font-mono print:text-black">
                             -{amount.toLocaleString()}
                           </span>

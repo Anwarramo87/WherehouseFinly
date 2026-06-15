@@ -3,20 +3,29 @@ import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
+import { getApiErrorMessage } from "@/lib/http/error";
 
-export const usePenalties = (params?: { employeeId?: string; startDate?: string; endDate?: string; period?: string; enabled?: boolean }) => {
-  const queryClient = useQueryClient();
+/** Re-export for backwards-compat with components that import getErrorMessage from here */
+export const getErrorMessage = getApiErrorMessage;
 
-  const penaltiesQuery = useQuery<Penalty[]>({
-    queryKey: ["penalties", params?.employeeId || "all", params?.period || "current", params?.startDate || "no-start", params?.endDate || "no-end"],
+export const usePenalties = (params?: {
+  employeeId?: string;
+  startDate?: string;
+  endDate?: string; period?: string;
+}) => {
+  return useQuery<PenaltyRecord[]>({
+    queryKey: [
+      "penalties",
+      params?.employeeId || "all",
+      params?.period || "current", params?.startDate || "all-start",
+      params?.endDate || "all-end",
+    ],
     queryFn: async () => {
       const res = await apiClient.get("/penalties", {
         params: {
           employeeId: params?.employeeId,
           startDate: params?.startDate,
           endDate: params?.endDate,
-          period: params?.period,
         },
       });
       return Array.isArray(res.data) ? res.data : [];
@@ -26,12 +35,23 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 
+  const toPenaltyAmountNumber = (value: Penalty["amount"]) => {
+    if (value && typeof value === "object" && "$numberDecimal" in value) {
+      return Number(value.$numberDecimal || 0);
+    }
+    if (typeof value === "string") {
+      const normalized = value.replace(/,/g).trim();
+      return Number(normalized || 0);
+    }
+    return Number(value || 0);
+  };
+
   const createPenalty = useMutation({
     mutationFn: async (payload: Omit<Penalty, "id">) => {
       const data = {
         employeeId: payload.employeeId,
         category: payload.category,
-        amount: Number(payload.amount || 0),
+        amount: toPenaltyAmountNumber(payload.amount),
         reason: payload.reason,
         issueDate: payload.issueDate,
       };
@@ -50,7 +70,7 @@ export const usePenalties = (params?: { employeeId?: string; startDate?: string;
     mutationFn: async ({ id, data }: { id: string; data: Partial<Omit<Penalty, "id">> }) => {
       const payload = {
         category: data.category,
-        amount: data.amount !== undefined ? Number(data.amount) : undefined,
+        amount: data.amount !== undefined ? toPenaltyAmountNumber(data.amount) : undefined,
         reason: data.reason,
         issueDate: data.issueDate,
       };

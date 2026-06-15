@@ -17,13 +17,13 @@ const reportDebug = (...args: unknown[]) => {
   }
 };
 
-const backendBaseUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const _backendBaseUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 // Safe navigation helper that handles HMR router initialization errors
 const safeNavigate = (router: ReturnType<typeof useRouter>, path: string) => {
   try {
     router.replace(path);
-  } catch (e) {
+  } catch (_e) {
     // Fallback to window.location if router fails (HMR race condition)
     if (typeof window !== "undefined") {
       window.location.href = path;

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -53,10 +54,10 @@ export function useTransportation() {
     refetchOnWindowFocus: true, // تحديث تلقائي عند العودة للصفحة
   });
 
-  const getBus = async (busId: string): Promise<BusDetailsResponse> => {
+  const getBus = useCallback(async (busId: string): Promise<BusDetailsResponse> => {
     const res = await apiClient.get(`/transportation/buses/${busId}`);
     return res.data;
-  };
+  }, []);
 
   const createBus = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -119,12 +120,10 @@ export function useTransportation() {
   });
 
   const addPassenger = useMutation({
-    mutationFn: async ({ busId, payload }: { busId: string; payload: { employeeId: string; name?: string; paidAmount?: number; isManual?: boolean } }) => {
-      // Send optional presentation fields if present; backend may ignore them but frontends that accept them will persist
+    mutationFn: async ({ busId, payload }: { busId: string; payload: { employeeId: string; name?: string; subscriptionDate?: string } }) => {
       const body: Record<string, unknown> = { employeeId: payload.employeeId };
       if (payload.name !== undefined) body.name = payload.name;
-      if (payload.paidAmount !== undefined) body.paidAmount = payload.paidAmount;
-      if (payload.isManual !== undefined) body.isManual = payload.isManual;
+      if (payload.subscriptionDate !== undefined) body.subscriptionDate = payload.subscriptionDate;
       const res = await apiClient.post(`/transportation/buses/${busId}/passengers`, body);
       return res.data;
     },

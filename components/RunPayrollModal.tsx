@@ -46,7 +46,7 @@ const createDefaultForm = (monthStr?: string): CalculatePayrollInput => {
   return {
     periodStart: range.periodStart,
     periodEnd: range.periodEnd,
-    gracePeriodMinutes: 15,
+    gracePeriodMinutes: 5,
     includeAttendanceDeductions: true,
     includeTransportationDeductions: true,
   };

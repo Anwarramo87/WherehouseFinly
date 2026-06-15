@@ -151,6 +151,23 @@ export default function ManageSalaryModal({
     );
   }, [employees, searchQuery]);
 
+  // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
+  const baseSalary = watch("baseSalary");
+  const lumpSumSalary = watch("lumpSumSalary");
+  const livingAllowance = watch("livingAllowance");
+  const transportAllowance = watch("transportAllowance");
+  const insuranceAmount = watch("insuranceAmount");
+  
+  const netTotal = useMemo(
+    () =>
+      Number(baseSalary || 0) +
+      Number(lumpSumSalary || 0) +
+      Number(livingAllowance || 0) +
+      Number(transportAllowance || 0) -
+      Number(insuranceAmount || 0),
+    [baseSalary, lumpSumSalary, livingAllowance, transportAllowance, insuranceAmount]
+  );
+
   if (!isOpen || typeof document === "undefined") return null;
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -170,7 +187,7 @@ export default function ManageSalaryModal({
       livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
       transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
       insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
-      // Hardcoded to 0 - managed in Rewards/Bonuses module:
+      // Hardcoded to 0 - these are now managed in Rewards/Bonuses module:
       responsibilityAllowance: 0,
       extraEffortAllowance:    0,
       productionIncentive:     0,
@@ -178,20 +195,6 @@ export default function ManageSalaryModal({
     savedRef.current = true;
     onSave(values.employeeId, payload);
   };
-
-  // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
-  const baseSalary = watch("baseSalary");
-  const lumpSumSalary = watch("lumpSumSalary");
-  const livingAllowance = watch("livingAllowance");
-  const transportAllowance = watch("transportAllowance");
-  const insuranceAmount = watch("insuranceAmount");
-  
-  const netTotal =
-    Number(baseSalary || 0) +
-    Number(lumpSumSalary || 0) +
-    Number(livingAllowance || 0) +
-    Number(transportAllowance || 0) -
-    Number(insuranceAmount || 0);
 
   // ─── Shared input class ───────────────────────────────────────────────────────
   const inputCls = (hasErr?: boolean) =>

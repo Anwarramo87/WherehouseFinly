@@ -62,9 +62,23 @@ export default function BiometricDashboard() {
     }
   };
 
-  // Load device status
+  // Load device status on mount
   useEffect(() => {
-    fetchDeviceStatus();
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/biometric/sync');
+        const data = await response.json();
+        if (!cancelled) setDeviceStatus(data);
+      } catch (error) {
+        console.error('Failed to fetch device status:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const handleSync = async () => {

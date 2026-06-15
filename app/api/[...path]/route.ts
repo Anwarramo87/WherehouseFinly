@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
-const BACKEND_URL = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
+// Resolve at request time so env vars are always fresh
+const getBackendUrl = () => resolveApiUrl(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL);
 const HOP_BY_HOP_HEADERS = new Set([
   "accept-encoding",
   "connection",
@@ -58,14 +59,14 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
 
 // reportDebug is referenced in older versions of this proxy file.
 // If it isn't available in the current codebase, keep compilation working.
-const reportDebug: undefined | ((...args: any[]) => void) = undefined;
+const reportDebug: undefined | ((...args: unknown[]) => void) = undefined;
 
 export async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
   const pathParts = path.split("/").filter(Boolean);
   const apiPath = "/" + pathParts.slice(1).join("/");
-  const fullUrl = `${BACKEND_URL}${apiPath}${url.search}`;
+  const fullUrl = `${getBackendUrl()}${apiPath}${url.search}`;
 
   if (request.method === "OPTIONS") {
     return new NextResponse(null, {
@@ -88,16 +89,19 @@ export async function handler(request: NextRequest) {
       headers: buildResponseHeaders(response, request),
     });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : '';
+    console.error("[proxy] fetch failed:", errMsg, "\nStack:", errStack);
     // #region debug-point C:proxy-network-error
     reportDebug?.("C", "Next API proxy failed before upstream response", {
       method: request.method,
       path,
       fullUrl,
-      error: error instanceof Error ? error.message : String(error),
+      error: errMsg,
     });
     // #endregion
     return NextResponse.json(
-      { error: "Backend unreachable", message: error instanceof Error ? error.message : String(error) },
+      { error: "Backend unreachable", message: errMsg },
       {
         status: 502,
         headers: buildCorsHeaders(request),

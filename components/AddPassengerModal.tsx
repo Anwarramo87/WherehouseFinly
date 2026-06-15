@@ -1,152 +1,12 @@
-// "use client";
-
-// import { useState, useEffect, useMemo } from "react";
-// import { createPortal } from "react-dom";
-// import { X, Save, UserPlus, Search, Coins, Info, Calculator } from "lucide-react";
-// import type { BusData, Passenger } from "@/app/(dashboard)/transportation/page";
-
-// interface Props {
-//   isOpen: boolean;
-//   onClose: () => void;
-//   onSave: (data: Passenger) => void;
-//   busData: BusData;
-// }
-
-// export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: Props) {
-//   const [mounted, setMounted] = useState(false);
-//   const [employeeSearch, setEmployeeSearch] = useState("");
-//   const [isAutoCalc, setIsAutoCalc] = useState(true);
-  
-//   // 1. حساب صافي التكلفة التي يجب تغطيتها من الركاب
-//   const netTotalToCover = useMemo(() => {
-//     return busData.totalCost - (busData.totalCost * (busData.discountPercent / 100));
-//   }, [busData]);
-
-//   // 2. حساب المبالغ المحجوزة مسبقاً (الدفع اليدوي)
-//   const manualPaymentsTotal = useMemo(() => {
-//     return busData.passengers
-//       .filter(p => p.isManual)
-//       .reduce((sum, p) => sum + p.paidAmount, 0);
-//   }, [busData.passengers]);
-
-//   // 3. عدد الركاب الذين يتبعون التوزيع التلقائي (الحاليين + الجديد)
-//   const autoPassengersCount = useMemo(() => {
-//     return busData.passengers.filter(p => !p.isManual).length + 1;
-//   }, [busData.passengers]);
-
-//   // 4. المبلغ المتبقي ليتم تقسيمه
-//   const remainingCost = netTotalToCover - manualPaymentsTotal;
-  
-//   // 5. الحصة التلقائية للشخص الواحد بناءً على الركاب "الفعليين"
-//   const autoAmountPerPerson = Math.max(0, Math.round(remainingCost / autoPassengersCount));
-
-//   const [customCost, setCustomCost] = useState(autoAmountPerPerson.toString());
-
-//   useEffect(() => {
-//     setMounted(true);
-//     if (isOpen) document.body.style.overflow = "hidden";
-//     else document.body.style.overflow = "unset";
-//     return () => { document.body.style.overflow = "unset"; };
-//   }, [isOpen]);
-
-//   if (!isOpen || !mounted) return null;
-
-//   const handleSubmit = (e: React.FormEvent) => {
-//     e.preventDefault();
-//     onSave({
-//       employeeId: employeeSearch,
-//       name: employeeSearch,
-//       paidAmount: isAutoCalc ? autoAmountPerPerson : Number(customCost),
-//       isManual: !isAutoCalc,
-//     });
-//   };
-
-//   return createPortal(
-//     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-//       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] w-full max-w-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 border border-white/10 outline outline-dashed outline-1 outline-[#C89355]/30 outline-offset-[-8px]">
-        
-//         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80">
-//           <div className="flex items-center gap-4">
-//             <div className="bg-[#C89355]/10 p-3 rounded-2xl border border-[#C89355]/20 shadow-[0_0_20px_rgba(200,147,85,0.15)]">
-//                <UserPlus className="text-[#C89355]" size={28} />
-//             </div>
-//             <h2 className="text-xl font-black text-white tracking-wide">تسجيل موظف بالرحلة</h2>
-//           </div>
-//           <button onClick={onClose} className="text-slate-500 hover:text-white bg-[#263544] p-2 rounded-xl active:scale-90 transition-all"><X size={24} /></button>
-//         </div>
-
-//         <div className="p-8 relative">
-//           <form id="passengerForm" onSubmit={handleSubmit} className="flex flex-col gap-6">
-            
-//             <div>
-//               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase mr-1">الموظف (الاسم أو الكود)</label>
-//               <div className="relative group">
-//                 <input type="text" required placeholder="ابحث بكود أو اسم الموظف..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none text-white font-bold shadow-inner pr-12" value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} />
-//                 <Search className="absolute right-4 top-4 text-slate-500" size={22} />
-//               </div>
-//             </div>
-
-//             {/* قسم الحسابات الذكية */}
-//             <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner">
-//               <div className="flex items-center justify-between mb-6">
-//                 <div className="flex items-center gap-2">
-//                   <Calculator size={18} className="text-[#C89355]" />
-//                   <label className="text-sm font-black text-white">طريقة حساب التكلفة</label>
-//                 </div>
-//                 <div className="flex items-center gap-2 bg-[#101720] p-1.5 rounded-xl border border-white/5">
-//                   <span className="text-[10px] font-bold text-slate-400 px-2">يدوي</span>
-//                   <label className="relative inline-flex items-center cursor-pointer">
-//                     <input type="checkbox" className="sr-only peer" checked={isAutoCalc} onChange={() => setIsAutoCalc(!isAutoCalc)} />
-//                     <div className="w-11 h-6 bg-[#263544] rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#C89355]"></div>
-//                   </label>
-//                   <span className="text-[10px] font-bold text-[#C89355] px-2">تلقائي</span>
-//                 </div>
-//               </div>
-
-//               {isAutoCalc ? (
-//                 <div className="space-y-4">
-//                   <div className="flex justify-between text-xs font-bold border-b border-white/5 pb-2">
-//                     <span className="text-slate-500 text-right">المبلغ المتبقي للتوزيع:</span>
-//                     <span className="text-white dir-ltr">{remainingCost.toLocaleString()} ل.س</span>
-//                   </div>
-//                   <div className="flex justify-between items-center bg-[#101720] p-4 rounded-xl border border-[#C89355]/20">
-//                     <div className="text-right">
-//                       <span className="text-[10px] font-black text-slate-500 block uppercase">الأجرة المقترحة</span>
-//                       <span className="text-xs text-slate-400 font-bold">تقسيم على {autoPassengersCount} ركاب فعليين</span>
-//                     </div>
-//                     <span className="text-2xl font-mono font-black text-[#C89355]">{autoAmountPerPerson.toLocaleString()} <span className="text-xs text-slate-500">ل.س</span></span>
-//                   </div>
-//                 </div>
-//               ) : (
-//                 <div className="relative group">
-//                   <label className="block text-[10px] font-black text-[#C89355] mb-2 uppercase mr-1">تحديد أجرة مخصصة</label>
-//                   <input type="number" required min={0} className="w-full p-4 bg-[#101720] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none text-white text-xl font-mono font-black pr-12 shadow-inner" value={customCost} onChange={(e) => setCustomCost(e.target.value)} />
-//                   <Coins className="absolute right-4 top-11 text-slate-500" size={22} />
-//                 </div>
-//               )}
-//             </div>
-//           </form>
-//         </div>
-
-//         <div className="p-6 sm:p-8 bg-[#1a2530]/80 border-t border-white/5 flex justify-end">
-//           <button type="submit" form="passengerForm" className="bg-[#C89355] text-[#101720] px-10 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-[#d0b468] active:scale-95 transition-all shadow-[0_0_20px_rgba(200,147,85,0.3)]">
-//             <Save size={20}/> تأكيد الاشتراك
-//           </button>
-//         </div>
-//       </div>
-//     </div>,
-//     document.body
-//   );
-// }
-
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Save, UserPlus, Search, Coins, Calculator } from "lucide-react";
+import { X, Save, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Check, AlertCircle, Bus as BusIcon } from "lucide-react";
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/page";
 import type { Employee } from "@/types/employee";
 import { useEmployees } from "@/hooks/useEmployees";
+import apiClient from "@/lib/api-client";
 
 interface Props {
   isOpen: boolean;
@@ -156,38 +16,57 @@ interface Props {
 }
 
 export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: Props) {
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const [isAutoCalc, setIsAutoCalc] = useState(true);
-  const [customCost, setCustomCost] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
+  const [subscriptionDate, setSubscriptionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isClosing, setIsClosing] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [activeSubscribers, setActiveSubscribers] = useState<Record<string, { route: string; plateNumber: string }>>({});
 
-  // Logic: الحساب الديناميكي العادل
-  const netCost = busData.totalCost - (busData.totalCost * (busData.companyDeductionPct / 100));
-  const manualTotal = busData.passengers.filter(p => p.isManual).reduce((sum, p) => sum + (p.paidAmount ?? 0), 0);
-  const autoCount = busData.passengers.filter(p => !p.isManual).length + 1; // +1 للراكب الجديد
-  const remainingCost = Math.max(0, netCost - manualTotal);
-  const autoAmountPerPerson = Math.round(remainingCost / autoCount);
-
+  // Focus trap and body scroll lock
   useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "unset";
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsClosing(false);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+      // Fetch active subscribers to disable already-subscribed employees  
+      apiClient.get("/transportation/active-subscribers")
+        .then(res => setActiveSubscribers(res.data ?? {}))
+        .catch(() => setActiveSubscribers({}));
+    } else {
+      document.body.style.overflow = "unset";
+    }
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
-  const routeText = useMemo(() => {
-    if (!busData?.route) return "";
-    return busData.route.trim();
-  }, [busData]);
+  const routeText = useMemo(() => busData?.route?.trim() || "", [busData]);
+  const { data: rawEmployees = [], isLoading } = useEmployees({ fetchAll: true });
+  const allEmployees = useMemo(() => (Array.isArray(rawEmployees) ? rawEmployees : []), [rawEmployees]);
+  
+  // Employees already subscribed to THIS bus
+  const existingEmployeeIds = useMemo(
+    () => new Set((busData.passengers || []).map(p => p.employeeId)),
+    [busData.passengers]
+  );
 
-  const { data: allEmployees = [] } = useEmployees({ fetchAll: true });
-  const existingEmployeeIds = useMemo(() => new Set((busData.passengers || []).map(p => p.employeeId)), [busData.passengers]);
+  // Employees subscribed to OTHER buses (cannot be added here)
+  const subscribedElsewhere = useMemo(() => {
+    const map = new Map<string, { route: string; plateNumber: string }>();
+    for (const [empId, info] of Object.entries(activeSubscribers)) {
+      if (!existingEmployeeIds.has(empId)) {
+        map.set(empId, info);
+      }
+    }
+    return map;
+  }, [activeSubscribers, existingEmployeeIds]);
 
-  // Normalize Arabic text: remove diacritics, normalize alef variants, remove tatweel
-  const normalize = (s: string) => {
+  // Normalization for matching
+  const normalize = useCallback((s: string) => {
     if (!s) return "";
     return s
       .toLowerCase()
-      .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") // remove tashkeel
+      .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
       .replace(/[إأآا]/g, "ا")
       .replace(/ى/g, "ي")
       .replace(/ؤ/g, "و")
@@ -195,177 +74,403 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
       .replace(/ـ/g, "")
       .replace(/[^\p{L}\p{N}\s]/gu, "")
       .trim();
-  };
+  }, []);
 
-  const { matched: matchingEmployees, others: otherEmployees } = useMemo(() => {
+  const { matchedEmployees, otherEmployees } = useMemo(() => {
     const normRoute = normalize(routeText);
     const matched: Employee[] = [];
     const others: Employee[] = [];
-    for (const e of (allEmployees || [])) {
-      if (!e) continue;
-      if (existingEmployeeIds.has(e.employeeId)) continue; // skip already added
-      const r = normalize(e.residence || "");
-      // Match if residence contains origin or origin contains residence or exact token match
-      const isMatch = normRoute && r && (normRoute.includes(r) || r.includes(normRoute) || r.split(" ").some((tok: string) => normRoute.includes(tok)));
-      if (isMatch) matched.push(e);
-      else others.push(e);
+
+    for (const emp of allEmployees) {
+      if (!emp || existingEmployeeIds.has(emp.employeeId)) continue;
+      const residenceNorm = normalize(emp.residence || "");
+      const isMatch = normRoute && residenceNorm && 
+        (normRoute.includes(residenceNorm) || residenceNorm.includes(normRoute) || 
+         residenceNorm.split(" ").some(token => normRoute.includes(token)));
+
+      if (isMatch) matched.push(emp);
+      else others.push(emp);
     }
-    // Sort matched by best heuristic: exact token match first
-    matched.sort((a: Employee, b: Employee) => {
+
+    matched.sort((a, b) => {
       const aScore = normalize(a.residence || "").includes(normRoute) ? 0 : 1;
       const bScore = normalize(b.residence || "").includes(normRoute) ? 0 : 1;
       return aScore - bScore;
     });
-    
-    const otherEmployeesLimited = (list: Employee[], limit = 30) => list.slice(0, limit);
-    return { matched: matched.slice(0, 50), others: otherEmployeesLimited(others, 50) };
-  }, [allEmployees, routeText, existingEmployeeIds]);
 
-  if (!isOpen) return null;
-  if (typeof document === "undefined") return null;
+    return {
+      matchedEmployees: matched.slice(0, 50),
+      otherEmployees: others.slice(0, 50),
+    };
+  }, [allEmployees, routeText, existingEmployeeIds, normalize]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!employeeSearch.trim() && !selectedEmployeeId) return alert("الرجاء إدخال كود أو اسم الموظف");
+  // Live search filter
+  const filterByQuery = useCallback((employees: Employee[]) => {
+    if (!searchQuery.trim()) return employees;
+    const q = searchQuery.trim().toLowerCase();
+    return employees.filter(emp =>
+      emp.employeeId.toLowerCase().includes(q) || emp.name.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
 
-    const employeeId = selectedEmployeeId || (employeeSearch.split('-')[0]?.trim() || employeeSearch.trim());
-    const name = selectedEmployeeId
-      ? (allEmployees.find((e: Employee) => e.employeeId === selectedEmployeeId)?.name || employeeSearch)
-      : employeeSearch;
+  const filteredMatched = useMemo(() => filterByQuery(matchedEmployees), [filterByQuery, matchedEmployees]);
+  const filteredOthers = useMemo(() => filterByQuery(otherEmployees), [filterByQuery, otherEmployees]);
 
-    const generatedId = `${busData.id}-${employeeId}-${busData.passengers.length + 1}`;
-
-    onSave({
-      id: generatedId,
-      employeeId,
-      name,
-      paidAmount: isAutoCalc ? autoAmountPerPerson : Number(customCost),
-      isManual: !isAutoCalc,
+  const toggleSelect = (empId: string) => {
+    if (subscribedElsewhere.has(empId)) return; // prevent selecting
+    setSelectedEmployeeIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(empId)) newSet.delete(empId);
+      else newSet.add(empId);
+      return newSet;
     });
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] w-full max-w-xl overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8">
-        
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80">
-          <div className="flex items-center gap-4">
-            <div className="bg-[#C89355]/10 p-3 rounded-2xl border border-[#C89355]/20">
-               <UserPlus className="text-[#C89355]" size={28} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-white">تسجيل موظف بالرحلة</h2>
-              <p className="text-xs text-[#C89355] font-bold mt-1">{busData.route}</p>
-            </div>
+  const selectAll = (employees: Employee[]) => {
+    setSelectedEmployeeIds(prev => {
+      const newSet = new Set(prev);
+      employees.forEach(emp => {
+        if (!subscribedElsewhere.has(emp.employeeId)) newSet.add(emp.employeeId);
+      });
+      return newSet;
+    });
+  };
+
+  const deselectAll = (employees: Employee[]) => {
+    setSelectedEmployeeIds(prev => {
+      const newSet = new Set(prev);
+      employees.forEach(emp => newSet.delete(emp.employeeId));
+      return newSet;
+    });
+  };
+
+  const clearAllSelections = () => setSelectedEmployeeIds(new Set());
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedEmployeeIds.size === 0) {
+      alert("الرجاء تحديد موظف واحد أو أكثر.");
+      return;
+    }
+    if (!subscriptionDate) {
+      alert("الرجاء إدخال تاريخ الاشتراك.");
+      return;
+    }
+
+    for (const empId of selectedEmployeeIds) {
+      const employee = allEmployees.find(emp => emp.employeeId === empId);
+      if (!employee) continue;
+      const generatedId = `${busData.id}-${empId}-${Date.now()}-${Math.random()}`;
+      onSave({
+        id: generatedId,
+        employeeId: employee.employeeId,
+        name: employee.name,
+        subscriptionDate,
+      });
+    }
+
+    // Reset and close with animation
+    setIsClosing(true);
+    setTimeout(() => {
+      setSelectedEmployeeIds(new Set());
+      setSearchQuery("");
+      onClose();
+      setIsClosing(false);
+    }, 200);
+  };
+
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isOpen && !isClosing) onClose();
+  }, [isOpen, onClose, isClosing]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [handleEscape]);
+
+  if (!isOpen && !isClosing) return null;
+  if (typeof document === "undefined") return null;
+
+  // Render employee list with checkboxes
+  const renderEmployeeList = (employees: Employee[], title: string, variant: 'matched' | 'other') => {
+    if (employees.length === 0) return null;
+    return (
+      <div className="animate-fadeInUp" style={{ animationDelay: variant === 'matched' ? '0.05s' : '0.1s' }}>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            {variant === 'matched' && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow"></span>
+            )}
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              {title}
+            </span>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white bg-[#263544] p-2 rounded-xl active:scale-90 transition-all"><X size={24} /></button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => selectAll(employees)}
+              className="text-[11px] font-medium bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5"
+            >
+              <CheckSquare size={12} /> الكل
+            </button>
+            <button
+              type="button"
+              onClick={() => deselectAll(employees)}
+              className="text-[11px] font-medium bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5"
+            >
+              <Square size={12} /> إلغاء
+            </button>
+          </div>
         </div>
-
-        <div className="p-8 relative">
-          <form id="passengerForm" onSubmit={handleSubmit} className="flex flex-col gap-6">
-            
-            <div>
-              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">الموظف (الاسم أو الكود)</label>
-              <div className="relative group">
-                <input type="text" required placeholder="ابحث بكود أو اسم الموظف..." className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold pr-12" value={employeeSearch} onChange={(e) => { setEmployeeSearch(e.target.value); setSelectedEmployeeId(null); }} />
-                <Search className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355]" size={22} />
-              </div>
-
-              {/* Suggestions based on residence / origin */}
-              <div className="mt-2 grid gap-2">
-                {matchingEmployees.length > 0 && (
-                  <div>
-                    <div className="text-xs text-slate-400 mb-2">الموظفون المطابقون للرحلة ({routeText || '—'})</div>
-                    <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
-                      {matchingEmployees.map((emp: Employee) => (
-                        <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
-                          <div className="text-left">
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="font-mono text-sm text-white">{emp.employeeId}</span>
-                              <span className="text-slate-400 text-xs">{emp.residence || '—'}</span>
-                            </div>
-                            <div className="text-xs text-slate-300">{emp.name}</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => { setEmployeeSearch(`${emp.employeeId} - ${emp.name}`); setSelectedEmployeeId(emp.employeeId); }}
-                            className="px-3 py-1 rounded-2xl bg-[#C89355] text-[#101720] text-xs font-black border border-[#C89355]/30"
-                          >اختيار</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {otherEmployees.length > 0 && (
-                  <div>
-                    <div className="text-xs text-slate-400 mb-2">موظفون آخرون</div>
-                    <div className="bg-[#0f1720] border border-[#263544] rounded-xl max-h-48 overflow-auto p-2">
-                      {otherEmployees.map((emp: Employee) => (
-                        <div key={emp.employeeId} className="flex items-center justify-between px-2 py-2 hover:bg-[#263544] rounded-md">
-                          <div>
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="font-mono text-sm text-white">{emp.employeeId}</span>
-                              <span className="text-slate-400 text-xs">{emp.residence || '—'}</span>
-                            </div>
-                            <div className="text-xs text-slate-300">{emp.name}</div>
-                          </div>
-                          <button type="button" onClick={() => { setEmployeeSearch(`${emp.employeeId} - ${emp.name}`); setSelectedEmployeeId(emp.employeeId); }} className="px-3 py-1 rounded-2xl bg-[#C89355] text-[#101720] text-xs font-black border border-[#C89355]/30">اختيار</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <Calculator size={18} className="text-[#C89355]" />
-                  <label className="text-sm font-black text-white">حساب الأجرة</label>
+        <div className="bg-[#0a0f15]/60 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
+          {employees.map((emp, idx) => {
+            const isSubscribedElsewhere = subscribedElsewhere.has(emp.employeeId);
+            const subInfo = subscribedElsewhere.get(emp.employeeId);
+            return (
+            <label
+              key={emp.employeeId}
+              className={`flex items-center justify-between px-4 py-3 transition-all duration-150 group ${
+                isSubscribedElsewhere
+                  ? 'opacity-60 cursor-not-allowed bg-rose-500/5'
+                  : selectedEmployeeIds.has(emp.employeeId)
+                    ? 'cursor-pointer bg-[#C89355]/5 hover:bg-white/5'
+                    : 'cursor-pointer hover:bg-white/5'
+              }`}
+              style={{ animationDelay: `${idx * 0.01}s` }}
+            >
+              <div className="flex items-center gap-4 flex-1">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={selectedEmployeeIds.has(emp.employeeId)}
+                    disabled={isSubscribedElsewhere}
+                    onChange={() => toggleSelect(emp.employeeId)}
+                    className="w-5 h-5 rounded-md border-2 border-slate-500 bg-transparent checked:bg-[#C89355] checked:border-[#C89355] focus:ring-2 focus:ring-[#C89355]/50 focus:ring-offset-0 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  {selectedEmployeeIds.has(emp.employeeId) && (
+                    <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white pointer-events-none" />
+                  )}
                 </div>
-                <div className="flex items-center gap-2 bg-[#101720] p-1.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-bold text-slate-400 px-2">يدوي</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" checked={isAutoCalc} onChange={() => setIsAutoCalc(!isAutoCalc)} />
-                    <div className="w-11 h-6 bg-[#263544] rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-0.5 after:right-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#C89355]"></div>
-                  </label>
-                  <span className="text-[10px] font-bold text-[#C89355] px-2">تلقائي</span>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="font-mono text-sm font-bold text-white tracking-wide">{emp.employeeId}</span>
+                    <span className="text-xs text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">
+                      {emp.residence || 'بدون سكن'}
+                    </span>
+                    {isSubscribedElsewhere && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                        <BusIcon size={10} />
+                        مشترك بباص &ldquo;{subInfo?.route}&rdquo; ({subInfo?.plateNumber})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-slate-300 mt-0.5 group-hover:text-white transition-colors">
+                    {emp.name}
+                  </div>
                 </div>
               </div>
-
-              {isAutoCalc ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between text-xs font-bold border-b border-white/5 pb-2">
-                    <span className="text-slate-500 text-right">المبلغ المتبقي للتوزيع:</span>
-                    <span className="text-white dir-ltr">{remainingCost.toLocaleString()} ل.س</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-[#101720] p-4 rounded-xl border border-[#C89355]/20">
-                    <div className="text-right">
-                      <span className="text-[10px] font-black text-[#C89355] block uppercase">الأجرة المقترحة للموظف</span>
-                      <span className="text-xs text-slate-400 font-bold">بناءً على {autoCount} ركاب (حالي+الجديد)</span>
-                    </div>
-                    <span className="text-2xl font-mono font-black text-[#C89355]">{autoAmountPerPerson.toLocaleString()} <span className="text-xs text-slate-500">ل.س</span></span>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative group mt-2">
-                  <label className="block text-[10px] font-black text-[#C89355] mb-2 uppercase">مبلغ مخصص</label>
-                  <input type="number" required min={0} className="w-full p-4 bg-[#101720] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white text-xl font-mono font-black pr-12 shadow-inner" value={customCost} onChange={(e) => setCustomCost(e.target.value)} />
-                  <Coins className="absolute right-4 top-11 text-slate-500" size={22} />
-                </div>
+              {!isSubscribedElsewhere && (
+                <ChevronLeft size={16} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
               )}
-            </div>
-          </form>
-        </div>
-
-        <div className="p-6 bg-[#1a2530]/80 border-t border-white/5 flex justify-end">
-          <button type="submit" form="passengerForm" className="bg-[#C89355] text-[#101720] px-10 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-[#d0b468] active:scale-95 transition-all">
-            <Save size={20}/> تأكيد الاشتراك
-          </button>
+            </label>
+            );
+          })}
         </div>
       </div>
+    );
+  };
+
+  return createPortal(
+    <div 
+      className={`fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 transition-all duration-300 ${
+        isClosing ? 'opacity-0 backdrop-blur-none' : 'opacity-100 backdrop-blur-md'
+      }`}
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+      dir="rtl"
+    >
+      <div 
+        className={`bg-gradient-to-br from-[#0f1720] to-[#0a0f15] rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border border-white/10 transition-all duration-300 ${
+          isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+        }`}
+      >
+        {/* Header with enhanced gradient and glow */}
+        <div className="relative p-6 border-b border-white/10 bg-gradient-to-r from-[#1a2530]/80 to-[#0f1720]/80">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#C89355] via-amber-500 to-[#C89355]"></div>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-[#C89355]/20 rounded-2xl blur-lg"></div>
+                <div className="relative bg-gradient-to-br from-[#C89355]/20 to-[#C89355]/5 p-3 rounded-2xl border border-[#C89355]/30">
+                  <Users className="text-[#C89355]" size={26} />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-xl font-black bg-gradient-to-l from-white to-slate-300 bg-clip-text text-transparent">
+                  تسجيل موظفين بالرحلة
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-[#C89355] font-bold bg-[#C89355]/10 px-2 py-0.5 rounded-full">
+                    {busData.route}
+                  </span>
+                  {selectedEmployeeIds.size > 0 && (
+                    <span className="text-xs text-slate-400">
+                      • تم اختيار <span className="text-[#C89355] font-bold">{selectedEmployeeIds.size}</span> موظف
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#C89355]/50"
+              aria-label="إغلاق"
+            >
+              <X size={22} />
+            </button>
+          </div>
+        </div>
+
+        <form id="passengerForm" onSubmit={handleSubmit} className="flex flex-col">
+          <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {/* Search Field */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs font-black text-[#C89355] uppercase tracking-wider">
+                <Search size={14} /> البحث عن موظف
+              </label>
+              <div className="relative group">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="اكتب كود الموظف أو اسمه..."
+                  className="w-full p-4 bg-[#1a2530] border-2 border-transparent rounded-xl focus:border-[#C89355]/60 outline-none text-white font-medium placeholder:text-slate-500 transition-all pr-12 focus:bg-[#1e2a36]"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Employee Lists */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="w-8 h-8 border-2 border-[#C89355]/30 border-t-[#C89355] rounded-full animate-spin"></div>
+                <p className="text-slate-400 text-sm">جاري تحميل الموظفين...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {filteredMatched.length > 0 && renderEmployeeList(filteredMatched, `✨ مطابقون للرحلة (${routeText || 'بدون مسار'})`, 'matched')}
+                {filteredOthers.length > 0 && renderEmployeeList(filteredOthers, 'جميع الموظفين الآخرين', 'other')}
+                {filteredMatched.length === 0 && filteredOthers.length === 0 && (
+                  <div className="text-center py-12 bg-white/5 rounded-2xl border border-dashed border-white/10">
+                    {searchQuery ? (
+                      <>
+                        <AlertCircle className="mx-auto text-slate-500 mb-2" size={32} />
+                        <p className="text-slate-400">لا توجد نتائج مطابقة لـ &ldquo;{searchQuery}&rdquo;</p>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="mx-auto text-slate-600 mb-2" size={32} />
+                        <p className="text-slate-400">لا يوجد موظفون متاحون للإضافة</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Subscription Date */}
+            <div className="bg-gradient-to-br from-[#1a2530]/50 to-[#0f1720]/50 rounded-2xl border border-white/10 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-[#C89355]" />
+                <label className="text-sm font-bold text-white">تاريخ الاشتراك الموحد</label>
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  required
+                  className="w-full p-3 bg-[#101720] border border-white/10 rounded-xl focus:border-[#C89355]/60 outline-none text-white font-mono text-base font-medium cursor-pointer transition-all"
+                  value={subscriptionDate}
+                  onChange={(e) => setSubscriptionDate(e.target.value)}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                سيتم تطبيق هذا التاريخ على جميع الموظفين المحددين
+              </p>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-6 bg-[#0a0f15]/80 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full">
+                <span className="text-xs text-slate-400">المحددون</span>
+                <span className="text-[#C89355] font-black text-lg">{selectedEmployeeIds.size}</span>
+              </div>
+              {selectedEmployeeIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllSelections}
+                  className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1"
+                >
+                  <X size={12} /> إلغاء الكل
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 sm:flex-none px-6 py-3 rounded-xl font-bold border border-white/10 hover:bg-white/5 transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                form="passengerForm"
+                className="flex-1 sm:flex-none bg-gradient-to-r from-[#C89355] to-[#d4a373] text-[#101720] px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-[#C89355]/20 active:scale-95 transition-all"
+              >
+                <Save size={18} /> تأكيد الاشتراك
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #1a2530;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #C89355;
+          border-radius: 10px;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>,
     document.body
   );

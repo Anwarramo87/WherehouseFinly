@@ -19,6 +19,7 @@ import {
   getAttendanceSocket,
   type AttendanceRealtimeEventPayload,
 } from "@/lib/realtime/attendance-socket";
+import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModal";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 
 const LeaveRequestModal = dynamic(
@@ -54,7 +55,7 @@ const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
   const ci = toMinutes(checkIn);
   const sc = toMinutes(scheduledStart || "08:00");
   if (ci === null || sc === null) return "present";
-  return ci > sc + 15 ? "late" : "present";
+  return ci > sc + 5 ? "late" : "present";
 };
 
 const statusUi: Record<TableStatus, { label: string; classes: string }> = {
@@ -83,6 +84,7 @@ interface AttendanceTableRow {
   source: "manual" | "device";
   status: TableStatus;
   leaveStatus?: string[];
+  leaveObjects?: LeaveRecord[];
 }
 
 export default function AttendancePage() {
@@ -94,6 +96,7 @@ export default function AttendancePage() {
   const [period, setPeriod] = useState(searchParams.get("period") || new Date().toISOString().slice(0, 7));
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
 
   const [timeModal, setTimeModal] = useState<{
     isOpen: boolean;
@@ -152,11 +155,18 @@ export default function AttendancePage() {
     });
 
     const leavesMap = new Map<string, string[]>();
+    const leavesObjectMap = new Map<string, LeaveRecord[]>();
     (leaves || []).forEach((leave) => {
       if (!leave.employeeId || !leave.leaveType) return;
       if (!isDayInsideLeave(leave, selectedDate)) return;
       if (!leavesMap.has(leave.employeeId)) leavesMap.set(leave.employeeId, []);
+      if (!leavesObjectMap.has(leave.employeeId)) leavesObjectMap.set(leave.employeeId, []);
       leavesMap.get(leave.employeeId)?.push(leave.leaveType);
+      const leaveObj = leave as LeaveRecord;
+      // لا نضيف نفس الإجازة مرتين
+      if (!leavesObjectMap.get(leave.employeeId)?.find(l => l.id === leaveObj.id)) {
+        leavesObjectMap.get(leave.employeeId)?.push(leaveObj);
+      }
     });
 
     const tableRows: AttendanceTableRow[] = [];
@@ -181,6 +191,7 @@ export default function AttendancePage() {
         source: (dv?.source === "biometric" ? "device" : "manual"),
         status: effectiveStatus,
         leaveStatus,
+        leaveObjects: leavesObjectMap.get(employeeId),
       });
     }
     return tableRows.sort((a, b) =>
@@ -441,7 +452,20 @@ export default function AttendancePage() {
                         </td>
                         {/* حالة الإجازة — تظهر "إجازة" بدلاً من "غائب" */}
                         <td className="p-4 text-center">
-                          {row.leaveStatus && row.leaveStatus.length > 0 ? (
+                          {row.leaveObjects && row.leaveObjects.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 justify-center">
+                              {row.leaveObjects.map((leaveObj) => (
+                                <button
+                                  key={leaveObj.id}
+                                  onClick={() => setSelectedLeave({ ...leaveObj, employee: { name: row.employeeName, employeeId: row.employeeId } })}
+                                  className="px-4 py-1.5 rounded-xl text-[11px] font-black border text-blue-700 bg-blue-50 border-blue-200 shadow-sm hover:bg-blue-100 hover:border-blue-300 transition-all cursor-pointer"
+                                  title="اضغط للتعديل أو الحذف"
+                                >
+                                  {LEAVE_TYPE_LABELS[leaveObj.leaveType] || leaveObj.leaveType}
+                                </button>
+                              ))}
+                            </div>
+                          ) : row.leaveStatus && row.leaveStatus.length > 0 ? (
                             <span className="px-4 py-1.5 rounded-xl text-[11px] font-black border text-blue-700 bg-blue-50 border-blue-200 shadow-sm">
                               {row.leaveStatus.map((t) => LEAVE_TYPE_LABELS[t] || t).join("، ")}
                             </span>
@@ -508,7 +532,7 @@ export default function AttendancePage() {
           <div className="mt-8 bg-white/60 backdrop-blur-xl p-5 rounded-3xl border border-white/80 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
             <div className="text-xs text-[#263544] font-black flex items-center gap-2.5">
               <Clock3 size={16} className="text-[#C89355]" />
-              يعتبر الموظف متأخراً إذا تجاوز وقت الدخول وقت الدوام المجدول + 15 دقيقة.
+              يعتبر الموظف متأخراً إذا تجاوز وقت الدخول وقت الدوام المجدول + 5 دقائق.
             </div>
             <div className="text-xs text-[#263544] font-black flex items-center gap-2.5">
               <Fingerprint size={16} className="text-[#C89355]" />
@@ -593,6 +617,18 @@ export default function AttendancePage() {
         onClose={() => setIsLeaveModalOpen(false)}
         employees={employeeList}
       />
+
+      {/* Leave Manage Modal — يفتح عند النقر على بادج الإجازة */}
+      {selectedLeave && (
+        <LeaveManageModal
+          isOpen={!!selectedLeave}
+          leave={selectedLeave}
+          onClose={() => setSelectedLeave(null)}
+          onUpdated={() => {
+            void queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+          }}
+        />
+      )}
     </>
   );
 }

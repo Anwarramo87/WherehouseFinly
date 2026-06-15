@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
@@ -118,7 +118,7 @@ export default function EmployeesPage() {
 
   const [isBulkTerminateModalOpen, setIsBulkTerminateModalOpen] = useState(false);
   const [bulkTerminateDept, setBulkTerminateDept] = useState("");
-  const [bulkTerminateReason, setBulkTerminateReason] = useState("");
+  const [_bulkTerminateReason, _setBulkTerminateReason] = useState("");
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
@@ -537,7 +537,7 @@ export default function EmployeesPage() {
                   <div className="bg-rose-500/5 border border-rose-500/10 p-3 rounded-xl flex items-start gap-3 mb-4">
                     <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
                       <p className="text-xs text-rose-200 leading-relaxed font-bold">
-                      أنت على وشك إنهاء خدمة **جميع الموظفين النشطين** في قسم "{selectedDept}". هذا الإجراء لا يمكن التراجع عنه. يرجى التأكد قبل المتابعة.
+                      أنت على وشك إنهاء خدمة **جميع الموظفين النشطين** في قسم &ldquo;{selectedDept}&rdquo;. هذا الإجراء لا يمكن التراجع عنه. يرجى التأكد قبل المتابعة.
                     </p>
                   </div>
 
