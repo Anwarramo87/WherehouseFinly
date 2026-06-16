@@ -104,20 +104,20 @@ const nextConfig: NextConfig = {
         ...config.optimization,
         minimize: true,
         splitChunks: {
-          chunks: 'all',
+          chunks: "all",
           cacheGroups: {
             default: false,
             vendors: false,
             vendor: {
-              name: 'vendor',
-              chunks: 'all',
+              name: "vendor",
+              chunks: "all",
               test: /node_modules/,
               priority: 20,
             },
             common: {
-              name: 'common',
+              name: "common",
               minChunks: 2,
-              chunks: 'all',
+              chunks: "all",
               priority: 10,
               reuseExistingChunk: true,
               enforce: true,
@@ -128,6 +128,10 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+
+  // Prevent Next/Turbopack from complaining when a webpack override exists.
+  // Next suggests using an empty turbopack config as a safe workaround.
+  turbopack: {},
 
   async headers() {
     return [
@@ -148,7 +152,7 @@ const nextConfig: NextConfig = {
       },
       {
         // تم التصحيح: تطبيق الـ Cache على الملفات الثابتة فقط لتجنب تخزين الـ API أو الصفحات الديناميكية
-        source: "/:all*(svg|jpg|png|webp|avif)",
+        source: "/:path*",
         locale: false,
         headers: [
           {
@@ -162,3 +166,4 @@ const nextConfig: NextConfig = {
 };
 
 export default withBundleAnalyzer(nextConfig);
+

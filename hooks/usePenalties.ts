@@ -1,23 +1,28 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage } from "@/lib/http/error";
 
-/** Re-export for backwards-compat with components that import getErrorMessage from here */
 export const getErrorMessage = getApiErrorMessage;
+
+export type PenaltyRecord = Penalty & { id: string };
 
 export const usePenalties = (params?: {
   employeeId?: string;
   startDate?: string;
-  endDate?: string; period?: string;
+  endDate?: string;
+  period?: string;
 }) => {
-  return useQuery<PenaltyRecord[]>({
+  const queryClient = useQueryClient();
+
+  const penaltiesQuery = useQuery<PenaltyRecord[]>({
     queryKey: [
       "penalties",
       params?.employeeId || "all",
-      params?.period || "current", params?.startDate || "all-start",
+      params?.period || "current",
+      params?.startDate || "all-start",
       params?.endDate || "all-end",
     ],
     queryFn: async () => {
@@ -26,11 +31,11 @@ export const usePenalties = (params?: {
           employeeId: params?.employeeId,
           startDate: params?.startDate,
           endDate: params?.endDate,
+          period: params?.period,
         },
       });
       return Array.isArray(res.data) ? res.data : [];
     },
-    enabled: params?.enabled ?? true,
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
@@ -40,7 +45,7 @@ export const usePenalties = (params?: {
       return Number(value.$numberDecimal || 0);
     }
     if (typeof value === "string") {
-      const normalized = value.replace(/,/g).trim();
+      const normalized = value.replace(/,/g, "").trim();
       return Number(normalized || 0);
     }
     return Number(value || 0);
