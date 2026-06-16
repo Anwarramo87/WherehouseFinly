@@ -28,7 +28,6 @@ export type DiscountPayload = {
 };
 
 
-
 const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
   // السجلات من جدول EmployeeAdvance فقط
   if (record.advanceType || record.totalAmount !== undefined) {
@@ -43,13 +42,15 @@ const mapBackendKindToType = (record: Record<string, unknown>): { type: string; 
   return { type: "أخرى", kind: "advance" as const };
 };
 
-export const useDiscounts = (employeeId?: string, enabled = true) => {
+export const useDiscounts = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
 
   const query = useQuery<DiscountRecord[]>({
-    queryKey: ["discounts", employeeId || "all"],
+    queryKey: ["discounts", employeeId || "all", period || "current"],
     queryFn: async () => {
-      const params = employeeId ? { employeeId } : {};
+      const params: Record<string, string> = {};
+      if (employeeId) params.employeeId = employeeId;
+      if (period) params.period = period;
       const res = await apiClient.get("/discounts", { params });
       const data = res.data;
 
@@ -141,7 +142,7 @@ export const useDiscounts = (employeeId?: string, enabled = true) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      toast.success("تم حذف الخصم بنجاح");
+      toast.success("تم نقل الخصم إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(normalizeError(error, "فشل حذف الخصم"));

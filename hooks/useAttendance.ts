@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import axios from "axios";
@@ -51,6 +52,7 @@ export interface AttendanceQueryParams {
   date?: string;
   startDate?: string;
   endDate?: string;
+  period?: string; // YYYY-MM format
   page?: number;
   limit?: number;
 }
@@ -170,6 +172,18 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
   const fallbackToday = toLocalDateString();
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 
+  // Calculate date range from period (YYYY-MM) if provided
+  const { periodStart, periodEnd } = useMemo(() => {
+    if (params?.period) {
+      const [year, month] = params.period.split("-").map(Number);
+      const start = `${year}-${String(month).padStart(2, "0")}-01`;
+      const endDay = new Date(year, month, 0).getDate();
+      const end = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
+      return { periodStart: start, periodEnd: end };
+    }
+    return { periodStart: undefined, periodEnd: undefined };
+  }, [params?.period]);
+
   const singleDayFromRange =
     !params?.date &&
     Boolean(params?.startDate && params?.endDate) &&
@@ -180,24 +194,29 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
   const requestDate =
     params?.date ??
     singleDayFromRange ??
-    (!params?.startDate && !params?.endDate ? fallbackToday : undefined);
-  const resolvedStartDate = params?.startDate ?? requestDate;
-  const resolvedEndDate = params?.endDate ?? requestDate;
+    (!params?.startDate && !params?.endDate && !params?.period ? fallbackToday : undefined);
+  const resolvedStartDate = params?.startDate ?? periodStart ?? requestDate;
+  const resolvedEndDate = params?.endDate ?? periodEnd ?? requestDate;
+
+  // Build query key including period for proper caching
+  const queryKey = useMemo(() => [
+    "attendance",
+    params?.employeeId || "all-employees",
+    params?.period || requestDate || "all-dates",
+    resolvedStartDate || "no-start",
+    resolvedEndDate || "no-end",
+    params?.page || 1,
+    safeLimit,
+  ], [params?.employeeId, params?.period, requestDate, resolvedStartDate, resolvedEndDate, params?.page, safeLimit]);
 
   const query = useQuery<AttendanceListResponse>({
-    queryKey: [
-      "attendance",
-      params?.employeeId || "all-employees",
-      requestDate || "all-dates",
-      resolvedStartDate || "no-start",
-      resolvedEndDate || "no-end",
-      params?.page || 1,
-      safeLimit,
-    ],
+    queryKey,
     queryFn: async () => {
       const requestList = async (requestParams: {
         employeeId?: string;
         date?: string;
+        startDate?: string;
+        endDate?: string;
         page?: number;
         limit: number;
       }) => {
@@ -213,6 +232,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       const requestParams = {
         employeeId: params?.employeeId,
         date: requestDate,
+        startDate: periodStart,
+        endDate: periodEnd,
         page: params?.page,
         limit: safeLimit,
       };

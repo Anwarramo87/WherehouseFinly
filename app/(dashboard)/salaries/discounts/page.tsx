@@ -1,27 +1,29 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 import { useAdvances } from "@/hooks/useAdvances";
 import { Advance, AdvanceInput } from "@/types/advance";
+import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 export default function DiscountsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
-  const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts();
-  const { createAdvance, updateAdvance } = useAdvances();
+  
+  const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
+  const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
+  const { createAdvance, updateAdvance } = useAdvances(undefined, period);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Default to current month (YYYY-MM)
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
@@ -42,8 +44,8 @@ export default function DiscountsPage() {
     let result = recordsWithNames;
 
     // Filter by Month/Year
-    if (selectedMonth) {
-      result = result.filter(d => d.date.startsWith(selectedMonth));
+    if (period) {
+      result = result.filter(d => d.date.startsWith(period));
     }
 
     // Filter by Search Term
@@ -54,7 +56,7 @@ export default function DiscountsPage() {
     }
 
     return result;
-  }, [recordsWithNames, searchTerm, selectedMonth]);
+  }, [recordsWithNames, searchTerm, period]);
 
   const totalSum = useMemo(() => {
     return filteredDiscounts.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -122,7 +124,7 @@ export default function DiscountsPage() {
   };
 
   const handleDelete = (id: string, kind: "advance" | "penalty" | "assistance") => {
-    if (window.confirm("هل أنت متأكد من حذف هذا الإجراء المالي؟")) {
+    if (window.confirm("هل أنت متأكد من نقل هذا الإجراء المالي إلى سلة المهملات؟")) {
       deleteDiscount?.mutate({ id, kind });
     }
   };
@@ -179,18 +181,16 @@ export default function DiscountsPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-
-              {/* Month Filter */}
-              <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all group w-full sm:w-auto">
-                <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-                <CalendarDays size={18} className="text-[#C89355] ml-2 shrink-0 relative z-10" />
-                <input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="bg-transparent text-sm font-bold text-[#263544] outline-none w-full relative z-10 font-mono"
-                />
-              </div>
+              {/* Month Period Selector */}
+              <MonthPeriodSelector
+                value={period}
+                onChange={(newPeriod) => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("period", newPeriod);
+                  router.replace(`?${params.toString()}`);
+                }}
+                className="flex-1 sm:flex-none"
+              />
 
               {/* شريط البحث المدمج */}
               <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full sm:w-64 transition-all">

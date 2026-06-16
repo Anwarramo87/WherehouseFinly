@@ -1,25 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import type { EmployeesStats, AttendanceStats, InventoryStats, DashboardKpis } from '@/types/dashboard';
+import type { DashboardKpis } from '@/types/dashboard';
 import apiClient from '@/lib/api-client';
-
-const fallbackEmployeesStats: EmployeesStats = {
-  total: 0,
-  active: 0,
-  byDepartment: {},
-};
-
-const fallbackAttendanceStats: AttendanceStats = {
-  statistics: {
-    totalLateArrivals: 0,
-  },
-  topLateEmployees: [],
-};
-
-const fallbackInventoryStats: InventoryStats = {
-  totalQuantity: 0,
-  totalProducts: 0,
-};
 
 const fallbackKpis: DashboardKpis = {
   totalEmployees: 0,
@@ -40,66 +22,70 @@ const toNumber = (value: unknown) => {
   return 0;
 };
 
+export interface DashboardPresentEmployee {
+  name: string;
+  department: string | null;
+  checkIn: string;
+}
+
+export interface DashboardAbsentEmployee {
+  employeeId: string;
+  name: string;
+  department: string | null;
+  scheduledStart: string | null;
+}
+
+export interface DashboardLateEmployee {
+  employeeId: string;
+  name: string;
+  scheduledStart: string;
+  checkIn: string;
+  minutesLate: number;
+}
+
+export interface DashboardOvertimeEmployee {
+  employeeId: string;
+  name: string;
+  department: string | null;
+  scheduledEnd: string;
+  actualCheckOut: string;
+  overtimeMinutes: number;
+  overtimePay: number;
+}
+
 export const useDashboard = () => {
-  // Fetch aggregated dashboard payload (reduces multiple /stats calls)
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'home'],
     queryFn: async () => {
       try {
         const response = await apiClient.get('/dashboard/home');
-        return response.data ?? {
-          totalEmployees: 0,
-          totalDueSalaries: 0,
-          totalReceivedSalaries: 0,
-          totalLateMinutesToday: 0,
-          totalOvertimeMinutesToday: 0,
-          activeToday: 0,
-          totalAbsentToday: 0,
-        };
+        return response.data ?? null;
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        return {
-          totalEmployees: 0,
-          totalDueSalaries: 0,
-          totalReceivedSalaries: 0,
-          totalLateMinutesToday: 0,
-          totalOvertimeMinutesToday: 0,
-          activeToday: 0,
-          totalAbsentToday: 0,
-        };
+        return null;
       }
     },
     staleTime: 60_000,
   });
-  
+
   const dashboard = dashboardQuery.data as {
     totalEmployees?: number;
-    attendance?: { count?: number; employees?: unknown[] };
-    absence?: { count?: number; employees?: unknown[] };
+    attendance?: { count?: number; employees?: DashboardPresentEmployee[] };
+    absence?: { count?: number; employees?: DashboardAbsentEmployee[] };
     totalDueSalaries?: number;
     totalReceivedSalaries?: number;
-    lateness?: { totalMinutes?: number };
-    overtime?: { totalMinutes?: number };
+    lateness?: { totalMinutes?: number; count?: number; employees?: DashboardLateEmployee[] };
+    overtime?: { totalMinutes?: number; count?: number; employees?: DashboardOvertimeEmployee[] };
+    reportDate?: string;
   } | null;
 
-  // Extract values from dashboard response with proper null checks
-  const activeToday = toNumber(
-    (dashboard as { attendance?: { count?: number } })?.attendance?.count ??
-    (dashboard as { activeToday?: number })?.activeToday
-  );
+  const activeToday = toNumber(dashboard?.attendance?.count);
   const totalEmployees = toNumber(dashboard?.totalEmployees);
-  const totalAbsentToday = toNumber(
-    (dashboard as { absence?: { count?: number } })?.absence?.count
-  );
-  const totalLateMinutesToday = toNumber(
-    (dashboard as { lateness?: { totalMinutes?: number } })?.lateness?.totalMinutes ??
-    (dashboard as { totalLateMinutesToday?: number })?.totalLateMinutesToday
-  );
-  const totalOvertimeMinutesToday = toNumber(
-    (dashboard as { overtime?: { totalMinutes?: number } })?.overtime?.totalMinutes ??
-    (dashboard as { totalOvertimeMinutesToday?: number })?.totalOvertimeMinutesToday
-  );
+  const totalAbsentToday = toNumber(dashboard?.absence?.count);
+  const totalLateMinutesToday = toNumber(dashboard?.lateness?.totalMinutes);
+  const totalOvertimeMinutesToday = toNumber(dashboard?.overtime?.totalMinutes);
   const totalDueSalaries = toNumber(dashboard?.totalDueSalaries);
+  const totalReceivedSalaries = toNumber(dashboard?.totalReceivedSalaries);
 
   const kpis: DashboardKpis = {
     ...fallbackKpis,
@@ -107,19 +93,18 @@ export const useDashboard = () => {
     activeToday,
     totalAbsentToday,
     totalDueSalaries,
+    totalReceivedSalaries,
     totalLateMinutesToday,
     totalOvertimeMinutesToday,
   };
 
   return {
-    employeesStats: fallbackEmployeesStats,
-    attendanceStats: fallbackAttendanceStats,
-    inventoryStats: fallbackInventoryStats,
     kpis,
     isLoading: dashboardQuery.isLoading,
     isError: dashboardQuery.isError,
+    presentEmployees: dashboard?.attendance?.employees ?? [],
+    absentEmployees: dashboard?.absence?.employees ?? [],
+    lateEmployees: dashboard?.lateness?.employees ?? [],
+    overtimeEmployees: dashboard?.overtime?.employees ?? [],
   };
 };
-
-
-

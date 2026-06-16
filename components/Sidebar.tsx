@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, ClipboardList,
   Wallet, Box, Bus, FileInput, Settings, Fingerprint,
   ChevronDown, LogOut, Shield,
-  UserMinus, X, ChevronsRight // أعدنا استيراد السهم هنا
+  UserMinus, X, ChevronsRight, Trash2
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -44,6 +44,7 @@ const menuItems = [
   { name: 'مخزن الشغل', icon: Box, href: '/inventory', roles: ['admin', 'warehouse', 'manager'] },
   { name: 'الباص', icon: Bus, href: '/Transportation', roles: ['admin', 'warehouse', 'manager'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', roles: ['admin', 'manager'] },
+  { name: 'سلة المهملات', icon: Trash2, href: '/trash', roles: ['admin'] },
   { name: 'الإعدادات', icon: Settings, href: '/settings', roles: ['admin'] },
 ];
 

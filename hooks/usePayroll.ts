@@ -113,7 +113,7 @@ export const usePayroll = (params?: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll"], exact: false });
-      toast.success("تم حذف مسير الرواتب بنجاح");
+      toast.success("تم نقل مسير الرواتب إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف مسير الرواتب من الخادم"));

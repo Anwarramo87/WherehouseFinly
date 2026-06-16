@@ -92,7 +92,7 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
-      toast.success("تم حذف المكافأة");
+      toast.success("تم نقل المكافأة إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف المكافأة"));

@@ -22,7 +22,6 @@ import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
 import { useDiscounts } from '@/hooks/useDiscounts';
-import { usePayrollReport } from '@/hooks/usePayrollReport';
 import { Employee } from '@/types/employee';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -31,7 +30,7 @@ import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 
-const _AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
+const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   loading: () => null,
 });
 
@@ -126,31 +125,22 @@ interface LateEmployeeDetail {
 type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 
 export default function DashboardPage() {
-  const { kpis, isLoading } = useDashboard();
+  const { kpis, isLoading, presentEmployees, absentEmployees, lateEmployees, overtimeEmployees } = useDashboard();
   const { data: employees = [] } = useEmployees({ includeTerminated: true, fetchAll: true, limit: 500 });
   const canViewFinancialRecords = useAuthStore((state: { hasAnyRole: (roles: string[]) => boolean }) => state.hasAnyRole(["admin"]));
   const router = useRouter();
-  const currentPayrollMonth = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    return `${y}-${m}`;
-  }, []);
-  const { data: payrollReport, isLoading: payrollReportLoading } = usePayrollReport(currentPayrollMonth);
 
-  const isSkeleton = isLoading || payrollReportLoading;
+  const isSkeleton = isLoading;
 
-  // --- Modal state management ---
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [modalData, setModalData] = useState<
-    PresentEmployee[] | AbsentEmployee[] | LateEmployeeDetail[] | OvertimeEmployee[] | null
-  >(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
 
-  // --- إدارة الأقسام ---
   const queryClient = useQueryClient();
 
-  const toNumber = (value: unknown) => {    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+
+  const toNumber = (value: unknown) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;
       const parsed = Number(raw ?? 0);
@@ -163,93 +153,41 @@ export default function DashboardPage() {
     return 0;
   };
 
-  const totalReceivedFromPayrollReport = useMemo(() => {
-    const items = Array.isArray(payrollReport?.items) ? payrollReport.items : [];
-    return items.reduce((sum, item) => sum + toNumber(item?.netPayRounded ?? item?.netPay), 0);
-  }, [payrollReport?.items]);
-
   const formatTime = (timestamp?: string | null): string => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return "";
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   };
-  void formatTime; // used in JSX indirectly
-
-  const fetchModalData = async (type: ModalType) => {
-    if (!type) return;
-
-    setIsModalLoading(true);
-    setModalData(null);
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      if (type === 'present') {
-        const mockPresentData: PresentEmployee[] = [
-          { employeeId: 'EMP001', name: 'أحمد محمد علي', department: 'الخياطة', profession: 'خياط رئيسي', checkIn: '08:15', checkOut: null },
-          { employeeId: 'EMP005', name: 'فاطمة حسن الأحمد', department: 'القص', profession: 'عاملة قص', checkIn: '08:00', checkOut: '16:30' },
-        ];
-        setModalData(mockPresentData);
-      } else if (type === 'absent') {
-        const mockAbsentData: AbsentEmployee[] = [
-          { employeeId: 'EMP042', name: 'خالد عبدالله السيد', department: 'الكي', profession: 'عامل كي', scheduledStart: '08:00', lastCheckIn: '2026-04-24' },
-        ];
-        setModalData(mockAbsentData);
-      } else if (type === 'late') {
-        const mockLateData: LateEmployeeDetail[] = [
-          { employeeId: 'EMP015', name: 'محمد خالد الدين', department: 'الخياطة', profession: 'مشرف خط', scheduledStart: '08:00', checkIn: '08:23', minutesLate: 23 },
-          { employeeId: 'EMP028', name: 'سارة أحمد النجار', department: 'التعبئة', profession: 'مشرفة تعبئة', scheduledStart: '08:00', checkIn: '08:12', minutesLate: 12 },
-        ];
-        setModalData(mockLateData);
-      } else if (type === 'overtime') {
-        const mockOvertimeData: OvertimeEmployee[] = [
-          { employeeId: 'EMP012', name: 'محمد أحمد الخطيب', department: 'الخياطة', profession: 'خياط رئيسي', scheduledEnd: '16:00', actualCheckOut: '18:30', overtimeMinutes: 150, overtimeHours: 2.5, hourlyRate: 5000, overtimePay: 12500 },
-          { employeeId: 'EMP025', name: 'فاطمة حسن العلي', department: 'القص', profession: 'عاملة قص', scheduledEnd: '16:00', actualCheckOut: '17:45', overtimeMinutes: 105, overtimeHours: 1.75, hourlyRate: 4500, overtimePay: 7875 },
-          { employeeId: 'EMP033', name: 'علي محمود الشامي', department: 'الكي', profession: 'عامل كي', scheduledEnd: '16:00', actualCheckOut: '17:30', overtimeMinutes: 90, overtimeHours: 1.5, hourlyRate: 4000, overtimePay: 6000 },
-        ];
-        setModalData(mockOvertimeData);
-      }
-    } catch (error) {
-      console.error('Error fetching modal data:', error);
-      setModalData([]);
-    } finally {
-      setIsModalLoading(false);
-    }
-  };
+  void formatTime;
 
   const handleCardClick = (type: ModalType) => {
     if (type === null) return;
     setActiveModal(type);
-    fetchModalData(type);
   };
 
   const handleCloseModal = () => {
     setActiveModal(null);
-    setModalData(null);
   };
 
-  // --- حذف الأقسام ---
   const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
     if (!deptId || count > 0) return;
-    if (!window.confirm('هل أنت متأكد من مسح هذا القسم؟')) return;
+    if (!window.confirm('هل أنت متأكد من نقل هذا القسم إلى سلة المهملات؟')) return;
     try {
       await apiClient.delete(`/departments/${deptId}`);
       queryClient.invalidateQueries({ queryKey: ['departments'] });
     } catch (err) {
       console.error('Error deleting department:', err);
-      alert('فشل حذف القسم');
     }
   };
-  void handleDeleteDepartment;
 
   const monthKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  const { data: advances = [] } = useAdvances(undefined, canViewFinancialRecords);
-  const { data: discounts = [] } = useDiscounts(undefined, canViewFinancialRecords);
+  const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
+  const { data: discounts = [] } = useDiscounts(undefined, undefined, canViewFinancialRecords);
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];
@@ -270,7 +208,7 @@ export default function DashboardPage() {
         return {
           advanceId: advance.id,
           employeeId: advance.employeeId,
-          name: `${employee.name} - ${employee.employeeId}`,
+          name: `${employee.name} - ${advance.employeeId}`,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
@@ -295,15 +233,14 @@ export default function DashboardPage() {
       .slice(0, 6)
       .map((penalty): EmployeePenalty | null => {
         const employee = employeeListMemo.find((emp) => emp.employeeId === penalty.employeeId);
-        const isAdvance = penalty.kind === "advance" || penalty.backendModel === "advance" || Boolean(penalty.advanceType);
         if (!employee?.name) return null;
         return {
           penaltyId: penalty.id,
           employeeId: penalty.employeeId,
-          name: `${employee.name} - ${employee.employeeId}`,
+          name: `${employee.name} - ${penalty.employeeId}`,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
-          reason: penalty.notes || penalty.type || (isAdvance ? "سلفة" : "عقوبة"),
+          reason: penalty.notes || penalty.type || (penalty.kind === "advance" ? "سلفة" : "عقوبة"),
           severity: "moderate" as const,
           amount: Number(penalty.amount ?? 0),
           date: (penalty.date || penalty.createdAt || "").slice(0, 10),
@@ -323,11 +260,10 @@ export default function DashboardPage() {
   }, [deptsData]);
 
   const stats = [
-
     { title: 'إجمالي الموظفين', value: kpis.totalEmployees, subValue: 'مسجل في النظام', icon: Users, clickable: true, onClick: () => router.push('/employees') },
     { title: 'حضور اليوم', value: kpis.activeToday, subValue: 'موظف على رأس عمله', icon: UserCheck, clickable: true, onClick: () => handleCardClick('present') },
     { title: 'إجمالي الغياب', value: kpis.totalAbsentToday, subValue: 'موظف غائب اليوم', icon: UserX, clickable: true, onClick: () => handleCardClick('absent') },
-    { title: 'اجمالي المقبوض', value: totalReceivedFromPayrollReport.toLocaleString(), subValue: 'ليرة سورية', icon: HandCoins, clickable: false },
+    { title: 'اجمالي المقبوض', value: kpis.totalReceivedSalaries.toLocaleString(), subValue: 'ليرة سورية', icon: HandCoins, clickable: false },
     { title: 'دقائق التأخير', value: kpis.totalLateMinutesToday, subValue: 'إجمالي تأخير اليوم', icon: Clock, clickable: true, onClick: () => handleCardClick('late') },
     { title: 'العمل الإضافي', value: kpis.totalOvertimeMinutesToday, subValue: 'دقيقة عمل إضافية', icon: Timer, clickable: true, onClick: () => handleCardClick('overtime') },
   ];
@@ -454,13 +390,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bottom Grid: Department Details */}
+          {/* ── الأقسام ── */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-sm">
                 <Building2 className="text-[#C89355]" size={22} />
               </div>
               <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
+              <button
+                onClick={() => setIsDeptModalOpen(true)}
+                className="mr-auto px-4 py-2 bg-[#1a2530] text-[#C89355] rounded-xl text-xs font-black border border-[#C89355]/40 hover:bg-[#263544] transition-all active:scale-95"
+              >
+                + إضافة قسم
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
@@ -473,6 +415,18 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
                     <p className="text-[11px] font-bold text-slate-500">موظف</p>
+                    {canViewFinancialRecords && (
+                      <div className="flex gap-1 mt-2">
+                        {dept.count === 0 && (
+                          <button
+                            onClick={() => handleDeleteDepartment(dept.id, dept.count)}
+                            className="text-[10px] text-red-400 hover:text-red-600 font-bold px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-all"
+                          >
+                            حذف
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -490,8 +444,15 @@ export default function DashboardPage() {
         onClose={handleCloseModal}
         title="الموظفون الحاضرون اليوم"
         icon={UserCheck}
-        isLoading={isModalLoading}
-        data={modalData as PresentEmployee[] | null}
+        isLoading={false}
+        data={presentEmployees.map((emp) => ({
+          employeeId: emp.name,
+          name: emp.name,
+          department: emp.department || '',
+          profession: '',
+          checkIn: emp.checkIn,
+          checkOut: null,
+        }))}
         emptyMessage="لا يوجد موظفون حاضرون اليوم"
         emptyIcon={User}
         renderItem={(employee) => (
@@ -536,8 +497,14 @@ export default function DashboardPage() {
         onClose={handleCloseModal}
         title="الموظفون الغائبون اليوم"
         icon={UserX}
-        isLoading={isModalLoading}
-        data={modalData as AbsentEmployee[] | null}
+        isLoading={false}
+        data={absentEmployees.map((emp) => ({
+          employeeId: emp.employeeId,
+          name: emp.name,
+          department: emp.department || '',
+          profession: '',
+          scheduledStart: emp.scheduledStart || '08:00',
+        }))}
         emptyMessage="لا يوجد موظفون غائبون اليوم - حضور كامل! 🎉"
         emptyIcon={CalendarX}
         renderItem={(employee) => (
@@ -585,8 +552,16 @@ export default function DashboardPage() {
         onClose={handleCloseModal}
         title="الموظفون المتأخرون اليوم"
         icon={ClockAlert}
-        isLoading={isModalLoading}
-        data={modalData as LateEmployeeDetail[] | null}
+        isLoading={false}
+        data={lateEmployees.map((emp) => ({
+          employeeId: emp.employeeId,
+          name: emp.name,
+          department: '',
+          profession: '',
+          scheduledStart: emp.scheduledStart,
+          checkIn: emp.checkIn,
+          minutesLate: emp.minutesLate,
+        }))}
         emptyMessage="لا يوجد موظفون متأخرون اليوم - التزام ممتاز! ⭐"
         emptyIcon={ClockAlert}
         renderItem={(employee) => (
@@ -629,8 +604,19 @@ export default function DashboardPage() {
         onClose={handleCloseModal}
         title="موظفو العمل الإضافي اليوم"
         icon={Timer}
-        isLoading={isModalLoading}
-        data={modalData as OvertimeEmployee[] | null}
+        isLoading={false}
+        data={overtimeEmployees.map((emp) => ({
+          employeeId: emp.employeeId,
+          name: emp.name,
+          department: emp.department || '',
+          profession: '',
+          scheduledEnd: emp.scheduledEnd,
+          actualCheckOut: emp.actualCheckOut,
+          overtimeMinutes: emp.overtimeMinutes,
+          overtimeHours: emp.overtimeMinutes / 60,
+          hourlyRate: 0,
+          overtimePay: emp.overtimePay,
+        }))}
         emptyMessage="لا يوجد عمل إضافي اليوم"
         emptyIcon={Timer}
         renderItem={(employee) => (
@@ -669,6 +655,19 @@ export default function DashboardPage() {
           </div>
         )}
       />
+
+      {/* Add Department Modal */}
+      {isDeptModalOpen && (
+        <AddDepartmentModal
+          isOpen={isDeptModalOpen}
+          onClose={() => setIsDeptModalOpen(false)}
+          onSave={async (data) => {
+            await apiClient.post('/departments', { name: data.name });
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+            setIsDeptModalOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }

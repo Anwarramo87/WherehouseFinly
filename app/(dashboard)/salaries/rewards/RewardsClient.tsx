@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
@@ -12,13 +13,14 @@ import type { Bonus, BonusInput } from "@/types/bonus";
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
 
 export default function RewardsClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: salaries = [] } = useSalaries();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
-  const initialMonth = searchParams.get("month") ?? "";
-  const initialDate = initialMonth ? `${initialMonth}-01` : searchParams.get("date") ?? "";
+  const initialDate = period ? `${period}-01` : searchParams.get("date") ?? "";
   const initialAllEmployees = searchParams.get("allEmployees") === "true";
   const shouldOpenOnLoad = Boolean(initialEmployeeId || initialType || initialDate || initialAllEmployees);
 
@@ -40,7 +42,7 @@ export default function RewardsClient() {
 
   const { data: bonusesData = [], isLoading, createBonus, deleteBonus } = useBonuses({
     employeeId: initialEmployeeId || undefined,
-    period: initialMonth || undefined,
+    period: period,
   });
 
   const resolveAmount = (value: Bonus["bonusAmount"]) => {
@@ -178,7 +180,7 @@ export default function RewardsClient() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("هل أنت متأكد من حذف هذه الزيادة؟")) {
+    if (window.confirm("هل أنت متأكد من نقل هذه الزيادة إلى سلة المهملات؟")) {
       try {
         await deleteBonus.mutateAsync(id);
       } catch (error) {
@@ -224,6 +226,11 @@ export default function RewardsClient() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-5 w-full md:w-auto">
+            <MonthPeriodSelector
+              value={period}
+              onChange={(p) => router.replace(`/salaries/rewards?period=${p}`)}
+              className="shrink-0"
+            />
             <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full md:w-64 transition-all">
               <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
               <Search size={18} className="text-[#C89355] ml-2 shrink-0 relative z-10" />

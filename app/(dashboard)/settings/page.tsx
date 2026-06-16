@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { 
   Save, Building2, Users, Fingerprint, 
-  Bell, ShieldCheck, Box, Server, Settings
+  Bell, ShieldCheck, Box, Server, Settings,
+  Database, Download, Calendar
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -17,6 +18,7 @@ export default function SettingsPage() {
     { id: "devices", name: "أجهزة البصمة والربط", icon: Fingerprint },
     { id: "inventory", name: "المخزون والتنبيهات", icon: Box },
     { id: "security", name: "الأمان والصلاحيات", icon: ShieldCheck },
+    { id: "backup", name: "النسخ الاحتياطي", icon: Database },
   ];
 
   return (
@@ -266,6 +268,95 @@ export default function SettingsPage() {
                           defaultValue="KU&M JEANS" 
                           className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all" 
                         />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- قسم النسخ الاحتياطي --- */}
+              {activeTab === "backup" && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  
+                  {/* بطاقة النسخ الاحتياطي الكامل */}
+                  <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
+                    <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
+                    
+                    <div className="relative z-10">
+                      <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
+                        <div className="p-2.5 bg-[#1a2530] rounded-xl border border-[#C89355]/40 shadow-inner">
+                          <Database className="text-[#C89355] group-hover/card:animate-pulse transition-all duration-300" />
+                        </div>
+                        النسخ الاحتياطي
+                      </h2>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* نسخة احتياطية كاملة */}
+                        <div className="bg-white/60 backdrop-blur-md p-6 rounded-2xl border border-white shadow-sm hover:shadow-md transition-all">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30">
+                              <Download size={20} className="text-[#C89355]" />
+                            </div>
+                            <h3 className="text-lg font-black text-[#263544]">نسخة احتياطية كاملة</h3>
+                          </div>
+                          <p className="text-sm text-slate-600 font-bold mb-6">
+                            تصدير جميع بيانات النظام (الموظفين، الحضور، الرواتب، السلف، الخصومات، المكافآت) في ملف Excel واحد.
+                          </p>
+                          <button
+                            onClick={() => {
+                              const link = document.createElement("a");
+                              link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/backup/export/full`;
+                              link.click();
+                            }}
+                            className="w-full relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group/btn"
+                          >
+                            <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/50" />
+                            <Download size={18} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
+                            <span className="relative z-10">تحميل النسخة الكاملة</span>
+                          </button>
+                        </div>
+
+                        {/* نسخة احتياطية شهرية */}
+                        <div className="bg-white/60 backdrop-blur-md p-6 rounded-2xl border border-white shadow-sm hover:shadow-md transition-all">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30">
+                              <Calendar size={20} className="text-[#C89355]" />
+                            </div>
+                            <h3 className="text-lg font-black text-[#263544]">نسخة احتياطية شهرية</h3>
+                          </div>
+                          <p className="text-sm text-slate-600 font-bold mb-6">
+                            تصدير بيانات شهر محدد فقط (الحضور، الرواتب، السلف، الخصومات، المكافآت).
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="month"
+                              defaultValue={new Date().toISOString().slice(0, 7)}
+                              id="backup-month"
+                              className="flex-1 bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-lg font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all font-mono"
+                            />
+                            <button
+                              onClick={() => {
+                                const input = document.getElementById("backup-month") as HTMLInputElement;
+                                const period = input?.value;
+                                if (!period) return;
+                                const link = document.createElement("a");
+                                link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/backup/export/month?period=${period}`;
+                                link.click();
+                              }}
+                              className="relative overflow-hidden bg-[#C89355] hover:bg-[#b8834a] text-[#1a2530] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(200,147,85,0.3)] transition-all active:scale-95 text-sm font-black group/btn"
+                            >
+                              <Download size={18} className="group-hover/btn:-translate-y-1 transition-transform" />
+                              <span>تحميل</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 p-4 bg-amber-50/80 border border-amber-200 rounded-2xl">
+                        <p className="text-sm font-bold text-amber-700 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                          تذكير: يُنصح بالاحتفاظ بنسخ احتياطية منتظمة لضمان سلامة البيانات.
+                        </p>
                       </div>
                     </div>
                   </div>

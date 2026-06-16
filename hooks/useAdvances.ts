@@ -5,13 +5,13 @@ import { Advance, AdvanceInput } from "@/types/advance";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
-export const useAdvances = (employeeId?: string, enabled = true) => {
+export const useAdvances = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
 
   const advancesQuery = useQuery<Advance[]>({
-    queryKey: ["advances", employeeId || "all"],
+    queryKey: ["advances", employeeId || "all", period || "current"],
     queryFn: async () => {
-      const res = await apiClient.get("/advances", { params: { employeeId } });
+      const res = await apiClient.get("/advances", { params: { employeeId, period } });
       return Array.isArray(res.data) ? res.data : [];
     },
     enabled,
@@ -63,7 +63,7 @@ export const useAdvances = (employeeId?: string, enabled = true) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
-      toast.success("تم حذف السلفة");
+      toast.success("تم نقل السلفة إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف السلفة"));
