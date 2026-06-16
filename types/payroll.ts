@@ -29,6 +29,8 @@ export interface PayrollItem {
   /** فرق التقريب = netPayRounded − netPay */
   roundingDifference: number | string | { $numberDecimal: string };
   netPayWithAdvance?: number | string | { $numberDecimal: string };
+  earlyLeaveMinutes?: number;
+  earlyLeaveDeduction?: number | string | { $numberDecimal: string };
   anomalies?: string[];
 }
 

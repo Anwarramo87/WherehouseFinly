@@ -14,6 +14,8 @@ interface AggregatedPayroll {
   earnedSalary: number;
   bonusesTotal: number;
   discountsTotal: number;
+  totalEarlyLeaveMinutes?: number;
+  earlyLeaveDeduction?: number;
 }
 
 interface PayrollRowProps {

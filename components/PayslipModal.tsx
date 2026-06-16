@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wallet, Receipt, HandCoins, ChevronLeft, Download } from 'lucide-react';
+import { Wallet, Receipt, HandCoins, ChevronLeft, Download, AlertTriangle } from 'lucide-react';
 import type { Bonus } from '@/types/bonus';
 import type { DiscountRecord } from '@/hooks/useDiscounts';
 import type { PenaltyRecord } from '@/hooks/usePenalties';
@@ -32,6 +32,8 @@ interface AggregatedPayroll {
   variableEarnings: number;
   fixedDeductions: number;
   variableDeductions: number;
+  totalEarlyLeaveMinutes?: number;
+  earlyLeaveDeduction?: number;
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
@@ -301,6 +303,21 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                     </span>
                     <span className="text-xl font-black text-rose-600 font-mono print:text-black">
                       -{payslip.variableDeductions.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Early Leave / Missing Minutes Deduction ──────────────────── */}
+              {(payslip?.earlyLeaveDeduction ?? 0) > 0 && (
+                <div className="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="flex items-center gap-2 text-sm font-bold text-amber-700 print:text-black">
+                      <AlertTriangle size={15} className="text-amber-500" />
+                      خصم دوام ناقص ({payslip?.totalEarlyLeaveMinutes ?? 0} دقيقة)
+                    </span>
+                    <span className="text-lg font-black text-red-600 font-mono print:text-black">
+                      -{payslip.earlyLeaveDeduction!.toLocaleString()} ل.س
                     </span>
                   </div>
                 </div>

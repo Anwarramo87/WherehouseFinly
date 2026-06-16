@@ -508,6 +508,14 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
       await queryClient.refetchQueries({ queryKey: ["attendance"], exact: false });
+
+      // ── Invalidate deductions after a short delay to account for fire-and-forget
+      //    aggregation on the backend (EARLY_LEAVE_MINUTES may not be written yet) ──
+      await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"], exact: false });
+      // Schedule a delayed refetch so the aggregation engine has time to persist
+      setTimeout(() => {
+        void queryClient.refetchQueries({ queryKey: ["attendance-deductions"], exact: false });
+      }, 1500);
     },
   });
 

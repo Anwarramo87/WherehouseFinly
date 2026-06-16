@@ -93,6 +93,8 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrollInputs"] });
+      // Also invalidate deductions so the UI picks up fresh EARLY_LEAVE_MINUTES
+      queryClient.invalidateQueries({ queryKey: ["attendance-deductions"] });
       toast.success("تم الحفظ بنجاح!");
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

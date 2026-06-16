@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2, CalendarPlus } from "lucide-react";
+import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2, CalendarPlus, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
@@ -267,7 +267,7 @@ export default function TimeTablePage() {
   });
 
   // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
-  const { data: monthlyAttendanceData, markAttendance } = useAttendance({
+  const { data: monthlyAttendanceData, markAttendance: _markAttendance } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
     limit: 200,
@@ -440,7 +440,8 @@ export default function TimeTablePage() {
       const totalLeaves = sickLeaveDays + unpaidLeaveDays + adminLeaveDays + deathLeaveDays;
       // إجمالي الغياب والإجازات للعرض — نستخدم الغياب الصافي
       const totalAbsencesLeaves = absenceDays + totalLeaves;
-      const totalDelayMinutes = lateMinutes + (manualInput?.earlyLeaveMinutes ?? 0);
+      const totalDelayMinutes = lateMinutes;
+      const totalEarlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
 
       // أيام الحضور الفعلية من البصمة — نحسبها من السجلات مباشرة
       // نستخدم الأكبر بين local و backend لتجنب فقدان بيانات
@@ -478,7 +479,7 @@ export default function TimeTablePage() {
             actualWorkDays,
             effectivePaidLeaveDays,                   // إجازات مدفوعة (100% + 50% مرضية)
             lateMinutes,                              // دقائق التأخير فقط
-            manualInput?.earlyLeaveMinutes ?? 0,      // دقائق الخروج المبكر
+            manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,      // دقائق الخروج المبكر
             totalOvertimeMinutes,                     // إضافي عادي (دقائق)
             totalOvertimeDays,                        // إضافي جمعة (أيام)
           )
@@ -495,6 +496,7 @@ export default function TimeTablePage() {
         totalAbsencesLeaves,
         actualWorkDays,
         totalDelayMinutes,
+        totalEarlyLeaveMinutes,
         totalOvertimeMinutes,
         totalOvertimeDays,
         grossSalary,
@@ -506,7 +508,7 @@ export default function TimeTablePage() {
         unpaidLeaveDays,
       };
     });
-    }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, localPresentDaysMap]);
+    }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, localPresentDaysMap, monthlyLeaves, periodStart, periodEnd]);
 
 
   const filteredRecords = useMemo(() => {
@@ -673,6 +675,7 @@ export default function TimeTablePage() {
                   <th className="px-6 py-5 text-sm font-black text-center">الغياب والإجازات</th>
                   <th className="px-6 py-5 text-sm font-black text-center">حالة الإجازة</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي التأخير (دقائق)</th>
+                  <th className="px-6 py-5 text-sm font-black text-center bg-slate-800/50">خروج مبكر / ناقص (دقائق)</th>
                   <th className="px-6 py-5 text-sm font-black text-center">إجمالي الإضافي</th>
                   <th className="px-6 py-5 text-sm font-black text-center">الراتب المستحق</th>
                   <th className="px-6 py-5 text-sm font-black text-center w-24">إجراءات</th>
@@ -745,6 +748,21 @@ export default function TimeTablePage() {
                         )}
                       </td>
 
+                      {/* خروج مبكر / ناقص (دقائق) */}
+                      <td className="px-6 py-4 text-center">
+                        {record.totalEarlyLeaveMinutes > 0 ? (
+                          <span
+                            className="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-100 text-xs font-bold px-3 py-1 rounded-full"
+                            title="تم استبعاد الإجازات الساعية المعتمدة تلقائياً"
+                          >
+                            <AlertTriangle size={13} />
+                            {record.totalEarlyLeaveMinutes} دقيقة
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-medium">-</span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
                           {record.totalOvertimeMinutes > 0 && (
@@ -806,7 +824,7 @@ export default function TimeTablePage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="p-4 bg-slate-50 rounded-full">
                           <Search className="text-slate-300" size={32} />
