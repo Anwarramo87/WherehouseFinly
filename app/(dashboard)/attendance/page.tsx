@@ -50,7 +50,7 @@ const formatDate = (date: string) => {
   return `${day}/${month}/${year}`;
 };
 
-const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
+const _getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
   if (!checkIn) return "absent";
   const ci = toMinutes(checkIn);
   const sc = toMinutes(scheduledStart || "08:00");

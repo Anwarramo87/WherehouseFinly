@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
@@ -42,6 +43,7 @@ export interface BusDetailsResponse extends BusResponse {
 
 export function useTransportation() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const query = useQuery<BusResponse[]>({
     queryKey: ["buses"],
@@ -73,8 +75,9 @@ export function useTransportation() {
       };
       return await apiClient.post("/transportation/buses", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buses"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      router.refresh();
       toast.success("تم إضافة الباص بنجاح");
     },
     onError: (error: unknown) => {
@@ -97,8 +100,9 @@ export function useTransportation() {
       if (data.capacity !== undefined) payload.capacity = Number(data.capacity);
       return await apiClient.put(`/transportation/buses/${id}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buses"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      router.refresh();
       toast.success("تم تحديث الباص بنجاح");
     },
     onError: (error: unknown) => {
@@ -110,8 +114,9 @@ export function useTransportation() {
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/transportation/buses/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buses"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      router.refresh();
       toast.success("تم نقل الباص إلى سلة المهملات");
     },
     onError: (error: unknown) => {
@@ -127,8 +132,10 @@ export function useTransportation() {
       const res = await apiClient.post(`/transportation/buses/${busId}/passengers`, body);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buses"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      router.refresh();
       toast.success("تمت إضافة الموظف للباص");
     },
     onError: (error: unknown) => {
@@ -140,8 +147,10 @@ export function useTransportation() {
     mutationFn: async ({ busId, employeeId }: { busId: string; employeeId: string }) => {
       return await apiClient.delete(`/transportation/buses/${busId}/passengers/${employeeId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buses"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      router.refresh();
       toast.success("تمت إزالة الموظف من الباص");
     },
     onError: (error: unknown) => {

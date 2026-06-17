@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -40,6 +41,7 @@ const normalizeError = (error: any): string => {
 
 export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const query = useQuery<PayrollInputRecord[]>({
     queryKey: ["payrollInputs", periodStart, periodEnd],
@@ -91,10 +93,11 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
 
       return apiClient.post("/payroll/inputs", formattedPayload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payrollInputs"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["payrollInputs"] });
       // Also invalidate deductions so the UI picks up fresh EARLY_LEAVE_MINUTES
-      queryClient.invalidateQueries({ queryKey: ["attendance-deductions"] });
+      await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"] });
+      router.refresh();
       toast.success("تم الحفظ بنجاح!");
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

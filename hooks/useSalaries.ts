@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import axios from "axios";
@@ -37,6 +38,7 @@ const normalizeSalary = (raw: Record<string, unknown>): Salary => {
  */
 export const useSalaries = () => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const salariesQuery = useQuery<Salary[]>({
     queryKey: ["salaries"],
@@ -112,13 +114,14 @@ export const useSalaries = () => {
 
       return await apiClient.put(`/salary/${employeeId}`, payload);
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: async (_data, variables) => {
       // Only runs on HTTP 2xx — TanStack Query guarantees this
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
       if (variables?.employeeId) {
-        queryClient.invalidateQueries({ queryKey: ["salary", variables.employeeId] });
+        await queryClient.invalidateQueries({ queryKey: ["salary", variables.employeeId] });
       }
-      toast.success("تم حفظ مكونات الراتب بنجاح ✓");
+      router.refresh();
+      toast.success("تم حفظ مكونات الراتب بنجاح \u2713");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حفظ الراتب"));
@@ -129,11 +132,12 @@ export const useSalaries = () => {
     mutationFn: async (employeeId: string) => {
       return await apiClient.delete(`/salary/${employeeId}`);
     },
-    onSuccess: (_data, employeeId) => {
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+    onSuccess: async (_data, employeeId) => {
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
       if (employeeId) {
-        queryClient.invalidateQueries({ queryKey: ["salary", employeeId] });
+        await queryClient.invalidateQueries({ queryKey: ["salary", employeeId] });
       }
+      router.refresh();
       toast.success("تم نقل بيانات الراتب إلى سلة المهملات");
     },
     onError: (error: unknown) => {

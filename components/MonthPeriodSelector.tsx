@@ -69,6 +69,7 @@ export function MonthPeriodSelector({
   const effectiveDate = selectedDate || today;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDropdownValue(value);
     setIsDayOpen(false);
   }, [value]);

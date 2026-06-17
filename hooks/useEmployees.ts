@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
@@ -64,6 +65,7 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 
 export const useEmployees = (options?: UseEmployeesOptions) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const safeLimit = Math.min(Math.max(options?.limit ?? 500, 1), 500); // Changed from 200 to 500
   const fetchAll = options?.fetchAll ?? false;
@@ -237,9 +239,11 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
 
       return await apiClient.post("/employees", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -267,9 +271,11 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
       };
       return await apiClient.put(`/employees/${id}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم تحديث بيانات الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -282,9 +288,11 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/employees/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم نقل الموظف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
@@ -307,8 +315,10 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
       const endpoint = data.status === "resigned" ? "resign" : "terminate";
       return await apiClient.patch(`/employees/${id}/${endpoint}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم نقل الموظف للأرشيف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -327,9 +337,11 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
         terminationNotes: payload.notes,
       });
     },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       const message = (response as unknown as { data?: { message?: string } }).data?.message || "تم الإقالة الجماعية بنجاح";
       toast.success(message);
     },
@@ -343,8 +355,10 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     mutationFn: async (id: string) => {
       return await apiClient.patch(`/employees/${id}/settle`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
     },
     onError: (error: unknown) => {
@@ -368,6 +382,7 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
 // يستخدم نقطة النهاية المخصصة GET /employees/resigned بدلاً من القائمة العامة
 export const useResignedEmployees = () => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const query = useQuery<Employee[]>({
     queryKey: ['resigned-employees'],
@@ -397,8 +412,11 @@ export const useResignedEmployees = () => {
     mutationFn: async (id: string) => {
       return await apiClient.patch(`/employees/${id}/settle`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      router.refresh();
       toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
     },
     onError: (error: unknown) => {

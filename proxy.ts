@@ -12,7 +12,7 @@ const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 // Very short timeout for session checks to not block page loads
 const SESSION_CHECK_TIMEOUT_MS = IS_DEVELOPMENT ? 500 : 1_000;
 // Longer cache for successful sessions
-const SESSION_SUCCESS_CACHE_TTL_MS = 30 * 60 * 1_000; // 30 minutes
+const SESSION_SUCCESS_CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
 const SESSION_FAILURE_CACHE_TTL_MS = 5_000;
 const SESSION_RATE_LIMIT_CACHE_TTL_MS = 15_000;
 const SESSION_CACHE_MAX_ENTRIES = 512;

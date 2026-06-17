@@ -138,7 +138,7 @@ export default function DashboardPage() {
   const isSkeleton = isLoading;
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [_isModalLoading, _setIsModalLoading] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -147,7 +147,7 @@ export default function DashboardPage() {
   const [editingDeptData, setEditingDeptData] = useState<import("@/components/AddDepartmentModal").DeptFormData | null>(null);
   const [isDeletingDept, setIsDeletingDept] = useState<string | null>(null);
 
-  const toNumber = (value: unknown) => {
+  const _toNumber = (value: unknown) => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;

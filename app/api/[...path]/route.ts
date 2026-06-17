@@ -1,3 +1,8 @@
+// ─── منع Next.js من كوشرة أي طلب GET بالكامل ───────────────────────────────
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
@@ -53,6 +58,11 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
   Object.entries(corsHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
+
+  // ─── إجبار المتصفح وأي CDN على عدم كوشرة استجابات الـ API ───────────────
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  // ─────────────────────────────────────────────────────────────────────────
 
   return headers;
 };

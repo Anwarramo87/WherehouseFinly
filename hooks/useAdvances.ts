@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { Advance, AdvanceInput } from "@/types/advance";
@@ -7,6 +8,7 @@ import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export const useAdvances = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const advancesQuery = useQuery<Advance[]>({
     queryKey: ["advances", employeeId || "all", period || "current"],
@@ -30,8 +32,11 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       };
       return await apiClient.post("/advances", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تمت إضافة السلفة بنجاح");
     },
     onError: (error: unknown) => {
@@ -48,8 +53,11 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       };
       return await apiClient.put(`/advances/${id}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم تحديث السلفة");
     },
     onError: (error: unknown) => {
@@ -61,8 +69,11 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/advances/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم نقل السلفة إلى سلة المهملات");
     },
     onError: (error: unknown) => {

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { Bonus, BonusInput } from "@/types/bonus";
@@ -7,6 +8,7 @@ import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export const useBonuses = (params?: { employeeId?: string; period?: string }) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const bonusesQuery = useQuery<Bonus[]>({
     queryKey: ["bonuses", params?.employeeId || "all", params?.period || "all-periods"],
@@ -58,8 +60,11 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
       };
       return await apiClient.post("/bonuses", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تمت إضافة المكافأة بنجاح");
     },
     onError: (error: unknown) => {
@@ -77,8 +82,11 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
       };
       return await apiClient.put(`/bonuses/${id}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم تحديث المكافأة");
     },
     onError: (error: unknown) => {
@@ -90,8 +98,11 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/bonuses/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم نقل المكافأة إلى سلة المهملات");
     },
     onError: (error: unknown) => {

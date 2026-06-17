@@ -3,8 +3,8 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Trash2, RotateCcw, XCircle, Search, ChevronLeft,
-  Filter, Loader2, AlertTriangle, Clock
+  Trash2, RotateCcw, XCircle, Search,
+  Loader2, Clock
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
@@ -14,6 +14,7 @@ interface DeletedRecord {
   id: string;
   entityType: string;
   entityId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entityData: any;
   deletedBy?: string;
   deletedAt: string;
@@ -46,7 +47,7 @@ export default function TrashPage() {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const { data: typesData = [], isLoading: typesLoading } = useQuery({
+  const { data: typesData = [], isLoading: _typesLoading } = useQuery({
     queryKey: ["trash", "types"],
     queryFn: () => apiClient.get("/trash/types").then((r) => r.data),
   });
@@ -54,7 +55,7 @@ export default function TrashPage() {
   const { data: trashData, isLoading } = useQuery({
     queryKey: ["trash", "list", typeFilter, period],
     queryFn: () => {
-      const params: any = { limit: 200 };
+      const params: Record<string, unknown> = { limit: 200 };
       if (typeFilter) params.entityType = typeFilter;
       if (period) {
         const [y, m] = period.split("-").map(Number);
@@ -81,7 +82,7 @@ export default function TrashPage() {
     },
   });
 
-  const records: DeletedRecord[] = trashData?.data || [];
+  const records: DeletedRecord[] = useMemo(() => trashData?.data || [], [trashData?.data]);
   const types: { entityType: string; count: number }[] = typesData || [];
 
   const filteredRecords = useMemo(() => {

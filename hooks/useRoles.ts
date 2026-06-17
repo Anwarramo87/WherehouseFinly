@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
-import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { QUERY_GC_TIME } from "@/lib/query-cache";
 
-// Use QUERY_STALE_TIME for consistency
-const STALE_TIME = QUERY_STALE_TIME.STANDARD;
+// Roles rarely change — 10 minutes staleTime
+const STALE_TIME = 10 * 60 * 1000;
 
 export type RoleOption = {
   id: string;

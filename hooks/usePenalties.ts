@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Penalty } from "@/types/penalty";
@@ -16,6 +17,7 @@ export const usePenalties = (params?: {
   period?: string;
 }) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const penaltiesQuery = useQuery<PenaltyRecord[]>({
     queryKey: [
@@ -62,8 +64,11 @@ export const usePenalties = (params?: {
       };
       return await apiClient.post("/penalties", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تمت إضافة العقوبة بنجاح");
     },
     onError: (error: unknown) => {
@@ -81,8 +86,11 @@ export const usePenalties = (params?: {
       };
       return await apiClient.put(`/penalties/${id}`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["penalties"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم تحديث العقوبة");
     },
     onError: (error: unknown) => {

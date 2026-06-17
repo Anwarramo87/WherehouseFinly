@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -44,6 +45,7 @@ const mapBackendKindToType = (record: Record<string, unknown>): { type: string; 
 
 export const useDiscounts = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const query = useQuery<DiscountRecord[]>({
     queryKey: ["discounts", employeeId || "all", period || "current"],
@@ -97,8 +99,10 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
 
       return await apiClient.post("/discounts", body);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم إضافة الخصم بنجاح");
     },
     onError: (error: unknown) => {
@@ -126,8 +130,10 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
 
       return await apiClient.put(`/bonuses/${id}`, body);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم تحديث الخصم بنجاح");
     },
     onError: (error: unknown) => {
@@ -140,8 +146,10 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       const backendKind = kind === "advance" ? "advance" : "assistance";
       return await apiClient.delete(`/discounts/${id}?kind=${backendKind}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم نقل الخصم إلى سلة المهملات");
     },
     onError: (error: unknown) => {

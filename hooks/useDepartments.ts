@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/http/api';
 
 interface Department {
@@ -15,6 +16,7 @@ interface DepartmentsResponse {
 
 export const useDepartments = () => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const listQuery = useQuery({
     queryKey: ['departments'],
@@ -25,7 +27,7 @@ export const useDepartments = () => {
       // fallback: if API returns array directly
       return { departments: Array.isArray(data) ? data : [] };
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000, // 5 minutes — departments change rarely
   });
 
   const createMutation = useMutation({
@@ -33,9 +35,10 @@ export const useDepartments = () => {
       // backend DTO accepts only { name }
       return await api.post('/departments', { name: payload.name });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      await queryClient.invalidateQueries({ queryKey: ['employees'] });
+      router.refresh();
     },
   });
 
@@ -43,8 +46,9 @@ export const useDepartments = () => {
     mutationFn: async ({ id, name, date }: { id: string; name: string; date?: string }) => {
       return await api.put(`/departments/${id}`, { name, ...(date && { date }) });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      router.refresh();
     },
   });
 
@@ -52,8 +56,9 @@ export const useDepartments = () => {
     mutationFn: async (id: string) => {
       return await api.delete(`/departments/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      router.refresh();
     },
   });
 

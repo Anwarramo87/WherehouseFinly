@@ -6,7 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   Download, FileSpreadsheet, Wallet, Receipt,
-  HandCoins, Calendar as CalendarIcon,
+  HandCoins,
   ChevronLeft, Search, AlertTriangle, Info, Play,
   UserMinus, ExternalLink,
 } from "lucide-react";
@@ -173,7 +173,7 @@ function PayrollVirtualTable({
   "use no memo";
   const parentRef = React.useRef<HTMLDivElement>(null);
 
-  const rowVirtualizer = useVirtualizer({
+  const rowVirtualizer = useVirtualizer({ // eslint-disable-line react-hooks/incompatible-library
     count: allRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index: number) => {

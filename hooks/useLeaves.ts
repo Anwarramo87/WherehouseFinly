@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -37,6 +38,7 @@ export type LeaveInput = {
 
 export const useLeaves = (params?: { employeeId?: string; status?: string; leaveType?: string; startDate?: string; endDate?: string }) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const leavesQuery = useQuery<LeaveRequest[]>({
     queryKey: ["leaves", params?.employeeId || "all", params?.status || "all-statuses", params?.leaveType || "all-types", params?.startDate || "no-start", params?.endDate || "no-end"],
@@ -78,8 +80,10 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
     mutationFn: async (payload: LeaveInput) => {
       return await apiClient.post("/leaves", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تمت إضافة طلب الإجازة بنجاح");
     },
     onError: (error: unknown) => {
@@ -91,8 +95,10 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
     mutationFn: async ({ id, data }: { id: string; data: Partial<LeaveInput> }) => {
       return await apiClient.patch(`/leaves/${id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم تحديث طلب الإجازة");
     },
     onError: (error: unknown) => {
@@ -104,8 +110,10 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/leaves/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      router.refresh();
       toast.success("تم نقل طلب الإجازة إلى سلة المهملات");
     },
     onError: (error: unknown) => {
