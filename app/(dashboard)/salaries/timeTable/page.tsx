@@ -266,12 +266,12 @@ export default function TimeTablePage() {
     periodEnd: periodEnd ?? "",
   });
 
-  // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
-  const { data: monthlyAttendanceData, markAttendance } = useAttendance({
-    startDate: periodStart,
-    endDate: periodEnd,
-    limit: 200,
-  });
+// جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
+   const { data: monthlyAttendanceData } = useAttendance({
+     startDate: periodStart,
+     endDate: periodEnd,
+     limit: 200,
+   });
 
   // جلب الإجازات الشهرية لعرض حالتها وإضافة الإجازات المدفوعة للراتب
   const { data: monthlyLeaves = [] } = useLeaves({
@@ -506,7 +506,7 @@ export default function TimeTablePage() {
         unpaidLeaveDays,
       };
     });
-    }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, localPresentDaysMap]);
+    }, [employees, payrollInputs, autoDeductions, salaryMap, employeeLeavesMap, localPresentDaysMap, monthlyLeaves, periodStart, periodEnd]);
 
 
   const filteredRecords = useMemo(() => {

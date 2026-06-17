@@ -78,11 +78,16 @@ export default function FinancialSettlementModal({
 
   useEffect(() => {
     if (isOpen) {
-      const newFormData = {
+      const newFormData: SettlementData = {
         ...defaultFormState,
         settlementDate: new Date().toISOString().split('T')[0],
+        // ← الإضافة الحاسمة: نقل بيانات initialSettlementData للفورم
+        ...(initialSettlementData != null ? {
+          finalSalaryAmount: parseFloat(String(initialSettlementData.earnedSalary ?? 0)) || 0,
+          bonuses: parseFloat(String(initialSettlementData.bonuses ?? 0)) || 0,
+          deductions: parseFloat(String(initialSettlementData.deductions ?? 0)) || 0,
+        } : {}),
       };
-      // Use a timeout to avoid setState during render
       setTimeout(() => {
         setFormData(newFormData);
         setFinalSalaryError("");
@@ -90,7 +95,7 @@ export default function FinancialSettlementModal({
         setBonusesError("");
       }, 0);
     }
-  }, [isOpen]);
+  }, [isOpen, initialSettlementData]);
 
   if (!isOpen || !isMounted) return null;
 

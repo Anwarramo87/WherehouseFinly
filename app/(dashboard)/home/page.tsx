@@ -21,7 +21,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
-import { useDiscounts } from '@/hooks/useDiscounts';
+import { usePenalties } from '@/hooks/usePenalties';
 import { Employee } from '@/types/employee';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -133,13 +133,18 @@ export default function DashboardPage() {
   const isSkeleton = isLoading;
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [isModalLoading, setIsModalLoading] = useState(false);
+
+  const [_isModalLoading, setIsModalLoading] = useState(false);
+
+  void setIsModalLoading;
 
   const queryClient = useQueryClient();
 
-  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
 
-  const toNumber = (value: unknown) => {
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<DepartmentData | null>(null);
+
+  const _toNumber = (value: unknown) => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
       const raw = (value as { $numberDecimal?: string }).$numberDecimal;
@@ -187,7 +192,7 @@ export default function DashboardPage() {
   }, []);
 
   const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
-  const { data: discounts = [] } = useDiscounts(undefined, undefined, canViewFinancialRecords);
+  const { data: penaltiesData = [] } = usePenalties();
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];
@@ -208,7 +213,7 @@ export default function DashboardPage() {
         return {
           advanceId: advance.id,
           employeeId: advance.employeeId,
-          name: `${employee.name} - ${advance.employeeId}`,
+          name: employee.name,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
@@ -225,32 +230,35 @@ export default function DashboardPage() {
   }, [advances, employeeListMemo, monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
-    const monthRecords = discounts.filter((record) => (record.date || "").startsWith(monthKey));
-    const source = monthRecords.length > 0 ? monthRecords : discounts;
+    const monthRecords = penaltiesData.filter((record) => (record.issueDate || "").startsWith(monthKey));
+    const source = monthRecords.length > 0 ? monthRecords : penaltiesData;
 
     return source
-      .sort((a, b) => (b.date || b.createdAt || "").localeCompare(a.date || a.createdAt || ""))
+      .sort((a, b) => (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""))
       .slice(0, 6)
       .map((penalty): EmployeePenalty | null => {
         const employee = employeeListMemo.find((emp) => emp.employeeId === penalty.employeeId);
         if (!employee?.name) return null;
+        const amountNum = penalty.amount && typeof penalty.amount === 'object' && '$numberDecimal' in penalty.amount
+          ? Number(penalty.amount.$numberDecimal || 0)
+          : Number(penalty.amount ?? 0);
         return {
           penaltyId: penalty.id,
           employeeId: penalty.employeeId,
-          name: `${employee.name} - ${penalty.employeeId}`,
+          name: employee.name,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
-          reason: penalty.notes || penalty.type || (penalty.kind === "advance" ? "سلفة" : "عقوبة"),
+          reason: penalty.reason || penalty.category || "عقوبة",
           severity: "moderate" as const,
-          amount: Number(penalty.amount ?? 0),
-          date: (penalty.date || penalty.createdAt || "").slice(0, 10),
+          amount: amountNum,
+          date: (penalty.issueDate || "").slice(0, 10),
           issuedBy: "",
           status: "active" as const,
           avatar: undefined,
         };
       })
       .filter((item): item is EmployeePenalty => Boolean(item));
-  }, [discounts, employeeListMemo, monthKey]);
+  }, [penaltiesData, employeeListMemo, monthKey]);
 
   const { data: deptsData } = useDepartments();
 
@@ -398,7 +406,10 @@ export default function DashboardPage() {
               </div>
               <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
               <button
-                onClick={() => setIsDeptModalOpen(true)}
+                onClick={() => {
+                  setSelectedDepartment(null);
+                  setIsDeptModalOpen(true);
+                }}
                 className="mr-auto px-4 py-2 bg-[#1a2530] text-[#C89355] rounded-xl text-xs font-black border border-[#C89355]/40 hover:bg-[#263544] transition-all active:scale-95"
               >
                 + إضافة قسم
@@ -407,6 +418,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
+
                   <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-3">
@@ -416,11 +428,20 @@ export default function DashboardPage() {
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
                     <p className="text-[11px] font-bold text-slate-500">موظف</p>
                     {canViewFinancialRecords && (
-                      <div className="flex gap-1 mt-2">
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            setSelectedDepartment(dept);
+                            setIsDeptModalOpen(true);
+                          }}
+                          className="text-[10px] text-[#C89355] hover:text-[#263544] font-bold px-2.5 py-1 rounded-lg bg-[#C89355]/10 hover:bg-[#C89355]/20 border border-[#C89355]/20 transition-all"
+                        >
+                          تعديل
+                        </button>
                         {dept.count === 0 && (
                           <button
                             onClick={() => handleDeleteDepartment(dept.id, dept.count)}
-                            className="text-[10px] text-red-400 hover:text-red-600 font-bold px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-all"
+                            className="text-[10px] text-rose-600 hover:text-rose-700 font-bold px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
                           >
                             حذف
                           </button>
@@ -499,8 +520,10 @@ export default function DashboardPage() {
         icon={UserX}
         isLoading={false}
         data={absentEmployees.map((emp) => ({
+          // useDashboard types: DashboardAbsentEmployee = {employeeId,name,department,scheduledStart}
           employeeId: emp.employeeId,
           name: emp.name,
+
           department: emp.department || '',
           profession: '',
           scheduledStart: emp.scheduledStart || '08:00',
@@ -540,6 +563,7 @@ export default function DashboardPage() {
                     <Clock size={10} /> آخر حضور: <span className="font-mono tracking-wider">{employee.lastCheckIn}</span>
                   </span>
                 )}
+                {/* lastCheckIn may be missing depending on backend payload */}
               </div>
             </div>
           </div>
@@ -656,15 +680,24 @@ export default function DashboardPage() {
         )}
       />
 
-      {/* Add Department Modal */}
+      {/* Add/Edit Department Modal */}
       {isDeptModalOpen && (
         <AddDepartmentModal
           isOpen={isDeptModalOpen}
-          onClose={() => setIsDeptModalOpen(false)}
-          onSave={async (data) => {
-            await apiClient.post('/departments', { name: data.name });
+          onClose={() => {
+            setIsDeptModalOpen(false);
+            setSelectedDepartment(null);
+          }}
+          initialData={selectedDepartment ? {
+            id: selectedDepartment.id,
+            name: selectedDepartment.name,
+            manager: selectedDepartment.manager || '',
+            date: new Date().toISOString().split('T')[0],
+          } : null}
+          onSave={async () => {
             queryClient.invalidateQueries({ queryKey: ['departments'] });
             setIsDeptModalOpen(false);
+            setSelectedDepartment(null);
           }}
         />
       )}

@@ -201,8 +201,8 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       const payload: Record<string, unknown> = {
         employeeId:            newEmployee.employeeId,
         name:                  newEmployee.name,
-username:              (newEmployee as unknown as Record<string, unknown>).username,
-         password:              (newEmployee as unknown as Record<string, unknown>).password,
+        username:              (newEmployee as unknown as Record<string, unknown>).username,
+        password:              (newEmployee as unknown as Record<string, unknown>).password,
         mobile:                newEmployee.mobile,
         nationalId:            newEmployee.nationalId,
         dateOfBirth:           newEmployee.dateOfBirth,
@@ -235,19 +235,35 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
         if (payload[key] === undefined) delete payload[key];
       });
 
-      return await apiClient.post("/employees", payload);
+      console.log('Creating employee with payload:', payload);
+      const response = await apiClient.post("/employees", payload);
+      console.log('Employee created response:', response);
+      return response;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+    onSuccess: async (response) => {
+      console.log('onSuccess called, invalidating queries');
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
+      console.error('Create employee error:', error);
       let finalMessage = getErrorMessage(error, "حدث خطأ غير متوقع");
+
       if (finalMessage.includes("employeeId must match")) {
         finalMessage = "خطأ: يجب أن يبدأ كود الموظف بـ EMP متبوعاً بأرقام (مثال: EMP001)";
       }
-      toast.error(finalMessage, { duration: 5000 });
+
+      // Backend: 400 Employee ID already exists
+      if (
+        finalMessage.includes("Employee ID already exists") ||
+        (finalMessage.includes("already exists") && finalMessage.includes("Employee ID"))
+      ) {
+        finalMessage = "خطأ: كود الموظف موجود مسبقاً. لازم يكون employeeId جديد (النظام لن يسمح بتكراره).";
+      }
+
+
+      toast.error(finalMessage, { duration: 8000 });
     }
   });
 

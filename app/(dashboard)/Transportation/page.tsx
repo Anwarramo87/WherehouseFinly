@@ -224,7 +224,7 @@ export default function TransportationPage() {
           fetchingRef.current.delete(id);
         });
     });
-  }, [buses, stableGetBus]);
+  }, [buses, stableGetBus, busDetails]);
 
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex flex-col overflow-hidden" dir="rtl">

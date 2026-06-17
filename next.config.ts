@@ -151,13 +151,24 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // تم التصحيح: تطبيق الـ Cache على الملفات الثابتة فقط لتجنب تخزين الـ API أو الصفحات الديناميكية
-        source: "/:path*",
+        // Cache للملفات الثابتة فقط (_next/static)
+        source: "/_next/static/:path*",
         locale: false,
         headers: [
           {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // منع Cache للصفحات الديناميكية
+        source: "/((?!_next/static).*)",
+        locale: false,
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
           },
         ],
       },

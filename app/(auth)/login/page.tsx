@@ -286,10 +286,17 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="flex justify-start w-full px-1">
+              <div className="flex justify-between items-center w-full px-1">
                 <button type="button" className="text-xs font-bold text-[#C89355] hover:text-[#a67741] transition-colors">
                   نسيت كلمة المرور؟
                 </button>
+                <a 
+                  href="/clear-cache" 
+                  className="text-xs font-bold text-slate-400 hover:text-[#263544] transition-colors"
+                  title="إذا كنت تواجه مشاكل في تسجيل الدخول"
+                >
+                  مسح الذاكرة المؤقتة
+                </a>
               </div>
 
               {/* زر الدخول بلون الجلد/الذهبي الخاص بالماركة */}

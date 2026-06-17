@@ -3,10 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 import apiClient from "@/lib/api-client";
+import { getApiErrorMessage } from "@/lib/http/error";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
 import { toLocalDateString } from "@/lib/date-time";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export type AttendanceSource = "manual" | "device";
 export type AttendanceType = "IN" | "OUT";
@@ -174,14 +174,13 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
 
   // Calculate date range from period (YYYY-MM) if provided
   const { periodStart, periodEnd } = useMemo(() => {
-    if (params?.period) {
-      const [year, month] = params.period.split("-").map(Number);
-      const start = `${year}-${String(month).padStart(2, "0")}-01`;
-      const endDay = new Date(year, month, 0).getDate();
-      const end = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
-      return { periodStart: start, periodEnd: end };
-    }
-    return { periodStart: undefined, periodEnd: undefined };
+    const period = params?.period;
+    if (!period) return { periodStart: undefined, periodEnd: undefined };
+    const [year, month] = period.split("-").map(Number);
+    const start = `${year}-${String(month).padStart(2, "0")}-01`;
+    const endDay = new Date(year, month, 0).getDate();
+    const end = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
+    return { periodStart: start, periodEnd: end };
   }, [params?.period]);
 
   const singleDayFromRange =
@@ -243,6 +242,12 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         let records: AttendanceRecord[] = Array.isArray(res.data?.records) ? res.data.records : [];
         const pagination = res.data;
 
+        console.log('📊 Attendance API Response:', {
+          recordsCount: records.length,
+          params: requestParams,
+          sample: records.slice(0, 2)
+        });
+
         // عند عدم تحديد صفحة: حمّل جميع الصفحات لتجنب نقصان السجلات بسبب pagination.
         if (!params?.page && pagination?.pages && pagination.pages > 1) {
           for (let page = 2; page <= pagination.pages; page += 1) {
@@ -258,6 +263,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           dailyRecords: toDailyRecords(records, resolvedStartDate, resolvedEndDate),
         };
       } catch (error: unknown) {
+        console.error('❌ Attendance API Error:', error);
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
 
         // Fallback: بعض بيئات الخادم ترفض date في list endpoint
@@ -287,7 +293,9 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           };
         }
 
-        throw new Error(getErrorMessage(error, "فشل تحميل بيانات الحضور"));
+        throw new Error(axios.isAxiosError(error)
+          ? error.response?.data?.message ?? error.message ?? "فشل تحميل بيانات الحضور"
+          : String(error ?? "فشل تحميل بيانات الحضور"));
       }
     },
     staleTime: QUERY_STALE_TIME.FAST,
@@ -304,6 +312,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 
@@ -317,6 +326,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
     },
   });
 
@@ -514,6 +524,9 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       return lastResponse;
     },
     onSuccess: () => {
+      // Invalidate and refetch immediately
+      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       toast.success("تم تسجيل الحضور بنجاح");
     },
     onError: (error: unknown, _variables, context) => {
@@ -523,12 +536,14 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         }
       }
 
-      const message = getErrorMessage(error, "فشل تسجيل الحضور");
+      const message = getApiErrorMessage(error, "فشل تسجيل الحضور");
       toast.error(message);
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       await queryClient.refetchQueries({ queryKey: ["attendance"], exact: false });
+      await queryClient.refetchQueries({ queryKey: ["dashboard"], exact: false });
     },
   });
 

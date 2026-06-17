@@ -20,9 +20,11 @@ export default function RewardsClient() {
   const { data: salaries = [] } = useSalaries();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
-  const initialDate = period ? `${period}-01` : searchParams.get("date") ?? "";
+  // لا تستخدم period هنا — فقط إذا وُجد ?date= صريح بالـ URL
+  const initialDate = searchParams.get("date") ?? "";
   const initialAllEmployees = searchParams.get("allEmployees") === "true";
-  const shouldOpenOnLoad = Boolean(initialEmployeeId || initialType || initialDate || initialAllEmployees);
+  // المودال يفتح فقط إذا أُرسل رابط مباشر بـ params صريحة، وليس عند كل زيارة عادية
+  const shouldOpenOnLoad = Boolean(initialEmployeeId || initialType || initialAllEmployees);
 
   type RewardRecord = {
     id: string;

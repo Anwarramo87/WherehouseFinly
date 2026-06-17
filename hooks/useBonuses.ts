@@ -8,6 +8,9 @@ import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 export const useBonuses = (params?: { employeeId?: string; period?: string }) => {
   const queryClient = useQueryClient();
 
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const isPastPeriod = params?.period ? params.period < currentPeriod : false;
+
   const bonusesQuery = useQuery<Bonus[]>({
     queryKey: ["bonuses", params?.employeeId || "all", params?.period || "all-periods"],
     queryFn: async () => {
@@ -19,6 +22,7 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
       });
       
       const data = res.data;
+      console.log('Bonuses API response:', data);
       
       // التحقق من أن البيانات array
       if (Array.isArray(data)) {
@@ -40,10 +44,11 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
         return data.data;
       }
       
+      console.warn('Bonuses API returned unexpected format:', data);
       // إرجاع array فارغ كـ fallback
       return [];
     },
-    staleTime: QUERY_STALE_TIME.RELAXED,
+    staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

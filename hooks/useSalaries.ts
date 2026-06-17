@@ -21,7 +21,9 @@ const normalizeSalary = (raw: Record<string, unknown>): Salary => {
     transportAllowance: toNumber(raw.transportAllowance),
     insuranceAmount: raw.insuranceAmount !== undefined ? toNumber(raw.insuranceAmount) : undefined,
     roundingDifference: raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,
-    monthlySalary: raw.monthlySalary !== undefined ? toNumber(raw.monthlySalary) : undefined,
+    monthlySalary: raw.monthlySalary !== undefined
+      ? toNumber(raw.monthlySalary)
+      : (toNumber(raw.baseSalary ?? 0) + toNumber(raw.livingAllowance ?? 0) + toNumber(raw.lumpSumSalary ?? 0)) || undefined,
   } as Salary;
 };
 

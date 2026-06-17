@@ -6,7 +6,10 @@ interface Department {
   name: string;
   manager?: string;
   employeeCount?: number;
+  // ملاحظة: بعض الـ APIs قد ترجع count تحت اسم مختلف
+  // لذلك يتم الاعتماد على normalisation في واجهات الاستخدام
 }
+
 
 interface DepartmentsResponse {
   departments: Department[];

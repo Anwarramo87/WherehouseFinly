@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
-import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export interface DailyViewEmployee {
   employeeId: string;

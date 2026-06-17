@@ -3,8 +3,8 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Trash2, RotateCcw, XCircle, Search, ChevronLeft,
-  Filter, Loader2, AlertTriangle, Clock
+  Trash2, RotateCcw, XCircle, Search,
+  Loader2, Clock
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
@@ -14,7 +14,7 @@ interface DeletedRecord {
   id: string;
   entityType: string;
   entityId: string;
-  entityData: any;
+  entityData: Record<string, unknown>;
   deletedBy?: string;
   deletedAt: string;
   restoredAt?: string;
@@ -40,21 +40,22 @@ export default function TrashPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
-  const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const { data: typesData = [], isLoading: typesLoading } = useQuery({
-    queryKey: ["trash", "types"],
-    queryFn: () => apiClient.get("/trash/types").then((r) => r.data),
+  const { data: types = [] } = useQuery({
+    queryKey: ["trash", "types", period],
+    query: false,
+    queryFn: () => apiClient.get("/trash/types", { params: { period } }).then((r) => r.data),
   });
 
   const { data: trashData, isLoading } = useQuery({
-    queryKey: ["trash", "list", typeFilter, period],
-    queryFn: () => {
-      const params: any = { limit: 200 };
+     queryKey: ["trash", "list", typeFilter, period],
+     queryFn: () => {
+       const params: Record<string, string | number> = { limit: 200 };
       if (typeFilter) params.entityType = typeFilter;
       if (period) {
         const [y, m] = period.split("-").map(Number);
@@ -81,10 +82,10 @@ export default function TrashPage() {
     },
   });
 
-  const records: DeletedRecord[] = trashData?.data || [];
   const types: { entityType: string; count: number }[] = typesData || [];
 
   const filteredRecords = useMemo(() => {
+    const records: DeletedRecord[] = trashData?.data || [];
     if (!searchTerm) return records;
     const term = searchTerm.toLowerCase();
     return records.filter((r) => {
@@ -96,7 +97,7 @@ export default function TrashPage() {
         r.entityType.includes(term)
       );
     });
-  }, [records, searchTerm]);
+  }, [trashData, searchTerm]);
 
   const handleRestore = async (id: string) => {
     await restoreMutation.mutateAsync(id);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { useRoles } from "@/hooks/useRoles";
 import useDepartments from '@/hooks/useDepartments';
 import type { Employee } from "@/types/employee";
@@ -57,6 +58,7 @@ interface Props {
   isPending: boolean;
   initialData?: EmployeeWithExtendedFields | null;
   nextSuggestedId?: string;
+  existingIds?: string[];
 }
 
 const defaultFormState = {
@@ -77,13 +79,13 @@ const defaultFormState = {
   residence: "",
 };
 
-export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001" }: Props) {
+export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001", existingIds = [] }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
+  const [idError, setIdError] = useState("");
   const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
   const { data: deptsData } = useDepartments();
-  const hasInitializedRole = useRef(false);
   const prevIsOpen = useRef(isOpen);
 
   const buildFormState = useCallback((employee?: EmployeeWithExtendedFields | null) => {
@@ -93,7 +95,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
         name: employee.name || "",
         username: employee.username || employee.name || "",
         mobile: employee.mobile || "",
-        birthDate: normalizeDateValue(employee.dateOfBirth || employee.birthDate),
+        birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
         gender: employee.gender || "male",
         jobTitle: employee.jobTitle || employee.profession || "",
         department: employee.department || "قسم القص",
@@ -113,6 +115,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     };
   }, [nextSuggestedId]);
 
+  const [formData, setFormData] = useState(() => buildFormState(initialData));
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -122,34 +126,22 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
-  const [formData, setFormData] = useState(() => buildFormState(initialData));
-
-
   useEffect(() => {
     if (!isOpen && prevIsOpen.current) {
-      // Use setTimeout to avoid setState during render
-      const timer = setTimeout(() => {
-        setStep(1);
-        hasInitializedRole.current = false;
-      }, 0);
-      return () => clearTimeout(timer);
+      setStep(1);
     }
     prevIsOpen.current = isOpen;
   }, [isOpen]);
 
-  // Initialize role when modal opens
   useEffect(() => {
-    if (isOpen && !hasInitializedRole.current && !formData.roleId && roleOptions.length > 0) {
-      const timer = setTimeout(() => {
-        setFormData((prev) => ({ ...prev, roleId: roleOptions[0]?.id || "" }));
-        setRoleError("");
-        hasInitializedRole.current = true;
-      }, 0);
-      return () => clearTimeout(timer);
+    if (isOpen && !initialData) {
+      setFormData(buildFormState(null));
+      const newIdError = existingIds.includes(nextSuggestedId)
+        ? "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود."
+        : "";
+      setIdError(newIdError);
     }
-  }, [isOpen, roleOptions, formData.roleId]);
-
-
+  }, [isOpen, initialData, nextSuggestedId, existingIds, buildFormState]);
 
   const validateMobile = (number: string) => {
     const isValid = /^09[0-9]{8}$/.test(number);
@@ -162,7 +154,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   };
 
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '');
+    const val = e.target.value.replace(/\\D/g, '');
     setFormData({ ...formData, mobile: val });
     if (mobileError && /^09[0-9]{8}$/.test(val)) {
       setMobileError("");
@@ -173,6 +165,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (idError) {
+      toast.error(idError);
+      return;
+    }
     if (step === 1) {
       if (!validateMobile(formData.mobile)) return;
       setStep(2);
@@ -257,11 +253,13 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <input
                   type="text" placeholder="مثال: EMP001" required pattern="^EMP[0-9]{3,}$"
                   readOnly
-                  className="w-full p-3.5 bg-[#1a2530]/80 border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed"
+                  className={`w-full p-3.5 bg-[#1a2530]/80 border rounded-xl focus:ring-2 outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed ${idError ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500' : 'border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]'
+                    }`}
                   dir="ltr"
                   value={formData.employeeId}
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                 />
+                {idError && <p className="text-xs text-rose-400 font-bold mt-1.5">{idError}</p>}
               </div>
 
               <div>
@@ -290,8 +288,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                   <UserCircle className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
               </div>
-
-              
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>

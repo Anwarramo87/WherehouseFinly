@@ -82,9 +82,10 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
 
     if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
 
-    // Fallback: use backend-computed monthlySalary from salary record
-    if (salaryRecord.monthlySalary && Number.isFinite(salaryRecord.monthlySalary) && salaryRecord.monthlySalary > 0) {
-      return salaryRecord.monthlySalary;
+    // Fallback: compute from g3 = baseSalary + livingAllowance + lumpSumSalary
+    const g3 = (salaryRecord.baseSalary ?? 0) + (salaryRecord.livingAllowance ?? 0) + (salaryRecord.lumpSumSalary ?? 0);
+    if (g3 > 0) {
+      return g3;
     }
   }
 
@@ -96,7 +97,7 @@ export default function EmployeesPage() {
   const { data: employees, isLoading, isError, error, refetch, createEmployee, updateEmployee, terminateEmployee, bulkTerminateDepartment } = useEmployees({ includeTerminated: false });
   // Fetch ALL employees (including terminated/resigned) just for ID generation
   // so we never suggest an ID that already exists in the DB
-  const { data: allEmployeesForId } = useEmployees({ includeTerminated: true });
+  const { data: allEmployeesForId, refetch: refetchAllEmployees } = useEmployees({ includeTerminated: true, fetchAll: true, limit: 500 });
   const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
 
   const salaryMap = useMemo(() => {
@@ -254,15 +255,34 @@ export default function EmployeesPage() {
 
     try {
       if (selectedEmployee) {
-        // في حال التعديل
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
-        // Ensure salaries list reflects employeeSalary upsert performed by backend
-        try { await refetchSalaries(); } catch { /* best-effort */ }
+        await Promise.all([
+          refetchSalaries().catch(() => {}),
+        ]);
       } else {
-        // في حال موظف جديد
-        await createEmployee.mutateAsync(payload as Employee);
-        try { await refetchSalaries(); } catch { /* best-effort */ }
+        // منع POST ب employeeId موجود مسبقاً
+        const allIds = (Array.isArray(allEmployeesForId) ? allEmployeesForId : [])
+          .map((e) => e?.employeeId)
+          .filter(Boolean) as string[];
+
+        if (allIds.includes(normalizedEmployeeId)) {
+          toast.error("كود الموظف موجود مسبقاً. اختر كود جديد (مثال: EMP + رقم مختلف). ");
+          return;
+        }
+
+        // Create employee and wait for success
+        const result = await createEmployee.mutateAsync(payload as Employee);
+        console.log('Employee created:', result);
+        
+        // Force immediate refresh with a small delay to ensure backend has updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await Promise.all([
+          refetchSalaries().catch(err => console.error('Refetch salaries failed:', err)),
+          refetchAllEmployees().catch(err => console.error('Refetch all employees failed:', err)),
+          refetch().catch(err => console.error('Refetch employees failed:', err)),
+        ]);
       }
+
       setIsModalOpen(false);
       setSelectedEmployee(null);
     } catch (err) {
@@ -358,7 +378,12 @@ export default function EmployeesPage() {
 
               <div className="w-full md:w-auto flex justify-end">
                 <button 
-                  onClick={() => { setSelectedEmployee(null); setIsModalOpen(true); }}
+                  onClick={async () => {
+                    setSelectedEmployee(null);
+                    // Force refetch to get latest employee IDs before opening modal
+                    try { await refetchAllEmployees(); } catch { /* best-effort */ }
+                    setIsModalOpen(true);
+                  }}
                   className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group"
                 >
                   <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
@@ -493,17 +518,18 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {isModalOpen && (
-            <AddEmployeeModal 
-              key={`${isModalOpen}-${selectedEmployee?.employeeId ?? "new"}`}
-              isOpen={isModalOpen} 
-              onClose={() => { setIsModalOpen(false); setSelectedEmployee(null); }} 
-              onSave={handleSaveEmployee}
-              isPending={createEmployee.isPending || updateEmployee.isPending}
-              initialData={selectedEmployeeForModal}
-              nextSuggestedId={suggestedEmployeeId} // الكود الآمن المحسوب
-            />
-          )}
+{isModalOpen && (
+           <AddEmployeeModal 
+               key={`${isModalOpen}-${selectedEmployee?.employeeId ?? "new"}-${suggestedEmployeeId}`}
+               isOpen={isModalOpen} 
+               onClose={() => { setIsModalOpen(false); setSelectedEmployee(null); }} 
+               onSave={handleSaveEmployee}
+               isPending={createEmployee.isPending || updateEmployee.isPending}
+               initialData={selectedEmployeeForModal}
+               nextSuggestedId={suggestedEmployeeId}
+               existingIds={Array.isArray(allEmployeesForId) ? allEmployeesForId.map(e => e.employeeId) : []}
+             />
+           )}
 
           {isFireModalOpen && employeeToFire && (
             <FireEmployeeModal 

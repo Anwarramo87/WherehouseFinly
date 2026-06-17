@@ -50,13 +50,14 @@ const formatDate = (date: string) => {
   return `${day}/${month}/${year}`;
 };
 
-const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
+const _getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
   if (!checkIn) return "absent";
   const ci = toMinutes(checkIn);
   const sc = toMinutes(scheduledStart || "08:00");
   if (ci === null || sc === null) return "present";
   return ci > sc + 5 ? "late" : "present";
 };
+void _getStatus;
 
 const statusUi: Record<TableStatus, { label: string; classes: string }> = {
   present: { label: "حاضر", classes: "text-[#C89355] bg-[#1a2530] border-[#C89355]/30 shadow-sm" },
@@ -179,8 +180,12 @@ export default function AttendancePage() {
       const leaveStatus = leavesMap.get(employeeId);
 
       const rawStatus: TableStatus = dv?.status === "late" ? "late" : dv?.status === "present" ? "present" : "absent";
+      // فقط الإجازات المدفوعة الفعلية تحوّل الغائب لحاضر
+      const PAID_LEAVE_TYPES = ["PAID", "SICK", "ADMIN", "DEATH"];
       const effectiveStatus: TableStatus =
-        rawStatus === "absent" && leaveStatus && leaveStatus.length > 0
+        rawStatus === "absent" &&
+        leaveStatus &&
+        leaveStatus.some((lt) => PAID_LEAVE_TYPES.includes(lt))
           ? "present"
           : rawStatus;
 

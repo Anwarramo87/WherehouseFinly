@@ -17,6 +17,9 @@ export const usePenalties = (params?: {
 }) => {
   const queryClient = useQueryClient();
 
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const isPastPeriod = params?.period ? params.period < currentPeriod : false;
+
   const penaltiesQuery = useQuery<PenaltyRecord[]>({
     queryKey: [
       "penalties",
@@ -36,7 +39,7 @@ export const usePenalties = (params?: {
       });
       return Array.isArray(res.data) ? res.data : [];
     },
-    staleTime: QUERY_STALE_TIME.RELAXED,
+    staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

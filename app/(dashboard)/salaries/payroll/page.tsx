@@ -6,7 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   Download, FileSpreadsheet, Wallet, Receipt,
-  HandCoins, Calendar as CalendarIcon,
+  HandCoins,
   ChevronLeft, Search, AlertTriangle, Info, Play,
   UserMinus, ExternalLink,
 } from "lucide-react";
@@ -353,7 +353,7 @@ export default function PayrollPage() {
         },
       };
     });
-  }, [employees, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localLateMinutesMap]);
+  }, [employees, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localLateMinutesMap, localPresentDaysMap]);
 
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
     // If we have a payroll run, use backend data
@@ -473,7 +473,7 @@ export default function PayrollPage() {
     
     // ✅ NEW: If no payroll run, use the generated preview data
     return previewData;
-  }, [reportData, salaries, bonuses, discounts, penalties, month, employees, payrollInputs, autoDeductions, localLateMinutesMap, previewData]);
+  }, [reportData, salaries, bonuses, discounts, penalties, month, employees, payrollInputs, autoDeductions, localLateMinutesMap, localPresentDaysMap, previewData]);
 
   // ── Filtering ────────────────────────────────────────────────────────────────
   const filteredPayrollData = useMemo(() => {
