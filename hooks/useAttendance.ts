@@ -527,8 +527,15 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       toast.error(message);
     },
     onSettled: async () => {
+      // Invalidate all attendance queries (broad match)
       await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
       await queryClient.refetchQueries({ queryKey: ["attendance"], exact: false });
+
+      // Explicitly refetch daily-view after a short delay to ensure DB write is visible
+      // (the daily-view endpoint reads directly from the DB, so replication lag can cause stale reads)
+      setTimeout(() => {
+        void queryClient.refetchQueries({ queryKey: ["attendance", "daily-view"], exact: false });
+      }, 600);
 
       // ── Invalidate deductions after a short delay to account for fire-and-forget
       //    aggregation on the backend (EARLY_LEAVE_MINUTES may not be written yet) ──

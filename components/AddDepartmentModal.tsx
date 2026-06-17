@@ -78,7 +78,13 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
       await onSave(form);
     } catch (error) {
       console.error("فشل حفظ القسم:", error);
-      setErrorMessage("تعذر حفظ القسم حالياً. حاول مرة أخرى.");
+      // Handle 409 Conflict (department name already exists)
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        setErrorMessage(`القسم "${form.name}" موجود بالفعل. يرجى استخدام اسم آخر.`);
+      } else {
+        setErrorMessage("تعذر حفظ القسم حالياً. حاول مرة أخرى.");
+      }
     } finally {
       setIsSubmitting(false);
     }

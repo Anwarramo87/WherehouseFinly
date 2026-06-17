@@ -247,8 +247,11 @@ export default function AttendancePage() {
       checkIn: field === "checkIn" ? normalizedValue : undefined,
       checkOut: field === "checkOut" ? normalizedValue : undefined,
       source: "manual",
+    }, {
+      onSuccess: () => {
+        setTimeModal({ isOpen: false, row: null, field: null, value: "" });
+      },
     });
-    setTimeModal({ isOpen: false, row: null, field: null, value: "" });
   };
 
   // إضافة يوم كامل (IN + OUT) بوقت الدوام المجدول — للاختبار
@@ -258,15 +261,18 @@ export default function AttendancePage() {
       return;
     }
     const scheduledStart = employeeScheduleMap.get(row.employeeId) || "08:00";
-    const scheduledEnd = "16:00"; // fallback — يمكن قراءته من Employee لاحقاً
+    const scheduledEnd = "16:00";
     markAttendance.mutate({
       employeeId: row.employeeId,
       date: row.date,
       checkIn: scheduledStart,
       checkOut: scheduledEnd,
       source: "manual",
+    }, {
+      onSuccess: () => {
+        toast.success(`تم تسجيل يوم كامل للموظف ${row.employeeName}`);
+      },
     });
-    toast.success(`تم تسجيل يوم كامل للموظف ${row.employeeName}`);
   };
 
   if (employeesLoading || leavesLoading || dailyViewLoading) return (

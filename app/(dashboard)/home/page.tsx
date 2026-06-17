@@ -15,7 +15,11 @@ import {
   Briefcase,
   ArrowLeftRight,
   X,
-  HandCoins
+  HandCoins,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  CalendarDays,
 } from "lucide-react";
 import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
@@ -43,6 +47,7 @@ interface DepartmentData {
   name: string;
   count: number;
   manager: string;
+  createdAt?: string;
 }
 
 interface OvertimeEmployee {
@@ -138,6 +143,9 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
 
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [deptMenuOpen, setDeptMenuOpen] = useState<string | null>(null);
+  const [editingDeptData, setEditingDeptData] = useState<import("@/components/AddDepartmentModal").DeptFormData | null>(null);
+  const [isDeletingDept, setIsDeletingDept] = useState<string | null>(null);
 
   const toNumber = (value: unknown) => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -173,12 +181,27 @@ export default function DashboardPage() {
   const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
     if (!deptId || count > 0) return;
     if (!window.confirm('هل أنت متأكد من نقل هذا القسم إلى سلة المهملات؟')) return;
+    setIsDeletingDept(deptId);
     try {
       await apiClient.delete(`/departments/${deptId}`);
       queryClient.invalidateQueries({ queryKey: ['departments'] });
     } catch (err) {
       console.error('Error deleting department:', err);
+    } finally {
+      setIsDeletingDept(null);
     }
+  };
+
+  const handleEditDepartment = (dept: DepartmentData) => {
+    setEditingDeptData({
+      id: dept.id,
+      name: dept.name,
+      manager: dept.manager || '',
+      date: dept.createdAt ? dept.createdAt.slice(0, 10) : new Date().toISOString().split('T')[0],
+      originalName: dept.name,
+    });
+    setDeptMenuOpen(null);
+    setIsDeptModalOpen(true);
   };
 
   const monthKey = useMemo(() => {
@@ -256,7 +279,7 @@ export default function DashboardPage() {
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
-    return apiList.map((d) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '' }));
+    return apiList.map((d) => ({ id: d.id, name: d.name, count: Number(d.employeeCount ?? 0), manager: d.manager ?? '', createdAt: d.createdAt }));
   }, [deptsData]);
 
   const stats = [
@@ -398,7 +421,7 @@ export default function DashboardPage() {
               </div>
               <h2 className="text-2xl font-black text-[#263544]">تفاصيل الأقسام</h2>
               <button
-                onClick={() => setIsDeptModalOpen(true)}
+                onClick={() => { setEditingDeptData(null); setIsDeptModalOpen(true); }}
                 className="mr-auto px-4 py-2 bg-[#1a2530] text-[#C89355] rounded-xl text-xs font-black border border-[#C89355]/40 hover:bg-[#263544] transition-all active:scale-95"
               >
                 + إضافة قسم
@@ -408,6 +431,38 @@ export default function DashboardPage() {
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
                   <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
+                  {/* 3-dot Context Menu */}
+                  {canViewFinancialRecords && (
+                    <div className="absolute top-4 left-4 z-20">
+                      <button
+                        onClick={() => { const id = dept.id; if (!id) return; setDeptMenuOpen(deptMenuOpen === id ? null : id); }}
+                        className="p-1.5 rounded-lg hover:bg-[#263544]/10 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <MoreVertical size={16} className="text-[#263544]/60" />
+                      </button>
+                      {deptMenuOpen === dept.id && (
+                        <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-200 py-1 min-w-[140px] z-50">
+                          <button
+                            onClick={() => handleEditDepartment(dept)}
+                            className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-[#263544] hover:bg-[#C89355]/10 transition-colors"
+                          >
+                            <Pencil size={14} className="text-[#C89355]" />
+                            تعديل
+                          </button>
+                          {dept.count === 0 && (
+                            <button
+                              onClick={() => { setDeptMenuOpen(null); handleDeleteDepartment(dept.id, dept.count); }}
+                              disabled={isDeletingDept === dept.id}
+                              className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 size={14} className="text-red-400" />
+                              {isDeletingDept === dept.id ? 'جارٍ الحذف...' : 'حذف'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
@@ -415,17 +470,11 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">{dept.count}</p>
                     <p className="text-[11px] font-bold text-slate-500">موظف</p>
-                    {canViewFinancialRecords && (
-                      <div className="flex gap-1 mt-2">
-                        {dept.count === 0 && (
-                          <button
-                            onClick={() => handleDeleteDepartment(dept.id, dept.count)}
-                            className="text-[10px] text-red-400 hover:text-red-600 font-bold px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-all"
-                          >
-                            حذف
-                          </button>
-                        )}
-                      </div>
+                    {dept.createdAt && (
+                      <p className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1" dir="ltr">
+                        <CalendarDays size={12} />
+                        <span className="font-mono">{new Date(dept.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      </p>
                     )}
                   </div>
                 </div>
@@ -660,11 +709,13 @@ export default function DashboardPage() {
       {isDeptModalOpen && (
         <AddDepartmentModal
           isOpen={isDeptModalOpen}
-          onClose={() => setIsDeptModalOpen(false)}
-          onSave={async (data) => {
-            await apiClient.post('/departments', { name: data.name });
+          onClose={() => { setIsDeptModalOpen(false); setEditingDeptData(null); }}
+          initialData={editingDeptData}
+          onSave={async () => {
+            // Modal handles API call internally via hook
             queryClient.invalidateQueries({ queryKey: ['departments'] });
             setIsDeptModalOpen(false);
+            setEditingDeptData(null);
           }}
         />
       )}
