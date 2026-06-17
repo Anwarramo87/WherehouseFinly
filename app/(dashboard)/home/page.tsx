@@ -25,7 +25,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import useDepartments from '@/hooks/useDepartments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAdvances } from '@/hooks/useAdvances';
-import { useDiscounts } from '@/hooks/useDiscounts';
+import { usePenalties } from '@/hooks/usePenalties';
 import { Employee } from '@/types/employee';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -138,9 +138,13 @@ export default function DashboardPage() {
   const isSkeleton = isLoading;
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [_isModalLoading, _setIsModalLoading] = useState(false);
+
+  const [_isModalLoading, setIsModalLoading] = useState(false);
+
+  void setIsModalLoading;
 
   const queryClient = useQueryClient();
+
 
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [deptMenuOpen, setDeptMenuOpen] = useState<string | null>(null);
@@ -210,7 +214,7 @@ export default function DashboardPage() {
   }, []);
 
   const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
-  const { data: discounts = [] } = useDiscounts(undefined, undefined, canViewFinancialRecords);
+  const { data: penaltiesData = [] } = usePenalties();
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];
@@ -231,7 +235,7 @@ export default function DashboardPage() {
         return {
           advanceId: advance.id,
           employeeId: advance.employeeId,
-          name: `${employee.name} - ${advance.employeeId}`,
+          name: employee.name,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
@@ -248,32 +252,35 @@ export default function DashboardPage() {
   }, [advances, employeeListMemo, monthKey]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
-    const monthRecords = discounts.filter((record) => (record.date || "").startsWith(monthKey));
-    const source = monthRecords.length > 0 ? monthRecords : discounts;
+    const monthRecords = penaltiesData.filter((record) => (record.issueDate || "").startsWith(monthKey));
+    const source = monthRecords.length > 0 ? monthRecords : penaltiesData;
 
     return source
-      .sort((a, b) => (b.date || b.createdAt || "").localeCompare(a.date || a.createdAt || ""))
+      .sort((a, b) => (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""))
       .slice(0, 6)
       .map((penalty): EmployeePenalty | null => {
         const employee = employeeListMemo.find((emp) => emp.employeeId === penalty.employeeId);
         if (!employee?.name) return null;
+        const amountNum = penalty.amount && typeof penalty.amount === 'object' && '$numberDecimal' in penalty.amount
+          ? Number(penalty.amount.$numberDecimal || 0)
+          : Number(penalty.amount ?? 0);
         return {
           penaltyId: penalty.id,
           employeeId: penalty.employeeId,
-          name: `${employee.name} - ${penalty.employeeId}`,
+          name: employee.name,
           department: employee?.department || "",
           profession: employee?.jobTitle || employee?.profession || "",
-          reason: penalty.notes || penalty.type || (penalty.kind === "advance" ? "سلفة" : "عقوبة"),
+          reason: penalty.reason || penalty.category || "عقوبة",
           severity: "moderate" as const,
-          amount: Number(penalty.amount ?? 0),
-          date: (penalty.date || penalty.createdAt || "").slice(0, 10),
+          amount: amountNum,
+          date: (penalty.issueDate || "").slice(0, 10),
           issuedBy: "",
           status: "active" as const,
           avatar: undefined,
         };
       })
       .filter((item): item is EmployeePenalty => Boolean(item));
-  }, [discounts, employeeListMemo, monthKey]);
+  }, [penaltiesData, employeeListMemo, monthKey]);
 
   const { data: deptsData } = useDepartments();
 
@@ -430,6 +437,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {departmentSummary.map((dept, index) => (
                 <div key={index} className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden">
+
                   <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
                   {/* 3-dot Context Menu */}
                   {canViewFinancialRecords && (
@@ -548,8 +556,10 @@ export default function DashboardPage() {
         icon={UserX}
         isLoading={false}
         data={absentEmployees.map((emp) => ({
+          // useDashboard types: DashboardAbsentEmployee = {employeeId,name,department,scheduledStart}
           employeeId: emp.employeeId,
           name: emp.name,
+
           department: emp.department || '',
           profession: '',
           scheduledStart: emp.scheduledStart || '08:00',
@@ -589,6 +599,7 @@ export default function DashboardPage() {
                     <Clock size={10} /> آخر حضور: <span className="font-mono tracking-wider">{employee.lastCheckIn}</span>
                   </span>
                 )}
+                {/* lastCheckIn may be missing depending on backend payload */}
               </div>
             </div>
           </div>
@@ -705,7 +716,7 @@ export default function DashboardPage() {
         )}
       />
 
-      {/* Add Department Modal */}
+      {/* Add/Edit Department Modal */}
       {isDeptModalOpen && (
         <AddDepartmentModal
           isOpen={isDeptModalOpen}

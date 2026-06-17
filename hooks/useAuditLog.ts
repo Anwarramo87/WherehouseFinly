@@ -160,8 +160,6 @@ export function useAuditLog(): UseAuditLogReturn {
 
       // In a real implementation, this would trigger a file download
       // For now, we'll just show a success message
-      console.log(`Audit trail exported as ${format}`);
-
       setState((prev) => ({ ...prev, loading: false, error: null }));
     } catch (error) {
       setState((prev) => ({

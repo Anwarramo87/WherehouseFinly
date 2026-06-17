@@ -51,6 +51,23 @@ export const clearAuthSession = () => {
   if (!isBrowser()) return;
   localStorage.removeItem(USER_KEY);
   removeCookie(ACCESS_TOKEN_KEY);
+  
+  // مسح كل الـ cache
+  try {
+    // مسح sessionStorage
+    sessionStorage.clear();
+    
+    // مسح Service Worker cache
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          caches.delete(name);
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Failed to clear cache:', error);
+  }
 };
 
 export const setAuthAccessToken = (token?: string | null) => {

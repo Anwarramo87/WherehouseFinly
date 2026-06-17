@@ -135,33 +135,9 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
-      // ─── 1. الملفات ثابتة: immutable للأبد ────────────────────────
       {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      // ─── 2. الـ API proxy: ممنوع الكوش نهائياً ──────────────────────
-      {
-        source: "/api/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-store, no-cache, must-revalidate",
-          },
-          {
-            key: "Pragma",
-            value: "no-cache",
-          },
-        ],
-      },
-      // ─── 3. كل شيء آخر (صفحات Dashboard، login، إلخ) ──────────────
-      {
-        source: "/((?!_next/static|api).*)",
+        // تطبيق مسار الحماية على كل الصفحات
+        source: "/:path*",
         headers: [
           ...securityHeaders,
           ...(isProduction
@@ -172,9 +148,27 @@ const nextConfig: NextConfig = {
                 },
               ]
             : []),
+        ],
+      },
+      {
+        // Cache للملفات الثابتة فقط (_next/static)
+        source: "/_next/static/:path*",
+        locale: false,
+        headers: [
           {
             key: "Cache-Control",
-            value: "no-store, must-revalidate",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // منع Cache للصفحات الديناميكية
+        source: "/((?!_next/static).*)",
+        locale: false,
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
           },
         ],
       },

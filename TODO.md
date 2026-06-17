@@ -1,13 +1,28 @@
-# TODO - Payroll consistency fixes (Frontend)
+# TODO - إصلاح home (الموظفون الغائبون اليوم) + الأقسام (إضافة/تعديل/حذف) + إضافة موظف
 
-- [x] app/(dashboard)/salaries/timeTable/page.tsx
-  - [x] توحيد فلترة الموظفين: استبعاد terminated/resigned فقط (نفس سياسة /employees)
-  - [x] تحديث calcEarnedSalary لإضافة overtimeRegularMinutes و overtimeWeekendDays باستخدام مضاعفات مشتركة
-  - [x] توحيد مصدر دقائق التأخير: حذف calcLateMinutes المحلي والاعتماد على autoDeductions.delayMinutes من الباك
-  - [ ] إضافة Tooltip/عمود تفصيلي معادلة الراتب لمطابقة PayrollItem بعد تشغيل الرواتب
-- [x] التأكد في pages الأخرى (timeTable uses startDate/endDate) أن requests تعتمد على نفس تصحيح الباك دون تعديلات.
-- [ ] تشغيل typecheck/lint وتجربة شهر واحد عبر:
-  - [ ] /employees
-  - [ ] /salaries/timeTable
-  - [ ] /salaries/payroll/[month]
-  - [ ] مقارنة التطابق بالأرقام
+## الخطوة 1
+- [ ] قراءة `Factory/hooks/useDashboard.ts` لمعرفة شكل `absentEmployees` القادمة من الـ hook.
+- [ ] قراءة `Factory/components/DataDrilldownModal.tsx` لمعرفة expected props وأنواع الحقول.
+- [ ] تحديد سبب عرض “الموظفون الغائبون اليوم” بشكل خاطئ في `Factory/app/(dashboard)/home/page.tsx`.
+
+## الخطوة 2
+- [ ] قراءة صفحة/كومبوننتات الأقسام داخل `Factory/app/(dashboard)/settings/**`.
+- [ ] قراءة `Factory/hooks/useDepartments.ts`.
+- [ ] قراءة `Factory/components/AddDepartmentModal.tsx`.
+- [ ] العثور على UI الخاصة بـ (تعديل/حذف) إن كانت موجودة، أو إضافتها.
+
+## الخطوة 3
+- [ ] قراءة `Factory/components/AddEmployeeModal.tsx` لمعرفة كيف يتم اختيار/إرسال القسم.
+- [ ] التأكد من استخدام `departmentId`/`department` بالشكل الصحيح.
+
+## الخطوة 4
+- [ ] تنفيذ الإصلاحات في الملفات المطلوبة.
+- [ ] تأكيد refresh بعد إضافة/تعديل/حذف (invalidate queries على نفس queryKey).
+
+## الخطوة 5
+- [ ] تشغيل التطبيق والتحقق:
+  - [ ] `/home` -> مودال “الموظفون الغائبون اليوم” يعرض حقول صحيحة (دوام مجدول/آخر حضور).
+  - [ ] `/settings` أو صفحة الأقسام -> إضافة قسم تعمل.
+  - [ ] تعديل/حذف قسم يعمل.
+  - [ ] إضافة موظف مع اختيار القسم تعمل بدون مشاكل.
+

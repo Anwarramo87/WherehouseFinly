@@ -203,8 +203,8 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       const payload: Record<string, unknown> = {
         employeeId:            newEmployee.employeeId,
         name:                  newEmployee.name,
-username:              (newEmployee as unknown as Record<string, unknown>).username,
-         password:              (newEmployee as unknown as Record<string, unknown>).password,
+        username:              (newEmployee as unknown as Record<string, unknown>).username,
+        password:              (newEmployee as unknown as Record<string, unknown>).password,
         mobile:                newEmployee.mobile,
         nationalId:            newEmployee.nationalId,
         dateOfBirth:           newEmployee.dateOfBirth,
@@ -237,9 +237,13 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
         if (payload[key] === undefined) delete payload[key];
       });
 
-      return await apiClient.post("/employees", payload);
+      console.log('Creating employee with payload:', payload);
+      const response = await apiClient.post("/employees", payload);
+      console.log('Employee created response:', response);
+      return response;
     },
-    onSuccess: async () => {
+    onSuccess: async (response) => {
+      console.log('onSuccess called, invalidating queries');
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       await queryClient.invalidateQueries({ queryKey: ["salaries"] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -247,11 +251,23 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
+      console.error('Create employee error:', error);
       let finalMessage = getErrorMessage(error, "حدث خطأ غير متوقع");
+
       if (finalMessage.includes("employeeId must match")) {
         finalMessage = "خطأ: يجب أن يبدأ كود الموظف بـ EMP متبوعاً بأرقام (مثال: EMP001)";
       }
-      toast.error(finalMessage, { duration: 5000 });
+
+      // Backend: 400 Employee ID already exists
+      if (
+        finalMessage.includes("Employee ID already exists") ||
+        (finalMessage.includes("already exists") && finalMessage.includes("Employee ID"))
+      ) {
+        finalMessage = "خطأ: كود الموظف موجود مسبقاً. لازم يكون employeeId جديد (النظام لن يسمح بتكراره).";
+      }
+
+
+      toast.error(finalMessage, { duration: 8000 });
     }
   });
 
@@ -271,11 +287,9 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
       };
       return await apiClient.put(`/employees/${id}`, payload);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم تحديث بيانات الموظف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -288,11 +302,9 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/employees/${id}`);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
       toast.success("تم نقل الموظف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
@@ -315,10 +327,8 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
       const endpoint = data.status === "resigned" ? "resign" : "terminate";
       return await apiClient.patch(`/employees/${id}/${endpoint}`, payload);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success("تم نقل الموظف للأرشيف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -337,11 +347,9 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
         terminationNotes: payload.notes,
       });
     },
-    onSuccess: async (response) => {
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
       const message = (response as unknown as { data?: { message?: string } }).data?.message || "تم الإقالة الجماعية بنجاح";
       toast.success(message);
     },
@@ -355,10 +363,8 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
     mutationFn: async (id: string) => {
       return await apiClient.patch(`/employees/${id}/settle`);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
     },
     onError: (error: unknown) => {
@@ -382,7 +388,6 @@ username:              (newEmployee as unknown as Record<string, unknown>).usern
 // يستخدم نقطة النهاية المخصصة GET /employees/resigned بدلاً من القائمة العامة
 export const useResignedEmployees = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   const query = useQuery<Employee[]>({
     queryKey: ['resigned-employees'],
@@ -412,11 +417,8 @@ export const useResignedEmployees = () => {
     mutationFn: async (id: string) => {
       return await apiClient.patch(`/employees/${id}/settle`);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
       toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
     },
     onError: (error: unknown) => {

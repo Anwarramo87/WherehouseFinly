@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays as _CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -43,11 +43,6 @@ export default function DiscountsPage() {
   const filteredDiscounts = useMemo(() => {
     let result = recordsWithNames;
 
-    // Filter by Month/Year
-    if (period) {
-      result = result.filter(d => d.date.startsWith(period));
-    }
-
     // Filter by Search Term
     if (searchTerm) {
       result = result.filter(d =>
@@ -56,7 +51,7 @@ export default function DiscountsPage() {
     }
 
     return result;
-  }, [recordsWithNames, searchTerm, period]);
+  }, [recordsWithNames, searchTerm]);
 
   const totalSum = useMemo(() => {
     return filteredDiscounts.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -281,7 +276,7 @@ export default function DiscountsPage() {
                         {isExpanded && (
                           <tr>
                             <td colSpan={5} className="p-0 border-b border-slate-200/50">
-                              <div className="bg-slate-50/80 p-6 shadow-inner border-y border-slate-200/40">
+                              <div className="bg-slate-50/80 p-6 shadow-inner border-y border-slate-200/40 overflow-x-auto">
                                 <table className="w-full text-right text-sm border border-slate-200/50 rounded-xl overflow-hidden bg-white/50">
                                   <thead className="text-[#263544] bg-slate-100/80 border-b border-slate-200/60">
                                     <tr>

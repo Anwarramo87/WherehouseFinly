@@ -10,14 +10,18 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
   const queryClient = useQueryClient();
   const router = useRouter();
 
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const isPastPeriod = period ? period < currentPeriod : false;
+
   const advancesQuery = useQuery<Advance[]>({
     queryKey: ["advances", employeeId || "all", period || "current"],
     queryFn: async () => {
       const res = await apiClient.get("/advances", { params: { employeeId, period } });
+      console.log('Advances API response:', res.data);
       return Array.isArray(res.data) ? res.data : [];
     },
     enabled,
-    staleTime: QUERY_STALE_TIME.RELAXED,
+    staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
 

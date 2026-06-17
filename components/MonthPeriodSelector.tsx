@@ -66,13 +66,14 @@ export function MonthPeriodSelector({
     return result;
   }, [value]);
 
-  const effectiveDate = selectedDate || today;
+const effectiveDate = selectedDate || today;
 
+  // Sync dropdown when value changes from parent (isDayOpen reset is intentional for UX)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDropdownValue(value);
-    setIsDayOpen(false);
-  }, [value]);
+    if (isDayOpen && selectedDate) {
+      setIsDayOpen(false);
+    }
+  }, [value, selectedDate, isDayOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

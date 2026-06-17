@@ -67,7 +67,8 @@ function LeaveManageModalContent({ onClose, leave, onUpdated }: Omit<Props, "isO
   const [mode, setMode] = useState<"view" | "edit" | "confirmDelete">("view");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
+  // Sync form state when leave prop changes - use values directly from leave prop
+  const getInitialForm = () => ({
     leaveType: leave.leaveType,
     startDate: leave.startDate?.slice(0, 10) ?? "",
     endDate:   leave.endDate?.slice(0, 10)   ?? "",

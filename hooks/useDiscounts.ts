@@ -30,7 +30,19 @@ export type DiscountPayload = {
 
 
 const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
-  // السجلات من جدول EmployeeAdvance فقط
+  // استقبال البيانات من الـ discounts endpoint الموحد
+  // السجلات تأتي بخاصية kind من الـ backend
+  if (record.kind === 'advance') {
+    const advanceType = record.advanceType as string;
+    if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
+    return { type: "سلفة", kind: "advance" as const };
+  }
+  
+  if (record.kind === 'assistance') {
+    return { type: record.type as string || 'خصم متنوع', kind: "assistance" as const };
+  }
+  
+  // السجلات القديمة من جدول EmployeeAdvance فقط (fallback)
   if (record.advanceType || record.totalAmount !== undefined) {
     const advanceType = record.advanceType as string;
     if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
@@ -47,6 +59,9 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
   const queryClient = useQueryClient();
   const router = useRouter();
 
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const isPastPeriod = period ? period < currentPeriod : false;
+
   const query = useQuery<DiscountRecord[]>({
     queryKey: ["discounts", employeeId || "all", period || "current"],
     queryFn: async () => {
@@ -57,6 +72,7 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       const data = res.data;
 
       if (!Array.isArray(data)) {
+        console.warn('Discounts API returned non-array data:', data);
         return [];
       }
 
@@ -77,9 +93,9 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       });
     },
     enabled,
-    staleTime: QUERY_STALE_TIME.FAST, // تحديث أسرع
+    staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.STANDARD,
-    refetchOnWindowFocus: true, // تحديث تلقائي
+    refetchOnWindowFocus: true,
   });
 
   const createDiscount = useMutation({
@@ -97,15 +113,20 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
         body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
       }
 
+      console.log('Creating discount with payload:', body);
       return await apiClient.post("/discounts", body);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+    onSuccess: (response) => {
+      console.log('Discount created successfully:', response.data);
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       router.refresh();
       toast.success("تم إضافة الخصم بنجاح");
     },
     onError: (error: unknown) => {
+      console.error('Failed to create discount:', error);
       toast.error(normalizeError(error, "فشل إضافة الخصم"));
     },
   });
@@ -130,10 +151,8 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
 
       return await apiClient.put(`/bonuses/${id}`, body);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
       toast.success("تم تحديث الخصم بنجاح");
     },
     onError: (error: unknown) => {
@@ -146,10 +165,8 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       const backendKind = kind === "advance" ? "advance" : "assistance";
       return await apiClient.delete(`/discounts/${id}?kind=${backendKind}`);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
-      router.refresh();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
       toast.success("تم نقل الخصم إلى سلة المهملات");
     },
     onError: (error: unknown) => {
