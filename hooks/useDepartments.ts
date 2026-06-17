@@ -6,10 +6,8 @@ interface Department {
   name: string;
   manager?: string;
   employeeCount?: number;
-  // ملاحظة: بعض الـ APIs قد ترجع count تحت اسم مختلف
-  // لذلك يتم الاعتماد على normalisation في واجهات الاستخدام
+  createdAt?: string;
 }
-
 
 interface DepartmentsResponse {
   departments: Department[];
@@ -42,8 +40,8 @@ export const useDepartments = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      return await api.put(`/departments/${id}`, { name });
+    mutationFn: async ({ id, name, date }: { id: string; name: string; date?: string }) => {
+      return await api.put(`/departments/${id}`, { name, ...(date && { date }) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });

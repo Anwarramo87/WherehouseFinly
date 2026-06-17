@@ -22,6 +22,9 @@ export interface AttendanceDeductionBreakdown {
   // الخصم المحسوب للتأخير
   delayDeduction: number;
 
+  // إجمالي دقائق الخروج المبكر / الدوام الناقص (من DailyAttendanceLog)
+  earlyLeaveMinutes: number;
+
   // الإجمالي = غياب + تأخير
   totalAttendanceDeduction: number;
 

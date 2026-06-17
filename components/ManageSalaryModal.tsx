@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -70,48 +70,59 @@ export default function ManageSalaryModal({
   const prevSalariesRef = useRef<Salary[] | undefined>(undefined);
   const savedRef = useRef(false);
 
-  // Employee search state
-  const [searchQuery, setSearchQuery] = useState("");
+  // Employee search state (initialized from props — component is remounted via key on employeeId change)
+  const initSearchLabel = (): string => {
+    if (initialData?.employeeId) {
+      const emp = employees.find(e => e.employeeId === initialData.employeeId);
+      return emp ? `${emp.employeeId} - ${emp.name}` : initialData.employeeId;
+    }
+    if (preselectedEmployeeId) {
+      const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
+      return emp ? `${emp.employeeId} - ${emp.name}` : "";
+    }
+    return "";
+  };
+
+  const initEmployeeName = (): string => {
+    if (initialData?.employeeId) {
+      const emp = employees.find(e => e.employeeId === initialData.employeeId);
+      return emp?.name ?? "";
+    }
+    if (preselectedEmployeeId) {
+      const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
+      return emp?.name ?? "";
+    }
+    return "";
+  };
+
+  const [searchQuery, setSearchQuery] = useState(initSearchLabel);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState(initEmployeeName);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ─── React Hook Form ─────────────────────────────────────────────────────────
   const {
-    control, register, handleSubmit, watch, setValue,
+    control, register, handleSubmit, setValue,
     formState: { errors },
   } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
     mode: "onChange",
     defaultValues: {
       employeeId:        initialData?.employeeId ?? preselectedEmployeeId ?? "",
-      baseSalary:        toNum(initialData?.baseSalary) || 0,
+      baseSalary:        (() => {
+        if (initialData?.baseSalary) return toNum(initialData.baseSalary);
+        if (preselectedEmployeeId) {
+          const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
+          if (emp && toNum(emp.hourlyRate) > 0) return toNum(emp.hourlyRate);
+        }
+        return 0;
+      })(),
       lumpSumSalary:     toNum(initialData?.lumpSumSalary) || 0,
       livingAllowance:   toNum(initialData?.livingAllowance) || 0,
       transportAllowance: toNum(initialData?.transportAllowance) || 0,
       insuranceAmount:   toNum(initialData?.insuranceAmount) || 0,
     },
   });
-
-
-
-  // ─── Init search label ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (initialData?.employeeId) {
-      const emp = employees.find(e => e.employeeId === initialData.employeeId);
-      setSearchQuery(emp ? `${emp.employeeId} - ${emp.name}` : initialData.employeeId);
-      setSelectedEmployeeName(emp?.name ?? "");
-    } else if (preselectedEmployeeId) {
-      const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
-      if (emp) {
-        setSearchQuery(`${emp.employeeId} - ${emp.name}`);
-        setSelectedEmployeeName(emp.name);
-        // Pre-fill baseSalary from hourlyRate if available
-        if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Body scroll lock
   useEffect(() => {
@@ -152,11 +163,11 @@ export default function ManageSalaryModal({
   }, [employees, searchQuery]);
 
   // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
-  const baseSalary = watch("baseSalary");
-  const lumpSumSalary = watch("lumpSumSalary");
-  const livingAllowance = watch("livingAllowance");
-  const transportAllowance = watch("transportAllowance");
-  const insuranceAmount = watch("insuranceAmount");
+  const watchedValues = useWatch({
+    control,
+    name: ["baseSalary", "lumpSumSalary", "livingAllowance", "transportAllowance", "insuranceAmount"],
+  }) as [number | undefined, number | undefined, number | undefined, number | undefined, number | undefined];
+  const [baseSalary, lumpSumSalary, livingAllowance, transportAllowance, insuranceAmount] = watchedValues;
   
   const netTotal = useMemo(
     () =>
@@ -168,18 +179,8 @@ export default function ManageSalaryModal({
     [baseSalary, lumpSumSalary, livingAllowance, transportAllowance, insuranceAmount]
   );
 
-  if (!isOpen || typeof document === "undefined") return null;
-
   // ─── Handlers ─────────────────────────────────────────────────────────────────
-  const handleSelectEmployee = (emp: Employee) => {
-    setValue("employeeId", emp.employeeId, { shouldValidate: true });
-    setSelectedEmployeeName(emp.name);
-    setSearchQuery(`${emp.employeeId} - ${emp.name}`);
-    setIsDropdownOpen(false);
-    if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
-  };
-
-  const onSubmit = (values: SalaryFormValues) => {
+  const onSubmit = useCallback((values: SalaryFormValues) => {
     const payload: SalaryPayload = {
       profession:             initialData?.profession ?? "",
       baseSalary:             Math.round(Number(values.baseSalary ?? 0)),
@@ -194,6 +195,17 @@ export default function ManageSalaryModal({
     };
     savedRef.current = true;
     onSave(values.employeeId, payload);
+  }, [initialData, onSave]);
+
+  if (!isOpen || typeof document === "undefined") return null;
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────────
+  const handleSelectEmployee = (emp: Employee) => {
+    setValue("employeeId", emp.employeeId, { shouldValidate: true });
+    setSelectedEmployeeName(emp.name);
+    setSearchQuery(`${emp.employeeId} - ${emp.name}`);
+    setIsDropdownOpen(false);
+    if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
   };
 
   // ─── Shared input class ───────────────────────────────────────────────────────
@@ -232,6 +244,7 @@ export default function ManageSalaryModal({
 
         {/* Body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 p-8 sm:p-10">
+          {/* eslint-disable-next-line react-hooks/refs */}
           <form id="salaryForm" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
             {/* ── Employee Search ── */}

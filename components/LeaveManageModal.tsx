@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X, Edit2, Trash2, Save, CalendarDays, FileText,
@@ -75,14 +75,6 @@ function LeaveManageModalContent({ onClose, leave, onUpdated }: Omit<Props, "isO
     reason:    leave.reason ?? "",
     isPaid:    leave.isPaid,
   });
-
-  const [form, setForm] = useState(getInitialForm);
-
-  // Sync if parent passes a different leave
-  useEffect(() => {
-    setForm(getInitialForm());
-    setMode("view");
-  }, [leave.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["leaves"],                  exact: false });

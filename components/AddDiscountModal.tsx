@@ -6,7 +6,7 @@ import {
   X, Save, Search, Wallet, FileText, AlertOctagon, 
   Coins, Calendar, Edit3, Shirt, Banknote , Loader2 , ChevronDown
 } from "lucide-react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Employee } from "@/types/employee";
@@ -50,7 +50,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
     handleSubmit,
     setValue,
     reset,
-    watch,
+
     control, // تم إضافة control للـ Controller
     formState: { errors }
   } = useForm<DiscountFormValues>({
@@ -65,7 +65,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
     }
   });
 
-  const currentType = watch("type");
+  const currentType = useWatch({ control, name: "type" });
 
   useEffect(() => {
     if (initialData) {

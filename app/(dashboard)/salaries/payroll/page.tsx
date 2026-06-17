@@ -79,6 +79,11 @@ interface AggregatedPayroll {
   variableEarnings: number;
   fixedDeductions: number;
   variableDeductions: number;
+
+  // ✂️ Early leave / missing minutes deduction (from backend payroll run)
+  totalEarlyLeaveMinutes: number;
+  earlyLeaveDeduction: number;
+
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
@@ -155,7 +160,85 @@ const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 
   return diff > 0 ? diff : 0;
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Virtualized Payroll Table Wrapper (opts out of React Compiler) ────────────
+// TanStack Virtual's `useVirtualizer` returns functions that cannot be memoized,
+// so we isolate it in a "use no memo" component to keep the rest of the page compiled.
+function PayrollVirtualTable({
+  allRows,
+  onSelectPayslip,
+}: {
+  allRows: Array<AggregatedPayroll | { isHeader: true; department: string; count: number }>;
+  onSelectPayslip: (item: AggregatedPayroll) => void;
+}) {
+  "use no memo";
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: allRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index: number) => {
+      const row = allRows[index] as { isHeader?: boolean } | undefined;
+      return row?.isHeader ? 48 : 96;
+    },
+    overscan: 5,
+  });
+
+  return (
+    <div className="relative bg-white rounded-3xl shadow-[0_10px_40px_rgba(38,53,68,0.08)] border border-slate-200 overflow-hidden group/table">
+      <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '75vh', minHeight: '500px' }}>
+        <table className="w-full text-center min-w-[1000px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+          <thead className="bg-[#1a2530] text-white sticky top-0 z-10">
+            <tr>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الموظف</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الراتب المستحق</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-emerald-300">المكافآت</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-rose-300">الخصومات</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">المجموع</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider bg-[#C89355]/20 text-[#C89355] border-b-3 border-[#C89355]/50">
+                الراتب المقبوض
+              </th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الفرق</th>
+              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">إجراء</th>
+            </tr>
+          </thead>
+          <tbody style={{ position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualItem: VirtualItem) => {
+              const row = allRows[virtualItem.index];
+              const isHeaderRow = (r: typeof row): r is { isHeader: true; department: string; count: number } => 'isHeader' in r;
+              if (isHeaderRow(row)) {
+                return (
+                  <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100 border-y border-slate-200">
+                    <td colSpan={8} className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-4 bg-[#C89355] rounded-full" />
+                        <span className="font-black text-[#263544] text-sm">
+                          {row.department}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          {row.count} موظف
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              return (
+                <PayrollRow
+                  key={virtualItem.index}
+                  item={row}
+                  onSelectPayslip={() => onSelectPayslip(row as AggregatedPayroll)}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
   const router = useRouter();
@@ -345,6 +428,8 @@ export default function PayrollPage() {
         variableEarnings,
         fixedDeductions: toNumber(salaryConfig?.insuranceAmount),
         variableDeductions,
+        totalEarlyLeaveMinutes: 0,
+        earlyLeaveDeduction: 0,
         details: {
           salaryConfig,
           bonuses: employeeBonuses,
@@ -461,6 +546,8 @@ export default function PayrollPage() {
           variableEarnings,
           fixedDeductions: toNumber(salaryConfig?.insuranceAmount),
           variableDeductions,
+          totalEarlyLeaveMinutes: Number(backendItem.earlyLeaveMinutes ?? 0),
+          earlyLeaveDeduction: toNumber(backendItem.earlyLeaveDeduction),
           details: {
             salaryConfig,
             bonuses: employeeBonuses,
@@ -506,18 +593,6 @@ export default function PayrollPage() {
 
     return rows;
   }, [filteredPayrollData]);
-
-  const parentRef = React.useRef<HTMLDivElement>(null);
-
-  const rowVirtualizer = useVirtualizer({
-    count: allRows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (index: number) => {
-      const row = allRows[index] as { isHeader?: boolean } | undefined;
-      return row?.isHeader ? 48 : 96;
-    },
-    overscan: 5,
-  });
 
   // ── Grand totals (server figures only) ───────────────────────────────────────
   const globalTotals = useMemo(
@@ -822,57 +897,10 @@ export default function PayrollPage() {
         </div>
 
         {/* ── Payroll table ─────────────────────────────────────────────────────── */}
-        <div className="relative bg-white rounded-3xl shadow-[0_10px_40px_rgba(38,53,68,0.08)] border border-slate-200 overflow-hidden group/table">
-          <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '75vh', minHeight: '500px' }}>
-            <table className="w-full text-center min-w-[1000px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
-              <thead className="bg-[#1a2530] text-white sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الموظف</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الراتب المستحق</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-emerald-300">المكافآت</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-rose-300">الخصومات</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">المجموع</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider bg-[#C89355]/20 text-[#C89355] border-b-3 border-[#C89355]/50">
-                    الراتب المقبوض
-                  </th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الفرق</th>
-                  <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">إجراء</th>
-                </tr>
-              </thead>
-              <tbody style={{ position: 'relative' }}>
-                {rowVirtualizer.getVirtualItems().map((virtualItem: VirtualItem) => {
-                  const row = allRows[virtualItem.index];
-                  const isHeaderRow = (r: typeof row): r is { isHeader: true; department: string; count: number } => 'isHeader' in r;
-                  if (isHeaderRow(row)) {
-                    return (
-                      <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100 border-y border-slate-200">
-                        <td colSpan={8} className="px-6 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-1.5 h-4 bg-[#C89355] rounded-full" />
-                            <span className="font-black text-[#263544] text-sm">
-                              {row.department}
-                            </span>
-                            <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                              {row.count} موظف
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return (
-                    <PayrollRow
-                      key={virtualItem.index}
-                      item={row}
-                      onSelectPayslip={() => setSelectedPayslip(row as AggregatedPayroll)}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <PayrollVirtualTable
+          allRows={allRows}
+          onSelectPayslip={(item) => setSelectedPayslip(item)}
+        />
 
         {/* ── Resigned Employees Section (Pending Financial Settlement) ─────────── */}
         {resignedPendingSettlement.length > 0 && (
