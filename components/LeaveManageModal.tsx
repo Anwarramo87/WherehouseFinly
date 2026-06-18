@@ -76,6 +76,8 @@ function LeaveManageModalContent({ onClose, leave, onUpdated }: Omit<Props, "isO
     isPaid:    leave.isPaid,
   });
 
+  const [form, setForm] = useState(getInitialForm());
+
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["leaves"],                  exact: false });
     void queryClient.invalidateQueries({ queryKey: ["employeeMonthlyLeaves"],   exact: false });

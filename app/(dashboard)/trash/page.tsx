@@ -46,9 +46,8 @@ const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const { data: types = [] } = useQuery({
+  const { data: types = [] } = useQuery<{ entityType: string; count: number }[]>({
     queryKey: ["trash", "types", period],
-    query: false,
     queryFn: () => apiClient.get("/trash/types", { params: { period } }).then((r) => r.data),
   });
 
@@ -82,15 +81,13 @@ const queryClient = useQueryClient();
     },
   });
 
-  const types: { entityType: string; count: number }[] = typesData || [];
-
   const filteredRecords = useMemo(() => {
     const records: DeletedRecord[] = trashData?.data || [];
     if (!searchTerm) return records;
     const term = searchTerm.toLowerCase();
     return records.filter((r) => {
-      const name = r.entityData?.name || r.entityData?.employeeId || "";
-      const reason = r.entityData?.reason || r.entityData?.bonusReason || "";
+      const name = String(r.entityData?.name || r.entityData?.employeeId || "");
+      const reason = String(r.entityData?.reason || r.entityData?.bonusReason || "");
       return (
         name.toLowerCase().includes(term) ||
         reason.toLowerCase().includes(term) ||
@@ -108,7 +105,7 @@ const queryClient = useQueryClient();
   };
 
   const formatEntityData = (record: DeletedRecord) => {
-    const data = record.entityData || {};
+    const data = (record.entityData || {}) as Record<string, string | number | undefined | null>;
     switch (record.entityType) {
       case "advance":
         return (
