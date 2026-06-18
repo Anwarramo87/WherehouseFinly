@@ -270,10 +270,34 @@ export default function EmployeesPage() {
           return;
         }
 
-        // Create employee and wait for success
-        const result = await createEmployee.mutateAsync(payload as Employee);
-        console.log('Employee created:', result);
-        
+        // Create employee with auto-retry on duplicate ID (backend may have IDs not in our cache)
+        let currentPayload = { ...payload } as Employee;
+        let currentId = normalizedEmployeeId;
+        const MAX_RETRIES = 5;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const result = await createEmployee.mutateAsync(currentPayload);
+            console.log('Employee created:', result);
+            break; // success
+          } catch (retryErr) {
+            const errMsg = getErrorMessage(retryErr, "");
+            const isDuplicateId = errMsg.includes("Employee ID already exists") || errMsg.includes("already exists");
+
+            if (isDuplicateId && attempt < MAX_RETRIES) {
+              // Extract number from current ID, increment, and retry
+              const numMatch = currentId.match(/^EMP(\d+)$/i);
+              const nextNum = numMatch ? parseInt(numMatch[1], 10) + 1 : attempt + 1;
+              currentId = `EMP${String(nextNum).padStart(5, '0')}`;
+              currentPayload = { ...currentPayload, employeeId: currentId };
+              console.warn(`Employee ID ${currentId} exists in DB but not in cache. Retrying with ${currentPayload.employeeId}`);
+              continue;
+            }
+
+            throw retryErr; // non-duplicate error or max retries reached
+          }
+        }
+
         // Force immediate refresh with a small delay to ensure backend has updated
         await new Promise(resolve => setTimeout(resolve, 100));
         await Promise.all([
@@ -287,8 +311,14 @@ export default function EmployeesPage() {
       setSelectedEmployee(null);
     } catch (err) {
       const message = getErrorMessage(err, "فشل حفظ الموظف");
-      toast.error(message);
       console.error("Error saving employee:", err);
+      // Log the full response data from the backend for debugging
+      const responseData = (err as { response?: { data?: unknown; status?: number } })?.response;
+      if (responseData) {
+        console.error("Backend response status:", responseData.status);
+        console.error("Backend response data:", JSON.stringify(responseData.data, null, 2));
+      }
+      toast.error(message, { duration: 8000 });
     }
   };
 
