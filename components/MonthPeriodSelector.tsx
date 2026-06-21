@@ -24,7 +24,10 @@ export function MonthPeriodSelector({
   selectedDate,
   onDateChange,
 }: MonthPeriodSelectorProps) {
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  })();
   const effectiveMax = maxPeriod || currentMonth;
   const [isOpen, setIsOpen] = useState(false);
   const [isDayOpen, setIsDayOpen] = useState(false);
@@ -52,7 +55,10 @@ export function MonthPeriodSelector({
   }, [minPeriod, effectiveMax]);
 
   const isCurrentMonth = value === currentMonth;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
 
   const daysInMonth = useMemo(() => {
     const [y, m] = value.split("-").map(Number);
@@ -68,9 +74,15 @@ export function MonthPeriodSelector({
 
 const effectiveDate = selectedDate || today;
 
-  // Sync dropdown when value changes from parent (isDayOpen reset is intentional for UX)
+  // Close day dropdown only when the period or date actually changes from outside
+  const prevValueRef = useRef(value);
+  const prevSelectedDateRef = useRef(selectedDate);
   useEffect(() => {
-    if (isDayOpen && selectedDate) {
+    const valueChanged = prevValueRef.current !== value;
+    const dateChanged = prevSelectedDateRef.current !== selectedDate;
+    prevValueRef.current = value;
+    prevSelectedDateRef.current = selectedDate;
+    if (isDayOpen && (valueChanged || dateChanged)) {
       setIsDayOpen(false);
     }
   }, [value, selectedDate, isDayOpen]);
@@ -90,6 +102,17 @@ const effectiveDate = selectedDate || today;
     setDropdownValue(period);
     onChange(period);
     setIsOpen(false);
+  };
+
+  const handleGoToday = () => {
+    const todayMonth = today.slice(0, 7);
+    if (value !== todayMonth) {
+      setDropdownValue(todayMonth);
+      onChange(todayMonth);
+    }
+    if (selectedDate !== today && onDateChange) {
+      onDateChange(today);
+    }
   };
 
   const handlePrev = () => {
@@ -204,6 +227,17 @@ const effectiveDate = selectedDate || today;
         >
           <ChevronLeft size={16} />
         </button>
+
+        {/* زر العودة لليوم */}
+        {onDateChange && selectedDate !== today && (
+          <button
+            type="button"
+            onClick={handleGoToday}
+            className="px-3 py-2 text-xs font-black text-white bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 rounded-xl transition-all active:scale-95 shadow-sm"
+          >
+            اليوم
+          </button>
+        )}
       </div>
 
       {showCurrentBadge && isCurrentMonth && (

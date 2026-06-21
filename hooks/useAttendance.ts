@@ -173,7 +173,6 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 
   // Calculate date range from period (YYYY-MM) if provided
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { periodStart, periodEnd } = useMemo(() => {
     const period = params?.period;
     if (!period) return { periodStart: undefined, periodEnd: undefined };

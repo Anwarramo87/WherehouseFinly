@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Save, UserCog, Phone, User, Briefcase, ChevronRight, ChevronLeft, CalendarDays, Coins, CalendarHeart, Users, UserCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -52,7 +52,6 @@ export type AddEmployeeFormData = {
 };
 
 interface Props {
-  isOpen: boolean;
   onClose: () => void;
   onSave: (data: AddEmployeeFormData) => void;
   isPending: boolean;
@@ -79,14 +78,12 @@ const defaultFormState = {
   residence: "",
 };
 
-export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001", existingIds = [] }: Props) {
+export default function AddEmployeeModal({ onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001", existingIds = [] }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
-  const [idError, setIdError] = useState("");
   const [roleError, setRoleError] = useState("");
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
   const { data: deptsData } = useDepartments();
-  const prevIsOpen = useRef(isOpen);
 
   const buildFormState = useCallback((employee?: EmployeeWithExtendedFields | null) => {
     if (employee) {
@@ -115,33 +112,13 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     };
   }, [nextSuggestedId]);
 
-  const [formData, setFormData] = useState(() => buildFormState(initialData));
+  const [formData, setFormData] = useState<AddEmployeeFormData>(() =>
+    initialData ? buildFormState(initialData) : buildFormState(null)
+  );
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => { document.body.style.overflow = "unset"; };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen && prevIsOpen.current) {
-      setStep(1);
-    }
-    prevIsOpen.current = isOpen;
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && !initialData) {
-      setFormData(buildFormState(null));
-      const newIdError = existingIds.includes(nextSuggestedId)
-        ? "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود."
-        : "";
-      setIdError(newIdError);
-    }
-  }, [isOpen, initialData, nextSuggestedId, existingIds, buildFormState]);
+  const idError = !initialData && existingIds.includes(nextSuggestedId)
+    ? "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود."
+    : "";
 
   const validateMobile = (number: string) => {
     const isValid = /^09[0-9]{8}$/.test(number);
@@ -154,7 +131,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   };
 
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\\D/g, '');
+    const val = e.target.value.replace(/\D/g, '');
     setFormData({ ...formData, mobile: val });
     if (mobileError && /^09[0-9]{8}$/.test(val)) {
       setMobileError("");

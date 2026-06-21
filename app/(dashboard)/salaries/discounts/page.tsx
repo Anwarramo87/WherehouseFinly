@@ -33,11 +33,14 @@ export default function DiscountsPage() {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Helper to attach employee names to the records
+  // Filter out records for resigned/terminated employees (not in active employees list)
   const recordsWithNames = useMemo(() => {
-    return discounts.map(d => {
-      const emp = employees.find(e => e.employeeId === d.employeeId);
-      return { ...d, name: emp?.name || "موظف غير معروف" };
-    });
+    return discounts
+      .filter(d => employees.some(e => e.employeeId === d.employeeId))
+      .map(d => {
+        const emp = employees.find(e => e.employeeId === d.employeeId);
+        return { ...d, name: emp?.name || "موظف غير معروف" };
+      });
   }, [discounts, employees]);
 
   const filteredDiscounts = useMemo(() => {

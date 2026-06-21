@@ -75,7 +75,9 @@ export async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
   const pathParts = path.split("/").filter(Boolean);
-  const apiPath = "/" + pathParts.slice(1).join("/");
+  // Strip /api prefix, and also /v1 since backend URL already includes /api/v1
+  const rest = pathParts.slice(1);
+  const apiPath = "/" + (rest[0] === "v1" ? rest.slice(1) : rest).join("/");
   const fullUrl = `${getBackendUrl()}${apiPath}${url.search}`;
 
   if (request.method === "OPTIONS") {

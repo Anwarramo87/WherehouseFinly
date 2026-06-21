@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, UserMinus, ChevronLeft, ChevronRight, AlertTriangle, Calendar, FileText, Calculator, Coins, AlertOctagon, UserX, LogOut } from "lucide-react";
 import type { Employee } from "@/types/employee";
+import apiClient from "@/lib/api-client";
 
 type EmployeeWithCompensation = Employee & {
   baseSalary?: number | string;
@@ -42,15 +43,54 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [bonus, setBonus] = useState<string>("");
+  const [payrollSalary, setPayrollSalary] = useState<number | null>(null);
+  const [salaryLoading, setSalaryLoading] = useState(false);
+  const prevMonthRef = useRef<string>("");
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
     }
-    return () => { document.body.style.overflow = "unset"; };
+    return () => {
+      document.body.style.overflow = "unset";
+      setPayrollSalary(null);
+      prevMonthRef.current = "";
+    };
   }, [isOpen]);
+
+  // Fetch payroll report to get the correct netPayRounded (الراتب المقبوض)
+  useEffect(() => {
+    if (!isOpen || !employee) return;
+    const month = fireDate.substring(0, 7); // YYYY-MM
+    if (!month || month === prevMonthRef.current) return;
+    prevMonthRef.current = month;
+
+    const fetchPayroll = async () => {
+      setSalaryLoading(true);
+      try {
+        const res = await apiClient.get(`/payroll/report/${month}`);
+        const items = Array.isArray(res.data?.items) ? res.data.items : [];
+        const empItem = items.find((i: { employeeId?: string }) => i.employeeId === employee.employeeId);
+        if (empItem) {
+          const netRounded = Number(empItem.netPayRounded ?? 0);
+          setPayrollSalary(netRounded > 0 ? netRounded : null);
+        } else {
+          setPayrollSalary(null);
+        }
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: unknown }; config?: { url?: string } };
+        console.warn(
+          `[FireEmployeeModal] Payroll report fetch failed for month=${month}`,
+          `status=${axiosErr.response?.status}`,
+          `url=${axiosErr.config?.url}`,
+        );
+        setPayrollSalary(null);
+      } finally {
+        setSalaryLoading(false);
+      }
+    };
+    fetchPayroll();
+  }, [isOpen, employee, fireDate]);
 
   if (!isOpen || typeof document === "undefined" || !employee) return null;
 
@@ -74,7 +114,9 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
     toNumber(employeeWithCompensation.baseSalary) ||
     Math.round(toNumber(employee.hourlyRate) * 8 * 30);
   const daysWorkedThisMonth = new Date(fireDate).getDate();
-  const dueSalary = Math.round((baseSalary / 30) * daysWorkedThisMonth);
+  // Use netPayRounded from payroll report if available, otherwise fallback to manual calc
+  const manualDueSalary = Math.round((baseSalary / 30) * daysWorkedThisMonth);
+  const dueSalary = payrollSalary !== null ? payrollSalary : manualDueSalary;
   const totalDues = dueSalary + (Number(bonus) || 0);
 
   const handleNext = (e: React.FormEvent) => {
@@ -197,7 +239,19 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
               </div>
               <div className="bg-[#1a2530] p-3 rounded-xl border border-[#263544]">
                 <p className="text-[11px] sm:text-xs font-bold text-[#E7C873] mb-1">الراتب المستحق</p>
-                <p className="text-lg sm:text-xl font-mono font-black text-[#E7C873]">{dueSalary.toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-500">ل.س</span></p>
+                {salaryLoading ? (
+                  <p className="text-lg sm:text-xl font-black text-slate-400">جاري التحميل...</p>
+                ) : payrollSalary !== null ? (
+                  <>
+                    <p className="text-lg sm:text-xl font-mono font-black text-[#E7C873]">{dueSalary.toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-500">ل.س</span></p>
+                    <p className="text-[9px] text-emerald-500 font-bold mt-0.5">من التقرير النهائي ✓</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg sm:text-xl font-mono font-black text-amber-400">{dueSalary.toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-500">ل.س</span></p>
+                    <p className="text-[9px] text-amber-500 font-bold mt-0.5">حساب يدوي (لا يوجد تقرير)</p>
+                  </>
+                )}
               </div>
             </div>
 

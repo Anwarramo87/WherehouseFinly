@@ -94,7 +94,7 @@ export default function AttendancePage() {
   const today = getToday();
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(today);
-  const [period, setPeriod] = useState(searchParams.get("period") || new Date().toISOString().slice(0, 7));
+  const [period, setPeriod] = useState(searchParams.get("period") || today.slice(0, 7));
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);

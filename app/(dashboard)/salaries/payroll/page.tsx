@@ -320,15 +320,17 @@ export default function PayrollPage() {
   }, [monthlyAttendanceData?.dailyRecords]);
 
   const isLoading = salariesLoading || bonusesLoading || reportLoading || employeesLoading || inputsLoading || deductionsLoading || attendanceLoading || discountsLoading || penaltiesLoading;
-  // ── Filter resigned employees pending financial settlement ──
-  const resignedPendingSettlement = useMemo<Employee[]>(() => {
+  // ── All resigned/terminated employees for the payroll page ──
+  const allResignedList = useMemo<Employee[]>(() => {
     return allResignedEmployees.filter(
-      (emp) =>
-        (emp.status === "resigned" || emp.status === "terminated") &&
-        emp.financialSettlementStatus === "pending" &&
-        !emp.isSettled
+      (emp) => emp.status === "resigned" || emp.status === "terminated"
     );
   }, [allResignedEmployees]);
+
+  const resignedPendingCount = useMemo(
+    () => allResignedList.filter((e) => e.financialSettlementStatus === "pending" && !e.isSettled).length,
+    [allResignedList]
+  );
 
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
@@ -902,8 +904,8 @@ export default function PayrollPage() {
           onSelectPayslip={(item) => setSelectedPayslip(item)}
         />
 
-        {/* ── Resigned Employees Section (Pending Financial Settlement) ─────────── */}
-        {resignedPendingSettlement.length > 0 && (
+        {/* ── Resigned Employees Section (All resigned/terminated employees with settlement info) ── */}
+        {allResignedList.length > 0 && (
           <div className="mt-8">
             {/* Warning Banner */}
             <div className="mb-6 flex items-start gap-4 p-5 bg-amber-50/80 border-2 border-amber-300 rounded-3xl shadow-sm animate-in fade-in duration-300">
@@ -912,11 +914,12 @@ export default function PayrollPage() {
               </div>
               <div className="flex-1">
                 <p className="font-black text-amber-800 text-sm mb-1">
-                  موظفون مستقيلون بحاجة إلى تصفية مالية
+                  موظفون مستقيلون / مقالون
                 </p>
                 <p className="text-amber-700 text-xs font-bold leading-relaxed">
-                  الموظفون التالية أسماؤهم قد أنهوا خدمتهم ولكن لم تتم تصفية مستحقاتهم المالية بعد. 
-                  يجب إتمام التصفية المالية قبل إغلاق المسير النهائي.
+                  {resignedPendingCount > 0
+                    ? `${resignedPendingCount} موظف بحاجة إلى تصفية مالية. يجب إتمام التصفية قبل إغلاق المسير النهائي.`
+                    : "جميع الموظفين المستقيلين تمت تصفيتهم المالية."}
                 </p>
               </div>
               <Link
@@ -941,10 +944,10 @@ export default function PayrollPage() {
                   </div>
                   <div>
                     <h2 className="text-lg font-black text-amber-900 tracking-tight">
-                      المستقيلون (قيد التصفية المالية)
+                      المستقيلون والمقالون
                     </h2>
                     <p className="text-xs text-amber-700 font-bold mt-0.5">
-                      {resignedPendingSettlement.length} موظف بحاجة إلى تصفية مالية
+                      {allResignedList.length} موظف ({resignedPendingCount} بحاجة إلى تصفية مالية)
                     </p>
                   </div>
                 </div>
@@ -957,23 +960,31 @@ export default function PayrollPage() {
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">كود الموظف</th>
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">اسم الموظف</th>
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">القسم</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الراتب الأساسي</th>
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">تاريخ الإنهاء</th>
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">نوع الإنهاء</th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">حالة التصفية</th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-amber-200/50">
-                    {resignedPendingSettlement.map((employee) => {
+                    {allResignedList.map((employee: Employee) => {
                       const isFired = employee.status === "terminated";
                       const terminationType = isFired ? "إقالة" : "استقالة";
                       const terminationColor = isFired 
                         ? "text-rose-700 bg-rose-100/80 border-rose-300" 
                         : "text-amber-700 bg-amber-100/80 border-amber-300";
+                      const isSettled = employee.isSettled || employee.financialSettlementStatus === "completed";
+                      const settlementLabel = isSettled ? "تمت التصفية" : "قيد التصفية";
+                      const settlementColor = isSettled
+                        ? "text-emerald-700 bg-emerald-100/80 border-emerald-300"
+                        : "text-orange-700 bg-orange-100/80 border-orange-300";
+                      const baseSalaryVal = toNumber(employee.baseSalary ?? employee.hourlyRate);
 
                       return (
                         <tr
                           key={employee.employeeId}
-                          className="bg-white/60 hover:bg-white/90 transition-all duration-300 group/row"
+                          className={`transition-all duration-300 group/row ${isSettled ? "bg-white/40 opacity-70" : "bg-white/60 hover:bg-white/90"}`}
                         >
                           <td className="p-4 text-center font-mono text-sm font-black text-amber-900/70 group-hover/row:text-amber-700 transition-colors">
                             {employee.employeeId}
@@ -983,6 +994,9 @@ export default function PayrollPage() {
                           </td>
                           <td className="p-4 text-center font-bold text-slate-700 text-sm">
                             {employee.department || employee.profession || "—"}
+                          </td>
+                          <td className="p-4 text-center font-mono font-black text-slate-700 text-sm">
+                            {baseSalaryVal > 0 ? `${baseSalaryVal.toLocaleString()} ل.س` : "—"}
                           </td>
                           <td className="p-4 text-center font-mono font-bold text-slate-700 text-sm">
                             {employee.terminationDate
@@ -994,6 +1008,13 @@ export default function PayrollPage() {
                               className={`inline-block px-3 py-1.5 rounded-xl text-xs font-black border shadow-sm ${terminationColor}`}
                             >
                               {terminationType}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span
+                              className={`inline-block px-3 py-1.5 rounded-xl text-xs font-black border shadow-sm ${settlementColor}`}
+                            >
+                              {settlementLabel}
                             </span>
                           </td>
                         </tr>

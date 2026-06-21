@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, DollarSign, Calendar, MessageSquare, TrendingUp, TrendingDown, Coins, Info } from "lucide-react";
+import { X, Loader2, DollarSign, Calendar, MessageSquare, TrendingUp, TrendingDown, Coins, Info, User } from "lucide-react";
+import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 
 export interface SettlementData {
@@ -19,7 +20,7 @@ interface Props {
   onClose: () => void;
   onConfirm: (data: SettlementData) => void;
   isPending: boolean;
-  initialSettlementData?: { earnedSalary?: string | number; [key: string]: unknown } | null;
+  employeeId?: string;
 }
 
 const defaultFormState: SettlementData = {
@@ -32,7 +33,6 @@ const defaultFormState: SettlementData = {
 
 // Helper function to parse Arabic and English numerals
 const parseArabicNumber = (value: string): number => {
-  // Map Arabic-Indic digits to Western digits
   const arabicToWestern: { [key: string]: string } = {
     '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
     '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
@@ -49,18 +49,15 @@ export default function FinancialSettlementModal({
   onClose, 
   onConfirm, 
   isPending, 
-  initialSettlementData 
+  employeeId,
 }: Props) {
-  const isMounted = typeof document !== "undefined";
+const isMounted = typeof document !== "undefined";
   const [formData, setFormData] = useState<SettlementData>(() => ({
     ...defaultFormState,
-    settlementDate: new Date().toISOString().split('T')[0],
-    ...(initialSettlementData != null ? {
-      finalSalaryAmount: parseFloat(String(initialSettlementData.earnedSalary ?? 0)) || 0,
-      bonuses: parseFloat(String(initialSettlementData.bonuses ?? 0)) || 0,
-      deductions: parseFloat(String(initialSettlementData.deductions ?? 0)) || 0,
-    } : {}),
+    settlementDate: defaultFormState.settlementDate,
   }));
+  const [isLoadingSalary, setIsLoadingSalary] = useState(false);
+  const [isLoadingExtras, setIsLoadingExtras] = useState(false);
   const [finalSalaryError, setFinalSalaryError] = useState("");
   const [deductionsError, setDeductionsError] = useState("");
   const [bonusesError, setBonusesError] = useState("");
@@ -76,26 +73,77 @@ export default function FinancialSettlementModal({
     };
   }, [isOpen]);
 
+// Reset error state when modal opens
   useEffect(() => {
     if (isOpen) {
-      const newFormData: SettlementData = {
-        ...defaultFormState,
-        settlementDate: new Date().toISOString().split('T')[0],
-        // ← الإضافة الحاسمة: نقل بيانات initialSettlementData للفورم
-        ...(initialSettlementData != null ? {
-          finalSalaryAmount: parseFloat(String(initialSettlementData.earnedSalary ?? 0)) || 0,
-          bonuses: parseFloat(String(initialSettlementData.bonuses ?? 0)) || 0,
-          deductions: parseFloat(String(initialSettlementData.deductions ?? 0)) || 0,
-        } : {}),
-      };
       setTimeout(() => {
-        setFormData(newFormData);
         setFinalSalaryError("");
         setDeductionsError("");
         setBonusesError("");
       }, 0);
     }
-  }, [isOpen, initialSettlementData]);
+  }, [isOpen]);
+
+  // Fetch provisional settlement from API (re-fetches on date change)
+  useEffect(() => {
+    // نعتمد على id الموظف من الكائن نفسه لتجنب فخ الـ prop المفقود
+    const currentEmployeeId = employee?.employeeId || employeeId;
+    
+    if (!isOpen || !currentEmployeeId) return;
+
+    const controller = new AbortController();
+    const fetchSettlement = async () => {
+      console.log('[FinancialSettlementModal] Fetching for employeeId:', currentEmployeeId, 'date:', formData.settlementDate);
+      setIsLoadingSalary(true);
+      setIsLoadingExtras(true);
+      
+      try {
+        const res = await apiClient.get('/payroll/provisional-settlement', {
+          params: {
+            employeeId: currentEmployeeId,
+            terminationDate: new Date(formData.settlementDate + 'T00:00:00.000Z').toISOString(),
+          },
+          signal: controller.signal,
+        });
+
+        console.log('[FinancialSettlementModal] API response:', JSON.stringify(res.data));
+
+        // اختراق تغليف NestJS: إذا كانت البيانات داخل data.data نستخرجها، وإلا نأخذها مباشرة
+        const payload = res.data?.data || res.data || {};
+        
+        console.log('[FinancialSettlementModal] Payload:', JSON.stringify(payload));
+
+        // دعم لعدة مسميات محتملة من الباك إند (earnedSalary أو finalSalaryAmount)
+        const earned = parseFloat(String(payload.earnedSalary ?? payload.finalSalaryAmount ?? 0)) || 0;
+        const bonuses = parseFloat(String(payload.bonuses ?? 0)) || 0;
+        const deductions = parseFloat(String(payload.deductions ?? 0)) || 0;
+
+        console.log('[FinancialSettlementModal] Parsed values:', { earned, bonuses, deductions });
+
+        setFormData(prev => ({ 
+          ...prev, 
+          finalSalaryAmount: earned,
+          bonuses: bonuses,
+          deductions: deductions
+        }));
+
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name === 'CanceledError' || (err as { name?: string })?.name === 'AbortError') return;
+        const axiosErr = err as { response?: { status?: number; data?: unknown }; config?: { url?: string }; message?: string };
+        console.warn('[FinancialSettlementModal] Fetch failed:', 
+          `url=${axiosErr.config?.url}`,
+          `status=${axiosErr.response?.status}`,
+          `data=`, axiosErr.response?.data,
+          `msg=${axiosErr.message}`);
+      } finally {
+        setIsLoadingSalary(false);
+        setIsLoadingExtras(false);
+      }
+    };
+
+    fetchSettlement();
+    return () => controller.abort();
+  }, [isOpen, employee?.employeeId, employeeId, formData.settlementDate]);
 
   if (!isOpen || !isMounted) return null;
 
@@ -105,288 +153,219 @@ export default function FinancialSettlementModal({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate final salary
     if (formData.finalSalaryAmount <= 0) {
-      setFinalSalaryError("يجب أن يكون الراتب النهائي أكبر من صفر");
+      setFinalSalaryError("يجب أن يكون الراتب المقبوض أكبر من صفر");
       return;
     }
-    
-    // Validate deductions
     if (formData.deductions < 0) {
       setDeductionsError("لا يمكن أن تكون الخصومات سالبة");
       return;
     }
-    
-    // Validate bonuses
     if (formData.bonuses < 0) {
       setBonusesError("لا يمكن أن تكون المكافآت سالبة");
       return;
     }
-
     onConfirm(formData);
   };
 
   const handleFinalSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseArabicNumber(e.target.value);
     setFormData({ ...formData, finalSalaryAmount: value });
-    
-    if (finalSalaryError && value > 0) {
-      setFinalSalaryError("");
-    }
+    if (finalSalaryError && value > 0) setFinalSalaryError("");
   };
 
   const handleDeductionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseArabicNumber(e.target.value);
     setFormData({ ...formData, deductions: value });
-    
-    if (deductionsError && value >= 0) {
-      setDeductionsError("");
-    }
+    if (deductionsError && value >= 0) setDeductionsError("");
   };
 
   const handleBonusesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseArabicNumber(e.target.value);
     setFormData({ ...formData, bonuses: value });
-    
-    if (bonusesError && value >= 0) {
-      setBonusesError("");
-    }
+    if (bonusesError && value >= 0) setBonusesError("");
   };
 
   return createPortal(
     <div 
-      className="fixed inset-0 bg-[#101720]/80 backdrop-blur-md flex items-center justify-center z-999999 p-4 sm:p-6 transition-all duration-300" 
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999999] p-3 sm:p-6 transition-all duration-200" 
       dir="rtl"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-white/5 outline-dashed outline-1 outline-blue-500/20 outline-offset-[-6px]">
+      <div className="bg-[#101720] rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-white/[0.06]">
         
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
-              <DollarSign className="text-blue-500" size={24} />
+        <div className="px-4 sm:px-6 py-4 border-b border-white/[0.06] flex justify-between items-center bg-[#1a2530]/60 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-blue-500/10 p-2 rounded-xl border border-blue-500/20 shrink-0">
+              <DollarSign className="text-blue-400" size={20} />
             </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                التصفية المالية للموظف
-              </h2>
-              <p className="text-sm text-slate-400 font-semibold mt-0.5">
-                {employee.name} ({employee.employeeId})
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-white truncate">التصفية المالية</h2>
+              <p className="text-xs sm:text-sm text-slate-400 font-semibold truncate">
+                {employee.name} <span className="text-slate-500">({employee.employeeId})</span>
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-blue-400 bg-[#263544] p-2 rounded-xl shadow-sm border border-transparent hover:border-blue-400/30 transition-all hover:bg-blue-500/10 active:scale-95"
+            className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition-all active:scale-95 shrink-0 mr-2"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Info Banner */}
-        <div className="mx-6 mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-          <div className="flex items-start gap-3">
-            <Info className="text-blue-500 shrink-0 mt-0.5" size={20} />
-            <div className="text-sm">
-              <p className="text-blue-400 font-bold mb-1">معلومات التصفية المالية</p>
-              <p className="text-slate-400 font-semibold">
-                قم بإدخال الراتب النهائي والمكافآت والخصومات لحساب إجمالي التصفية المالية للموظف.
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Body — single scrollable area */}
+        <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-4">
+          <form id="settlementForm" onSubmit={handleFormSubmit} className="space-y-4">
 
-        {/* Employee Info */}
-        <div className="mx-6 mt-4 p-4 bg-[#1a2530] border border-[#263544] rounded-xl">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-slate-500 font-semibold">القسم:</span>
-              <span className="text-white font-bold mr-2">{employee.department || 'غير محدد'}</span>
+            {/* Employee quick info */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 font-semibold px-1">
+              <span className="flex items-center gap-1"><User size={13} className="text-slate-500" />{employee.department || '—'}</span>
+              <span className="text-slate-600">|</span>
+              <span>{employee.jobTitle || employee.profession || '—'}</span>
             </div>
-            <div>
-              <span className="text-slate-500 font-semibold">الوظيفة:</span>
-              <span className="text-white font-bold mr-2">{employee.jobTitle || employee.profession || 'غير محدد'}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Form */}
-        <div className="overflow-y-auto custom-scrollbar flex-1 p-6">
-          <form id="settlementForm" onSubmit={handleFormSubmit} className="space-y-5">
-            
             {/* Settlement Date */}
             <div>
-              <label htmlFor="settlementDate" className="block text-sm font-bold text-blue-400 mb-2">
+              <label htmlFor="settlementDate" className="block text-xs font-bold text-slate-400 mb-1.5">
                 تاريخ التصفية
               </label>
-              <div className="relative group">
+              <div className="relative">
                 <input
                   id="settlementDate"
                   type="date"
                   required
                   max={new Date().toISOString().split('T')[0]}
-                  className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition-all text-white font-mono font-bold shadow-inner pr-11 scheme-dark"
+                  className="w-full px-3 py-2.5 bg-[#1a2530] border border-white/[0.06] rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 outline-none transition-all text-white font-mono text-sm font-bold pr-10 scheme-dark"
                   value={formData.settlementDate}
                   onChange={(e) => setFormData({ ...formData, settlementDate: e.target.value })}
                 />
-                <Calendar className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                <Calendar className="absolute right-3 top-2.5 text-slate-500" size={18} />
               </div>
             </div>
 
             {/* Financial Fields */}
-            <div className="bg-[#1a2530] p-5 rounded-2xl border border-[#263544] shadow-inner space-y-4">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Coins size={20} className="text-blue-500" />
-                <span className="text-sm font-bold text-white">تفاصيل التصفية المالية</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <Coins size={15} className="text-blue-400" />
+                <span className="text-xs font-bold text-slate-300">البيانات المالية</span>
               </div>
 
-              {/* Final Salary */}
+              {/* Earned Salary */}
               <div>
-                <label htmlFor="finalSalary" className="block text-sm font-bold text-blue-400 mb-2">
-                  الراتب النهائي (ل.س) <span className="text-blue-500">*</span>
+                <label htmlFor="finalSalary" className="flex items-center justify-between text-xs font-bold text-blue-400 mb-1.5">
+                  <span>الراتب المستحق</span>
+                  {isLoadingSalary && <Loader2 className="animate-spin text-slate-500" size={13} />}
                 </label>
-                <div className="relative group">
+                <div className="relative">
                   <input
                     id="finalSalary"
                     type="number"
                     required
                     min={0}
                     step="0.01"
-                    placeholder="0.00"
-                    className={`w-full p-3.5 bg-[#101720] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-lg font-bold shadow-inner pr-11 placeholder:text-slate-600 ${
+                    className={`w-full px-3 py-2.5 bg-[#0d1319] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-base font-bold pr-10 placeholder:text-slate-600 ${
                       finalSalaryError 
-                        ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500 text-rose-400' 
-                        : 'border-[#263544] focus:ring-blue-500/30 focus:border-blue-500 text-blue-400'
+                        ? 'border-rose-500/60 focus:ring-rose-500/30 text-rose-400' 
+                        : 'border-white/[0.06] focus:ring-blue-500/30 focus:border-blue-500/50 text-blue-400'
                     }`}
-                    value={formData.finalSalaryAmount || ''}
+                    value={isLoadingSalary ? '' : (formData.finalSalaryAmount || '')}
+                    placeholder={isLoadingSalary ? '...' : '0.00'}
                     onChange={handleFinalSalaryChange}
                   />
-                  <DollarSign className={`absolute right-4 top-3.5 transition-colors ${
-                    finalSalaryError ? 'text-rose-500' : 'text-slate-500 group-focus-within:text-blue-500'
-                  }`} size={20} />
+                  <DollarSign className="absolute right-3 top-2.5 text-slate-600" size={18} />
                 </div>
-                {finalSalaryError && (
-                  <p className="text-xs text-rose-400 font-bold mt-1.5">{finalSalaryError}</p>
-                )}
+                {finalSalaryError && <p className="text-[11px] text-rose-400 font-bold mt-1">{finalSalaryError}</p>}
               </div>
 
-              {/* Bonuses */}
-              <div>
-                <label htmlFor="bonuses" className="block text-sm font-bold text-cyan-400 mb-2">
-                  المكافآت (ل.س)
-                </label>
-                <div className="relative group">
+              {/* Bonuses + Deductions side by side on sm+ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Bonuses */}
+                <div>
+                  <label htmlFor="bonuses" className="flex items-center justify-between text-xs font-bold text-emerald-400 mb-1.5">
+                    <span className="flex items-center gap-1"><TrendingUp size={13} />المكافآت</span>
+                    {isLoadingExtras && <Loader2 className="animate-spin text-slate-500" size={13} />}
+                  </label>
                   <input
                     id="bonuses"
                     type="number"
                     min={0}
                     step="0.01"
-                    placeholder="0.00"
-                    className={`w-full p-3.5 bg-[#101720] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-lg font-bold shadow-inner pr-11 placeholder:text-slate-600 ${
+                    className={`w-full px-3 py-2.5 bg-[#0d1319] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-base font-bold placeholder:text-slate-600 ${
                       bonusesError 
-                        ? 'border-cyan-500 focus:ring-cyan-500/30 focus:border-cyan-500 text-cyan-400' 
-                        : 'border-[#263544] focus:ring-cyan-500/30 focus:border-cyan-500 text-cyan-400'
+                        ? 'border-rose-500/60 focus:ring-rose-500/30 text-rose-400' 
+                        : 'border-white/[0.06] focus:ring-emerald-500/30 focus:border-emerald-500/50 text-emerald-400'
                     }`}
-                    value={formData.bonuses || ''}
+                    value={isLoadingExtras ? '' : (formData.bonuses || '')}
+                    placeholder="0.00"
                     onChange={handleBonusesChange}
                   />
-                  <TrendingUp className={`absolute right-4 top-3.5 transition-colors ${
-                    bonusesError ? 'text-cyan-500' : 'text-slate-500 group-focus-within:text-cyan-500'
-                  }`} size={20} />
+                  {bonusesError && <p className="text-[11px] text-rose-400 font-bold mt-1">{bonusesError}</p>}
                 </div>
-                {bonusesError && (
-                  <p className="text-xs text-cyan-400 font-bold mt-1.5">{bonusesError}</p>
-                )}
-              </div>
 
-              {/* Deductions */}
-              <div>
-                <label htmlFor="deductions" className="block text-sm font-bold text-rose-400 mb-2">
-                  الخصومات (ل.س)
-                </label>
-                <div className="relative group">
+                {/* Deductions */}
+                <div>
+                  <label htmlFor="deductions" className="flex items-center justify-between text-xs font-bold text-rose-400 mb-1.5">
+                    <span className="flex items-center gap-1"><TrendingDown size={13} />الخصومات</span>
+                    {isLoadingExtras && <Loader2 className="animate-spin text-slate-500" size={13} />}
+                  </label>
                   <input
                     id="deductions"
                     type="number"
                     min={0}
                     step="0.01"
-                    placeholder="0.00"
-                    className={`w-full p-3.5 bg-[#101720] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-lg font-bold shadow-inner pr-11 placeholder:text-slate-600 ${
+                    className={`w-full px-3 py-2.5 bg-[#0d1319] border rounded-xl focus:ring-2 outline-none transition-all font-mono text-base font-bold placeholder:text-slate-600 ${
                       deductionsError 
-                        ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500 text-rose-400' 
-                        : 'border-[#263544] focus:ring-rose-500/30 focus:border-rose-500 text-rose-400'
+                        ? 'border-rose-500/60 focus:ring-rose-500/30 text-rose-400' 
+                        : 'border-white/[0.06] focus:ring-rose-500/30 focus:border-rose-500/50 text-rose-400'
                     }`}
-                    value={formData.deductions || ''}
+                    value={isLoadingExtras ? '' : (formData.deductions || '')}
+                    placeholder="0.00"
                     onChange={handleDeductionsChange}
                   />
-                  <TrendingDown className={`absolute right-4 top-3.5 transition-colors ${
-                    deductionsError ? 'text-rose-500' : 'text-slate-500 group-focus-within:text-rose-500'
-                  }`} size={20} />
+                  {deductionsError && <p className="text-[11px] text-rose-400 font-bold mt-1">{deductionsError}</p>}
                 </div>
-                {deductionsError && (
-                  <p className="text-xs text-rose-400 font-bold mt-1.5">{deductionsError}</p>
+              </div>
+            </div>
+
+            {/* Total — single prominent display */}
+            <div className="bg-gradient-to-l from-emerald-500/[0.07] to-transparent border border-emerald-500/15 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-300">الصافي المستحق</span>
+                {(isLoadingSalary || isLoadingExtras) ? (
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 text-sm"><Loader2 className="animate-spin" size={15} />حساب...</span>
+                ) : (
+                  <span className={`font-mono font-black text-xl sm:text-2xl ${
+                    isNegativeSettlement ? 'text-rose-400' : 'text-emerald-400'
+                  }`}>
+                    {totalSettlement.toLocaleString('ar-SY')}
+                    <span className="text-xs font-bold text-slate-500 mr-1">ل.س</span>
+                  </span>
                 )}
               </div>
-
-              {/* Calculation Breakdown */}
-              <div className="pt-4 border-t border-white/5 space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-400 font-semibold">الراتب النهائي:</span>
-                  <span className="text-blue-400 font-mono font-bold">
-                    {formData.finalSalaryAmount.toLocaleString('ar-SY')} ل.س
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-400 font-semibold">+ المكافآت:</span>
-                  <span className="text-cyan-400 font-mono font-bold">
-                    {formData.bonuses.toLocaleString('ar-SY')} ل.س
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-400 font-semibold">- الخصومات:</span>
-                  <span className="text-rose-400 font-mono font-bold">
-                    {formData.deductions.toLocaleString('ar-SY')} ل.س
-                  </span>
-                </div>
-                <div className="h-px bg-white/10 my-2" />
-                <div className="flex justify-between items-center">
-                  <span className="text-white font-bold text-base">إجمالي التصفية:</span>
-                  <span className={`font-mono font-black text-xl ${
-                    isNegativeSettlement ? 'text-rose-500' : 'text-emerald-400'
-                  }`}>
-                    {totalSettlement.toLocaleString('ar-SY')} ل.س
-                  </span>
-                </div>
-              </div>
-
-              {/* Negative Settlement Warning */}
               {isNegativeSettlement && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg">
-                  <p className="text-xs text-rose-400 font-bold">
-                    ⚠️ تحذير: إجمالي التصفية سالب - الموظف مدين للشركة
-                  </p>
-                </div>
+                <p className="text-[11px] text-rose-400 font-bold mt-1.5 flex items-center gap-1">
+                  <Info size={13} />الموظف مدين للشركة
+                </p>
               )}
             </div>
 
-            {/* Additional Notes */}
+            {/* Notes */}
             <div>
-              <label className="block text-sm font-bold text-slate-400 mb-2">
-                ملاحظات إضافية (اختياري)
-              </label>
-              <div className="relative group">
+              <label className="block text-xs font-bold text-slate-400 mb-1.5">ملاحظات (اختياري)</label>
+              <div className="relative">
                 <textarea
-                  rows={3}
+                  rows={2}
                   maxLength={1000}
-                  placeholder="أي ملاحظات إضافية حول التصفية المالية..."
-                  className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500 resize-none"
+                  placeholder="ملاحظات حول التصفية..."
+                  className="w-full px-3 py-2.5 bg-[#1a2530] border border-white/[0.06] rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 outline-none transition-all text-white text-sm font-semibold pr-10 placeholder:text-slate-600 resize-none"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 />
-                <MessageSquare className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                <MessageSquare className="absolute right-3 top-2.5 text-slate-600" size={16} />
               </div>
-              <p className="text-xs text-slate-500 font-semibold mt-1.5">
+              <p className="text-[10px] text-slate-600 font-semibold mt-1 text-left">
                 {formData.notes?.length || 0}/1000
               </p>
             </div>
@@ -394,47 +373,29 @@ export default function FinancialSettlementModal({
           </form>
         </div>
 
-        {/* Footer with Total */}
-        <div className="p-5 sm:p-6 bg-[#1a2530]/80 border-t border-white/5 shrink-0 relative z-10">
-          {/* Total Settlement Display */}
-          <div className="mb-4 p-4 bg-[#101720] border border-blue-500/20 rounded-xl">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-bold text-sm">إجمالي التصفية النهائي:</span>
-              <span className={`font-mono font-black text-2xl ${
-                isNegativeSettlement ? 'text-rose-500' : 'text-emerald-400'
-              } drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]`}>
-                {totalSettlement.toLocaleString('ar-SY')} ل.س
-              </span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-between">
+        {/* Footer — compact action bar */}
+        <div className="px-4 sm:px-6 py-3 bg-[#1a2530]/60 border-t border-white/[0.06] shrink-0">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-6 sm:px-8 py-3 rounded-xl font-bold text-slate-300 bg-[#263544] hover:bg-[#324559] hover:text-white border border-transparent active:scale-95 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 sm:flex-none py-2.5 rounded-xl font-bold text-sm text-slate-300 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all disabled:opacity-50"
             >
               إلغاء
             </button>
-
             <button
               type="submit"
               form="settlementForm"
-              disabled={isPending}
-              className="bg-blue-500 text-white px-8 sm:px-10 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-blue-600 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(59,130,246,0.3)] text-sm sm:text-base"
+              disabled={isPending || isLoadingSalary || isLoadingExtras}
+              className="flex-[2] sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-blue-500 text-white flex items-center justify-center gap-2 hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-60 shadow-lg shadow-blue-500/20"
             >
-              {isPending ? (
-                <>
-                  <Loader2 className="animate-spin" size={20} />
-                  جاري المعالجة...
-                </>
+              {(isLoadingSalary || isLoadingExtras) ? (
+                <><Loader2 className="animate-spin" size={18} />جاري الجلب...</>
+              ) : isPending ? (
+                <><Loader2 className="animate-spin" size={18} />جاري المعالجة...</>
               ) : (
-                <>
-                  <DollarSign size={20} />
-                  تأكيد التصفية المالية
-                </>
+                <><DollarSign size={18} />تأكيد التصفية</>
               )}
             </button>
           </div>

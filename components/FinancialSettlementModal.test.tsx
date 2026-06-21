@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// Mock the API client to prevent real network calls in the useEffect fetch
+vi.mock("@/lib/api-client", () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({
+      data: { earnedSalary: 0, bonuses: 0, deductions: 0 },
+    }),
+  },
+}));
+
 import FinancialSettlementModal from "./FinancialSettlementModal";
 import type { Employee } from "@/types/employee";
 
@@ -92,7 +102,7 @@ describe("FinancialSettlementModal", () => {
     );
 
     // The final salary input has required and min="0" attributes
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     expect(finalSalaryInput).toHaveAttribute("required");
     expect(finalSalaryInput).toHaveAttribute("min", "0");
     
@@ -112,7 +122,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -136,7 +146,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -160,7 +170,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -192,7 +202,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "1000");
 
@@ -221,7 +231,7 @@ describe("FinancialSettlementModal", () => {
     await user.clear(dateInput);
     await user.type(dateInput, "2024-01-15");
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -290,7 +300,7 @@ describe("FinancialSettlementModal", () => {
     }
   });
 
-  it("should disable buttons when isPending is true", () => {
+  it("should disable buttons when isPending is true", async () => {
     render(
       <FinancialSettlementModal
         employee={mockEmployee}
@@ -301,14 +311,15 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const submitButton = screen.getByRole("button", { name: /جاري المعالجة/ });
+    // Wait for the initial API fetch to resolve, then button shows "جاري المعالجة..."
+    const submitButton = await screen.findByRole("button", { name: /جاري المعالجة/ });
     const cancelButton = screen.getByRole("button", { name: /إلغاء/ });
 
     expect(submitButton).toBeDisabled();
     expect(cancelButton).toBeDisabled();
   });
 
-  it("should show loading state when isPending is true", () => {
+  it("should show loading state when isPending is true", async () => {
     render(
       <FinancialSettlementModal
         employee={mockEmployee}
@@ -319,7 +330,8 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    expect(screen.getByText(/جاري المعالجة/)).toBeInTheDocument();
+    // Wait for the initial API fetch to resolve
+    expect(await screen.findByText(/جاري المعالجة/)).toBeInTheDocument();
   });
 
   it("should reset form when modal is reopened", async () => {
@@ -334,7 +346,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -360,7 +372,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const resetFinalSalaryInput = screen.getByLabelText(/الراتب النهائي/) as HTMLInputElement;
+    const resetFinalSalaryInput = screen.getByLabelText(/الراتب المقبوض/) as HTMLInputElement;
     expect(resetFinalSalaryInput.value).toBe("");
   });
 
@@ -424,12 +436,12 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
     await waitFor(() => {
-      expect(screen.getByText(/الراتب النهائي:/)).toBeInTheDocument();
+      expect(screen.getByText(/الراتب المقبوض:/)).toBeInTheDocument();
       expect(screen.getByText(/\+ المكافآت:/)).toBeInTheDocument();
       expect(screen.getByText(/- الخصومات:/)).toBeInTheDocument();
       expect(screen.getByText(/إجمالي التصفية:/)).toBeInTheDocument();
@@ -447,8 +459,11 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     
+    // Wait for the initial API fetch to resolve so it doesn't override user input
+    await screen.findByRole("button", { name: /تأكيد التصفية المالية/ });
+
     // Test that the component has the parseArabicNumber function by checking
     // that the input accepts numeric values
     fireEvent.change(finalSalaryInput, { target: { value: "5000" } });
@@ -470,7 +485,7 @@ describe("FinancialSettlementModal", () => {
     );
 
     // Provide valid input directly
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -480,7 +495,7 @@ describe("FinancialSettlementModal", () => {
     });
     
     // No error should be present
-    expect(screen.queryByText(/يجب أن يكون الراتب النهائي أكبر من صفر/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/يجب أن يكون الراتب المقبوض أكبر من صفر/)).not.toBeInTheDocument();
   });
 
   it("should display total settlement in footer prominently", async () => {
@@ -495,7 +510,7 @@ describe("FinancialSettlementModal", () => {
       />
     );
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 
@@ -520,7 +535,7 @@ describe("FinancialSettlementModal", () => {
     await user.clear(dateInput);
     await user.type(dateInput, "2024-01-15");
 
-    const finalSalaryInput = screen.getByLabelText(/الراتب النهائي/);
+    const finalSalaryInput = screen.getByLabelText(/الراتب المقبوض/);
     await user.clear(finalSalaryInput);
     await user.type(finalSalaryInput, "5000");
 

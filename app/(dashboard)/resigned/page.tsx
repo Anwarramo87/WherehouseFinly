@@ -25,7 +25,6 @@ export default function ResignedEmployeesPage() {
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isRehirePending, setIsRehirePending] = useState(false);
   const [isSettlementPending, setIsSettlementPending] = useState(false);
-  const [provisionalSettlement, setProvisionalSettlement] = useState<Record<string, unknown> | null>(null);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,22 +229,10 @@ export default function ResignedEmployeesPage() {
     }
   }, [selectedEmployeeForRehire]);
 
-  // Handle financial settlement
-  const handleFinancialSettlement = useCallback(async (employeeId: string) => {
+  // Handle financial settlement — open modal (data fetching is handled by the modal)
+  const handleFinancialSettlement = useCallback((employeeId: string) => {
     const employee = resignedOrTerminated.find(emp => emp.employeeId === employeeId);
     if (employee) {
-      try {
-        const response = await apiClient.get('/payroll/provisional-settlement', {
-          params: {
-            employeeId: employee.employeeId,
-            terminationDate: employee.terminationDate,
-          },
-        });
-        setProvisionalSettlement(response.data);
-      } catch (error) {
-        console.error('Failed to fetch provisional settlement:', error);
-        toast.error('Failed to fetch provisional settlement data.');
-      }
       setSelectedEmployeeForSettlement(employee);
       setIsSettlementModalOpen(true);
     }
@@ -538,7 +525,12 @@ export default function ResignedEmployeesPage() {
             }}
             onConfirm={handleSettlementConfirm}
             isPending={isSettlementPending}
-            initialSettlementData={provisionalSettlement}
+            employeeId={selectedEmployeeForSettlement.employeeId}
+            initialSettlementDate={
+              selectedEmployeeForSettlement.terminationDate
+                ? new Date(selectedEmployeeForSettlement.terminationDate).toISOString().split('T')[0]
+                : undefined
+            }
           />
         )}
     </div>

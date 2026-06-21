@@ -88,6 +88,8 @@ export default function RewardsClient() {
       const rewardId = bonus.id || `${bonus.employeeId}-${bonus.period || ""}`;
       const isAll = bonus.employeeId === "ALL";
       const employeeId = isAll ? "ALL" : bonus.employeeId;
+      // Skip records for resigned/terminated employees (not in active employees list)
+      if (!isAll && !employeesLookup.has(employeeId)) return null;
       const name = isAll
         ? "جميع الموظفين"
         : employeesLookup.get(employeeId) || "موظف غير معروف";
