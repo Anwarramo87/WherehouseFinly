@@ -34,7 +34,7 @@ interface PermissionGuardProps {
  * has the required permission.
  * 
  * @example
- * <PermissionGuard permission="termination:create">
+ * <PermissionGuard permission="edit_employees">
  *   <button onClick={handleTerminate}>إنهاء الخدمة</button>
  * </PermissionGuard>
  */
@@ -146,8 +146,8 @@ export function RoleGuard({
   children,
   className,
 }: RoleGuardProps) {
-  const { userRoles } = usePermissions();
-  const hasAccess = roles.some(role => userRoles.includes(role));
+  const { userRole } = usePermissions();
+  const hasAccess = userRole !== null && roles.includes(userRole);
 
   if (!hasAccess) {
     return <>{fallback}</>;
@@ -241,8 +241,8 @@ export function OperationGuard({
   children,
   className,
 }: OperationGuardProps) {
-  const { canPerform } = usePermissions();
-  const hasAccess = canPerform(operation);
+  const { hasPermission } = usePermissions();
+  const hasAccess = hasPermission(operation as Permission);
 
   if (!hasAccess) {
     return <>{fallback}</>;

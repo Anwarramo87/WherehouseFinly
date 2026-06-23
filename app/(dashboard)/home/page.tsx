@@ -132,7 +132,8 @@ type ModalType = 'present' | 'absent' | 'late' | 'overtime' | null;
 export default function DashboardPage() {
   const { kpis, isLoading, presentEmployees, absentEmployees, lateEmployees, overtimeEmployees } = useDashboard();
   const { data: employees = [] } = useEmployees({ includeTerminated: true, fetchAll: true, limit: 500 });
-  const canViewFinancialRecords = useAuthStore((state: { hasAnyRole: (roles: string[]) => boolean }) => state.hasAnyRole(["admin"]));
+  const userPermissions = useAuthStore((state) => state.user?.permissions);
+  const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
 
   const isSkeleton = isLoading;

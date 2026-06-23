@@ -1,8 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Menu } from "lucide-react";
+import SessionRefresh from "@/components/SessionRefresh";
+import apiClient from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 const Sidebar = dynamic(() => import("@/components/Sidebar"), {
   loading: () => <aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />,
@@ -13,8 +16,21 @@ export default function DashboardLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const setUser = useAuthStore((state) => state.setUser);
+  const user = useAuthStore((state) => state.user);
 
-
+  useEffect(() => {
+    if (user?.permissions) return;
+    apiClient.get('/auth/me').then((res) => {
+      const data = res.data as Record<string, unknown>;
+      if (data && data.permissions) {
+        setUser({
+          ...(user ?? {}),
+          ...(data as { id?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] }),
+        });
+      }
+    }).catch(() => {});
+  }, [user, setUser]);
 
   const toggleCollapse = useCallback(() => setIsCollapsed((v: boolean) => !v), []);
 
@@ -23,6 +39,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen h-screen overflow-hidden" dir="rtl">
+      <SessionRefresh />
       {/* ── Desktop Sidebar ── */}
       <div
         className={`hidden lg:block shrink-0 h-screen transition-all duration-300 ${

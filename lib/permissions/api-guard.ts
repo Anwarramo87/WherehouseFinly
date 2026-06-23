@@ -2,18 +2,11 @@
  * API Permission Guard
  * 
  * This module provides server-side permission checking for API routes.
- * It integrates with the existing authentication system to validate
- * permissions before allowing access to sensitive operations.
+ * It integrates with the backend's permission system via /auth/me.
  */
 
 import { headers } from "next/headers";
-import type { Permission, Role } from "./types";
-import {
-  ROLE_PERMISSIONS,
-  roleHasPermission,
-  roleHasAnyPermission,
-  canPerformOperation,
-} from "./types";
+import type { Permission } from "./types";
 
 // ============================================================================
 // Types
@@ -23,7 +16,6 @@ export interface AuthenticatedUser {
   id: string;
   employeeId?: string;
   role?: string;
-  roles?: string[];
   permissions?: string[];
 }
 
@@ -40,7 +32,6 @@ export interface PermissionCheckResult {
 
 /**
  * Extract authenticated user from request headers/cookies.
- * This simulates what the backend does for authentication.
  */
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   try {
@@ -48,27 +39,29 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
     const cookieHeader = headersList.get("cookie") || "";
     
     // Check for auth token in cookies
-    const hasAuthCookie = cookieHeader.includes("auth_access_token");
+    const hasAuthCookie = cookieHeader.includes("auth_access_token") || cookieHeader.includes("warehouse_access_token");
     
     if (!hasAuthCookie) {
       return null;
     }
 
-    // In a real implementation, we would decode the JWT token
-    // For now, we'll return a mock user based on the role header
+    // Headers set by the backend or proxy
     const roleHeader = headersList.get("x-user-role");
     const userIdHeader = headersList.get("x-user-id");
     const employeeIdHeader = headersList.get("x-user-employee-id");
+    const permissionsHeader = headersList.get("x-user-permissions");
     
-    if (!roleHeader) {
+    if (!userIdHeader) {
       return null;
     }
 
+    const permissions = permissionsHeader ? permissionsHeader.split(",") : [];
+
     return {
-      id: userIdHeader || "unknown",
+      id: userIdHeader,
       employeeId: employeeIdHeader || undefined,
-      role: roleHeader,
-      roles: roleHeader ? [roleHeader] : [],
+      role: roleHeader || undefined,
+      permissions,
     };
   } catch {
     return null;
@@ -95,8 +88,8 @@ export function checkPermission(
     };
   }
 
-  const userRoles = getUserRoles(user);
-  const isAdmin = userRoles.includes("admin");
+  const isAdmin = user.role === "admin";
+  const userPermissions = user.permissions || [];
 
   // Admin has all permissions
   if (isAdmin) {
@@ -108,13 +101,13 @@ export function checkPermission(
     };
   }
 
-  // Check if any role has the permission
-  const hasPermission = userRoles.some(role => roleHasPermission(role, permission));
+  // Check if permission is in user's permission list
+  const hasPermission = userPermissions.includes(permission);
 
   if (hasPermission) {
     return {
       allowed: true,
-      userPermissions: getUserPermissions(user),
+      userPermissions,
       requiredPermissions: [permission],
     };
   }
@@ -122,7 +115,7 @@ export function checkPermission(
   return {
     allowed: false,
     reason: `Permission denied: ${permission}`,
-    userPermissions: getUserPermissions(user),
+    userPermissions,
     requiredPermissions: [permission],
   };
 }
@@ -143,8 +136,8 @@ export function checkAnyPermission(
     };
   }
 
-  const userRoles = getUserRoles(user);
-  const isAdmin = userRoles.includes("admin");
+  const isAdmin = user.role === "admin";
+  const userPermissions = user.permissions || [];
 
   // Admin has all permissions
   if (isAdmin) {
@@ -156,13 +149,13 @@ export function checkAnyPermission(
     };
   }
 
-  // Check if any role has any of the permissions
-  const hasAny = userRoles.some(role => roleHasAnyPermission(role, permissions));
+  // Check if any permission is in user's list
+  const hasAny = permissions.some(perm => userPermissions.includes(perm));
 
   if (hasAny) {
     return {
       allowed: true,
-      userPermissions: getUserPermissions(user),
+      userPermissions,
       requiredPermissions: permissions,
     };
   }
@@ -170,102 +163,9 @@ export function checkAnyPermission(
   return {
     allowed: false,
     reason: `Permission denied: requires one of ${permissions.join(", ")}`,
-    userPermissions: getUserPermissions(user),
+    userPermissions,
     requiredPermissions: permissions,
   };
-}
-
-/**
- * Check if a user can perform a specific operation.
- */
-export function checkOperation(
-  user: AuthenticatedUser | null,
-  operation: string
-): PermissionCheckResult {
-  if (!user) {
-    return {
-      allowed: false,
-      reason: "Authentication required",
-      userPermissions: [],
-      requiredPermissions: [],
-    };
-  }
-
-  const userRoles = getUserRoles(user);
-  const isAdmin = userRoles.includes("admin");
-
-  // Admin can perform all operations
-  if (isAdmin) {
-    return {
-      allowed: true,
-      reason: "Admin bypass",
-      userPermissions: ["*"],
-      requiredPermissions: [],
-    };
-  }
-
-  // Check if any role can perform the operation
-  const canPerform = userRoles.some(role => canPerformOperation(role, operation));
-
-  if (canPerform) {
-    return {
-      allowed: true,
-      userPermissions: getUserPermissions(user),
-      requiredPermissions: [],
-    };
-  }
-
-  return {
-    allowed: false,
-    reason: `Operation not permitted: ${operation}`,
-    userPermissions: getUserPermissions(user),
-    requiredPermissions: [],
-  };
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Get all roles for a user.
- */
-function getUserRoles(user: AuthenticatedUser): string[] {
-  const roles: string[] = [];
-  
-  if (user.role) {
-    roles.push(String(user.role).toLowerCase());
-  }
-  
-  if (Array.isArray(user.roles)) {
-    user.roles.forEach(r => {
-      const role = String(r).toLowerCase();
-      if (!roles.includes(role)) {
-        roles.push(role);
-      }
-    });
-  }
-  
-  return roles;
-}
-
-/**
- * Get all permissions for a user based on their roles.
- */
-function getUserPermissions(user: AuthenticatedUser): string[] {
-  const userRoles = getUserRoles(user);
-  const permissions = new Set<string>();
-  
-  userRoles.forEach(role => {
-    const rolePerms = ROLE_PERMISSIONS[role as Role];
-    if (rolePerms) {
-      Object.entries(rolePerms)
-        .filter(([, has]) => has)
-        .forEach(([perm]) => permissions.add(perm));
-    }
-  });
-  
-  return Array.from(permissions);
 }
 
 // ============================================================================
@@ -314,45 +214,37 @@ export function createUnauthorizedResponse(): Response {
 }
 
 // ============================================================================
-// Termination-Specific Permission Checks
+// Employee Management Permission Checks
 // ============================================================================
 
 /**
- * Check if user can terminate an employee.
+ * Check if user can view employees (required for terminated employee workflows).
  */
-export async function canTerminateEmployee(): Promise<PermissionCheckResult> {
+export async function canViewEmployees(): Promise<PermissionCheckResult> {
   const user = await getAuthenticatedUser();
-  return checkPermission(user, "termination:create");
+  return checkPermission(user, "view_employees");
 }
 
 /**
- * Check if user can rehire an employee.
+ * Check if user can edit employees (required for termination/rehire workflows).
  */
-export async function canRehireEmployee(): Promise<PermissionCheckResult> {
+export async function canEditEmployees(): Promise<PermissionCheckResult> {
   const user = await getAuthenticatedUser();
-  return checkPermission(user, "rehire:process");
+  return checkPermission(user, "edit_employees");
 }
 
 /**
- * Check if user can process financial settlement.
+ * Check if user can view payroll (required for financial settlement).
  */
-export async function canProcessSettlement(): Promise<PermissionCheckResult> {
+export async function canViewPayroll(): Promise<PermissionCheckResult> {
   const user = await getAuthenticatedUser();
-  return checkPermission(user, "settlement:process");
+  return checkPermission(user, "view_payroll");
 }
 
 /**
- * Check if user can view resigned employees.
+ * Check if user can approve payroll (required for financial settlement).
  */
-export async function canViewResignedEmployees(): Promise<PermissionCheckResult> {
+export async function canApprovePayroll(): Promise<PermissionCheckResult> {
   const user = await getAuthenticatedUser();
-  return checkPermission(user, "termination:view");
-}
-
-/**
- * Check if user can export resigned list.
- */
-export async function canExportResignedList(): Promise<PermissionCheckResult> {
-  const user = await getAuthenticatedUser();
-  return checkPermission(user, "export:resigned");
+  return checkPermission(user, "approve_payroll");
 }

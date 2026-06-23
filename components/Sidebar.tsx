@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -20,18 +20,26 @@ import { QUERY_STALE_TIME } from '@/lib/query-cache';
 interface SidebarProps {
   isCollapsed?: boolean;
   onClose?: () => void;
-  toggleCollapse?: () => void; // دالة السهم العائم
+  toggleCollapse?: () => void;
 }
 
-const menuItems = [
+interface MenuItem {
+  name: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  href?: string;
+  permissions?: string[];
+  subItems?: { name: string; href: string }[];
+}
+
+const menuItems: MenuItem[] = [
   { name: 'الرئيسية: إحصائيات', icon: LayoutDashboard, href: '/home' },
-  { name: 'إدارة الموظفين', icon: Users, href: '/employees', roles: ['admin', 'hr', 'manager'] },
-  { name: 'المستقيلون', icon: UserMinus, href: '/resigned', roles: ['admin', 'hr', 'manager'] },
-  { name: 'سجل الحضور', icon: ClipboardList, href: '/attendance', roles: ['admin', 'hr', 'manager'] },
+  { name: 'إدارة الموظفين', icon: Users, href: '/employees', permissions: ['view_employees'] },
+  { name: 'المستقيلون', icon: UserMinus, href: '/resigned', permissions: ['view_employees'] },
+  { name: 'سجل الحضور', icon: ClipboardList, href: '/attendance', permissions: ['view_attendance'] },
   {
     name: 'الرواتب',
     icon: Wallet,
-    roles: ['admin', 'finance', 'manager'],
+    permissions: ['view_payroll'],
     subItems: [
       { name: 'إعدادات الرواتب', href: '/salaries/salariesSetting' },
       { name: 'المكافآت والحوافز', href: '/salaries/rewards' },
@@ -40,20 +48,23 @@ const menuItems = [
       { name: 'تقارير الرواتب', href: '/salaries/payroll' },
     ]
   },
-  { name: 'بصمتي وحضوري', icon: Fingerprint, href: '/biometric' },
-  { name: 'مخزن الشغل', icon: Box, href: '/inventory', roles: ['admin', 'warehouse', 'manager'] },
-  { name: 'الباص', icon: Bus, href: '/Transportation', roles: ['admin', 'warehouse', 'manager'] },
-  { name: 'استيراد البيانات', icon: FileInput, href: '/importData', roles: ['admin', 'manager'] },
-  { name: 'سلة المهملات', icon: Trash2, href: '/trash', roles: ['admin'] },
-  { name: 'الإعدادات', icon: Settings, href: '/settings', roles: ['admin'] },
+  { name: 'بصمتي وحضوري', icon: Fingerprint, href: '/biometric', permissions: ['view_attendance'] },
+  { name: 'مخزن الشغل', icon: Box, href: '/inventory', permissions: ['view_inventory'] },
+  { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
+  { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
+  { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },
+  { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
 ];
 
 function useIsHydrated() {
-  return useSyncExternalStore(
-    () => () => { },
-    () => true,
-    () => false,
-  );
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setHydrated(true);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
+  return hydrated;
 }
 
 export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }: SidebarProps) {
@@ -99,7 +110,8 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
 
   const currentUser = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
-  const hasAnyRole = useAuthStore((state) => state.hasAnyRole);
+
+  const userPermissions = currentUser?.permissions || [];
 
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
@@ -107,9 +119,9 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const displayRole = currentUser?.role || 'مشرف عام';
 
   const visibleMenuItems = menuItems.filter((item) => {
-    if (!item.roles || item.roles.length === 0) return true;
+    if (!item.permissions || item.permissions.length === 0) return true;
     if (!isHydrated) return false;
-    return hasAnyRole(item.roles);
+    return userPermissions.some(perm => item.permissions!.includes(perm));
   });
 
   const isHrefActive = (href: string) => {

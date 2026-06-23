@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import type { Bonus, BonusInput } from "@/types/bonus";
@@ -17,6 +17,8 @@ export default function RewardsClient() {
   const searchParams = useSearchParams();
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   const { data: salaries = [] } = useSalaries();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
@@ -78,18 +80,28 @@ export default function RewardsClient() {
   }, [employees]);
 
   // تجهيز السجلات المسطحة أولاً
+  // استخدام فحص مزدوج: (1) يجب أن يكون في قائمة الموظفين النشطين، (2) يجب ألا يكون في قائمة المستقيلين
   const rewards = useMemo<RewardRecord[]>(() => {
     // التحقق من أن البيانات array
     if (!Array.isArray(bonusesData)) {
       return [];
     }
     
+    const activeEmployeeIds = new Set(employees.map(e => e.employeeId));
+    
     return bonusesData.map((bonus) => {
       const rewardId = bonus.id || `${bonus.employeeId}-${bonus.period || ""}`;
       const isAll = bonus.employeeId === "ALL";
       const employeeId = isAll ? "ALL" : bonus.employeeId;
-      // Skip records for resigned/terminated employees (not in active employees list)
-      if (!isAll && !employeesLookup.has(employeeId)) return null;
+      
+      // Skip records for resigned/terminated employees
+      // Dual-check: must be in active list AND not in resigned list
+      if (!isAll) {
+        const isActive = activeEmployeeIds.has(employeeId);
+        const isNotResigned = !resignedIds.has(employeeId);
+        if (!isActive || !isNotResigned) return null;
+      }
+      
       const name = isAll
         ? "جميع الموظفين"
         : employeesLookup.get(employeeId) || "موظف غير معروف";
@@ -113,7 +125,7 @@ export default function RewardsClient() {
         allEmployees: isAll,
       };
     }).filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [bonusesData, employeesLookup]);
+  }, [bonusesData, employeesLookup, resignedIds, employees]);
 
   // تجميع السجلات حسب الموظف
   const groupedRewards = useMemo(() => {

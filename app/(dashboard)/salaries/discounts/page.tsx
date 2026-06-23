@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays as _CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
 import { useAdvances } from "@/hooks/useAdvances";
 import { Advance, AdvanceInput } from "@/types/advance";
@@ -17,6 +17,8 @@ export default function DiscountsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
@@ -33,15 +35,23 @@ export default function DiscountsPage() {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Helper to attach employee names to the records
-  // Filter out records for resigned/terminated employees (not in active employees list)
+  // Filter out records for resigned/terminated employees
+  // Use dual-check: (1) must be in active employees list, (2) must NOT be in resigned set
   const recordsWithNames = useMemo(() => {
+    const activeEmployeeIds = new Set(employees.map(e => e.employeeId));
+    
     return discounts
-      .filter(d => employees.some(e => e.employeeId === d.employeeId))
+      .filter(d => {
+        // Must be in active employees AND not in resigned list
+        const isActive = activeEmployeeIds.has(d.employeeId);
+        const isNotResigned = !resignedIds.has(d.employeeId);
+        return isActive && isNotResigned;
+      })
       .map(d => {
         const emp = employees.find(e => e.employeeId === d.employeeId);
         return { ...d, name: emp?.name || "موظف غير معروف" };
       });
-  }, [discounts, employees]);
+  }, [discounts, employees, resignedIds]);
 
   const filteredDiscounts = useMemo(() => {
     let result = recordsWithNames;

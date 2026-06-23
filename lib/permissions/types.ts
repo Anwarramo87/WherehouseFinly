@@ -1,269 +1,79 @@
 /**
- * Role-Based Access Control (RBAC) System for Employee Resignation Management
+ * Permission-Based Access Control System
  * 
- * This module defines the permission matrix and types for controlling access
- * to termination, rehire, and financial settlement operations.
+ * This module defines permission types and checks for authorization.
+ * Permissions are based on the backend's permission system via the /auth/me endpoint.
+ * The backend only issues role values of 'admin' or 'staff', which grant specific permissions.
  */
 
 // ============================================================================
 // Permission Definitions
 // ============================================================================
 
+/**
+ * Backend permission strings (from @Permissions decorators in backend controllers).
+ * These are the canonical permission values issued by the backend.
+ * Permissions are case-sensitive and use underscore naming (e.g., view_employees, not view:employees).
+ */
 export type Permission =
-  // Employee management permissions
-  | 'employee:view'
-  | 'employee:create'
-  | 'employee:edit'
-  | 'employee:delete'
+  // Employee management
+  | "view_employees"
+  | "edit_employees"
+  | "delete_employees"
   
-  // Termination permissions
-  | 'termination:view'
-  | 'termination:create'
-  | 'termination:process'
+  // Attendance
+  | "view_attendance"
+  | "edit_attendance"
   
-  // Rehire permissions
-  | 'rehire:view'
-  | 'rehire:process'
+  // Payroll
+  | "view_payroll"
+  | "run_payroll"
+  | "approve_payroll"
+  | "delete_payroll"
   
-  // Financial settlement permissions
-  | 'settlement:view'
-  | 'settlement:process'
+  // Inventory
+  | "view_inventory"
+  | "edit_inventory"
   
-  // Export permissions
-  | 'export:resigned'
-  | 'export:payroll'
+  // Imports
+  | "view_imports"
+  | "run_imports"
   
-  // Audit and reporting
-  | 'audit:view'
-  | 'reports:view'
-  | 'reports:generate';
+  // Device management
+  | "view_devices"
+  | "manage_devices"
+  
+  // Financial management
+  | "manage_advances"
+  | "manage_bonuses"
+  | "manage_penalties"
+  | "manage_insurance"
+  | "manage_salary"
+  
+  // Admin functions
+  | "manage_users"
+  | "manage_roles"
+  | "manage_trash"
+  | "manage_backups";
+
 
 // ============================================================================
-// Role Definitions
-// ============================================================================
-
-export type Role = 
-  | 'admin'
-  | 'hr_manager'
-  | 'accountant'
-  | 'manager'
-  | 'supervisor'
-  | 'employee';
-
-// ============================================================================
-// Permission Matrix
-// ============================================================================
-
-export interface PermissionMatrix {
-  [role: string]: {
-    [permission in Permission]?: boolean;
-  };
-}
-
-/**
- * Permission matrix defining which roles have which permissions.
- * This is the central configuration for access control.
- */
-export const ROLE_PERMISSIONS: PermissionMatrix = {
-  admin: {
-    // Full access to everything
-    'employee:view': true,
-    'employee:create': true,
-    'employee:edit': true,
-    'employee:delete': true,
-    'termination:view': true,
-    'termination:create': true,
-    'termination:process': true,
-    'rehire:view': true,
-    'rehire:process': true,
-    'settlement:view': true,
-    'settlement:process': true,
-    'export:resigned': true,
-    'export:payroll': true,
-    'audit:view': true,
-    'reports:view': true,
-    'reports:generate': true,
-  },
-  
-  hr_manager: {
-    // HR managers can manage employees and terminations
-    'employee:view': true,
-    'employee:create': true,
-    'employee:edit': true,
-    'termination:view': true,
-    'termination:create': true,
-    'termination:process': true,
-    'rehire:view': true,
-    'rehire:process': true,
-    'settlement:view': true,
-    'export:resigned': true,
-    'reports:view': true,
-    'reports:generate': true,
-  },
-  
-  accountant: {
-    // Accountants can view and process settlements
-    'employee:view': true,
-    'termination:view': true,
-    'rehire:view': true,
-    'settlement:view': true,
-    'settlement:process': true,
-    'export:payroll': true,
-    'reports:view': true,
-  },
-  
-  manager: {
-    // Managers can view and request terminations
-    'employee:view': true,
-    'termination:view': true,
-    'termination:create': true, // Can request, but needs approval
-    'rehire:view': true,
-    'settlement:view': true,
-    'reports:view': true,
-  },
-  
-  supervisor: {
-    // Supervisors have limited view access
-    'employee:view': true,
-    'termination:view': true,
-    'rehire:view': true,
-    'settlement:view': true,
-  },
-  
-  employee: {
-    // Regular employees have minimal access
-    'employee:view': true, // View own profile
-  },
-};
-
-// ============================================================================
-// Operation Permission Requirements
-// ============================================================================
-
-export interface OperationPermission {
-  operation: string;
-  requiredPermissions: Permission[];
-  description: string;
-}
-
-/**
- * Define which permissions are required for each termination-related operation.
- */
-export const OPERATION_PERMISSIONS: OperationPermission[] = [
-  {
-    operation: 'terminate_employee',
-    requiredPermissions: ['termination:create'],
-    description: 'إنهاء خدمة موظف (استقالة أو إقالة)',
-  },
-  {
-    operation: 'view_resigned_employees',
-    requiredPermissions: ['termination:view'],
-    description: 'عرض قائمة الموظفين المغادرين',
-  },
-  {
-    operation: 'rehire_employee',
-    requiredPermissions: ['rehire:process'],
-    description: 'إعادة تعيين موظف مغادر',
-  },
-  {
-    operation: 'process_financial_settlement',
-    requiredPermissions: ['settlement:process'],
-    description: 'معالجة التصفية المالية لموظف مغادر',
-  },
-  {
-    operation: 'view_financial_settlement',
-    requiredPermissions: ['settlement:view'],
-    description: 'عرض حالة التصفية المالية',
-  },
-  {
-    operation: 'export_resigned_list',
-    requiredPermissions: ['export:resigned'],
-    description: 'تصدير قائمة المستقيلين',
-  },
-  {
-    operation: 'view_audit_logs',
-    requiredPermissions: ['audit:view'],
-    description: 'عرض سجل التدقيق',
-  },
-];
-
-// ============================================================================
-// Helper Functions
+// Permission Checking Helpers
 // ============================================================================
 
 /**
- * Check if a role has a specific permission.
- */
-export function roleHasPermission(role: string, permission: Permission): boolean {
-  const rolePermissions = ROLE_PERMISSIONS[role as Role];
-  if (!rolePermissions) {
-    return false;
-  }
-  return rolePermissions[permission] === true;
-}
-
-/**
- * Check if a role has any of the specified permissions.
- */
-export function roleHasAnyPermission(role: string, permissions: Permission[]): boolean {
-  return permissions.some(permission => roleHasPermission(role, permission));
-}
-
-/**
- * Get all permissions for a specific role.
- */
-export function getRolePermissions(role: string): Permission[] {
-  const rolePermissions = ROLE_PERMISSIONS[role as Role];
-  if (!rolePermissions) {
-    return [];
-  }
-  return Object.entries(rolePermissions)
-    .filter(([, hasPermission]) => hasPermission)
-    .map(([permission]) => permission as Permission);
-}
-
-/**
- * Get the required permissions for a specific operation.
- */
-export function getOperationPermissions(operation: string): Permission[] {
-  const op = OPERATION_PERMISSIONS.find(o => o.operation === operation);
-  return op?.requiredPermissions || [];
-}
-
-/**
- * Check if a role can perform a specific operation.
- */
-export function canPerformOperation(role: string, operation: string): boolean {
-  const requiredPermissions = getOperationPermissions(operation);
-  if (requiredPermissions.length === 0) {
-    return false;
-  }
-  return roleHasAnyPermission(role, requiredPermissions);
-}
-
-// ============================================================================
-// Type Guards
-// ============================================================================
-
-/**
- * Type guard to check if a string is a valid permission.
+ * Check if a permission is valid (type guard).
  */
 export function isPermission(value: string): value is Permission {
   const validPermissions: Permission[] = [
-    'employee:view', 'employee:create', 'employee:edit', 'employee:delete',
-    'termination:view', 'termination:create', 'termination:process',
-    'rehire:view', 'rehire:process',
-    'settlement:view', 'settlement:process',
-    'export:resigned', 'export:payroll',
-    'audit:view', 'reports:view', 'reports:generate',
+    "view_employees", "edit_employees", "delete_employees",
+    "view_attendance", "edit_attendance",
+    "view_payroll", "run_payroll", "approve_payroll", "delete_payroll",
+    "view_inventory", "edit_inventory",
+    "view_imports", "run_imports",
+    "view_devices", "manage_devices",
+    "manage_advances", "manage_bonuses", "manage_penalties", "manage_insurance", "manage_salary",
+    "manage_users", "manage_roles", "manage_trash", "manage_backups",
   ];
   return validPermissions.includes(value as Permission);
-}
-
-/**
- * Type guard to check if a string is a valid role.
- */
-export function isRole(value: string): value is Role {
-  const validRoles: Role[] = ['admin', 'hr_manager', 'accountant', 'manager', 'supervisor', 'employee'];
-  return validRoles.includes(value as Role);
 }

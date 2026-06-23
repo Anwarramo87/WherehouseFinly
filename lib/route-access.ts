@@ -32,20 +32,23 @@ export const PROTECTED_ROUTE_PREFIXES = [
   "/bonuses",
 ];
 
-export const ROUTE_ROLE_MAP: Record<string, string[]> = {
-  "/employees": ["admin", "hr", "manager"],
-  "/resigned": ["admin", "hr", "manager"],
-  "/attendance": ["admin", "hr", "manager"],
-  "/salaries": ["admin", "finance", "manager"],
-  "/inventory": ["admin", "warehouse", "manager"],
-  "/Transportation": ["admin", "warehouse", "manager"],
-  "/importData": ["admin", "manager"],
-  "/settings": ["admin"],
-  "/payroll": ["admin", "finance", "manager"],
-  "/finances": ["admin", "finance", "manager"],
-  "/vouchers": ["admin", "finance", "manager"],
-  "/advances": ["admin", "finance", "manager"],
-  "/bonuses": ["admin", "finance", "manager"],
+export const ROUTE_PERMISSION_MAP: Record<string, string[]> = {
+  // Backend permissions extracted from @Permissions decorators in backend controllers
+  // Source: werehouse/backend-nest/src/*/[controller].ts
+  "/employees": ["view_employees"],
+  "/resigned": ["view_employees"],
+  "/attendance": ["view_attendance"],
+  "/salaries": ["manage_salary"],
+  "/inventory": ["view_inventory"],
+  "/Transportation": ["view_employees"],
+  "/importData": ["run_imports"],
+  "/settings": ["manage_users"], // Admin-only settings
+  "/payroll": ["view_payroll"],
+  "/finances": ["view_payroll"],
+  "/vouchers": ["view_payroll"],
+  "/advances": ["manage_advances"],
+  "/bonuses": ["manage_bonuses"],
+  "/biometric": ["view_attendance"],
 };
 
 export const isProtectedRoute = (pathname: string) =>
@@ -53,21 +56,22 @@ export const isProtectedRoute = (pathname: string) =>
     matchesRoutePrefix(pathname, routePrefix),
   );
 
-export const getRequiredRolesForPath = (pathname: string): string[] | null => {
+export const getRequiredPermissionsForPath = (pathname: string): string[] | null => {
   const normalizedPath = normalizePathname(pathname);
-  const sortedRouteKeys = Object.keys(ROUTE_ROLE_MAP).sort((a, b) => b.length - a.length);
+  const sortedRouteKeys = Object.keys(ROUTE_PERMISSION_MAP).sort((a, b) => b.length - a.length);
 
   for (const routeKey of sortedRouteKeys) {
     if (matchesRoutePrefix(normalizedPath, routeKey)) {
-      return ROUTE_ROLE_MAP[routeKey];
+      return ROUTE_PERMISSION_MAP[routeKey];
     }
   }
 
   return null;
 };
 
-export const hasAnyRequiredRole = (userRoles: string[], requiredRoles: string[]) => {
-  const normalizedUserRoles = userRoles.map((role) => role.trim().toLowerCase());
-  return requiredRoles.some((role) => normalizedUserRoles.includes(role.toLowerCase()));
+export const hasAnyRequiredPermission = (userPermissions: string[], requiredPermissions: string[]) => {
+  return requiredPermissions.some((permission) =>
+    userPermissions.includes(permission),
+  );
 };
 

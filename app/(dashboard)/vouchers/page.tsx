@@ -8,8 +8,38 @@ import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useDiscounts, DiscountRecord } from "@/hooks/useDiscounts";
 import { usePenalties, PenaltyRecord } from "@/hooks/usePenalties";
+import { usePayrollInputs } from "@/hooks/usePayrollInputs";
+import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
+import { useAttendance } from "@/hooks/useAttendance";
+import { useLeaves } from "@/hooks/useLeaves";
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
+import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
+
+// ─── Salary Calculation Constants ──────────────────────────────────────────────
+const STANDARD_WORK_DAYS = 26;
+const HOURS_PER_DAY = 8;
+
+const calcEarnedSalary = (
+  grossSalary: number,
+  presentDays: number,
+  paidLeaveDays: number,
+  lateMinutes: number,
+  earlyLeaveMinutes = 0,
+  overtimeMinutes = 0,
+  overtimeWeekendDays = 0,
+): number => {
+  if (grossSalary <= 0) return 0;
+  const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
+  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
+  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
+  const salaryFromDays = dailyRate * paidDays;
+  const lateDeduction = lateMinutes * minuteRate * 1.5;
+  const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
+  const overtimePay = overtimeMinutes * minuteRate * 1.5;
+  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5;
+  return Math.max(0, salaryFromDays - lateDeduction - earlyLeaveDeduction + overtimePay + weekendOvertimePay);
+};
 
 // ─── TypeScript Interfaces ─────────────────────────────────────────────────────
 interface VoucherData {
@@ -21,6 +51,7 @@ interface VoucherData {
   fixedDeductions: number;
   variableDeductions: number;
   netPay: number;
+  earnedSalary: number;
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
@@ -84,7 +115,57 @@ export default function VouchersPage() {
     endDate: periodEnd,
   });
 
-  const isLoading = employeesLoading || salariesLoading || bonusesLoading || discountsLoading || penaltiesLoading;
+  // Attendance hooks for earned salary calculation
+  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
+  const { data: deductionsResponse, isLoading: deductionsLoading2 } = useAttendanceDeductions({
+    periodStart: periodStart ?? "",
+    periodEnd: periodEnd ?? "",
+  });
+  const autoDeductions = useMemo<AttendanceDeductionBreakdown[]>(() => {
+    if (!deductionsResponse) return [];
+    if (Array.isArray(deductionsResponse.data)) return deductionsResponse.data;
+    return [];
+  }, [deductionsResponse]);
+
+  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({ period: month, limit: 500 });
+  const { data: monthlyLeaves = [], isLoading: leavesLoading } = useLeaves({ startDate: periodStart, endDate: periodEnd });
+
+  const localPresentDaysMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const dr of monthlyAttendanceData?.dailyRecords || []) {
+      if (!dr.checkIn) continue;
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords]);
+
+  const employeeLeavesMap = useMemo(() => {
+    const map = new Map<string, { paidLeaveDays: number; sickLeaveDays: number; countedDates: Set<string> }>();
+    if (!periodStart || !periodEnd) return map;
+    for (const leave of monthlyLeaves) {
+      if (!leave.employeeId || !leave.leaveType) continue;
+      if (leave.status && leave.status !== "APPROVED") continue;
+      const ls = leave.startDate?.slice(0, 10), le = leave.endDate?.slice(0, 10);
+      if (!ls || !le) continue;
+      const es = ls < periodStart ? periodStart : ls, ee = le > periodEnd ? periodEnd : le;
+      if (es > ee) continue;
+      if (!map.has(leave.employeeId)) map.set(leave.employeeId, { paidLeaveDays: 0, sickLeaveDays: 0, countedDates: new Set() });
+      const entry = map.get(leave.employeeId)!;
+      const cur = new Date(es), endD = new Date(ee);
+      while (cur <= endD) {
+        const ds = cur.toISOString().slice(0, 10);
+        if (!entry.countedDates.has(ds)) {
+          entry.countedDates.add(ds);
+          if (leave.leaveType === "SICK") entry.sickLeaveDays++;
+          else if (leave.isPaid) entry.paidLeaveDays++;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    return map;
+  }, [monthlyLeaves, periodStart, periodEnd]);
+
+  const isLoading = employeesLoading || salariesLoading || bonusesLoading || discountsLoading || penaltiesLoading || inputsLoading || deductionsLoading2 || attendanceLoading || leavesLoading;
 
   // ─── Aggregation ───────────────────────────────────────────────────────────
   const voucherData = useMemo<VoucherData[]>(() => {
@@ -95,62 +176,65 @@ export default function VouchersPage() {
       const employeeName = employee.name;
 
       const salaryConfig = salaries.find(s => s.employeeId === employeeId) || null;
-      const baseSalary = salaryConfig
-        ? toNumber(salaryConfig.baseSalary)
-        : toNumber(employee.baseSalary ?? employee.hourlyRate);
-      const lumpSumSalary = salaryConfig ? toNumber(salaryConfig.lumpSumSalary) : 0;
-      const livingAllowance = salaryConfig ? toNumber(salaryConfig.livingAllowance) : 0;
-      const transportAllowance = salaryConfig ? toNumber(salaryConfig.transportAllowance) : 0;
-      const responsibilityAllowance = salaryConfig ? toNumber(salaryConfig.responsibilityAllowance) : 0;
-      const extraEffortAllowance = salaryConfig ? toNumber(salaryConfig.extraEffortAllowance) : 0;
-      const productionIncentive = salaryConfig ? toNumber(salaryConfig.productionIncentive) : 0;
+
+      // Gross salary
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross = toNumber(salaryConfig.baseSalary) + toNumber(salaryConfig.lumpSumSalary) +
+          toNumber(salaryConfig.livingAllowance) + toNumber(salaryConfig.transportAllowance) +
+          toNumber(salaryConfig.responsibilityAllowance) + toNumber(salaryConfig.extraEffortAllowance) +
+          toNumber(salaryConfig.productionIncentive);
+      }
+      if (calcGross <= 0) calcGross = toNumber(employee.baseSalary) || toNumber(employee.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
 
-      const fixedEarnings = baseSalary + lumpSumSalary + livingAllowance + transportAllowance +
-        responsibilityAllowance + extraEffortAllowance + productionIncentive;
+      // ── Earned salary (same as TimeTable) ──
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+      const autoInput = autoDeductions.find((d: AttendanceDeductionBreakdown) => d.employeeId === employeeId);
+      const hasManualInput = !!manualInput;
+      const leaveData = employeeLeavesMap.get(employeeId);
 
-      // Bonuses (earnings)
+      const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0) ? (manualInput.lateMinutes ?? 0) : (autoInput?.delayMinutes ?? 0);
+      let actualWorkDays: number;
+      if (hasManualInput && manualInput.absenceDays !== undefined) {
+        actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
+      } else {
+        actualWorkDays = Math.max(autoInput?.presentDays ?? 0, localPresentDaysMap.get(employeeId) ?? 0);
+      }
+      const sickLeaveDays = Math.max(hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0, leaveData?.sickLeaveDays ?? 0);
+      const paidLeaveDays = Math.max(hasManualInput ? ((manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)) : 0, leaveData?.paidLeaveDays ?? 0);
+      const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
+      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const totalOvertimeMinutes = (hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0) ? (manualInput.overtimeRegularMinutes ?? 0) : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeDays = (hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0) ? (manualInput.overtimeWeekendDays ?? 0) : (autoInput?.overtimeWeekendDays ?? 0);
+
+      const rawEarned = calcEarnedSalary(calcGross, actualWorkDays, effectivePaidLeaveDays, lateMinutes, earlyLeaveMinutes, totalOvertimeMinutes, totalOvertimeDays);
+      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+
+      // Bonuses
       const employeeBonuses = bonuses.filter(b => b.employeeId === employeeId);
-      const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
-        return sum + toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount);
-      }, 0);
+      const variableEarnings = employeeBonuses.reduce((sum, bonus) => sum + toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount), 0);
 
-      // Deductions: advances (kind='advance' only) + penalties
-      const employeeAdvances = discounts.filter(d =>
-        d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month)
-      );
-      const employeePenalties = penalties.filter(p =>
-        p.employeeId === employeeId && p.issueDate.startsWith(month)
-      );
-
-      const advancesDeduction = employeeAdvances.reduce(
-        (sum, d) => sum + toNumber(d.amount), 0
-      );
-      const penaltiesDeduction = employeePenalties.reduce(
-        (sum, p) => sum + toNumber(p.amount), 0
-      );
+      // Deductions: advances + penalties
+      const employeeAdvances = discounts.filter(d => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month));
+      const employeePenalties = penalties.filter(p => p.employeeId === employeeId && p.issueDate.startsWith(month));
+      const advancesDeduction = employeeAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0);
+      const penaltiesDeduction = employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
 
       const fixedDeductions = insuranceAmount;
       const variableDeductions = advancesDeduction + penaltiesDeduction;
-      const netPay = (fixedEarnings + variableEarnings) - (fixedDeductions + variableDeductions);
+      const netPay = earnedSalary + variableEarnings - variableDeductions;
 
       return {
-        employeeId,
-        employeeName,
+        employeeId, employeeName,
         department: employee.department || salaryConfig?.profession?.trim() || "أقسام عامة",
-        fixedEarnings,
-        variableEarnings,
-        fixedDeductions,
-        variableDeductions,
-        netPay,
-        details: {
-          salaryConfig,
-          bonuses: employeeBonuses,
-          deductions: [...employeeAdvances, ...employeePenalties],
-        },
+        fixedEarnings: calcGross, variableEarnings, fixedDeductions, variableDeductions, netPay,
+        earnedSalary,
+        details: { salaryConfig, bonuses: employeeBonuses, deductions: [...employeeAdvances, ...employeePenalties] },
       };
     });
-  }, [employees, salaries, bonuses, discounts, penalties, month]);
+  }, [employees, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localPresentDaysMap, employeeLeavesMap]);
 
   // ─── Filter Vouchers ───────────────────────────────────────────────────────
   const filteredVouchers = useMemo(() => {

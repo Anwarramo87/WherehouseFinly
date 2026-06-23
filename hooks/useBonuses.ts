@@ -16,38 +16,56 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
   const bonusesQuery = useQuery<Bonus[]>({
     queryKey: ["bonuses", params?.employeeId || "all", params?.period || "all-periods"],
     queryFn: async () => {
+      const requestParams = {
+        employeeId: params?.employeeId,
+        period: params?.period,
+        limit: 500,
+      };
+      console.log('[useBonuses] Making API request with params:', requestParams);
+      
       const res = await apiClient.get("/bonuses", {
-        params: {
-          employeeId: params?.employeeId,
-          period: params?.period,
-        },
+        params: requestParams,
       });
       
       const data = res.data;
-      console.log('Bonuses API response:', data);
+      console.log('[useBonuses] Full API response:', JSON.stringify(data, null, 2));
+      console.log('[useBonuses] Response type:', typeof data, 'IsArray:', Array.isArray(data));
       
-      // التحقق من أن البيانات array
+      if (data && typeof data === 'object') {
+        console.log('[useBonuses] Response keys:', Object.keys(data));
+        if (data.data) {
+          console.log('[useBonuses] data.data is array:', Array.isArray(data.data), 'length:', data.data?.length);
+          if (Array.isArray(data.data) && data.data.length > 0) {
+            console.log('[useBonuses] First bonus item:', data.data[0]);
+          }
+        }
+      }
+      
+      // التحقق من أن البيانات array مباشرة
       if (Array.isArray(data)) {
+        console.log('[useBonuses] ✅ Returning direct array, count:', data.length);
         return data;
+      }
+      
+      // إذا كانت البيانات في خاصية data (paginated response)
+      if (data && Array.isArray(data.data)) {
+        console.log('[useBonuses] ✅ Returning data.data array, count:', data.data.length);
+        return data.data;
       }
       
       // إذا كانت البيانات في خاصية rewards
       if (data && Array.isArray(data.rewards)) {
+        console.log('[useBonuses] ✅ Returning data.rewards array, count:', data.rewards.length);
         return data.rewards;
       }
       
       // إذا كانت البيانات في خاصية bonuses
       if (data && Array.isArray(data.bonuses)) {
+        console.log('[useBonuses] ✅ Returning data.bonuses array, count:', data.bonuses.length);
         return data.bonuses;
       }
       
-      // إذا كانت البيانات في خاصية data
-      if (data && Array.isArray(data.data)) {
-        return data.data;
-      }
-      
-      console.warn('Bonuses API returned unexpected format:', data);
-      // إرجاع array فارغ كـ fallback
+      console.warn('[useBonuses] ❌ Unexpected format, returning empty array. Response:', data);
       return [];
     },
     staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,

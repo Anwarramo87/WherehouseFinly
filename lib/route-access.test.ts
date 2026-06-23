@@ -1,6 +1,6 @@
 import {
-  getRequiredRolesForPath,
-  hasAnyRequiredRole,
+  getRequiredPermissionsForPath,
+  hasAnyRequiredPermission,
   isProtectedRoute,
 } from "@/lib/route-access";
 
@@ -11,19 +11,40 @@ describe("route-access", () => {
     expect(isProtectedRoute("/public")).toBe(false);
   });
 
-  it("resolves required roles using prefix matching", () => {
-    expect(getRequiredRolesForPath("/settings")).toEqual(["admin"]);
-    expect(getRequiredRolesForPath("/inventory/stock")).toEqual([
-      "admin",
-      "warehouse",
-      "manager",
+  it("resolves required permissions using prefix matching", () => {
+    expect(getRequiredPermissionsForPath("/settings")).toEqual(["manage_users"]);
+    expect(getRequiredPermissionsForPath("/inventory/stock")).toEqual([
+      "view_inventory",
     ]);
-    expect(getRequiredRolesForPath("/home")).toBeNull();
+    expect(getRequiredPermissionsForPath("/payroll/2026-06")).toEqual([
+      "view_payroll",
+    ]);
   });
 
-  it("matches roles case-insensitively", () => {
-    expect(hasAnyRequiredRole(["Admin", "HR"], ["admin"])).toBe(true);
-    expect(hasAnyRequiredRole(["Warehouse"], ["finance", "manager"])).toBe(false);
+  it("matches permissions exactly (case-sensitive)", () => {
+    expect(
+      hasAnyRequiredPermission(["view_employees", "view_attendance"], [
+        "view_employees",
+      ])
+    ).toBe(true);
+    expect(
+      hasAnyRequiredPermission(["view_employees"], [
+        "view_payroll",
+        "manage_salary",
+      ])
+    ).toBe(false);
+  });
+
+  it("staff user with minimal permissions cannot access restricted routes", () => {
+    const staffPermissions = ["view_employees", "view_attendance"];
+    const salariesRequired = getRequiredPermissionsForPath("/salaries") || [];
+    expect(
+      hasAnyRequiredPermission(staffPermissions, salariesRequired)
+    ).toBe(false);
+  });
+
+  it("hasAnyRequiredPermission has no built-in admin bypass (bypass lives in proxy.ts)", () => {
+    expect(hasAnyRequiredPermission([], ["view_payroll"])).toBe(false);
   });
 });
 

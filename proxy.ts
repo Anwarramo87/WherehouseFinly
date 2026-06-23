@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
-  getRequiredRolesForPath,
-  hasAnyRequiredRole,
+  getRequiredPermissionsForPath,
+  hasAnyRequiredPermission,
   isProtectedRoute,
 } from "@/lib/route-access";
 import { DEFAULT_API_URL, normalizeApiUrl } from "@/lib/api-url";
@@ -27,10 +27,11 @@ const AUTH_COOKIE_CANDIDATES = [
 type AuthMeResponse = {
   role?: string | null;
   roles?: string[] | null;
+  permissions?: string[] | null;
 };
 
 type SessionCheckResult =
-  | { authorized: true; roles: string[] }
+  | { authorized: true; roles: string[]; permissions: string[] }
   | { authorized: false; status?: number };
 
 const sessionCheckCache = new Map<
@@ -245,7 +246,9 @@ const checkSession = async (request: NextRequest): Promise<SessionCheckResult> =
       }
     }
 
-    return cacheAndReturn({ authorized: true, roles: Array.from(roleSet) });
+    const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
+
+    return cacheAndReturn({ authorized: true, roles: Array.from(roleSet), permissions });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return cacheAndReturn({ authorized: false, status: 504 });
@@ -315,12 +318,16 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  const requiredRoles = getRequiredRolesForPath(pathname);
+  const requiredPermissions = getRequiredPermissionsForPath(pathname);
 
-  if (requiredRoles && requiredRoles.length > 0) {
-    const hasRequiredRole = hasAnyRequiredRole(session.roles, requiredRoles);
-    if (!hasRequiredRole) {
-      return buildRedirectResponse(request, "/home", { forbidden: "true" });
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    // Admin role has unrestricted access
+    const isAdmin = session.roles.includes('admin');
+    if (!isAdmin) {
+      const hasRequiredPermission = hasAnyRequiredPermission(session.permissions, requiredPermissions);
+      if (!hasRequiredPermission) {
+        return buildRedirectResponse(request, "/home", { forbidden: "true" });
+      }
     }
   }
 

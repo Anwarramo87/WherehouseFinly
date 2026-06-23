@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 const RewardsTab = dynamic(() => import("../rewards/page"), { ssr: false, loading: () => null });
 import { useSearchParams } from "next/navigation";
 import useSalaries from "@/hooks/useSalaries";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
 import type { Advance } from "@/types/advance";
@@ -72,8 +72,11 @@ export default function SalariesSettingClient() {
   const activeTab = getTabFromQuery(requestedTab);
 
   const { data: salaries = [], isLoading, isError, error, updateSalary, deleteSalary } = useSalaries();
-  // نجلب الموظفين مع المتقاعدين كي لا يظهر الاسم كـ "غير معروف" في الرواتب
-  const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees({ includeTerminated: true, limit: 500, fetchAll: false });
+  
+  const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees({ limit: 200, status: "active", fetchAll: false });
+  
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);  
   const { data: advances = [] } = useAdvances();
 
   const period = useMemo(() => getLocalMonth(), []);
@@ -107,17 +110,14 @@ export default function SalariesSettingClient() {
     return m;
   }, [employees]);
 
-  // If there are salary records for IDs not present in `employees`, try refetching employees (best-effort).
   useEffect(() => {
     if (!refetchEmployees) return;
     try {
       const missing = (salaries || []).some((s) => !!s?.employeeId && !employeeMap.has(s.employeeId));
       if (missing) {
-        // best-effort refetch to resolve any race where salary appears before employees list
         refetchEmployees().catch(() => {});
       }
     } catch {
-      // swallow errors — this is a best-effort UX improvement
     }
   }, [salaries, employeeMap, refetchEmployees]);
 
@@ -127,12 +127,24 @@ export default function SalariesSettingClient() {
     return m;
   }, [salaries]);
 
+  // 🟢 الفلتر الحديدي: جلب الموظفين النشطين فقط وتجاهل أي شخص مستقيل أو مقال
   const allIds = useMemo(() => {
     const set = new Set<string>();
-    (employees || []).forEach((e) => e?.employeeId && set.add(e.employeeId));
-    (salaries || []).forEach((s) => s?.employeeId && set.add(s.employeeId));
+    
+    (employees || []).forEach((e) => { 
+      if (!e?.employeeId) return;
+
+      // التحقق الصارم: إذا كان الموظف في قائمة المستقيلين، أو حالته صراحة "resigned" أو "terminated"
+      const isTerminated = resignedIds.has(e.employeeId) || e.status === "resigned" || e.status === "terminated";
+      
+      // نضيفه للقائمة فقط إذا كان على رأس عمله تماماً
+      if (!isTerminated) {
+        set.add(e.employeeId);
+      }
+    });
+
     return Array.from(set);
-  }, [employees, salaries]);
+  }, [employees, resignedIds]);
 
   const employeesForFinanceModals = useMemo(
     () => (employees || []).map((emp) => ({ employeeId: emp.employeeId, name: emp.name })),
@@ -218,7 +230,7 @@ export default function SalariesSettingClient() {
               <p className="text-slate-600 text-sm font-bold pr-14 mt-1">لوحة موحدة لإدارة الرواتب والسلف والمكافآت وحساب المسير النهائي.</p>
             </div>
 
-            {/* Smart Header Button - Task 1 */}
+            {/* Smart Header Button */}
             {actionButtonConfig && (
               <button
                 onClick={openFloatingAction}
@@ -241,7 +253,6 @@ export default function SalariesSettingClient() {
               ) : (
                 <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
                   <table className="w-full text-right min-w-250">
-                    {/* Updated Table Header */}
                     <thead className="bg-[#1a2530] border-b-2 border-[#C89355]/30">
                       <tr>
                         <th className="p-5 text-white font-black text-xs uppercase tracking-wider text-center">الموظف (الاسم والكود)</th>
@@ -261,7 +272,6 @@ export default function SalariesSettingClient() {
                           const s = salaryMap.get(id) ?? null;
                           const emp = employeeMap.get(id) ?? null;
 
-                          // Defaults when no salary record exists yet
                           let base = toNumber(emp?.hourlyRate);
                           let lumpSum = 0;
                           let living = toNumber(emp?.livingAllowance);
@@ -276,44 +286,36 @@ export default function SalariesSettingClient() {
                             insurance = toNumber(s.insuranceAmount);
                           }
 
-                          // الإجمالي الثابت الشامل بدون أي تعويضات إضافية
                           const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? id);
 
                           return (
                             <tr key={id} className="hover:bg-white/80 transition-all duration-300 group/row">
-                              {/* 1. اسم الموظف وتحته كود الموظف */}
                               <td className="p-4 text-center ">
                                 <div className="font-black text-slate-800 group-hover/row:text-[#263544] text-base">{employeeName}</div>
                                 <div className="font-mono font-bold text-[10px] text-slate-500 mt-0.5">{id}</div>
                               </td>
 
-                              {/* 2. الراتب الأساسي */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {base > 0 ? base.toLocaleString() : "—"}
                               </td>
 
-                              {/* 3. بدل المعيشة */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {living > 0 ? living.toLocaleString() : "—"}
                               </td>
 
-                              {/* 4. بدل النقل */}
                               <td className="p-4 text-center font-mono font-black text-[#263544]">
                                 {transport > 0 ? transport.toLocaleString() : "—"}
                               </td>
 
-                              {/* 5. التأمينات (بالأحمر كخصم) */}
                               <td className="p-4 text-center font-mono font-black text-rose-500">
                                 {insurance > 0 ? insurance.toLocaleString() : "—"}
                               </td>
 
-                              {/* 6. الإجمالي الثابت */}
                               <td className="p-4 font-black text-center text-[#1a2530] bg-[#C89355]/5 border-x border-[#C89355]/10">
                                 {monthlyFixedTotal > 0 ? monthlyFixedTotal.toLocaleString() : <span className="text-rose-500 text-[10px] bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">غير مضبوط</span>}
                               </td>
 
-                              {/* 7. إدارة */}
                               <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2 opacity-60 group-hover/row:opacity-100 transition-opacity">
                                   {!s ? (
@@ -341,12 +343,8 @@ export default function SalariesSettingClient() {
             </div>
           )}
 
-          {/* Advances tab removed — advances are now managed inside الخصومات والسلف (discounts) page */}
-
-          {/* تبويب المكافآت مع Contextual Stat Cards */}
           {activeTab === "bonuses" && (
             <>
-              {/* Contextual Stat Cards for Bonuses */}
               <div className="flex gap-4 mb-6">
                 <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-[0_8px_30px_rgba(38,53,68,0.04)] flex-1 hover:shadow-md transition-all group">
                   <div className="flex items-center gap-2 mb-1.5 relative z-10">
@@ -363,12 +361,10 @@ export default function SalariesSettingClient() {
                   <p className="font-black text-xl text-rose-600">{tabStats.totalDeductions.toLocaleString()}</p>
                 </div>
               </div>
-              {/* Render full rewards table via dynamic import to restore dashboard view */}
               <RewardsTab />
             </>
           )}
 
-          {/* تبويب المسير النهائي */}
           {activeTab === "final-payroll" && (
             <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل المسير...</div>
           )}
@@ -376,7 +372,6 @@ export default function SalariesSettingClient() {
         </div>
       </div>
 
-      {/* المودالات الخاصة بالرواتب والمكافآت */}
       {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} />}
       {isAdvanceModalOpen && <AddAdvanceModal isOpen={isAdvanceModalOpen} onClose={() => setIsAdvanceModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => { }} />}
       {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employees} salaries={salaries} isPending={false} onSave={() => { }} />}

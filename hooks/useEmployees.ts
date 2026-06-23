@@ -244,7 +244,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       console.log('Employee created response:', response);
       return response;
     },
-    onSuccess: async (response) => {
+    onSuccess: async (_response) => {
       console.log('onSuccess called, invalidating queries');
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       await queryClient.invalidateQueries({ queryKey: ["salaries"] });

@@ -7,9 +7,15 @@ import { useEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
+import { usePayrollInputs } from "@/hooks/usePayrollInputs";
+import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
+import { useAttendance } from "@/hooks/useAttendance";
+import { useLeaves } from "@/hooks/useLeaves";
+import { usePenalties } from "@/hooks/usePenalties";
 import type { Salary } from "@/types/salary";
 import type { Bonus } from "@/types/bonus";
 import type { Advance } from "@/types/advance";
+import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 
 // ─── TypeScript Interfaces ─────────────────────────────────────────────────────
 interface AggregatedPayroll {
@@ -20,6 +26,7 @@ interface AggregatedPayroll {
   fixedDeductions: number;
   variableDeductions: number;
   netPay: number;
+  earnedSalary: number;
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
@@ -27,6 +34,41 @@ interface AggregatedPayroll {
     attendance: null;
   };
 }
+
+// ─── Salary Calculation Constants ──────────────────────────────────────────────
+const STANDARD_WORK_DAYS = 26;
+const HOURS_PER_DAY = 8;
+
+/**
+ * حساب الراتب المستحق — نفس الصيغة المستخدمة في صفحة TimeTable بالضبط
+ */
+const calcEarnedSalary = (
+  grossSalary: number,
+  presentDays: number,
+  paidLeaveDays: number,
+  lateMinutes: number,
+  earlyLeaveMinutes = 0,
+  overtimeMinutes = 0,
+  overtimeWeekendDays = 0,
+): number => {
+  if (grossSalary <= 0) return 0;
+  const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
+  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
+  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
+  const salaryFromDays = dailyRate * paidDays;
+  const lateDeduction = lateMinutes * minuteRate * 1.5;
+  const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
+  const overtimePay = overtimeMinutes * minuteRate * 1.5;
+  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5;
+  return Math.max(
+    0,
+    salaryFromDays
+    - lateDeduction
+    - earlyLeaveDeduction
+    + overtimePay
+    + weekendOvertimePay,
+  );
+};
 
 // ─── Helper Functions ──────────────────────────────────────────────────────────
 const toNumber = (value: unknown): number => {
@@ -70,7 +112,77 @@ export default function VouchersClient() {
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
   const { data: advances = [], isLoading: advancesLoading } = useAdvances();
 
-  const isLoading = employeesLoading || salariesLoading || bonusesLoading || advancesLoading;
+  // Period boundaries for leaves/attendance queries
+  const { periodStart, periodEnd } = useMemo(() => {
+    if (!month) return { periodStart: undefined, periodEnd: undefined };
+    const [year, m] = month.split("-");
+    const startDate = `${year}-${m}-01`;
+    const endDay = new Date(Number(year), Number(m), 0).getDate();
+    const endDate = `${year}-${m}-${String(endDay).padStart(2, "0")}`;
+    return { periodStart: startDate, periodEnd: endDate };
+  }, [month]);
+
+  // Attendance hooks (same as payroll page)
+  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
+  const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
+    periodStart: periodStart ?? "",
+    periodEnd: periodEnd ?? "",
+  });
+  const autoDeductions = useMemo<AttendanceDeductionBreakdown[]>(() => {
+    if (!deductionsResponse) return [];
+    if (Array.isArray(deductionsResponse.data)) return deductionsResponse.data;
+    return [];
+  }, [deductionsResponse]);
+
+  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({ period: month, limit: 500 });
+  const { data: monthlyLeaves = [], isLoading: leavesLoading } = useLeaves({ startDate: periodStart, endDate: periodEnd });
+  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({ startDate: periodStart, endDate: periodEnd });
+
+  // Local present days map from attendance records
+  const localPresentDaysMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      if (!dr.checkIn) continue;
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords]);
+
+  // Employee leaves map (same as TimeTable)
+  const employeeLeavesMap = useMemo(() => {
+    const map = new Map<string, { paidLeaveDays: number; sickLeaveDays: number; unpaidLeaveDays: number; countedDates: Set<string> }>();
+    if (!periodStart || !periodEnd) return map;
+    for (const leave of monthlyLeaves) {
+      if (!leave.employeeId || !leave.leaveType) continue;
+      if (leave.status && leave.status !== "APPROVED") continue;
+      const leaveStart = leave.startDate?.slice(0, 10);
+      const leaveEnd = leave.endDate?.slice(0, 10);
+      if (!leaveStart || !leaveEnd) continue;
+      const effectiveStart = leaveStart < periodStart ? periodStart : leaveStart;
+      const effectiveEnd = leaveEnd > periodEnd ? periodEnd : leaveEnd;
+      if (effectiveStart > effectiveEnd) continue;
+      if (!map.has(leave.employeeId)) {
+        map.set(leave.employeeId, { paidLeaveDays: 0, sickLeaveDays: 0, unpaidLeaveDays: 0, countedDates: new Set() });
+      }
+      const entry = map.get(leave.employeeId)!;
+      const cur = new Date(effectiveStart);
+      const endD = new Date(effectiveEnd);
+      while (cur <= endD) {
+        const dateStr = cur.toISOString().slice(0, 10);
+        if (!entry.countedDates.has(dateStr)) {
+          entry.countedDates.add(dateStr);
+          if (leave.leaveType === "SICK") entry.sickLeaveDays++;
+          else if (leave.isPaid) entry.paidLeaveDays++;
+          else entry.unpaidLeaveDays++;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    return map;
+  }, [monthlyLeaves, periodStart, periodEnd]);
+
+  const isLoading = employeesLoading || salariesLoading || bonusesLoading || advancesLoading || inputsLoading || deductionsLoading || attendanceLoading || leavesLoading || penaltiesLoading;
 
   // ─── STEP 1: The Maestro Aggregation ─────────────────────────────────────────
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
@@ -81,43 +193,103 @@ export default function VouchersClient() {
       const employeeName = employee.name;
 
       const salaryConfig = salaries.find(s => s.employeeId === employeeId) || null;
-      const baseSalary = salaryConfig
-        ? toNumber(salaryConfig.baseSalary)
-        : toNumber(employee.baseSalary ?? employee.hourlyRate);
-      const lumpSumSalary = salaryConfig ? toNumber(salaryConfig.lumpSumSalary) : 0;
-      const livingAllowance = salaryConfig ? toNumber(salaryConfig.livingAllowance) : 0;
-      const transportAllowance = salaryConfig ? toNumber(salaryConfig.transportAllowance) : 0;
+
+      // Calculate gross salary (all components)
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross = toNumber(salaryConfig.baseSalary) +
+          toNumber(salaryConfig.lumpSumSalary) +
+          toNumber(salaryConfig.livingAllowance) +
+          toNumber(salaryConfig.responsibilityAllowance) +
+          toNumber(salaryConfig.extraEffortAllowance) +
+          toNumber(salaryConfig.productionIncentive) +
+          toNumber(salaryConfig.transportAllowance);
+      }
+      if (calcGross <= 0) {
+        calcGross = toNumber(employee.baseSalary) || toNumber(employee.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+      }
+
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
 
-      const fixedEarnings = baseSalary + lumpSumSalary + livingAllowance + transportAllowance;
+      // ── Earned salary calculation (same as TimeTable) ──
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+      const autoInput = autoDeductions.find((d: AttendanceDeductionBreakdown) => d.employeeId === employeeId);
+      const hasManualInput = !!manualInput;
+      const leaveData = employeeLeavesMap.get(employeeId);
 
+      // Late minutes
+      const lateMinutes = (hasManualInput && (manualInput.lateMinutes ?? 0) > 0)
+        ? (manualInput.lateMinutes ?? 0)
+        : (autoInput?.delayMinutes ?? 0);
+
+      // Present days
+      let actualWorkDays: number;
+      if (hasManualInput && manualInput.absenceDays !== undefined) {
+        actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
+      } else {
+        const backendPresent = autoInput?.presentDays ?? 0;
+        const localPresent = localPresentDaysMap.get(employeeId) ?? 0;
+        actualWorkDays = Math.max(backendPresent, localPresent);
+      }
+
+      // Paid leave days
+      const sickLeaveDays = Math.max(hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0, leaveData?.sickLeaveDays ?? 0);
+      const paidLeaveDays = Math.max(hasManualInput ? ((manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)) : 0, leaveData?.paidLeaveDays ?? 0);
+      const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
+
+      // Early leave & overtime
+      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const totalOvertimeMinutes = (hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0)
+        ? (manualInput.overtimeRegularMinutes ?? 0)
+        : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeDays = (hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0)
+        ? (manualInput.overtimeWeekendDays ?? 0)
+        : (autoInput?.overtimeWeekendDays ?? 0);
+
+      // Raw earned salary (before insurance)
+      const rawEarned = calcEarnedSalary(
+        calcGross, actualWorkDays, effectivePaidLeaveDays,
+        lateMinutes, earlyLeaveMinutes, totalOvertimeMinutes, totalOvertimeDays,
+      );
+      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+
+      // ── Bonuses ──
       const employeeBonuses = bonuses.filter(b => b.employeeId === employeeId);
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
         return sum + toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount);
       }, 0);
 
+      // ── Deductions: advances + penalties ──
       const employeeAdvances = advances.filter(a => {
         if (a.employeeId !== employeeId) return false;
         const advanceDate = a.issueDate || a.createdAt || "";
         return advanceDate.startsWith(month);
       });
-      
       const advancesDeduction = employeeAdvances.reduce((sum, advance) => {
         return sum + (toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount));
       }, 0);
 
-      const attendancePenalty = 0;
+      const employeePenalties = penalties.filter((p) => {
+        return p.employeeId === employeeId && p.issueDate.startsWith(month);
+      });
+      const penaltiesDeduction = employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
+
       const fixedDeductions = insuranceAmount;
-      const variableDeductions = advancesDeduction + attendancePenalty;
-      const netPay = (fixedEarnings + variableEarnings) - (fixedDeductions + variableDeductions);
+      const variableDeductions = advancesDeduction + penaltiesDeduction;
+
+      // ── Net pay = earned salary + bonuses - variable deductions ──
+      const netPay = earnedSalary + variableEarnings - variableDeductions;
 
       return {
-        employeeId, employeeName, fixedEarnings, variableEarnings,
+        employeeId, employeeName,
+        fixedEarnings: calcGross,
+        variableEarnings,
         fixedDeductions, variableDeductions, netPay,
+        earnedSalary,
         details: { salaryConfig, bonuses: employeeBonuses, advances: employeeAdvances, attendance: null },
       };
     });
-  }, [employees, salaries, bonuses, advances, month]);
+  }, [employees, salaries, bonuses, advances, month, payrollInputs, autoDeductions, localPresentDaysMap, employeeLeavesMap, penalties]);
 
   // ─── STEP 1: Filter Vouchers ─────────────────────────────────────────────────
   const filteredVouchers = useMemo(() => {

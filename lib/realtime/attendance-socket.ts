@@ -58,6 +58,25 @@ const resolveSocketBaseUrl = () => {
   }
 };
 
+const getAuthToken = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    // Try to get auth token from localStorage (auth store may have persisted it)
+    const authJson = localStorage.getItem("auth-store");
+    if (!authJson) {
+      return null;
+    }
+
+    const auth = JSON.parse(authJson);
+    return auth?.state?.token || null;
+  } catch {
+    return null;
+  }
+};
+
 export const getAttendanceSocket = () => {
   if (typeof window === "undefined") {
     return null;
@@ -68,12 +87,35 @@ export const getAttendanceSocket = () => {
   }
 
   const socketBase = trimTrailingSlash(resolveSocketBaseUrl());
+  const authToken = getAuthToken();
+
   const socket = io(`${socketBase}/realtime`, {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     withCredentials: true,
     autoConnect: true,
+    // Include auth token in handshake for token-based auth systems
+    auth: authToken
+      ? {
+          token: authToken,
+        }
+      : undefined,
   });
+
+  // Re-authenticate on disconnect/reconnect if token available
+  if (authToken) {
+    socket.on("disconnect", () => {
+      // Optional: log disconnect for debugging
+      console.debug("Attendance socket disconnected; will re-auth on reconnect");
+    });
+
+    socket.on("connect_error", (error) => {
+      // Log auth errors if they occur
+      if (error.message && error.message.includes("auth")) {
+        console.warn("Attendance socket auth error:", error.message);
+      }
+    });
+  }
 
   window.__factoryAttendanceSocket = socket;
   return socket;

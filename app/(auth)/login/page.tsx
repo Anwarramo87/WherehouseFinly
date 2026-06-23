@@ -127,8 +127,18 @@ export default function LoginPage() {
         hasUser: Boolean(authResponse.user),
       });
       // #endregion
-      setAuthAccessToken(token);
-      setUser((authResponse.user ?? null) as { name?: string; username?: string; role?: string } | null);
+      if (token) {
+        setAuthAccessToken(token);
+      }
+      const rawUser = authResponse.user as Record<string, unknown> | null;
+      const mergedUser = rawUser
+        ? {
+            ...rawUser,
+            roles: (authResponse as Record<string, unknown>).roles as string[] | undefined,
+            permissions: (authResponse as Record<string, unknown>).permissions as string[] | undefined,
+          }
+        : null;
+      setUser(mergedUser as { name?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] } | null);
       resetAuthVerificationCache();
 
       setStatus("authenticated");
@@ -317,7 +327,6 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
-
         </div>
       </div>
     </div>

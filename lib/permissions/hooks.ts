@@ -3,38 +3,25 @@
 import { useCallback, useMemo } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Permission } from "./types";
-import {
-  roleHasPermission,
-  roleHasAnyPermission,
-  canPerformOperation,
-  getRolePermissions,
-} from "./types";
 
 /**
  * Hook to check permissions for the current user.
- * Provides utility functions for permission-based UI rendering.
+ * Permissions come from the backend's /auth/me endpoint via the auth store.
  */
 export function usePermissions() {
   const { user } = useAuthStore();
 
-  const userRoles = useMemo(() => {
-    if (!user) return [];
-    
-    // Support both single role and roles array
-    if (user.role && typeof user.role === 'string') {
-      return [user.role.toLowerCase()];
-    }
-    
-    if (Array.isArray(user.roles)) {
-      return user.roles.map(r => String(r).toLowerCase());
-    }
-    
-    return [];
+  const userRole = useMemo(() => {
+    return user?.role ? String(user.role).toLowerCase() : null;
+  }, [user]);
+
+  const userPermissions = useMemo(() => {
+    return (user?.permissions && Array.isArray(user.permissions)) ? user.permissions : [];
   }, [user]);
 
   const isAdmin = useMemo(() => {
-    return userRoles.includes('admin');
-  }, [userRoles]);
+    return userRole === "admin";
+  }, [userRole]);
 
   /**
    * Check if the current user has a specific permission.
@@ -45,9 +32,9 @@ export function usePermissions() {
     // Admin has all permissions
     if (isAdmin) return true;
     
-    // Check if any of the user's roles have the permission
-    return userRoles.some(role => roleHasPermission(role, permission));
-  }, [user, userRoles, isAdmin]);
+    // Check if permission is in user's permission list from backend
+    return userPermissions.includes(permission);
+  }, [user, userPermissions, isAdmin]);
 
   /**
    * Check if the current user has any of the specified permissions.
@@ -58,110 +45,79 @@ export function usePermissions() {
     // Admin has all permissions
     if (isAdmin) return true;
     
-    // Check if any of the user's roles have any of the permissions
-    return userRoles.some(role => roleHasAnyPermission(role, permissions));
-  }, [user, userRoles, isAdmin]);
-
-  /**
-   * Check if the current user can perform a specific operation.
-   */
-  const canPerform = useCallback((operation: string): boolean => {
-    if (!user) return false;
-    
-    // Admin can perform all operations
-    if (isAdmin) return true;
-    
-    // Check if any of the user's roles can perform the operation
-    return userRoles.some(role => canPerformOperation(role, operation));
-  }, [user, userRoles, isAdmin]);
+    // Check if any permission is in user's list
+    return permissions.some(perm => userPermissions.includes(perm));
+  }, [user, userPermissions, isAdmin]);
 
   /**
    * Get all permissions for the current user.
    */
   const permissions = useMemo((): Permission[] => {
     if (!user) return [];
-    
-    // Collect all permissions from all roles
-    const allPermissions = new Set<Permission>();
-    userRoles.forEach(role => {
-      const rolePerms = getRolePermissions(role);
-      rolePerms.forEach(perm => allPermissions.add(perm));
-    });
-    
-    return Array.from(allPermissions);
-  }, [user, userRoles]);
+    return userPermissions;
+  }, [user, userPermissions]);
 
   /**
-   * Check if the user can terminate an employee.
-   */
-  const canTerminateEmployee = useCallback((): boolean => {
-    return hasPermission('termination:create');
-  }, [hasPermission]);
-
-  /**
-   * Check if the user can view resigned employees.
+   * Check if the user can view employees (termination-related).
    */
   const canViewResignedEmployees = useCallback((): boolean => {
-    return hasPermission('termination:view');
+    return hasPermission("view_employees");
   }, [hasPermission]);
 
   /**
-   * Check if the user can rehire an employee.
+   * Check if the user can edit employees (termination-related).
    */
-  const canRehireEmployee = useCallback((): boolean => {
-    return hasPermission('rehire:process');
+  const canTerminateEmployee = useCallback((): boolean => {
+    return hasPermission("edit_employees");
   }, [hasPermission]);
 
   /**
-   * Check if the user can process financial settlements.
+   * Check if the user can process settlements (financial).
    */
   const canProcessSettlement = useCallback((): boolean => {
-    return hasPermission('settlement:process');
+    return hasPermission("approve_payroll");
   }, [hasPermission]);
 
   /**
-   * Check if the user can view financial settlements.
+   * Check if the user can view payroll/settlements.
    */
   const canViewSettlement = useCallback((): boolean => {
-    return hasPermission('settlement:view');
+    return hasPermission("view_payroll");
   }, [hasPermission]);
 
   /**
-   * Check if the user can export resigned employees list.
+   * Check if the user can rehire employees.
+   */
+  const canRehireEmployee = useCallback((): boolean => {
+    return hasPermission("edit_employees");
+  }, [hasPermission]);
+
+  /**
+   * Check if the user can export payroll/employee lists.
    */
   const canExportResignedList = useCallback((): boolean => {
-    return hasPermission('export:resigned');
-  }, [hasPermission]);
-
-  /**
-   * Check if the user can view audit logs.
-   */
-  const canViewAuditLogs = useCallback((): boolean => {
-    return hasPermission('audit:view');
+    return hasPermission("view_employees");
   }, [hasPermission]);
 
   return {
     user,
-    userRoles,
+    userRole,
     isAdmin,
     permissions,
     hasPermission,
     hasAnyPermission,
-    canPerform,
     // Specific operation checks
-    canTerminateEmployee,
     canViewResignedEmployees,
+    canTerminateEmployee,
     canRehireEmployee,
     canProcessSettlement,
     canViewSettlement,
     canExportResignedList,
-    canViewAuditLogs,
   };
 }
 
 /**
- * Hook to require specific permissions for a component.
- * Throws an error or returns false if permissions are not met.
+ * Hook to require a specific permission for a component.
  */
 export function useRequiredPermission(permission: Permission): boolean {
   const { hasPermission } = usePermissions();

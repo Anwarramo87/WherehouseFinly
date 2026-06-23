@@ -12,6 +12,7 @@ export type AuthUser = {
   employeeId?: string;
   role?: string;
   roles?: string[];
+  permissions?: string[];
   roleId?: string;
   email?: string;
 };
@@ -79,4 +80,3 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
-

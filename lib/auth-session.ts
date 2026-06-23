@@ -72,6 +72,14 @@ export const clearAuthSession = () => {
 
 export const setAuthAccessToken = (token?: string | null) => {
   if (!isBrowser()) return;
+
+  // In production, the backend sets HttpOnly cookies directly in the response.
+  // The frontend should not write access tokens to cookies.
+  // In development, allow writing for testing purposes.
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
   if (!token || !token.trim()) {
     removeCookie(ACCESS_TOKEN_KEY);
     return;
