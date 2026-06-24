@@ -210,21 +210,29 @@ function PayrollVirtualTable({
   });
 
   return (
-    <div className="relative bg-white rounded-3xl shadow-[0_10px_40px_rgba(38,53,68,0.08)] border border-slate-200 overflow-hidden group/table">
+    <div className="relative bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden" dir="rtl">
       <div ref={parentRef} className="w-full overflow-x-auto custom-scrollbar relative z-10" style={{ height: '75vh', minHeight: '500px' }}>
-        <table className="w-full text-center min-w-[1000px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
-          <thead className="bg-[#1a2530] text-white sticky top-0 z-10">
+        <table className="w-full min-w-[1100px] border-collapse" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+          <colgroup>
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '9%' }} />
+          </colgroup>
+          <thead className="bg-gradient-to-b from-[#1a2530] to-[#263544] text-white sticky top-0 z-20 shadow-lg">
             <tr>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الموظف</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الراتب المستحق</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-emerald-300">المكافآت</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider text-rose-300">الخصومات</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">المجموع</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider bg-[#C89355]/20 text-[#C89355] border-b-3 border-[#C89355]/50">
-                الراتب المقبوض
-              </th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">الفرق</th>
-              <th className="px-4 py-4 font-black text-xs uppercase tracking-wider">إجراء</th>
+              <th className="px-4 py-4 font-bold text-xs text-right border-l border-slate-600/30">الموظف</th>
+              <th className="px-4 py-4 font-bold text-xs text-center border-l border-slate-600/30">الراتب المستحق</th>
+              <th className="px-4 py-4 font-bold text-xs text-center text-emerald-300 border-l border-slate-600/30">المكافآت</th>
+              <th className="px-4 py-4 font-bold text-xs text-center text-rose-300 border-l border-slate-600/30">الخصومات</th>
+              <th className="px-4 py-4 font-bold text-xs text-center border-l border-slate-600/30">المجموع</th>
+              <th className="px-4 py-4 font-bold text-xs text-center bg-[#C89355]/25 text-[#C89355] border-l-2 border-l-[#C89355]/60">الراتب المقبوض</th>
+              <th className="px-4 py-4 font-bold text-xs text-center border-l border-slate-600/30">الفرق</th>
+              <th className="px-4 py-4 font-bold text-xs text-center">إجراء</th>
             </tr>
           </thead>
           <tbody style={{ position: 'relative' }}>
@@ -233,14 +241,18 @@ function PayrollVirtualTable({
               const isHeaderRow = (r: typeof row): r is { isHeader: true; department: string; count: number } => 'isHeader' in r;
               if (isHeaderRow(row)) {
                 return (
-                  <tr key={virtualItem.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} className="bg-slate-100 border-y border-slate-200">
+                  <tr 
+                    key={virtualItem.index} 
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }} 
+                    className="bg-gradient-to-r from-slate-50 via-slate-100/70 to-slate-50 border-y-2 border-slate-300"
+                  >
                     <td colSpan={8} className="px-6 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-4 bg-[#C89355] rounded-full" />
-                        <span className="font-black text-[#263544] text-sm">
+                        <div className="w-1.5 h-6 bg-gradient-to-b from-[#C89355] to-[#C89355]/70 rounded-full shadow-md" />
+                        <span className="font-bold text-[#263544] text-sm">
                           {row.department}
                         </span>
-                        <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                        <span className="text-[11px] font-semibold text-slate-600 bg-white px-3 py-1 rounded-md border border-slate-300 shadow-sm">
                           {row.count} موظف
                         </span>
                       </div>
@@ -598,7 +610,7 @@ export default function PayrollPage() {
           "أقسام عامة";
 
         const grossPay = toNumber(backendItem.grossPay);
-        const totalDeductions = toNumber(backendItem.totalDeductions);
+        const _totalDeductions = toNumber(backendItem.totalDeductions);
         const _netPay = toNumber(backendItem.netPay);
         
         const anomalies: string[] = Array.isArray(backendItem.anomalies)
@@ -996,10 +1008,10 @@ export default function PayrollPage() {
               <div className="p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)] transition-shadow">
                 <Wallet className="text-[#C89355]" size={22} />
               </div>
-              <p className="font-black text-[#263544] text-sm">الراتب النهائي (ل.س) *</p>
+              <p className="font-black text-[#263544] text-sm">صافي الإجمالي المقبوض  (ل.س) *</p>
             </div>
             <p className="text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm">
-              {globalTotals.totalEarnedSalary.toLocaleString()}
+              {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
             </p>
             <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
               * الراتب المستحق من أيام الدوام الفعلية
@@ -1042,7 +1054,7 @@ export default function PayrollPage() {
         </div>
 
         {/* بطاقة إجمالية للتصفية */}
-        <div className="mb-8 relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] backdrop-blur-xl border-2 border-[#C89355]/40 rounded-[2.5rem] p-8 shadow-[0_25px_60px_rgba(200,147,85,0.2)] group">
+        {/* <div className="mb-8 relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] backdrop-blur-xl border-2 border-[#C89355]/40 rounded-[2.5rem] p-8 shadow-[0_25px_60px_rgba(200,147,85,0.2)] group">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/40 pointer-events-none transition-colors group-hover:border-[#C89355]/60" />
           <div className="relative z-10">
             <h3 className="text-lg font-black text-[#C89355] mb-6 uppercase tracking-wide flex items-center gap-3">
@@ -1070,7 +1082,7 @@ export default function PayrollPage() {
               </span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* ── Search ───────────────────────────────────────────────────────────── */}
         <div className="mb-6 relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all group">

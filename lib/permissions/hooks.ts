@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Permission } from "./types";
+import { isPermission } from "./types";
 
 /**
  * Hook to check permissions for the current user.
@@ -54,7 +55,7 @@ export function usePermissions() {
    */
   const permissions = useMemo((): Permission[] => {
     if (!user) return [];
-    return userPermissions;
+    return userPermissions.filter(isPermission);
   }, [user, userPermissions]);
 
   /**

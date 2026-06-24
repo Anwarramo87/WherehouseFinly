@@ -28,6 +28,18 @@ const asText = (value: unknown) => {
   return String(value);
 };
 
+// Formatting function to add commas to numbers (e.g., 1000000 -> 1,000,000)
+const formatNumberWithCommas = (val: string) => {
+  if (!val) return "";
+  const numericOnly = val.replace(/\D/g, '');
+  return numericOnly.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+// Function to remove commas for backend submission
+const removeCommas = (val: string) => {
+  return val.replace(/,/g, '');
+};
+
 const normalizeDateValue = (value?: string | null) => {
   if (!value) return "";
   return value.includes("T") ? value.split("T")[0] : value;
@@ -82,8 +94,16 @@ const defaultFormState = {
 export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, initialData, nextSuggestedId = "EMP001", existingIds = [] }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
-  const [idError, setIdError] = useState("");
+  const [idError] = useState(() => {
+    if (!initialData && existingIds.includes(nextSuggestedId)) {
+      return "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود.";
+    }
+    return "";
+  });
   const [roleError, setRoleError] = useState("");
+  // للتحكم اليدوي باسم المستخدم (حتى لا يتم الكتابة فوقه إذا تم تعديله يدوياً)
+  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
+
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
   const { data: deptsData } = useDepartments();
   const prevIsOpen = useRef(isOpen);
@@ -93,15 +113,16 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
       return {
         employeeId: employee.employeeId || "",
         name: employee.name || "",
-        username: employee.username || employee.name || "",
+        username: employee.username || employee.name?.split(" ")[0] || "",
         mobile: employee.mobile || "",
         birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
         gender: employee.gender || "male",
         jobTitle: employee.jobTitle || employee.profession || "",
         department: employee.department || "قسم القص",
-        baseSalary: asText(employee.baseSalary || ""),
-        lumpSumSalary: asText(employee.lumpSumSalary || ""),
-        livingAllowance: asText(employee.livingAllowance || ""),
+        // Apply formatting directly to initial data
+        baseSalary: formatNumberWithCommas(asText(employee.baseSalary || "")),
+        lumpSumSalary: asText(employee.lumpSumSalary || ""), // hidden but kept for type
+        livingAllowance: formatNumberWithCommas(asText(employee.livingAllowance || "")),
         scheduledStart: employee.scheduledStart || "08:00",
         scheduledEnd: employee.scheduledEnd || "16:00",
         roleId: employee.roleId || "",
@@ -123,7 +144,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     } else {
       document.body.style.overflow = "unset";
     }
-    return () => { document.body.style.overflow = "unset"; };
+    return () => {
+      document.body.style.overflow = "unset";
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -132,23 +155,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     }
     prevIsOpen.current = isOpen;
   }, [isOpen]);
-
-  const resetForm = useCallback(() => {
-    setFormData(buildFormState(null));
-    const newIdError = existingIds.includes(nextSuggestedId)
-      ? "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود."
-      : "";
-    setIdError(newIdError);
-  }, [buildFormState, existingIds, nextSuggestedId]);
-
-  useEffect(() => {
-    if (isOpen && !initialData) {
-      const timeoutId = setTimeout(() => {
-        resetForm();
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isOpen, initialData, resetForm]);
 
   const validateMobile = (number: string) => {
     const isValid = /^09[0-9]{8}$/.test(number);
@@ -161,11 +167,34 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   };
 
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\\D/g, '');
+    const val = e.target.value.replace(/\D/g, '');
     setFormData({ ...formData, mobile: val });
     if (mobileError && /^09[0-9]{8}$/.test(val)) {
       setMobileError("");
     }
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    
+    // Auto-fill username with first name if it hasn't been manually edited
+    if (!isUsernameManuallyEdited) {
+      const firstName = newName.trim().split(" ")[0] || "";
+      setFormData({ ...formData, name: newName, username: firstName });
+    } else {
+      setFormData({ ...formData, name: newName });
+    }
+  };
+
+  // Mask for birthDate (YYYY-MM-DD)
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    // Apply YYYY-MM-DD mask dynamically
+    if (val.length > 4) val = val.slice(0, 4) + '-' + val.slice(4);
+    if (val.length > 7) val = val.slice(0, 7) + '-' + val.slice(7, 9);
+    
+    setFormData({ ...formData, birthDate: val });
   };
 
   const resolvedRoleId = formData.roleId || roleOptions[0]?.id || "";
@@ -178,20 +207,39 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
     }
     if (step === 1) {
       if (!validateMobile(formData.mobile)) return;
+      
+      // Basic date validation for length
+      if (formData.birthDate && formData.birthDate.length !== 10) {
+        toast.error("الرجاء كتابة تاريخ الميلاد بالشكل الصحيح: سنة-شهر-يوم");
+        return;
+      }
+      
       setStep(2);
     } else {
       if (!resolvedRoleId) {
         setRoleError("يجب اختيار الدور الوظيفي");
         return;
       }
-      onSave({ ...formData, roleId: resolvedRoleId });
+      
+      // Remove commas before sending to onSave
+      const dataToSave = {
+        ...formData,
+        roleId: resolvedRoleId,
+        baseSalary: removeCommas(formData.baseSalary),
+        livingAllowance: removeCommas(formData.livingAllowance),
+        // Ensure lumpSum is passed as empty or 0 if it was removed
+        lumpSumSalary: "0", 
+      };
+      
+      onSave(dataToSave);
     }
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-[#101720]/80 backdrop-blur-md flex items-center justify-center z-999999 p-4 sm:p-6 transition-all duration-300" dir="rtl">
+    <div className="fixed inset-0 bg-[#101720]/80 backdrop-blur-md flex items-center justify-center z-[999999] p-4 sm:p-6 transition-all duration-300" dir="rtl">
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-white/5 outline-dashed outline-1 outline-[#C89355]/20 outline-offset-[-6px]">
 
+        {/* Header */}
         <div className="p-5 sm:p-6 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
           <div className="flex items-center gap-4">
             <div className="bg-[#C89355]/10 p-2.5 rounded-xl border border-[#C89355]/20 shadow-[0_0_15px_rgba(200,147,85,0.15)]">
@@ -209,6 +257,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
           </button>
         </div>
 
+        {/* Progress Bar */}
         <div className="px-6 pt-6 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <div className={`h-2.5 rounded-full transition-all duration-500 ease-out flex-1 ${step >= 1 ? 'bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.4)]' : 'bg-[#263544]'}`} />
@@ -221,22 +270,23 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
           </div>
         </div>
 
+        {/* Form Body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 p-6 relative">
           <form id="employeeForm" onSubmit={handleFormSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5 text-right relative z-10">
 
-            {/* الخطوة الأولى */}
+            {/* ─── الخطوة الأولى: البيانات الشخصية ─── */}
             <div className={`col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 transition-all duration-500 ${step === 1 ? 'block animate-in slide-in-from-right-8' : 'hidden'}`}>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-[#C89355] mb-2">اسم الموظف الثلاثي</label>
                 <div className="relative group">
                   <input
-                    type="text" required placeholder="أسم الثلاثي"
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500"
+                    type="text" required placeholder="أدخل الاسم الثلاثي"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-12 placeholder:text-slate-500"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={handleNameChange}
                   />
-                  <User className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                  <User className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
               </div>
 
@@ -245,12 +295,13 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <div className="relative group">
                   <input
                     type="tel" required placeholder="09xxxxxxxx" maxLength={10}
-                    className={`w-full p-3.5 bg-[#1a2530] border rounded-xl focus:ring-2 outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pl-11 dir-ltr text-right ${mobileError ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500' : 'border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]'
-                      }`}
+                    className={`w-full p-4 bg-[#1a2530] border rounded-xl focus:ring-2 outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pl-11 dir-ltr text-right ${
+                      mobileError ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500' : 'border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]'
+                    }`}
                     value={formData.mobile}
                     onChange={handleMobileChange}
                   />
-                  <Phone className={`absolute left-4 top-3.5 transition-colors ${mobileError ? 'text-rose-500' : 'text-slate-500 group-focus-within:text-[#C89355]'}`} size={20} />
+                  <Phone className={`absolute left-4 top-4 transition-colors ${mobileError ? 'text-rose-500' : 'text-slate-500 group-focus-within:text-[#C89355]'}`} size={20} />
                 </div>
                 {mobileError && <p className="text-xs text-rose-400 font-bold mt-1.5">{mobileError}</p>}
               </div>
@@ -260,8 +311,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <input
                   type="text" placeholder="مثال: EMP001" required pattern="^EMP[0-9]{3,}$"
                   readOnly
-                  className={`w-full p-3.5 bg-[#1a2530]/80 border rounded-xl focus:ring-2 outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed ${idError ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500' : 'border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]'
-                    }`}
+                  className={`w-full p-4 bg-[#1a2530]/80 border rounded-xl focus:ring-2 outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed ${
+                    idError ? 'border-rose-500 focus:ring-rose-500/30 focus:border-rose-500' : 'border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]'
+                  }`}
                   dir="ltr"
                   value={formData.employeeId}
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
@@ -274,7 +326,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <div className="relative group">
                   <input
                     type="text" placeholder="مثال: دوما، دمشق" 
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500"
                     value={formData.residence}
                     onChange={(e) => setFormData({ ...formData, residence: e.target.value })}
                   />
@@ -286,13 +338,15 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <div className="relative group">
                   <input
                     type="text"
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pr-11"
-                    dir="ltr"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pr-11"
                     value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder=" أسم الموظف الظاهر"
+                    onChange={(e) => {
+                      setIsUsernameManuallyEdited(true);
+                      setFormData({ ...formData, username: e.target.value });
+                    }}
+                    placeholder="الاسم المستعار للنظام"
                   />
-                  <UserCircle className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                  <UserCircle className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
               </div>
 
@@ -300,12 +354,15 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>
                 <div className="relative group">
                   <input
-                    type="date" required
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono font-bold shadow-inner pr-11 scheme-dark"
+                    type="text" required
+                    placeholder="مثال: 1995-05-24"
+                    maxLength={10}
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono font-bold shadow-inner pr-12 text-left"
+                    dir="ltr"
                     value={formData.birthDate}
-                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    onChange={handleBirthDateChange}
                   />
-                  <CalendarHeart className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                  <CalendarHeart className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
               </div>
 
@@ -314,26 +371,26 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <div className="relative group">
                   <select
                     required
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer pr-11 appearance-none"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer pr-12 appearance-none"
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                   >
                     <option value="male">ذكر</option>
                     <option value="female">أنثى</option>
                   </select>
-                  <Users className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={20} />
+                  <Users className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={20} />
                 </div>
               </div>
 
             </div>
 
-            {/* الخطوة الثانية */}
+            {/* ─── الخطوة الثانية: البيانات الوظيفية والمالية ─── */}
             <div className={`col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 transition-all duration-500 ${step === 2 ? 'block animate-in slide-in-from-left-8' : 'hidden'}`}>
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">القسم التابع له</label>
                 <select
-                  className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
+                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 >
@@ -348,7 +405,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 {roleOptions.length > 0 ? (
                   <select
                     required={step === 2}
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
                     value={formData.roleId || roleOptions[0]?.id || ""}
                     onChange={(e) => {
                       setFormData({ ...formData, roleId: e.target.value });
@@ -366,7 +423,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                     type="text"
                     required={step === 2}
                     placeholder="أدخل Role ID"
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
                     value={formData.roleId}
                     onChange={(e) => {
                       setFormData({ ...formData, roleId: e.target.value });
@@ -387,90 +444,78 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
                 <div className="relative group">
                   <input
                     type="text" required={step === 2} placeholder="مثال: حويص، خياط، كواء..."
-                    className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500"
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500"
                     value={formData.jobTitle}
                     onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                   />
-                  <Briefcase className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                  <Briefcase className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
                 </div>
               </div>
 
-              {/* حقول الراتب الثلاثة */}
-              <div className="md:col-span-2 bg-[#1a2530] p-5 rounded-2xl border border-[#263544] shadow-inner">
-                <div className="flex items-center gap-2 border-b border-white/5 pb-3 mb-5">
-                  <Coins size={20} className="text-[#C89355]" />
-                  <span className="text-sm font-bold text-white">معلومات الراتب</span>
+              {/* ── معلومات الراتب (معدلة) ── */}
+              <div className="md:col-span-2 bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner mt-2">
+                <div className="flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
+                  <Coins size={22} className="text-[#C89355]" />
+                  <span className="text-base font-bold text-white">معلومات الراتب</span>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* الشبكة مقسومة لـ 2 بدلاً من 3 بسبب حذف الراتب المقطوع */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* الراتب الأساسي */}
                   <div>
-                    <label htmlFor="baseSalary" className="block text-xs font-bold text-slate-400 mb-2">الراتب الأساسي (ل.س)</label>
+                    <label htmlFor="baseSalary" className="block text-xs font-bold text-[#C89355] mb-2">الراتب الأساسي (ل.س)</label>
                     <input
                       id="baseSalary"
-                      type="number"
-                      min={0}
+                      type="text"
                       placeholder="0"
-                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
+                      className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      dir="ltr"
                       value={formData.baseSalary}
-                      onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
-                    />
-                  </div>
-
-                  {/* الراتب المقطوع */}
-                  <div>
-                    <label htmlFor="lumpSumSalary" className="block text-xs font-bold text-slate-400 mb-2">الراتب المقطوع (ل.س)</label>
-                    <input
-                      id="lumpSumSalary"
-                      type="number"
-                      min={0}
-                      placeholder="0"
-                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
-                      value={formData.lumpSumSalary}
-                      onChange={(e) => setFormData({ ...formData, lumpSumSalary: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, baseSalary: formatNumberWithCommas(e.target.value) })}
                     />
                   </div>
 
                   {/* بدل غلاء المعيشة */}
                   <div>
-                    <label htmlFor="livingAllowance" className="block text-xs font-bold text-slate-400 mb-2">بدل غلاء المعيشة (ل.س)</label>
+                    <label htmlFor="livingAllowance" className="block text-xs font-bold text-[#C89355] mb-2">بدل غلاء المعيشة (ل.س)</label>
                     <input
                       id="livingAllowance"
-                      type="number"
-                      min={0}
+                      type="text"
                       placeholder="0"
-                      className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-base font-bold shadow-sm placeholder:text-slate-600"
+                      className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      dir="ltr"
                       value={formData.livingAllowance}
-                      onChange={(e) => setFormData({ ...formData, livingAllowance: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, livingAllowance: formatNumberWithCommas(e.target.value) })}
                     />
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-500 mt-3 font-semibold">
+                <p className="text-xs text-slate-500 mt-4 font-semibold">
                   💡 يمكنك ترك الحقول فارغة إذا لم تكن مطلوبة (سيتم حفظها كقيمة 0)
                 </p>
               </div>
 
-              <div className="bg-[#1a2530] p-5 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-5 shadow-inner">
-                <div className="col-span-2 flex items-center gap-2 border-b border-white/5 pb-3">
-                  <CalendarDays size={20} className="text-[#C89355]" />
-                  <span className="text-sm font-bold text-white">أوقات الدوام المجدولة</span>
+              {/* ── أوقات الدوام ── */}
+              <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-6 shadow-inner">
+                <div className="col-span-2 flex items-center gap-2 border-b border-white/5 pb-4">
+                  <CalendarDays size={22} className="text-[#C89355]" />
+                  <span className="text-base font-bold text-white">أوقات الدوام المجدولة</span>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">وقت الحضور</label>
+                  <label className="block text-xs font-bold text-[#C89355] mb-2">وقت الحضور</label>
                   <input
                     type="time" required={step === 2}
-                    className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono font-bold text-center shadow-sm scheme-dark"
+                    className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono text-lg font-bold text-center shadow-sm scheme-dark"
                     value={formData.scheduledStart}
                     onChange={(e) => setFormData({ ...formData, scheduledStart: e.target.value })}
                     dir="ltr"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">وقت الانصراف</label>
+                  <label className="block text-xs font-bold text-[#C89355] mb-2">وقت الانصراف</label>
                   <input
                     type="time" required={step === 2}
-                    className="w-full p-3 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono font-bold text-center shadow-sm scheme-dark"
+                    className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono text-lg font-bold text-center shadow-sm scheme-dark"
                     value={formData.scheduledEnd}
                     onChange={(e) => setFormData({ ...formData, scheduledEnd: e.target.value })}
                     dir="ltr"
@@ -482,6 +527,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
           </form>
         </div>
 
+        {/* Footer */}
         <div className="p-5 sm:p-6 bg-[#1a2530]/80 border-t border-white/5 flex justify-between shrink-0 relative z-10">
           {step === 1 ? (
             <button
