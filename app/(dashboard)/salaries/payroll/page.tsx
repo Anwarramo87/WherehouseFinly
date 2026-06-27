@@ -1215,8 +1215,7 @@ export default function PayrollPage() {
               </span>
             </div>
           </div>
-        </div> */}
-        </div> */}
+
 
         {/* ── Search ───────────────────────────────────────────────────────────── */}
         <div className="mb-6 relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all group">

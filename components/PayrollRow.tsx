@@ -71,7 +71,7 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
-          <span className="text-sm text-slate-400">—</span>
+
         )}
       </div>
 
@@ -83,7 +83,7 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
-          <span className="text-sm text-slate-400">—</span>
+
         )}
       </div>
 
