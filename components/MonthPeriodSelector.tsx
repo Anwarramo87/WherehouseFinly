@@ -150,7 +150,7 @@ const effectiveDate = selectedDate || today;
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 min-w-[180px] px-3 py-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all"
+            className="flex items-center gap-2 min-w-45 px-3 py-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md transition-all"
           >
             <Calendar size={16} className="text-[#C89355] shrink-0" />
             <span className="font-mono text-sm font-black text-[#263544] flex-1 text-right">

@@ -65,8 +65,8 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" dir="rtl">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-xl font-bold text-slate-800">تشغيل مسير الرواتب</h2>
           <button onClick={handleClose} className="text-slate-400 hover:text-red-500 transition-colors active:scale-95">

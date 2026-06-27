@@ -1,5 +1,5 @@
 import React from "react";
-import { Wallet, Receipt, ChevronLeft, Download } from "lucide-react";
+import { Wallet, Receipt, HandCoins, ChevronLeft, Download, AlertTriangle } from "lucide-react";
 import type { Bonus } from "@/types/bonus";
 import type { DiscountRecord } from "@/hooks/useDiscounts";
 import type { PenaltyRecord } from "@/hooks/usePenalties";
@@ -64,10 +64,10 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
       dir="rtl"
     >
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+      <div className="payslip-container bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in fade-in zoom-in-95 duration-200">
         {/* Modal header */}
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10 print:bg-transparent print:border-b-2 print:border-slate-800">
           <div className="flex items-center gap-4">
@@ -125,7 +125,16 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </p>
               </div>
             </div>
-
+            {payslip.anomalies.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm font-bold print:hidden">
+                <strong>ملاحظات النظام: </strong>
+                <ul className="list-disc list-inside ms-4 mt-1">
+                  {payslip.anomalies.map((an, idx) => (
+                    <li key={idx}>{an}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Earnings / Deductions grid */}
@@ -153,6 +162,10 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                         {
                           label: "الراتب الأساسي",
                           value: toNumber(payslip.details.salaryConfig.baseSalary),
+                        },
+                        {
+                          label: "الراتب المقطوع",
+                          value: toNumber(payslip.details.salaryConfig.lumpSumSalary),
                         },
                         {
                           label: "بدل المعيشة",
@@ -305,6 +318,21 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </div>
               )}
 
+              {/* ── Early Leave / Missing Minutes Deduction ──────────────────── */}
+              {(payslip?.earlyLeaveDeduction ?? 0) > 0 && (
+                <div className="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="flex items-center gap-2 text-sm font-bold text-amber-700 print:text-black">
+                      <AlertTriangle size={15} className="text-amber-500" />
+                      خصم دوام ناقص ({payslip?.totalEarlyLeaveMinutes ?? 0} دقيقة)
+                    </span>
+                    <span className="text-lg font-black text-red-600 font-mono print:text-black">
+                      -{payslip.earlyLeaveDeduction!.toLocaleString()} ل.س
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Authoritative total deductions (from backend) */}
               <div className="bg-rose-50 rounded-2xl p-6 border border-rose-200 shadow-sm print:shadow-none print:border-slate-400 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-2 h-full bg-rose-500" />
@@ -318,6 +346,16 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </div>
               </div>
 
+              {payslip.totalDeductions === 0 && (
+                <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100 print:hidden">
+                    <HandCoins className="text-slate-400" size={28} />
+                  </div>
+                  <p className="text-slate-500 font-bold text-base print:text-black">
+                    لا توجد أي خصومات مالية مسجلة لهذا الشهر.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
