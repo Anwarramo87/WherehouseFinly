@@ -21,6 +21,7 @@ interface Props {
   onConfirm: (data: SettlementData) => void;
   isPending: boolean;
   employeeId?: string;
+  initialSettlementDate?: string;
 }
 
 const defaultFormState: SettlementData = {
@@ -50,11 +51,12 @@ export default function FinancialSettlementModal({
   onConfirm, 
   isPending, 
   employeeId,
+  initialSettlementDate,
 }: Props) {
 const isMounted = typeof document !== "undefined";
   const [formData, setFormData] = useState<SettlementData>(() => ({
     ...defaultFormState,
-    settlementDate: defaultFormState.settlementDate,
+    settlementDate: initialSettlementDate || defaultFormState.settlementDate,
   }));
   const [isLoadingSalary, setIsLoadingSalary] = useState(false);
   const [isLoadingExtras, setIsLoadingExtras] = useState(false);

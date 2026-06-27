@@ -208,9 +208,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         mobile:                newEmployee.mobile,
         nationalId:            newEmployee.nationalId,
         dateOfBirth:           newEmployee.dateOfBirth,
-        gender:                typeof newEmployee.gender === 'string'
-                                 ? newEmployee.gender.toLowerCase()
-                                 : newEmployee.gender,
+        gender:                newEmployee.gender,
         jobTitle:              newEmployee.jobTitle,
         profession:            newEmployee.profession,
         department:            newEmployee.department,

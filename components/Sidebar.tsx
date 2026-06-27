@@ -25,7 +25,7 @@ interface SidebarProps {
 
 interface MenuItem {
   name: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   href?: string;
   permissions?: string[];
   subItems?: { name: string; href: string }[];

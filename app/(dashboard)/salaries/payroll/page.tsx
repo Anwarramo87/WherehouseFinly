@@ -1127,6 +1127,7 @@ export default function PayrollPage() {
             </div>
             <p className="text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm">
               {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
+              {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
             </p>
             <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
               * الراتب المستحق من أيام الدوام الفعلية
@@ -1186,6 +1187,7 @@ export default function PayrollPage() {
 
         {/* بطاقة إجمالية للتصفية */}
         {/* <div className="mb-8 relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] backdrop-blur-xl border-2 border-[#C89355]/40 rounded-[2.5rem] p-8 shadow-[0_25px_60px_rgba(200,147,85,0.2)] group">
+        {/* <div className="mb-8 relative overflow-hidden bg-gradient-to-br from-[#1a2530] to-[#263544] backdrop-blur-xl border-2 border-[#C89355]/40 rounded-[2.5rem] p-8 shadow-[0_25px_60px_rgba(200,147,85,0.2)] group">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/40 pointer-events-none transition-colors group-hover:border-[#C89355]/60" />
           <div className="relative z-10">
             <h3 className="text-lg font-black text-[#C89355] mb-6 uppercase tracking-wide flex items-center gap-3">
@@ -1213,6 +1215,7 @@ export default function PayrollPage() {
               </span>
             </div>
           </div>
+        </div> */}
         </div> */}
 
         {/* ── Search ───────────────────────────────────────────────────────────── */}
