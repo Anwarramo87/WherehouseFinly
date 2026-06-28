@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Play, X, CalendarDays, Timer, Minus, Truck, Info } from "lucide-react";
+import { Loader2, Play, X, CalendarDays, Timer, Minus, Info } from "lucide-react";
 import { CalculatePayrollInput } from "@/types/payroll";
 
 interface RunPayrollModalProps {
