@@ -20,8 +20,8 @@ const envLocalPath = path.join(__dirname, '..', '.env.local');
 const BACKENDS = {
   local: {
     name: 'Local Backend',
-    url: 'http://localhost:5001/api/v1',
-    description: 'Using local backend at http://localhost:5001'
+    url: 'http://localhost:5003/api/v1',
+    description: 'Using local backend at http://localhost:5003'
   },
   remote: {
     name: 'Remote Backend (Railway)',
@@ -61,7 +61,7 @@ function switchBackend(targetBackend) {
       
       if (isLocal && targetBackend.toLowerCase() === 'local') {
         // This is the line we want, uncomment it
-        newLines.push('NEXT_PUBLIC_API_URL=http://localhost:5001/api');
+        newLines.push('NEXT_PUBLIC_API_URL=http://localhost:5003/api');
       } else if (isRemote && targetBackend.toLowerCase() === 'remote') {
         // This is the line we want, uncomment it
         newLines.push('NEXT_PUBLIC_API_URL=https://werehouse-production-f4f4.up.railway.app/api');
