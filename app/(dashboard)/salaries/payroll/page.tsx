@@ -226,7 +226,7 @@ function PayrollVirtualTable({
           className="flex w-full min-w-212.5 bg-slate-100 border-b border-slate-200 sticky top-0 z-20 shadow-sm"
         >
           {/* Employee (الموظف) */}
-          <div className="w-[15%] justify-start px-4 py-4 font-bold text-xs text-slate-700 flex items-center">
+          <div className="w-[15%] justify-center px-4 py-4 font-bold text-xs text-slate-700 flex items-center">
             الموظف
           </div>
           {/* Earned Salary (الراتب المستحق) */}
@@ -246,7 +246,7 @@ function PayrollVirtualTable({
             المجموع
           </div>
           {/* Difference (الفرق) */}
-          <div className="w-[10%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
+          <div className="w-[10%] justify-center px-4 py-4 font-bold text-xs text-slate-700 bg-amber-50/50 border-r border-slate-200 flex items-center">
             الفرق
           </div>
           {/* Net Pay (الراتب المقبوض) */}
@@ -1126,7 +1126,6 @@ export default function PayrollPage() {
               <p className="font-black text-[#263544] text-sm">صافي الإجمالي المقبوض (ل.س) *</p>
             </div>
             <p className="text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm">
-              {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
               {globalTotals.totalNetPayRounded.toLocaleString()} ل.س
             </p>
             <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
