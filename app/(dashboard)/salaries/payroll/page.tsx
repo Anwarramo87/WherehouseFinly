@@ -1381,10 +1381,21 @@ export default function PayrollPage() {
         isPending={calculatePayroll.isPending}
         initialMonth={month}
         onRun={(payload) => {
+          console.log('[Payroll] Submitting payload:', payload);
           calculatePayroll.mutate(payload, {
             onSuccess: () => {
+              // Extract month from periodStart and switch to it
+              const calculatedMonth = payload.periodStart.slice(0, 7); // YYYY-MM
+              console.log('[Payroll] Success! Switching to month:', calculatedMonth);
+              setMonth(calculatedMonth);
+              router.push(`/salaries/payroll?period=${calculatedMonth}`);
               setPayrollModalOpen(false);
+              toast.success(`تم حساب الرواتب لشهر ${calculatedMonth} بنجاح`);
             },
+            onError: (error) => {
+              console.error('[Payroll] Calculation failed:', error);
+              // Don't close modal or change month on error
+            }
           });
         }}
       />

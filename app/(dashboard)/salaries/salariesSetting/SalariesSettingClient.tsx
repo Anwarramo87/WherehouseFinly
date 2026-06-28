@@ -7,19 +7,17 @@ import { useSearchParams } from "next/navigation";
 import useSalaries from "@/hooks/useSalaries";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useBonuses } from "@/hooks/useBonuses";
-import { useAdvances } from "@/hooks/useAdvances";
-import type { Advance } from "@/types/advance";
-import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft } from "lucide-react";
+
+import { Edit, Trash, Gift, Plus, Sparkles, Loader2, Wallet, ChevronLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { Salary } from "@/types/salary";
 import type { Employee } from "@/types/employee";
 import type { Bonus } from "@/types/bonus";
 
-export type FinancialTabKey = "salary-config" | "advances" | "bonuses" | "final-payroll";
+export type FinancialTabKey = "salary-config" | "bonuses" | "final-payroll";
 
 const ManageSalaryModal = dynamic(() => import("@/components/ManageSalaryModal"), { loading: () => null });
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
-const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 const toNumber = (value: unknown) => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
@@ -62,7 +60,6 @@ const SkeletonRows = () => (
 const tabLabels: Record<FinancialTabKey, string> = {
   "salary-config": "إعداد الرواتب",
   "bonuses": "المكافآت والخصومات",
-  "advances": "السلف",
   "final-payroll": "المسير النهائي",
 };
 
@@ -77,7 +74,7 @@ export default function SalariesSettingClient() {
   
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);  
-  const { data: advances = [] } = useAdvances();
+
 
   const period = useMemo(() => getLocalMonth(), []);
   const { data: bonuses = [] } = useBonuses({ period });
@@ -95,7 +92,6 @@ export default function SalariesSettingClient() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected, setSelected] = useState<Salary | null>(null);
   const [preselectedEmployeeId, setPreselectedEmployeeId] = useState<string | undefined>(undefined);
-  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
 
   const openFor = (salary: Salary | null = null, preselectId?: string) => {
@@ -146,17 +142,13 @@ export default function SalariesSettingClient() {
     return Array.from(set);
   }, [employees, resignedIds]);
 
-  const employeesForFinanceModals = useMemo(
-    () => (employees || []).map((emp) => ({ employeeId: emp.employeeId, name: emp.name })),
-    [employees],
-  );
-
   const tabStats = useMemo(() => {
-    const totalAdvances = (advances || []).reduce((sum: number, item: Advance) => sum + toNumber(item.remainingAmount), 0);
     const totalBonus = (bonuses || []).reduce((sum: number, item: Bonus) => sum + toNumber(item.bonusAmount), 0);
     const totalDeductions = (bonuses || []).reduce((sum: number, item: Bonus) => sum + toNumber(item.assistanceAmount), 0);
-    return { totalAdvances, totalBonus, totalDeductions };
-  }, [advances, bonuses]);
+    return { totalBonus, totalDeductions };
+  }, [bonuses]);
+
+
 
   const handleSave = (employeeId: string, payload: SalaryPayload) => {
     if (!employeeId) return toast.error("يرجى إدخال كود الموظف");
@@ -182,7 +174,6 @@ export default function SalariesSettingClient() {
 
   const openFloatingAction = () => {
     if (activeTab === "salary-config") { openFor(null); return; }
-    if (activeTab === "advances") { setIsAdvanceModalOpen(true); return; }
     if (activeTab === "bonuses") { setIsBonusModalOpen(true); }
   };
 
@@ -190,8 +181,6 @@ export default function SalariesSettingClient() {
     switch (activeTab) {
       case "salary-config":
         return { text: "ضبط راتب جديد", icon: <Plus size={18} /> };
-      case "advances":
-        return { text: "إضافة سلفة", icon: <HandCoins size={18} /> };
       case "bonuses":
         return { text: "إضافة مكافأة / خصم", icon: <Gift size={18} /> };
       case "final-payroll":
@@ -373,7 +362,6 @@ export default function SalariesSettingClient() {
       </div>
 
       {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} />}
-      {isAdvanceModalOpen && <AddAdvanceModal isOpen={isAdvanceModalOpen} onClose={() => setIsAdvanceModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => { }} />}
       {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employees} salaries={salaries} isPending={false} onSave={() => { }} />}
     </>
   );

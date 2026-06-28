@@ -6,12 +6,10 @@ import dynamic from "next/dynamic";
 import { Plus, Wallet, ChevronLeft, Search, Trash2, Edit3, Coins, CalendarDays as _CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscounts";
-import { useAdvances } from "@/hooks/useAdvances";
-import { Advance, AdvanceInput } from "@/types/advance";
+
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
-const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
 
 export default function DiscountsPage() {
   const router = useRouter();
@@ -22,14 +20,12 @@ export default function DiscountsPage() {
 
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
-  const { createAdvance, updateAdvance } = useAdvances(undefined, period);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
-  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
-  const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
+
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -105,18 +101,7 @@ export default function DiscountsPage() {
     setIsModalOpen(true);
   };
 
-  const handleOpenAddAdvance = () => {
-    setEditingAdvance(null);
-    setIsAdvanceModalOpen(true);
-  };
 
-  const handleSaveAdvance = (data: AdvanceInput) => {
-    if (editingAdvance) {
-      updateAdvance.mutate({ id: String(editingAdvance.employeeId), data }, { onSuccess: () => setIsAdvanceModalOpen(false) });
-    } else {
-      createAdvance.mutate(data, { onSuccess: () => setIsAdvanceModalOpen(false) });
-    }
-  };
 
   const handleSaveDiscount = (data: DiscountPayload) => {
     if (editingDiscount) {
@@ -219,14 +204,7 @@ export default function DiscountsPage() {
                 <Plus size={18} className="group-hover:animate-spin relative z-10" />
                 <span className="relative z-10 tracking-wide">إضافة إجراء مالي</span>
               </button>
-              <button
-                onClick={handleOpenAddAdvance}
-                title="إضافة سلفة مفصلة"
-                className="relative overflow-hidden bg-white/80 hover:bg-white text-[#263544] px-4 py-2 rounded-2xl flex items-center gap-2 transition-all shadow-sm border border-slate-200 text-sm font-bold"
-              >
-                <Wallet size={16} />
-                <span>إضافة سلفة</span>
-              </button>
+
             </div>
           </div>
         </header>
@@ -359,16 +337,7 @@ export default function DiscountsPage() {
           />
         )}
 
-        {isAdvanceModalOpen && (
-          <AddAdvanceModal
-            isOpen={isAdvanceModalOpen}
-            onClose={() => setIsAdvanceModalOpen(false)}
-            onSave={handleSaveAdvance}
-            isPending={createAdvance.isPending || updateAdvance.isPending}
-            employees={Array.isArray(employees) ? employees : []}
-            initialData={editingAdvance}
-          />
-        )}
+
 
       </div>
     </div>
