@@ -17,7 +17,7 @@ export default function DiscountsPage() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
-  
+
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
 
@@ -35,7 +35,7 @@ export default function DiscountsPage() {
   // Use dual-check: (1) must be in active employees list, (2) must NOT be in resigned set
   const recordsWithNames = useMemo(() => {
     const activeEmployeeIds = new Set(employees.map(e => e.employeeId));
-    
+
     return discounts
       .filter(d => {
         // Must be in active employees AND not in resigned list
@@ -299,11 +299,11 @@ export default function DiscountsPage() {
                                             >
                                               <Edit3 size={16} />
                                             </button>
-<button
-                                               onClick={(e) => { e.stopPropagation(); handleDelete(record.id, record.kind); }}
-                                               className="text-rose-400 hover:bg-rose-100 hover:text-rose-600 p-2 rounded-lg transition-all"
-                                               title="حذف"
-                                             >
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleDelete(record.id, record.kind); }}
+                                              className="text-rose-400 hover:bg-rose-100 hover:text-rose-600 p-2 rounded-lg transition-all"
+                                              title="حذف"
+                                            >
                                               <Trash2 size={16} />
                                             </button>
                                           </div>

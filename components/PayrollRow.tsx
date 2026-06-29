@@ -40,7 +40,7 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
       className="flex w-full min-w-212.5 bg-white hover:bg-slate-50 transition-colors duration-150 group/row border-b border-slate-200 cursor-pointer"
     >
       {/* الموظف - Employee */}
-      <div className="w-[15%] flex items-center justify-start p-4 align-middle border-l border-slate-200">
+      <div className="w-[15%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-slate-800 truncate max-w-50" title={item.employeeName}>
             {item.employeeName}
