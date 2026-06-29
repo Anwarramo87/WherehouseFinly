@@ -199,9 +199,7 @@ function PayrollVirtualTable({
   allRows: Array<AggregatedPayroll>; // Removed union with isHeader type
   onSelectPayslip: (item: AggregatedPayroll) => void;
 }) {
-  "use no memo";
-  const parentRef = React.useRef<HTMLDivElement>(null);
-
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: allRows.length,
     getScrollElement: () => parentRef.current,
@@ -211,6 +209,8 @@ function PayrollVirtualTable({
     },
     overscan: 5,
   });
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
 
   return (
     <div
@@ -936,7 +936,7 @@ export default function PayrollPage() {
 
       // 2. Map data to strictly match our exact layout columns
       const rows = filteredPayrollData.map((item, index) => ({
-        "#": index + 1,
+        "#": String(index + 1),
         "كود الموظف": item.employeeId,
         "اسم الموظف": item.employeeName,
         "القسم": item.department,
@@ -1381,7 +1381,7 @@ export default function PayrollPage() {
         onClose={() => setPayrollModalOpen(false)}
         isPending={calculatePayroll.isPending}
         initialMonth={month}
-        onRun={(payload) => {
+        onRun={async (payload) => {
           console.log('[Payroll] Submitting payload:', payload);
           calculatePayroll.mutate(payload, {
             onSuccess: () => {

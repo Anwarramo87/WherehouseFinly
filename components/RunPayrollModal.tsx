@@ -94,8 +94,8 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
         {/* Header */}
         <div className="px-4 sm:px-6 py-4 border-b border-slate-700/30 flex justify-between items-center bg-[#1e293b]/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600/10 p-2 rounded-xl border border-blue-600/20 shrink-0">
-              <CalendarDays className="text-blue-400" size={20} />
+            <div className="bg-[#C89355]/10 p-2 rounded-xl border border-[#C89355]/20 shrink-0">
+              <CalendarDays className="text-[#C89355]" size={20} />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-white">تشغيل مسير الرواتب</h2>
@@ -118,44 +118,6 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
             className="space-y-4"
             onSubmit={handleSubmit}
           >
-            {/* Date Range */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-blue-400 mb-2">
-                  <CalendarDays size={14} />
-                  بداية الفترة
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    required
-                    value={form.periodStart}
-                    max={form.periodEnd}
-                    onChange={(e) => setForm((p) => ({ ...p, periodStart: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-[#1e293b] border border-slate-700/40 rounded-xl focus:ring-2 focus:ring-blue-600/40 focus:border-blue-500/60 outline-none transition-all text-white font-mono text-sm font-bold pr-10 scheme-dark placeholder:text-slate-500"
-                  />
-                  <CalendarDays className="absolute right-3 top-2.5 text-slate-500 pointer-events-none" size={18} />
-                </div>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-blue-400 mb-2">
-                  <CalendarDays size={14} />
-                  نهاية الفترة
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    required
-                    value={form.periodEnd}
-                    min={form.periodStart}
-                    onChange={(e) => setForm((p) => ({ ...p, periodEnd: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-[#1e293b] border border-slate-700/40 rounded-xl focus:ring-2 focus:ring-blue-600/40 focus:border-blue-500/60 outline-none transition-all text-white font-mono text-sm font-bold pr-10 scheme-dark placeholder:text-slate-500"
-                  />
-                  <CalendarDays className="absolute right-3 top-2.5 text-slate-500 pointer-events-none" size={18} />
-                </div>
-              </div>
-            </div>
 
             {/* Grace Period */}
             <div>
@@ -169,7 +131,7 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
                   min={0}
                   value={form.gracePeriodMinutes?.toString() || ""}
                   onChange={(e) => setForm((p) => ({ ...p, gracePeriodMinutes: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-[#1e293b] border border-slate-700/40 rounded-xl focus:ring-2 focus:ring-blue-600/40 focus:border-blue-500/60 outline-none transition-all text-white font-mono text-sm font-bold pr-10 placeholder:text-slate-500"
+                  className="w-full px-3 py-2.5 bg-[#1e293b] border border-slate-700/40 rounded-xl focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355]/60 outline-none transition-all text-white font-mono text-sm font-bold pr-10 placeholder:text-slate-500"
                   placeholder="5"
                 />
                 <Timer className="absolute right-3 top-2.5 text-slate-500 pointer-events-none" size={18} />
@@ -188,15 +150,15 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
               </div>
 
               {/* Attendance Deductions */}
-              <label className="flex items-start gap-3 p-3 bg-blue-600/5 border border-blue-600/15 rounded-xl cursor-pointer hover:bg-blue-600/10 transition-all group">
+              <label className="flex items-start gap-3 p-3 bg-[#C89355]/5 border border-[#C89355]/15 rounded-xl cursor-pointer hover:bg-[#C89355]/10 transition-all group">
                 <input
                   type="checkbox"
                   checked={form.includeAttendanceDeductions ?? true}
                   onChange={(e) => setForm((p) => ({ ...p, includeAttendanceDeductions: e.target.checked }))}
-                  className="w-5 h-5 mt-0.5 rounded border-blue-600/40 bg-[#1e293b] text-blue-500 focus:ring-blue-600/40 cursor-pointer"
+                  className="w-5 h-5 mt-0.5 rounded border-[#C89355]/40 bg-[#1e293b] text-[#C89355] focus:ring-[#C89355]/40 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-bold text-blue-400 group-hover:text-blue-300 transition-colors">
+                  <div className="text-sm font-bold text-[#C89355] group-hover:text-[#d0b468] transition-colors">
                     خصومات الدوام
                   </div>
                   <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
@@ -206,15 +168,15 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
               </label>
 
               {/* Transportation Deductions */}
-              <label className="flex items-start gap-3 p-3 bg-indigo-600/5 border border-indigo-600/15 rounded-xl cursor-pointer hover:bg-indigo-600/10 transition-all group">
+              <label className="flex items-start gap-3 p-3 bg-[#C89355]/5 border border-[#C89355]/15 rounded-xl cursor-pointer hover:bg-[#C89355]/10 transition-all group">
                 <input
                   type="checkbox"
                   checked={form.includeTransportationDeductions ?? true}
                   onChange={(e) => setForm((p) => ({ ...p, includeTransportationDeductions: e.target.checked }))}
-                  className="w-5 h-5 mt-0.5 rounded border-indigo-600/40 bg-[#1e293b] text-indigo-500 focus:ring-indigo-600/40 cursor-pointer"
+                  className="w-5 h-5 mt-0.5 rounded border-[#C89355]/40 bg-[#1e293b] text-[#C89355] focus:ring-[#C89355]/40 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-bold text-indigo-400 group-hover:text-indigo-300 transition-colors">
+                  <div className="text-sm font-bold text-[#C89355] group-hover:text-[#d0b468] transition-colors">
                     خصومات النقل
                   </div>
                   <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
@@ -225,8 +187,8 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
             </div>
 
             {/* Info Box */}
-            <div className="bg-blue-600/5 border border-blue-600/15 rounded-xl px-4 py-3 flex items-start gap-2">
-              <Info size={16} className="text-blue-400 mt-0.5 shrink-0" />
+            <div className="bg-[#C89355]/5 border border-[#C89355]/15 rounded-xl px-4 py-3 flex items-start gap-2">
+              <Info size={16} className="text-[#C89355] mt-0.5 shrink-0" />
               <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">
                 سيتم حساب الرواتب بناءً على سجلات الحضور الفعلية، مع خصم الغياب والتأخير حسب ساعات العمل لكل موظف.
               </p>
@@ -246,15 +208,10 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
               إلغاء
             </button>
             <button
-              type="button"
-              onClick={() => {
-                console.log('[RunPayrollModal] Submit button clicked');
-                if (formRef.current) {
-                  formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                }
-              }}
+              type="submit"
+              form="payrollForm"
               disabled={isPending}
-              className="flex-[2] sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-blue-600 text-white flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-60 shadow-lg shadow-blue-600/20"
+              className="flex-[2] sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-[#C89355] text-[#101720] flex items-center justify-center gap-2 hover:bg-[#b07f45] active:scale-[0.98] transition-all disabled:opacity-60 shadow-[0_0_20px_rgba(200,147,85,0.3)]"
             >
               {isPending ? (
                 <><Loader2 className="animate-spin" size={18} />جاري المعالجة...</>

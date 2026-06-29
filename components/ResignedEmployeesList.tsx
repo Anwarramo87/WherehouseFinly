@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { 
   Loader2, 
-  BadgeInfo, 
   ChevronLeft, 
   ChevronRight,
   CheckCircle, 
@@ -48,7 +47,6 @@ export default function ResignedEmployeesList({
   onFilterFinancialStatus,
   onFilterDateRange,
   onPageChange,
-  onSettle,
   onRehire,
   onFinancialSettlement,
   departments = []
@@ -129,14 +127,6 @@ export default function ResignedEmployeesList({
     }
   };
 
-  const handleSettle = async (employeeId: string) => {
-    if (confirm("هل أنت متأكد من تسليم المستحقات وتصفية هذا الموظف مالياً؟ هذا الإجراء لا يمكن التراجع عنه.")) {
-      if (onSettle) {
-        onSettle(employeeId);
-      }
-    }
-  };
-
   const renderEmployeeTable = (employeesList: Employee[], title: string, count: number) => {
     if (employeesList.length === 0) {
       return (
@@ -174,6 +164,7 @@ export default function ResignedEmployeesList({
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">القسم</th>
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الوظيفة</th>
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">نوع الإنهاء</th>
+                  <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">سبب الإنهاء</th>
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">تاريخ الإنهاء</th>
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الحالة المالية</th>
                   <th className="p-4 text-[#263544] font-black text-xs uppercase tracking-wider text-center">إجراءات</th>
@@ -208,6 +199,10 @@ export default function ResignedEmployeesList({
                         <span className={`px-3 py-1.5 rounded-xl text-[11px] font-black backdrop-blur-md border shadow-sm ${departureColor}`}>
                           {departureType}
                         </span>
+                      </td>
+
+                      <td className="p-4 text-center font-bold text-slate-600 text-sm">
+                        {employee.terminationReason || '—'}
                       </td>
 
                       <td className="p-4 text-center font-bold text-[#263544] text-sm">
@@ -279,30 +274,7 @@ export default function ResignedEmployeesList({
                             )}
                           </ProcessSettlementGuard>
 
-                          {/* اعتماد التصفية السريع */}
-                          <ProcessSettlementGuard
-                            fallback={
-                              <button
-                                disabled
-                                className="inline-flex items-center gap-1.5 bg-slate-300 text-slate-500 px-3 py-2 rounded-xl text-[11px] font-black cursor-not-allowed"
-                                title="ليس لديك صلاحية اعتماد التصفية"
-                              >
-                                <Lock size={14} />
-                                اعتماد التصفية
-                              </button>
-                            }
-                          >
-                            {!employee.isSettled && employee.financialSettlementStatus !== 'completed' && (
-                              <button 
-                                onClick={() => handleSettle(employee.employeeId)}
-                                className="inline-flex items-center gap-1.5 bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-sm border border-[#C89355]/40 active:scale-95"
-                                title="الضغط هنا يعني أن الموظف استلم كافة رواتبه ومستحقاته"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-                                اعتماد التصفية
-                              </button>
-                            )}
-                          </ProcessSettlementGuard>
+
 
                           {employee.isSettled || employee.financialSettlementStatus === 'completed' ? (
                             <span className="text-slate-400 text-xs font-bold">تمت التصفية</span>
@@ -323,26 +295,7 @@ export default function ResignedEmployeesList({
   return (
     <div className="space-y-6">
       {/* شريط الإحصائيات والفلاتر */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* الإحصائيات */}
-        {statistics && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative overflow-hidden inline-flex items-center gap-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-xl px-4 py-2 shadow-sm text-[#263544] text-sm font-black group hover:shadow-md transition-all">
-              <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-              <BadgeInfo size={16} className="text-[#C89355] relative z-10" />
-              <span className="relative z-10">الإجمالي: {statistics.totalResigned}</span>
-            </div>
-            
-            <div className="inline-flex items-center gap-2 bg-blue-50/60 backdrop-blur-xl border border-blue-200/60 rounded-xl px-4 py-2 shadow-sm text-blue-700 text-sm font-black">
-              <span>استقالات: {statistics.resignations}</span>
-            </div>
-            
-            <div className="inline-flex items-center gap-2 bg-rose-50/60 backdrop-blur-xl border border-rose-200/60 rounded-xl px-4 py-2 shadow-sm text-rose-700 text-sm font-black">
-              <span>إقالات: {statistics.terminations}</span>
-            </div>
-          </div>
-        )}
-
+      <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
         {/* زر الفلاتر */}
         <button
           onClick={() => setShowFilters(!showFilters)}
