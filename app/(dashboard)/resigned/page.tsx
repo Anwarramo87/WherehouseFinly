@@ -333,33 +333,37 @@ export default function ResignedEmployeesPage() {
             </div>
             
             <div className="flex flex-wrap w-full md:w-auto justify-end gap-3">
-              <div className="relative overflow-hidden inline-flex items-center gap-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-5 py-3 shadow-[0_10px_20px_rgba(38,53,68,0.05)] text-[#263544] text-sm font-black group hover:shadow-md transition-all">
-                <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-                <BadgeInfo size={18} className="text-[#C89355] group-hover:animate-pulse relative z-10" />
-                <span className="relative z-10 tracking-wide">العدد الإجمالي: {statistics.totalResigned}</span>
-              </div>
+              {mounted && !isLoading && (
+                <div className="relative overflow-hidden inline-flex items-center gap-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-5 py-3 shadow-[0_10px_20px_rgba(38,53,68,0.05)] text-[#263544] text-sm font-black group hover:shadow-md transition-all">
+                  <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
+                  <BadgeInfo size={18} className="text-[#C89355] group-hover:animate-pulse relative z-10" />
+                  <span className="relative z-10 tracking-wide">العدد الإجمالي: {statistics.totalResigned}</span>
+                </div>
+              )}
               
-              <ExportResignedListGuard
-                fallback={
+              {mounted && !isLoading && (
+                <ExportResignedListGuard
+                  fallback={
+                    <button
+                      disabled
+                      className="relative overflow-hidden inline-flex items-center gap-2 bg-slate-300 text-slate-500 rounded-2xl px-5 py-3 text-sm font-black cursor-not-allowed"
+                    >
+                      <Lock size={18} />
+                      <span className="relative z-10">تصدير Excel</span>
+                    </button>
+                  }
+                >
                   <button
-                    disabled
-                    className="relative overflow-hidden inline-flex items-center gap-2 bg-slate-300 text-slate-500 rounded-2xl px-5 py-3 text-sm font-black cursor-not-allowed"
+                    onClick={handleExportToExcel}
+                    disabled={isFetching}
+                    className="relative overflow-hidden inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl px-5 py-3 shadow-[0_10px_20px_rgba(16,185,129,0.2)] text-sm font-black group transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Lock size={18} />
+                    <div className="absolute inset-1 rounded-xl border border-dashed border-white/30 pointer-events-none transition-colors group-hover:border-white/50" />
+                    <Download size={18} className="relative z-10" />
                     <span className="relative z-10">تصدير Excel</span>
                   </button>
-                }
-              >
-                <button
-                  onClick={handleExportToExcel}
-                  disabled={filteredEmployees.length === 0 || isFetching}
-                  className="relative overflow-hidden inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl px-5 py-3 shadow-[0_10px_20px_rgba(16,185,129,0.2)] text-sm font-black group transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="absolute inset-1 rounded-xl border border-dashed border-white/30 pointer-events-none transition-colors group-hover:border-white/50" />
-                  <Download size={18} className="relative z-10" />
-                  <span className="relative z-10">تصدير Excel</span>
-                </button>
-              </ExportResignedListGuard>
+                </ExportResignedListGuard>
+              )}
             </div>
           </header>
 
