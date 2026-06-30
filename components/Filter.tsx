@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter as FilterIcon, SlidersHorizontal } from "lucide-react";
 
 interface FilterProps {
@@ -13,6 +13,12 @@ interface FilterProps {
 
 export default function Filter({ searchTerm, onSearchChange, selectedDept, onDeptChange, departments }: FilterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Avoid hydration mismatch by only rendering select options after client hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   return (
     <div className="flex flex-row-reverse items-center gap-3 w-full md:w-auto relative z-20">
@@ -42,7 +48,7 @@ export default function Filter({ searchTerm, onSearchChange, selectedDept, onDep
             className="bg-transparent text-sm font-black text-[#263544] outline-none cursor-pointer appearance-none pr-2 relative z-10 min-w-20"
           >
             {/* عرض كلمة "الكل" ضمن الخيارات بشكل صحيح */}
-            {departments.map(dept => (
+            {isHydrated && departments.map(dept => (
               <option key={dept} value={dept}>{dept}</option>
             ))}
           </select>

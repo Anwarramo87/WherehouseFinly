@@ -189,6 +189,17 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
 
                 {isDropdownOpen && !isEditMode && (
                   <div className="absolute top-[calc(100%+8px)] left-0 w-full max-h-56 overflow-y-auto custom-scrollbar bg-[#1a2530]/95 backdrop-blur-xl border border-[#263544] rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.5)] z-50 p-2">
+                    <div
+                      onClick={() => {
+                        setValue("employeeId", "ALL", { shouldValidate: true });
+                        setSearchQuery("جميع الموظفين");
+                        setIsDropdownOpen(false);
+                      }}
+                      className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98] border-b border-[#263544] mb-1"
+                    >
+                      <div className="bg-[#C89355]/20 px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355] border border-[#C89355]/30 shadow-sm">ALL</div>
+                      <span className="font-bold text-white text-sm">جميع الموظفين</span>
+                    </div>
                     {filteredEmployees.length === 0 ? (
                       <div className="p-4 text-center text-slate-500 font-bold text-sm">لا يوجد موظف بهذا الاسم أو الكود</div>
                     ) : (

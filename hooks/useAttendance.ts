@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/lib/http/error";
 import { HH_MM_REGEX, normalizeHHmm } from "@/lib/attendance-time";
 import { toLocalDateString } from "@/lib/date-time";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 
 export type AttendanceSource = "manual" | "device";
 export type AttendanceType = "IN" | "OUT";
@@ -114,7 +115,8 @@ const buildTimestampFromDateAndTime = (date: string, hhmm: string) => {
   return `${date}T${hhmm}:00${sign}${offsetHours}:${offsetMins}`;
 };
 
-const normalizeSource = (source?: string): AttendanceSource => (source === "device" ? "device" : "manual");
+const normalizeSource = (source?: string): AttendanceSource =>
+  source === "device" ? "device" : "manual";
 
 const inDateRange = (date: string, startDate?: string, endDate?: string) => {
   if (!startDate && !endDate) return true;
@@ -123,7 +125,11 @@ const inDateRange = (date: string, startDate?: string, endDate?: string) => {
   return true;
 };
 
-const toDailyRecords = (records: AttendanceRecord[], startDate?: string, endDate?: string): AttendanceDailyRecord[] => {
+const toDailyRecords = (
+  records: AttendanceRecord[],
+  startDate?: string,
+  endDate?: string,
+): AttendanceDailyRecord[] => {
   const grouped = new Map<string, AttendanceRecord[]>();
 
   for (const record of records) {
@@ -139,7 +145,9 @@ const toDailyRecords = (records: AttendanceRecord[], startDate?: string, endDate
   const rows: AttendanceDailyRecord[] = [];
 
   grouped.forEach((events, key) => {
-    const sorted = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
 
     const inEvents = sorted.filter((x) => x.type.toUpperCase() === "IN");
     const outEvents = sorted.filter((x) => x.type.toUpperCase() === "OUT");
@@ -164,7 +172,9 @@ const toDailyRecords = (records: AttendanceRecord[], startDate?: string, endDate
     });
   });
 
-  return rows.sort((a, b) => `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`));
+  return rows.sort((a, b) =>
+    `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`),
+  );
 };
 
 export const useAttendance = (params?: AttendanceQueryParams) => {
@@ -198,15 +208,26 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
   const resolvedEndDate = params?.endDate ?? periodEnd ?? requestDate;
 
   // Build query key including period for proper caching
-  const queryKey = useMemo(() => [
-    "attendance",
-    params?.employeeId || "all-employees",
-    params?.period || requestDate || "all-dates",
-    resolvedStartDate || "no-start",
-    resolvedEndDate || "no-end",
-    params?.page || 1,
-    safeLimit,
-  ], [params?.employeeId, params?.period, requestDate, resolvedStartDate, resolvedEndDate, params?.page, safeLimit]);
+  const queryKey = useMemo(
+    () => [
+      "attendance",
+      params?.employeeId || "all-employees",
+      params?.period || requestDate || "all-dates",
+      resolvedStartDate || "no-start",
+      resolvedEndDate || "no-end",
+      params?.page || 1,
+      safeLimit,
+    ],
+    [
+      params?.employeeId,
+      params?.period,
+      requestDate,
+      resolvedStartDate,
+      resolvedEndDate,
+      params?.page,
+      safeLimit,
+    ],
+  );
 
   const query = useQuery<AttendanceListResponse>({
     queryKey,
@@ -242,17 +263,19 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         let records: AttendanceRecord[] = Array.isArray(res.data?.records) ? res.data.records : [];
         const pagination = res.data;
 
-        console.log('📊 Attendance API Response:', {
+        console.log("📊 Attendance API Response:", {
           recordsCount: records.length,
           params: requestParams,
-          sample: records.slice(0, 2)
+          sample: records.slice(0, 2),
         });
 
         // عند عدم تحديد صفحة: حمّل جميع الصفحات لتجنب نقصان السجلات بسبب pagination.
         if (!params?.page && pagination?.pages && pagination.pages > 1) {
           for (let page = 2; page <= pagination.pages; page += 1) {
             const pageRes = await requestList({ ...requestParams, page });
-            const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records) ? pageRes.data.records : [];
+            const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
+              ? pageRes.data.records
+              : [];
             records = records.concat(pageRecords);
           }
         }
@@ -263,7 +286,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           dailyRecords: toDailyRecords(records, resolvedStartDate, resolvedEndDate),
         };
       } catch (error: unknown) {
-        console.error('❌ Attendance API Error:', error);
+        console.error("❌ Attendance API Error:", error);
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
 
         // Fallback: بعض بيئات الخادم ترفض date في list endpoint
@@ -275,13 +298,17 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           };
 
           const retryRes = await requestList(fallbackParams);
-          let retryRecords: AttendanceRecord[] = Array.isArray(retryRes.data?.data) ? retryRes.data.data : [];
+          let retryRecords: AttendanceRecord[] = Array.isArray(retryRes.data?.data)
+            ? retryRes.data.data
+            : [];
           const retryPagination = retryRes.data;
 
           if (!params?.page && retryPagination?.pages && retryPagination.pages > 1) {
             for (let page = 2; page <= retryPagination.pages; page += 1) {
               const pageRes = await requestList({ ...fallbackParams, page });
-              const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records) ? pageRes.data.records : [];
+              const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
+                ? pageRes.data.records
+                : [];
               retryRecords = retryRecords.concat(pageRecords);
             }
           }
@@ -293,9 +320,11 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           };
         }
 
-        throw new Error(axios.isAxiosError(error)
-          ? error.response?.data?.message ?? error.message ?? "فشل تحميل بيانات الحضور"
-          : String(error ?? "فشل تحميل بيانات الحضور"));
+        throw new Error(
+          axios.isAxiosError(error)
+            ? (error.response?.data?.message ?? error.message ?? "فشل تحميل بيانات الحضور")
+            : String(error ?? "فشل تحميل بيانات الحضور"),
+        );
       }
     },
     staleTime: QUERY_STALE_TIME.FAST,
@@ -311,13 +340,19 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       return await apiClient.post("/attendance", cleanPayload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attendance"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 
   const updateAttendance = useMutation({
-    mutationFn: async ({ recordId, data }: { recordId: string; data: Partial<AttendancePayload> }) => {
+    mutationFn: async ({
+      recordId,
+      data,
+    }: {
+      recordId: string;
+      data: Partial<AttendancePayload>;
+    }) => {
       const cleanPayload = {
         ...data,
         source: data.source || "manual",
@@ -325,17 +360,17 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       return await apiClient.put(`/attendance/${recordId}`, cleanPayload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
     },
   });
 
   const markAttendance = useMutation({
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: ["attendance"], exact: false });
+      await queryClient.cancelQueries({ queryKey: queryKeys.attendance.all, exact: false });
 
       const previousEntries = queryClient.getQueriesData<AttendanceListResponse>({
-        queryKey: ["attendance"],
+        queryKey: queryKeys.attendance.all,
         exact: false,
       });
 
@@ -345,9 +380,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       const normalizedCheckIn = normalizeHHmm(input.checkIn);
       const normalizedCheckOut = normalizeHHmm(input.checkOut);
 
-
       queryClient.setQueriesData<AttendanceListResponse>(
-        { queryKey: ["attendance"], exact: false },
+        { queryKey: queryKeys.attendance.all, exact: false },
         (old) => {
           if (!old) return old;
 
@@ -413,17 +447,18 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           const nextDaily = [...(old.dailyRecords || [])];
           const rowIndex = nextDaily.findIndex((row) => row.key === rowKey);
 
-          const nextRow: AttendanceDailyRecord = rowIndex >= 0
-            ? { ...nextDaily[rowIndex] }
-            : {
-                key: rowKey,
-                employeeId: input.employeeId,
-                date: attendanceDate,
-                checkIn: "",
-                checkOut: "",
-                source,
-                verified: true,
-              };
+          const nextRow: AttendanceDailyRecord =
+            rowIndex >= 0
+              ? { ...nextDaily[rowIndex] }
+              : {
+                  key: rowKey,
+                  employeeId: input.employeeId,
+                  date: attendanceDate,
+                  checkIn: "",
+                  checkOut: "",
+                  source,
+                  verified: true,
+                };
 
           if (normalizedCheckIn) nextRow.checkIn = normalizedCheckIn;
           if (normalizedCheckOut) nextRow.checkOut = normalizedCheckOut;
@@ -438,7 +473,9 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           return {
             ...old,
             records: nextRecords,
-            dailyRecords: nextDaily.sort((a, b) => `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`)),
+            dailyRecords: nextDaily.sort((a, b) =>
+              `${b.date}-${b.employeeId}`.localeCompare(`${a.date}-${a.employeeId}`),
+            ),
           };
         },
       );
@@ -465,10 +502,12 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       const source = input.source || "manual";
 
       const existingRes = await apiClient.get(
-        `/attendance/employee/${input.employeeId}/date/${attendanceDate}`
+        `/attendance/employee/${input.employeeId}/date/${attendanceDate}`,
       );
 
-      const existingRecords: AttendanceRecord[] = Array.isArray(existingRes.data?.records) ? existingRes.data.records : [];
+      const existingRecords: AttendanceRecord[] = Array.isArray(existingRes.data?.records)
+        ? existingRes.data.records
+        : [];
 
       const inRecords = [...existingRecords]
         .filter((x) => x.type === "IN")
@@ -525,8 +564,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     },
     onSuccess: () => {
       // Invalidate and refetch immediately
-      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       toast.success("تم تسجيل الحضور بنجاح");
     },
     onError: (error: unknown, _variables, context) => {
@@ -541,22 +580,28 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     },
     onSettled: async () => {
       // Invalidate all attendance queries (broad match)
-      await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
-      await queryClient.refetchQueries({ queryKey: ["attendance"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
+      await queryClient.refetchQueries({ queryKey: queryKeys.attendance.all, exact: false });
 
       // Explicitly refetch daily-view after a short delay to ensure DB write is visible
       // (the daily-view endpoint reads directly from the DB, so replication lag can cause stale reads)
       setTimeout(() => {
-        void queryClient.refetchQueries({ queryKey: ["attendance", "daily-view"], exact: false });
+        void queryClient.refetchQueries({ queryKey: queryKeys.attendance.all, exact: false });
       }, 600);
 
       // ── Invalidate deductions after a short delay to account for fire-and-forget
       //    aggregation on the backend (EARLY_LEAVE_MINUTES may not be written yet) ──
-      await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"], exact: false });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys["attendance-deductions"].all,
+        exact: false,
+      });
       // Schedule a delayed refetch so the aggregation engine has time to persist
       setTimeout(() => {
-        void queryClient.refetchQueries({ queryKey: ["attendance-deductions"], exact: false });
+        void queryClient.refetchQueries({
+          queryKey: queryKeys["attendance-deductions"].all,
+          exact: false,
+        });
       }, 1500);
     },
   });
@@ -568,4 +613,3 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     markAttendance,
   };
 };
-

@@ -2,10 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import SessionRefresh from "@/components/SessionRefresh";
 import apiClient from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
+import axios from "axios";
 
 const Sidebar = dynamic(() => import("@/components/Sidebar"), {
   loading: () => <aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />,
@@ -17,7 +19,9 @@ export default function DashboardLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const setUser = useAuthStore((state) => state.setUser);
+  const clear = useAuthStore((state) => state.clear);
   const user = useAuthStore((state) => state.user);
+  const router = useRouter();
 
   useEffect(() => {
     if (user?.permissions) return;
@@ -29,8 +33,13 @@ export default function DashboardLayout({
           ...(data as { id?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] }),
         });
       }
-    }).catch(() => {});
-  }, [user, setUser]);
+    }).catch((err: unknown) => {
+      if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+        clear();
+        router.replace('/login');
+      }
+    });
+  }, [user, setUser, clear, router]);
 
   const toggleCollapse = useCallback(() => setIsCollapsed((v: boolean) => !v), []);
 

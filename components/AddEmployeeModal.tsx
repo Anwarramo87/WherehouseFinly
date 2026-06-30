@@ -1134,12 +1134,10 @@
 //     document.body
 //   );
 // }
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-// تم إزالة CalendarHeart تماماً لتجنب أي خطأ في الكاش، واستخدمنا Calendar الأساسية
 import {
   X,
   Loader2,
@@ -1274,6 +1272,7 @@ export default function AddEmployeeModal({
         return {
           employeeId: employee.employeeId || "",
           name: employee.name || "",
+          // تم إلغاء الدمج ليعود لأخذ الاسم الأول فقط
           username: employee.username || employee.name?.split(" ")[0] || "",
           mobile: employee.mobile || "",
           birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
@@ -1339,6 +1338,7 @@ export default function AddEmployeeModal({
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
 
+    // تم إعادة المنطق القديم: تعبئة اسم المستخدم بالاسم الأول فقط
     if (!isUsernameManuallyEdited) {
       const firstName = newName.trim().split(" ")[0] || "";
       setFormData({ ...formData, name: newName, username: firstName });
@@ -1359,12 +1359,12 @@ export default function AddEmployeeModal({
     if (step === 1) {
       if (!validateMobile(formData.mobile)) return;
 
+      // 🌟 الحماية من الكود الحالي: التحقق من التاريخ والعمر (10 سنوات) 🌟
       if (!formData.birthDate || formData.birthDate.length !== 10) {
         toast.error("الرجاء اختيار تاريخ الميلاد بشكل صحيح");
         return;
       }
 
-      // 🌟 حساب العمر الدقيق والتأكد من أنه أكبر أو يساوي 10 سنوات 🌟
       const birthDateObj = new Date(formData.birthDate);
       if (isNaN(birthDateObj.getTime())) {
         toast.error("الرجاء اختيار تاريخ الميلاد بشكل صحيح");
@@ -1410,7 +1410,7 @@ export default function AddEmployeeModal({
   return createPortal(
     <div
       className="fixed inset-0 bg-[#101720]/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all duration-300"
-      style={{zIndex: 9998}}
+      style={{zIndex: 9998}} // 🌟 حماية الـ Pop-up من الكود الحالي
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-white/5 outline-dashed outline-1 outline-[#C89355]/20 outline-offset-[-6px]">
@@ -1569,7 +1569,7 @@ export default function AddEmployeeModal({
                 </div>
               </div>
 
-              {/* 🌟 حقل تاريخ الميلاد بالتصميم الداكن السليم 🌟 */}
+              {/* 🌟 حقل تاريخ الميلاد بالتصميم الداكن السليم من الكود الحالي 🌟 */}
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>
                 <div className="relative group">

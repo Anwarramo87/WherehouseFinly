@@ -6,6 +6,7 @@ import {
   AttendanceDeductionBreakdown,
 } from "@/types/attendance-deduction";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 
 /**
  * Hook لحساب خصومات الدوام (غياب + تأخير)
@@ -13,7 +14,12 @@ import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
  */
 export const useAttendanceDeductions = (input: AttendanceDeductionInput) => {
   return useQuery<AttendanceDeductionResponse>({
-    queryKey: ["attendance-deductions", input.periodStart, input.periodEnd, input.gracePeriodMinutes, input.employeeId],
+    queryKey: queryKeys["attendance-deductions"].list(
+      input.periodStart,
+      input.periodEnd,
+      input.gracePeriodMinutes,
+      input.employeeId,
+    ),
     queryFn: async () => {
       const res = await apiClient.post("/attendance/calculate-deductions", {
         periodStart: input.periodStart,
@@ -34,7 +40,7 @@ export const useAttendanceDeductions = (input: AttendanceDeductionInput) => {
  */
 export const getEmployeeDeduction = (
   breakdowns: AttendanceDeductionBreakdown[],
-  employeeId: string
+  employeeId: string,
 ): AttendanceDeductionBreakdown | undefined => {
   return breakdowns.find((item) => item.employeeId === employeeId);
 };
@@ -42,9 +48,7 @@ export const getEmployeeDeduction = (
 /**
  * دالة مساعدة لحساب إجمالي الخصومات
  */
-export const calculateTotalDeductions = (
-  breakdowns: AttendanceDeductionBreakdown[]
-): number => {
+export const calculateTotalDeductions = (breakdowns: AttendanceDeductionBreakdown[]): number => {
   return breakdowns.reduce((sum, item) => sum + item.totalAttendanceDeduction, 0);
 };
 

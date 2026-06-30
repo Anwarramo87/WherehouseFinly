@@ -13,12 +13,20 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
+  const [isHydrated, setIsHydrated] = useState(false);
+
   const getInitialCollapsed = () => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || !isHydrated) return false;
     return window.matchMedia('(max-width: 768px)').matches;
   };
+
   const [isCollapsed, setIsCollapsed] = useState(getInitialCollapsed());
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Set hydrated after mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Listen for media query changes
   useEffect(() => {

@@ -31,7 +31,7 @@ describe("usePermissions Hook", () => {
       const { result } = renderHook(() => usePermissions());
       
       expect(result.current.user).toBeNull();
-      expect(result.current.userRole).toBeNull();
+      expect(result.current.userRoles).toEqual([]);
       expect(result.current.isAdmin).toBe(false);
       expect(result.current.permissions).toEqual([]);
     });
@@ -58,7 +58,7 @@ describe("usePermissions Hook", () => {
       const { result } = renderHook(() => usePermissions());
       
       expect(result.current.isAdmin).toBe(true);
-      expect(result.current.userRole).toBe("admin");
+      expect(result.current.userRoles).toContain("admin");
     });
 
     it("should have all permissions", () => {
@@ -158,7 +158,7 @@ describe("usePermissions Hook", () => {
   describe("hasPermission function", () => {
     beforeEach(() => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "5", name: "Test User", role: "hr_manager", permissions: ["edit_employees"] },
+        user: { id: "5", name: "Test User", role: "hr_manager" },
         hasAnyRole: () => true,
       });
     });
@@ -166,20 +166,20 @@ describe("usePermissions Hook", () => {
     it("should return true for granted permission", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.hasPermission("edit_employees")).toBe(true);
+      expect(result.current.hasPermission("termination:create")).toBe(true);
     });
 
     it("should return false for denied permission", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.hasPermission("approve_payroll")).toBe(false);
+      expect(result.current.hasPermission("settlement:process")).toBe(false);
     });
   });
 
   describe("hasAnyPermission function", () => {
     beforeEach(() => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "6", name: "Test User", role: "manager", permissions: ["edit_employees"] },
+        user: { id: "6", name: "Test User", role: "manager" },
         hasAnyRole: () => true,
       });
     });
@@ -187,20 +187,20 @@ describe("usePermissions Hook", () => {
     it("should return true when user has any of the permissions", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.hasAnyPermission(["edit_employees", "approve_payroll"])).toBe(true);
+      expect(result.current.hasAnyPermission(["termination:create", "settlement:process"])).toBe(true);
     });
 
     it("should return false when user has none of the permissions", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.hasAnyPermission(["view_payroll", "approve_payroll"])).toBe(false);
+      expect(result.current.hasAnyPermission(["rehire:process", "settlement:process"])).toBe(false);
     });
   });
 
   describe("canPerform function", () => {
     beforeEach(() => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "7", name: "Test User", role: "hr_manager", permissions: ["edit_employees"] },
+        user: { id: "7", name: "Test User", role: "hr_manager" },
         hasAnyRole: () => true,
       });
     });
@@ -208,14 +208,14 @@ describe("usePermissions Hook", () => {
     it("should return true for permitted operation", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.canTerminateEmployee()).toBe(true);
-      expect(result.current.canRehireEmployee()).toBe(true);
+      expect(result.current.canPerform("terminate_employee")).toBe(true);
+      expect(result.current.canPerform("rehire_employee")).toBe(true);
     });
 
     it("should return false for non-permitted operation", () => {
       const { result } = renderHook(() => usePermissions());
       
-      expect(result.current.canProcessSettlement()).toBe(false);
+      expect(result.current.canPerform("process_financial_settlement")).toBe(false);
     });
   });
 });

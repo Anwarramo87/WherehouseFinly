@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 
 export interface DailyViewEmployee {
   employeeId: string;
@@ -29,7 +30,7 @@ interface DailyViewResponse {
 
 export const useAttendanceDailyView = (date: string) => {
   return useQuery<DailyViewResponse>({
-    queryKey: ["attendance", "daily-view", date],
+    queryKey: queryKeys.attendance.dailyView(date),
     queryFn: async () => {
       const res = await apiClient.get("/attendance/daily-view", {
         params: { date },

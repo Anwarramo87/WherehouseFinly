@@ -7,6 +7,51 @@ import {
 } from "@/lib/route-access";
 import { DEFAULT_API_URL, normalizeApiUrl } from "@/lib/api-url";
 
+// ─── CSP nonce helpers ────────────────────────────────────────────────
+function buildCspHeader(nonce: string): string {
+  const isProduction = process.env.NODE_ENV === "production";
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  let apiOrigin = "";
+  let apiWsOrigin = "";
+
+  try {
+    if (rawApiUrl) {
+      apiOrigin = new URL(rawApiUrl).origin;
+      const parsed = new URL(apiOrigin);
+      parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+      apiWsOrigin = parsed.origin;
+    }
+  } catch {
+    // ignore malformed URL
+  }
+
+  const connectSources = ["'self'", apiOrigin, apiWsOrigin].filter(Boolean);
+  if (isProduction) {
+    connectSources.push("https:", "wss:");
+  } else {
+    connectSources.push("http:", "https:", "ws:", "wss:");
+  }
+
+  const cspDirectives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    isProduction
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
+      : `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "worker-src 'self' blob:",
+    `connect-src ${connectSources.join(" ")}`,
+    ...(isProduction ? ["upgrade-insecure-requests"] : []),
+  ];
+
+  return cspDirectives.join("; ");
+}
+
 const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL, DEFAULT_API_URL);
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 // Very short timeout for session checks to not block page loads
@@ -95,11 +140,11 @@ const getCookieValue = (cookieHeader: string | null, cookieName: string) => {
 const getSessionCacheKey = (request: NextRequest) => {
   const cookieHeader = request.headers.get("cookie");
   const authHeader = request.headers.get("authorization")?.trim() || "";
-  const authCookieParts = AUTH_COOKIE_CANDIDATES
-    .map((cookieName) => getCookieValue(cookieHeader, cookieName))
-    .filter((value) => value.trim().length > 0);
+  const authCookieParts = AUTH_COOKIE_CANDIDATES.map((cookieName) =>
+    getCookieValue(cookieHeader, cookieName),
+  ).filter((value) => value.trim().length > 0);
 
-  const cookieKey = authCookieParts.join("|") || (cookieHeader?.trim() || "");
+  const cookieKey = authCookieParts.join("|") || cookieHeader?.trim() || "";
 
   if (!cookieKey && !authHeader) {
     return "";
@@ -260,12 +305,23 @@ const checkSession = async (request: NextRequest): Promise<SessionCheckResult> =
   }
 };
 
+function makeNextResponse(request: NextRequest, nonce: string, requestHeaders: Headers) {
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy", buildCspHeader(nonce));
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
+  // ─── CSP nonce (per-request) ────────────────────────────────────────
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+
   const pathname = normalizePathname(request.nextUrl.pathname);
 
   // Skip auth checks for login page and API routes
   if (pathname === "/login" || pathname.startsWith("/api/")) {
-    return NextResponse.next();
+    return makeNextResponse(request, nonce, requestHeaders);
   }
 
   const isRootRoute = pathname === "/";
@@ -274,12 +330,12 @@ export async function proxy(request: NextRequest) {
 
   // Skip prefetch requests
   if (isPrefetchRequest(request)) {
-    return NextResponse.next();
+    return makeNextResponse(request, nonce, requestHeaders);
   }
 
   // ===== SUPER FAST PATH: Skip all auth checks for protected routes with session hints
   if (isProtected && hasHints) {
-    return NextResponse.next();
+    return makeNextResponse(request, nonce, requestHeaders);
   }
   // ===== END SUPER FAST PATH =====
 
@@ -309,7 +365,7 @@ export async function proxy(request: NextRequest) {
     const isTransientUpstreamFailure = status === 429 || status === 503 || status === 504;
 
     if (IS_DEVELOPMENT && hasHints && isTransientUpstreamFailure) {
-      return NextResponse.next();
+      return makeNextResponse(request, nonce, requestHeaders);
     }
 
     return buildRedirectResponse(request, "/login", {
@@ -322,20 +378,21 @@ export async function proxy(request: NextRequest) {
 
   if (requiredPermissions && requiredPermissions.length > 0) {
     // Admin role has unrestricted access
-    const isAdmin = session.roles.includes('admin');
+    const isAdmin = session.roles.includes("admin");
     if (!isAdmin) {
-      const hasRequiredPermission = hasAnyRequiredPermission(session.permissions, requiredPermissions);
+      const hasRequiredPermission = hasAnyRequiredPermission(
+        session.permissions,
+        requiredPermissions,
+      );
       if (!hasRequiredPermission) {
         return buildRedirectResponse(request, "/home", { forbidden: "true" });
       }
     }
   }
 
-  return NextResponse.next();
+  return makeNextResponse(request, nonce, requestHeaders);
 }
 
 export const config = {
-  matcher: [
-    "/((?!api|backend-api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
-  ],
+  matcher: ["/((?!api|backend-api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
 };
