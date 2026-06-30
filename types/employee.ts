@@ -75,6 +75,8 @@ export interface Employee {
   baseSalary?: number | string | { $numberDecimal: string } | null;
   lumpSumSalary?: number | string | { $numberDecimal: string } | null;
   livingAllowance?: number | string | null;
+   transportAllowance?: number | string | null;
+   insuranceAmount?: number | string | null;
   
   // ============================================================================
   // Authentication Fields (for frontend user management)

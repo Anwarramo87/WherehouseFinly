@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Clock, ChevronLeft, Search, Edit2, CalendarDays, Banknote, Loader2, CalendarPlus, AlertTriangle } from "lucide-react";
+import { Clock, ChevronLeft, Search, Edit2, Banknote, Loader2, CalendarPlus, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
@@ -864,8 +864,8 @@ export default function TimeTablePage() {
 
       {/* ── Add Attendance Day Modal ── */}
       {isAddDayOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
-          <div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-md overflow-hidden relative" dir="rtl">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
+          <div className="bg-white/95 backdrop-blur-2xl rounded-4xl shadow-[0_30px_80px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-md overflow-hidden relative" dir="rtl">
             <div className="p-6 relative z-10">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-lg font-black text-[#263544] flex items-center gap-2">

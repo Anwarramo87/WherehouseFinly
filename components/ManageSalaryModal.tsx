@@ -21,10 +21,7 @@ const salarySchema = z.object({
   livingAllowance:   z.number().min(0),
   transportAllowance: z.number().min(0),
   insuranceAmount:   z.number().min(0),
-}).refine(
-  (d) => (d.lumpSumSalary ?? 0) + (d.livingAllowance ?? 0) <= d.baseSalary,
-  { message: "مجموع الراتب المقطوع وبدل المعيشة يتجاوز الراتب الكلي", path: ["lumpSumSalary"] }
-);
+});
 
 type SalaryFormValues = z.infer<typeof salarySchema>;
 
@@ -36,7 +33,6 @@ export type SalaryPayload = {
   livingAllowance: number;
   transportAllowance: number;
   insuranceAmount: number;
-  // Hardcoded to 0 - these are now managed in Rewards/Bonuses module:
   responsibilityAllowance: number;
   extraEffortAllowance: number;
   productionIncentive: number;
@@ -51,6 +47,7 @@ interface Props {
   initialData?: Salary | null;
   employees?: Employee[];
   preselectedEmployeeId?: string;
+  allSalariesMap?: Map<string, Salary>;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,13 +61,13 @@ const toNum = (val: unknown): number => {
 // ─── Component ─────────────────────────────────────────────────────────────────
 export default function ManageSalaryModal({
   isOpen, onClose, onSave, isPending,
-  initialData, employees = [], preselectedEmployeeId,
+  initialData, employees = [], preselectedEmployeeId, allSalariesMap
 }: Props) {
   const queryClient = useQueryClient();
   const prevSalariesRef = useRef<Salary[] | undefined>(undefined);
   const savedRef = useRef(false);
 
-  // Employee search state (initialized from props — component is remounted via key on employeeId change)
+  // ─── Initialize State ─────────────────────────────────────────────────────────
   const initSearchLabel = (): string => {
     if (initialData?.employeeId) {
       const emp = employees.find(e => e.employeeId === initialData.employeeId);
@@ -102,21 +99,14 @@ export default function ManageSalaryModal({
 
   // ─── React Hook Form ─────────────────────────────────────────────────────────
   const {
-    control, register, handleSubmit, setValue,
+    control, handleSubmit, setValue,
     formState: { errors },
   } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
     mode: "onChange",
     defaultValues: {
       employeeId:        initialData?.employeeId ?? preselectedEmployeeId ?? "",
-      baseSalary:        (() => {
-        if (initialData?.baseSalary) return toNum(initialData.baseSalary);
-        if (preselectedEmployeeId) {
-          const emp = employees.find(e => e.employeeId === preselectedEmployeeId);
-          if (emp && toNum(emp.hourlyRate) > 0) return toNum(emp.hourlyRate);
-        }
-        return 0;
-      })(),
+      baseSalary:        toNum(initialData?.baseSalary) || 0,
       lumpSumSalary:     toNum(initialData?.lumpSumSalary) || 0,
       livingAllowance:   toNum(initialData?.livingAllowance) || 0,
       transportAllowance: toNum(initialData?.transportAllowance) || 0,
@@ -162,7 +152,7 @@ export default function ManageSalaryModal({
     );
   }, [employees, searchQuery]);
 
-  // Live total display - STRICTLY: baseSalary + lumpSumSalary + livingAllowance + transportAllowance - insuranceAmount
+  // Live total display
   const watchedValues = useWatch({
     control,
     name: ["baseSalary", "lumpSumSalary", "livingAllowance", "transportAllowance", "insuranceAmount"],
@@ -188,7 +178,6 @@ export default function ManageSalaryModal({
       livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
       transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
       insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
-      // Hardcoded to 0 - these are now managed in Rewards/Bonuses module:
       responsibilityAllowance: 0,
       extraEffortAllowance:    0,
       productionIncentive:     0,
@@ -197,16 +186,37 @@ export default function ManageSalaryModal({
     onSave(values.employeeId, payload);
   }, [initialData, onSave]);
 
-  if (!isOpen || typeof document === "undefined") return null;
-
-  // ─── Handlers ─────────────────────────────────────────────────────────────────
   const handleSelectEmployee = (emp: Employee) => {
-    setValue("employeeId", emp.employeeId, { shouldValidate: true });
+    const empId = emp.employeeId?.trim();
+    setValue("employeeId", empId, { shouldValidate: true });
     setSelectedEmployeeName(emp.name);
-    setSearchQuery(`${emp.employeeId} - ${emp.name}`);
+    setSearchQuery(`${empId} - ${emp.name}`);
     setIsDropdownOpen(false);
-    if (toNum(emp.hourlyRate) > 0) setValue("baseSalary", toNum(emp.hourlyRate));
+
+    const existingSalary = allSalariesMap?.get(empId);
+
+    if (existingSalary) {
+      setValue("baseSalary", toNum(existingSalary.baseSalary));
+      setValue("lumpSumSalary", toNum(existingSalary.lumpSumSalary));
+      setValue("livingAllowance", toNum(existingSalary.livingAllowance));
+      setValue("transportAllowance", toNum(existingSalary.transportAllowance));
+      setValue("insuranceAmount", toNum(existingSalary.insuranceAmount));
+    } else {
+      // الحساب الصارم للراتب وتجاهل أي كسور أو قيم خاطئة
+      const hr = toNum(emp.hourlyRate);
+      const calculatedBase = Math.round(hr * 208) || 0;
+
+      setValue("baseSalary", calculatedBase);
+      setValue("lumpSumSalary", toNum(emp.lumpSumSalary) || 0);
+      setValue("livingAllowance", toNum(emp.livingAllowance) || 0);
+      setValue("transportAllowance", toNum(emp.transportAllowance) || 0);
+      setValue("insuranceAmount", toNum(emp.insuranceAmount) || 0);
+    }
   };
+
+  const handleFormSubmit = useCallback(() => handleSubmit(onSubmit), [handleSubmit, onSubmit]);
+
+  if (!isOpen || typeof document === "undefined") return null;
 
   // ─── Shared input class ───────────────────────────────────────────────────────
   const inputCls = (hasErr?: boolean) =>
@@ -228,7 +238,7 @@ export default function ManageSalaryModal({
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
-                {initialData ? "تعديل راتب الموظف" : "ضبط الراتب والثوابت"}
+                {initialData ? "تعديل راتب الموظف" : "ضبط الرااتب والثوابت"}
               </h2>
               <p className="text-xs text-slate-400 font-bold mt-0.5">KU&amp;M JEANS — نظام الرواتب</p>
             </div>
@@ -244,8 +254,7 @@ export default function ManageSalaryModal({
 
         {/* Body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 p-8 sm:p-10">
-          {/* eslint-disable-next-line react-hooks/refs */}
-          <form id="salaryForm" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form id="salaryForm" onSubmit={handleFormSubmit} className="space-y-6">
 
             {/* ── Employee Search ── */}
             <div ref={dropdownRef}>
@@ -308,12 +317,28 @@ export default function ManageSalaryModal({
                   الراتب الأساسي الكلي (ل.س) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative group">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    className={inputCls(!!errors.baseSalary)}
-                    {...register("baseSalary", { valueAsNumber: true })}
+                  <Controller
+                    name="baseSalary"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={inputCls(!!errors.baseSalary)}
+                        placeholder="الراتب الأساسي"
+                        value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          const value = rawValue === "" ? 0 : Number(rawValue);
+                          field.onChange(value);
+                        }}
+                        onBlur={() => {
+                          if (field.value !== 0 && field.value !== null && field.value !== undefined) {
+                            field.onChange(Number(field.value));
+                          }
+                        }}
+                      />
+                    )}
                   />
                   <Coins className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
                 </div>
@@ -326,7 +351,29 @@ export default function ManageSalaryModal({
                   الراتب المقطوع (ل.س)
                 </label>
                 <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.lumpSumSalary)} {...register("lumpSumSalary", { valueAsNumber: true })} />
+                  <Controller
+                    name="lumpSumSalary"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                         type="text"
+                         inputMode="numeric"
+                         className={inputCls(!!errors.lumpSumSalary)}
+                         placeholder="الراتب المقطوع"
+                         value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
+                         onChange={(e) => {
+                           const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                           const value = rawValue === "" ? 0 : Number(rawValue);
+                           field.onChange(value);
+                         }}
+                         onBlur={() => {
+                           if (field.value !== 0 && field.value !== null && field.value !== undefined) {
+                             field.onChange(Number(field.value));
+                           }
+                         }}
+                       />
+                    )}
+                  />
                   <Zap className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
                 </div>
                 {errors.lumpSumSalary && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.lumpSumSalary.message}</p>}
@@ -338,7 +385,29 @@ export default function ManageSalaryModal({
                   بدل المعيشة (ل.س)
                 </label>
                 <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.livingAllowance)} {...register("livingAllowance", { valueAsNumber: true })} />
+                  <Controller
+                    name="livingAllowance"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                         type="text"
+                         inputMode="numeric"
+                         className={inputCls(!!errors.livingAllowance)}
+                         placeholder="بدل المعيشة"
+                         value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
+                         onChange={(e) => {
+                           const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                           const value = rawValue === "" ? 0 : Number(rawValue);
+                           field.onChange(value);
+                         }}
+                         onBlur={() => {
+                           if (field.value !== 0 && field.value !== null && field.value !== undefined) {
+                             field.onChange(Number(field.value));
+                           }
+                         }}
+                       />
+                    )}
+                  />
                   <Shield className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
                 </div>
                 {errors.livingAllowance && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.livingAllowance.message}</p>}
@@ -350,7 +419,29 @@ export default function ManageSalaryModal({
                   بدل النقل (ل.س)
                 </label>
                 <div className="relative group">
-                  <input type="number" min={0} step={1000} className={inputCls(!!errors.transportAllowance)} {...register("transportAllowance", { valueAsNumber: true })} />
+                  <Controller
+                    name="transportAllowance"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                         type="text"
+                         inputMode="numeric"
+                         className={inputCls(!!errors.transportAllowance)}
+                         placeholder="بدل النقل"
+                         value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
+                         onChange={(e) => {
+                           const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                           const value = rawValue === "" ? 0 : Number(rawValue);
+                           field.onChange(value);
+                         }}
+                         onBlur={() => {
+                           if (field.value !== 0 && field.value !== null && field.value !== undefined) {
+                             field.onChange(Number(field.value));
+                           }
+                         }}
+                       />
+                    )}
+                  />
                   <Truck className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
                 </div>
                 {errors.transportAllowance && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.transportAllowance.message}</p>}
@@ -362,12 +453,28 @@ export default function ManageSalaryModal({
                   التأمينات — خصم شهري (ل.س)
                 </label>
                 <div className="relative group">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl focus:border-rose-500 outline-none text-rose-400 text-lg font-mono font-black pr-12 shadow-inner transition-colors"
-                    {...register("insuranceAmount", { valueAsNumber: true })}
+                  <Controller
+                    name="insuranceAmount"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl focus:border-rose-500 outline-none text-rose-400 text-lg font-mono font-black pr-12 shadow-inner transition-colors"
+                        placeholder="مبلغ التأمينات"
+                        value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          const value = rawValue === "" ? 0 : Number(rawValue);
+                          field.onChange(value);
+                        }}
+                        onBlur={() => {
+                          if (field.value !== 0 && field.value !== null && field.value !== undefined) {
+                            field.onChange(Number(field.value));
+                          }
+                        }}
+                      />
+                    )}
                   />
                   <Lock className="absolute right-4 top-4.5 text-rose-500/50 group-focus-within:text-rose-500 pointer-events-none" size={22} />
                 </div>
