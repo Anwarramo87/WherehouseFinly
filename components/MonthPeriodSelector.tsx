@@ -294,17 +294,9 @@ export function MonthPeriodSelector({
 
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<"days" | "months" | "years">(isDaily ? "days" : "months");
-  
-  const [cursorDate, setCursorDate] = useState<Date>(
-    new Date(isDaily ? selectedDate! : `${value}-01`)
-  );
 
-  useEffect(() => {
-    if (isOpen) {
-      setCursorDate(new Date(isDaily ? selectedDate! : `${value}-01`));
-      setView(isDaily ? "days" : "months");
-    }
-  }, [isOpen, isDaily, selectedDate, value]);
+  const getInitialCursorDate = () => isDaily ? (selectedDate ? new Date(selectedDate) : new Date()) : new Date(`${value}-01`);
+  const [cursorDate, setCursorDate] = useState<Date>(getInitialCursorDate);
 
   // عمل التمرير (Scroll) التلقائي للسنة المحددة عند فتح قائمة السنوات
   useEffect(() => {

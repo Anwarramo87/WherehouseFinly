@@ -257,26 +257,36 @@ export default function SalariesSettingClient() {
                       {allIds.length === 0 ? (
                         <tr><td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات.</td></tr>
                       ) : (
-                        allIds.map((id: string) => {
-                          const s = salaryMap.get(id) ?? null;
-                          const emp = employeeMap.get(id) ?? null;
+allIds.map((id: string) => {
+                            const s = salaryMap.get(id) ?? null;
+                            const emp = employeeMap.get(id) ?? null;
 
-                          let base = toNumber(emp?.hourlyRate);
-                          let lumpSum = 0;
-                          let living = toNumber(emp?.livingAllowance);
-                          let transport = 0;
-                          let insurance = 0;
+                            // 1. تصفير المتغيرات كقيمة مبدئية
+                            let base = 0;
+                            let lumpSum = 0;
+                            let living = 0;
+                            let transport = 0;
+                            let insurance = 0;
 
-                          if (s) {
-                            base = toNumber(s.baseSalary);
-                            lumpSum = toNumber(s.lumpSumSalary);
-                            living = toNumber(s.livingAllowance) || living;
-                            transport = toNumber(s.transportAllowance);
-                            insurance = toNumber(s.insuranceAmount);
-                          }
+                            // 2. التحقق من وجود راتب محفوظ للموظف
+                            if (s) {
+                              // أولوية أولى: إذا كان له راتب محفوظ، نجلب القيم كاملة منه
+                              base = toNumber(s.baseSalary);
+                              lumpSum = toNumber(s.lumpSumSalary);
+                              living = toNumber(s.livingAllowance);
+                              transport = toNumber(s.transportAllowance);
+                              insurance = toNumber(s.insuranceAmount);
+                            } else if (emp) {
+                              // أولوية ثانية: إذا لم يكن له راتب، نحسب الراتب الأساسي ونجلب بدلاته من ملفه
+                              base = Math.round(toNumber(emp.hourlyRate) * 208) || 0;
+                              lumpSum = toNumber(emp.lumpSumSalary) || 0;
+                              living = toNumber(emp.livingAllowance) || 0;
+                              transport = toNumber(emp.transportAllowance) || 0;
+                              insurance = toNumber(emp.insuranceAmount) || 0;
+                            }
 
-                          const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
-                          const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? id);
+                            const monthlyFixedTotal = base + lumpSum + living + transport - insurance;
+                           const employeeName = employeesLoading ? "جارٍ التحميل..." : (emp?.name ?? employeeNameMap[id] ?? id);
 
                           return (
                             <tr key={id} className="hover:bg-white/80 transition-all duration-300 group/row">
@@ -361,7 +371,7 @@ export default function SalariesSettingClient() {
         </div>
       </div>
 
-      {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} />}
+      {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} allSalariesMap={salaryMap} />}
       {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employees} salaries={salaries} isPending={false} onSave={() => { }} />}
     </>
   );
