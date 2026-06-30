@@ -84,9 +84,7 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Prevent Next/Turbopack from complaining when a webpack override exists.
-  // Next suggests using an empty turbopack config as a safe workaround.
-  turbopack: {},
+  // webpack override only runs in production builds, so no conflict with Turbopack in dev
 
   async headers() {
     return [
