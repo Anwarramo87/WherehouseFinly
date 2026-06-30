@@ -1,7 +1,7 @@
 import axios from "axios";
 import apiClient from "@/lib/api-client";
 
-const SUCCESS_TTL_MS = 10_000;
+const SUCCESS_TTL_MS = 30_000; // increased from 10s
 const FAILURE_TTL_MS = 1_500;
 const RATE_LIMIT_COOLDOWN_MS = 15_000;
 
@@ -12,12 +12,14 @@ type VerifyResult = {
   fromCache?: boolean;
 };
 
-let inFlightVerification: Promise<VerifyResult> | null = null;
-let cachedResult: VerifyResult | null = null;
-let cacheExpiresAt = 0;
-let blockedUntil = 0;
-let cacheGeneration = 0;
-let latestVerificationId = 0;
+// Simplified cache: single entry + single in-flight request
+const cache: { result: VerifyResult | null; expiresAt: number; blockedUntil: number } = {
+  result: null,
+  expiresAt: 0,
+  blockedUntil: 0,
+};
+let inFlight: Promise<VerifyResult> | null = null;
+
 const AUTH_COOKIE_CANDIDATES = [
   process.env.NEXT_PUBLIC_AUTH_COOKIE_NAME,
   "warehouse_access_token",
@@ -30,25 +32,21 @@ const now = () => Date.now();
 
 const hasSessionHints = () => {
   if (typeof document === "undefined") return false;
-
   const cookie = document.cookie || "";
   if (!cookie.trim()) return false;
-
   return AUTH_COOKIE_CANDIDATES.some((cookieName) => {
     const escaped = cookieName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(?:^|;\\s*)${escaped}=`);
-    return pattern.test(cookie);
+    return new RegExp(`(?:^|;\\s*)${escaped}=`).test(cookie);
   });
 };
 
-const hasFreshCache = () => Boolean(cachedResult) && cacheExpiresAt > now();
+const isFresh = () => Boolean(cache.result) && cache.expiresAt > now();
 
 export const resetAuthVerificationCache = () => {
-  inFlightVerification = null;
-  cachedResult = null;
-  cacheExpiresAt = 0;
-  blockedUntil = 0;
-  cacheGeneration += 1;
+  cache.result = null;
+  cache.expiresAt = 0;
+  cache.blockedUntil = 0;
+  inFlight = null;
 };
 
 export const verifyAuthSession = async (options?: { force?: boolean }) => {
@@ -59,65 +57,43 @@ export const verifyAuthSession = async (options?: { force?: boolean }) => {
     return { authorized: false, status: 401, fromCache: true };
   }
 
-  if (!force && blockedUntil > currentTime) {
+  if (!force && cache.blockedUntil > currentTime) {
     return { authorized: false, status: 429, rateLimited: true, fromCache: true };
   }
 
-  if (!force && hasFreshCache()) {
-    return {
-      ...(cachedResult as VerifyResult),
-      fromCache: true,
-    };
+  if (!force && isFresh()) {
+    return { ...cache.result!, fromCache: true };
   }
 
-  if (!force && inFlightVerification) {
-    return inFlightVerification;
+  // Dedupe: return existing in-flight request
+  if (!force && inFlight) {
+    return inFlight;
   }
 
-  const generationAtStart = cacheGeneration;
-  const verificationId = ++latestVerificationId;
-
-  const verificationPromise: Promise<VerifyResult> = (async () => {
+  const request = (async (): Promise<VerifyResult> => {
     try {
       await apiClient.get("/auth/me", {
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       });
 
-      if (generationAtStart === cacheGeneration) {
-        cachedResult = { authorized: true };
-        cacheExpiresAt = now() + SUCCESS_TTL_MS;
-        blockedUntil = 0;
-      }
-
+      cache.result = { authorized: true };
+      cache.expiresAt = now() + SUCCESS_TTL_MS;
+      cache.blockedUntil = 0;
       return { authorized: true };
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      const isRateLimited = status === 429;
 
-      if (generationAtStart === cacheGeneration) {
-        cachedResult = { authorized: false, status };
-        cacheExpiresAt = now() + FAILURE_TTL_MS;
+      cache.result = { authorized: false, status, rateLimited: isRateLimited || undefined };
+      cache.expiresAt = now() + FAILURE_TTL_MS;
+      if (isRateLimited) cache.blockedUntil = now() + RATE_LIMIT_COOLDOWN_MS;
 
-        if (status === 429) {
-          blockedUntil = now() + RATE_LIMIT_COOLDOWN_MS;
-          cachedResult = { authorized: false, status, rateLimited: true };
-        }
-      }
-
-      return status === 429
-        ? { authorized: false, status, rateLimited: true }
-        : { authorized: false, status };
+      return cache.result;
     } finally {
-      if (generationAtStart === cacheGeneration && verificationId === latestVerificationId) {
-        inFlightVerification = null;
-      }
+      inFlight = null;
     }
   })();
 
-  inFlightVerification = verificationPromise;
-
-  return verificationPromise;
+  inFlight = request;
+  return request;
 };
-

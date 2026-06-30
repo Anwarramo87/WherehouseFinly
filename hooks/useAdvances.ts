@@ -5,6 +5,7 @@ import apiClient from "@/lib/api-client";
 import { Advance, AdvanceInput } from "@/types/advance";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
+import { queryKeys } from "@/lib/query-keys";
 
 export const useAdvances = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
@@ -14,10 +15,10 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
   const isPastPeriod = period ? period < currentPeriod : false;
 
   const advancesQuery = useQuery<Advance[]>({
-    queryKey: ["advances", employeeId || "all", period || "current"],
+    queryKey: queryKeys.advances.list(employeeId, period),
     queryFn: async () => {
       const res = await apiClient.get("/advances", { params: { employeeId, period } });
-      console.log('Advances API response:', res.data);
+      console.log("Advances API response:", res.data);
       return Array.isArray(res.data) ? res.data : [];
     },
     enabled,
@@ -37,9 +38,9 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       return await apiClient.post("/advances", data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تمت إضافة السلفة بنجاح");
     },
@@ -51,16 +52,18 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
   const updateAdvance = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<AdvanceInput> }) => {
       const payload = {
-        remainingAmount: data.remainingAmount !== undefined ? Number(data.remainingAmount) : undefined,
-        installmentAmount: data.installmentAmount !== undefined ? Number(data.installmentAmount) : undefined,
+        remainingAmount:
+          data.remainingAmount !== undefined ? Number(data.remainingAmount) : undefined,
+        installmentAmount:
+          data.installmentAmount !== undefined ? Number(data.installmentAmount) : undefined,
         notes: data.notes,
       };
       return await apiClient.put(`/advances/${id}`, payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تم تحديث السلفة");
     },
@@ -74,9 +77,9 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       return await apiClient.delete(`/advances/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تم نقل السلفة إلى سلة المهملات");
     },
@@ -92,4 +95,3 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
     deleteAdvance,
   };
 };
-

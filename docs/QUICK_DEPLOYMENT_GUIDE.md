@@ -10,7 +10,7 @@ git pull origin main
 ### 2. Update Backend Database
 ```bash
 cd werehouse/backend-nest
-npx prisma db push --accept-data-loss
+npx prisma migrate dev
 npx prisma generate
 ```
 
@@ -34,10 +34,10 @@ npm run start:dev
 pg_dump your_database > backup_$(date +%Y%m%d).sql
 ```
 
-### 2. Apply Database Changes
+### 2. Apply pending migrations
 ```bash
 cd werehouse/backend-nest
-npx prisma db push --accept-data-loss
+npx prisma migrate deploy
 npx prisma generate
 ```
 
@@ -72,7 +72,7 @@ pm2 restart all
 ## 📋 Quick Checklist
 
 - [ ] Database backed up
-- [ ] Prisma schema synced
+- [ ] Prisma migrations applied (`migrate deploy`)
 - [ ] Backend restarted
 - [ ] Frontend restarted
 - [ ] Leave requests working
@@ -84,7 +84,7 @@ pm2 restart all
 ## 🆘 Troubleshooting
 
 ### Issue: "column does not exist"
-**Solution:** Run `npx prisma db push --accept-data-loss`
+**Solution:** Check `npx prisma migrate status`; apply pending migrations with `npx prisma migrate deploy` (after `pg_dump` backup). For local dev only: `npm run prisma:push:local`.
 
 ### Issue: Backend won't start
 **Solution:** Check if port 5001 is available

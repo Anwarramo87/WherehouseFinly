@@ -1,8 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Save, Bus, User, Phone, Hash, MapPin, Coins, Percent } from "lucide-react";
+import { X, Save, Bus, User, Phone, Hash, MapPin, Coins, Percent, Search, Users } from "lucide-react";
+import { useEmployees } from "@/hooks/useEmployees";
+
+const formatWithCommas = (value: string | number) => {
+  if (!value) return "";
+  const raw = value.toString().replace(/,/g, "").replace(/[^0-9.]/g, "");
+  const parts = raw.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
+};
+
+const SYRIAN_PHONE_REGEX = /^(09[0-9]{8}|[0-9]{9})$/;
+
+type DriverSource = "external" | "employee";
 
 type BusFormData = {
   id?: string;
@@ -35,6 +48,16 @@ interface Props {
 }
 
 export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Props) {
+  const { data: employees = [] } = useEmployees({ fetchAll: true, limit: 500 });
+
+  const [driverSource, setDriverSource] = useState<DriverSource>(initialData ? "external" : "external");
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [isEmpDropdownOpen, setIsEmpDropdownOpen] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+
   const [formData, setFormData] = useState<BusFormData>(() => {
     if (initialData) {
       return {
@@ -51,6 +74,14 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
     return { driverName: "", driverPhone: "", plateNumber: "", capacity: "", route: "", totalCost: "", discountPercent: "0" };
   });
 
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearch) return safeEmployees;
+    return safeEmployees.filter((emp: { name: string; employeeId: string }) =>
+      (emp.name || "").toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      (emp.employeeId || "").toLowerCase().includes(employeeSearch.toLowerCase())
+    );
+  }, [safeEmployees, employeeSearch]);
+
   useEffect(() => {
     if (isOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "unset";
@@ -64,11 +95,42 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsEmpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
 
+  const handleSelectEmployee = (emp: { employeeId: string; name: string }) => {
+    setFormData((p) => ({ ...p, driverName: emp.name, driverPhone: emp.employeeId }));
+    setEmployeeSearch(`${emp.employeeId} - ${emp.name}`);
+    setIsEmpDropdownOpen(false);
+    setPhoneError("");
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) {
+      setPhoneError("رقم السائق مطلوب");
+      return false;
+    }
+    if (!SYRIAN_PHONE_REGEX.test(phone)) {
+      setPhoneError("يجب أن يكون رقم سوري صحيح (09XXXXXXXX)");
+      return false;
+    }
+    setPhoneError("");
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (driverSource === "external" && !validatePhone(formData.driverPhone)) return;
     onSave({
       ...formData,
       capacity: Number(formData.capacity),
@@ -104,26 +166,105 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم اللوحة</label>
               <div className="relative group"><input type="text" required className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-12 dir-ltr text-left" value={formData.plateNumber} onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value })} /><Hash className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} /></div>
             </div>
-            <div>
-              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">اسم السائق</label>
-              <div className="relative group"><input type="text" required className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-bold pr-12" value={formData.driverName} onChange={(e) => setFormData({ ...formData, driverName: e.target.value })} /><User className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} /></div>
-            </div>
-            <div>
-              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم السائق</label>
-              <div className="relative group">
-                <input
-                  type="tel"
-                  required
-                  className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-12 dir-ltr text-right"
-                  value={formData.driverPhone}
-                  onChange={(e) => setFormData({ ...formData, driverPhone: e.target.value.replace(/\D/g, '') })}
-                />
-                <Phone className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
+
+            {/* Driver Source Toggle */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-black text-[#C89355] mb-3 uppercase">مصدر السائق</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDriverSource("external")}
+                  className={`flex-1 p-3 rounded-2xl border-2 font-black text-sm transition-all ${driverSource === "external" ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40 shadow-md" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-[#C89355]/30"}`}
+                >
+                  <User size={18} className="inline ml-1" />
+                  سائق خارجي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDriverSource("employee"); setEmployeeSearch(""); }}
+                  className={`flex-1 p-3 rounded-2xl border-2 font-black text-sm transition-all ${driverSource === "employee" ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40 shadow-md" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-[#C89355]/30"}`}
+                >
+                  <Users size={18} className="inline ml-1" />
+                  من الموظفين
+                </button>
               </div>
             </div>
+
+            {driverSource === "employee" ? (
+              <div className="md:col-span-2" ref={dropdownRef}>
+                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">اختيار السائق من الموظفين</label>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    placeholder="اكتب للبحث عن موظف..."
+                    className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-bold pr-12"
+                    value={employeeSearch}
+                    onChange={(e) => { setEmployeeSearch(e.target.value); setIsEmpDropdownOpen(true); }}
+                    onFocus={() => setIsEmpDropdownOpen(true)}
+                  />
+                  <Search className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
+                  {isEmpDropdownOpen && (
+                    <div className="absolute top-[calc(100%+8px)] left-0 w-full max-h-56 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-2xl shadow-lg z-50 p-2">
+                      {filteredEmployees.length === 0 ? (
+                        <div className="p-4 text-center text-slate-500 font-bold text-sm">لا يوجد موظف بهذا الاسم</div>
+                      ) : (
+                        filteredEmployees.map((emp: { employeeId: string; name: string }) => (
+                          <div
+                            key={emp.employeeId}
+                            onClick={() => handleSelectEmployee(emp)}
+                            className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-xl cursor-pointer transition-all"
+                          >
+                            <div className="bg-[#1a2530] px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355]">{emp.employeeId}</div>
+                            <span className="font-bold text-[#263544] text-sm">{emp.name}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">اسم السائق</label>
+                  <div className="relative group"><input type="text" required className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-bold pr-12" value={formData.driverName} onChange={(e) => setFormData({ ...formData, driverName: e.target.value })} /><User className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} /></div>
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم السائق</label>
+                  <div className="relative group">
+                    <input
+                      type="tel"
+                      required
+                      className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-12 dir-ltr text-right transition-all ${phoneError ? 'border-rose-400' : 'border-[#263544]/15'}`}
+                      value={formData.driverPhone}
+                      onChange={(e) => { setFormData({ ...formData, driverPhone: e.target.value.replace(/\D/g, '') }); setPhoneError(""); }}
+                      placeholder="09XXXXXXXX"
+                    />
+                    <Phone className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
+                  </div>
+                  {phoneError && <p className="text-rose-500 text-xs font-bold mt-1.5">{phoneError}</p>}
+                </div>
+              </>
+            )}
+
             <div>
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">التكلفة الإجمالية (ل.س)</label>
-              <div className="relative group"><input type="number" required min={0} className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#C89355] text-lg font-black font-mono pr-12" value={formData.totalCost} onChange={(e) => setFormData({ ...formData, totalCost: e.target.value })} /><Coins className="absolute right-4 top-4.5 text-slate-400 group-focus-within:text-[#C89355]" size={22} /></div>
+              <div className="relative group">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#C89355] text-lg font-black font-mono pr-12"
+                  value={formatWithCommas(formData.totalCost)}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/,/g, "");
+                    if (/^\d*\.?\d*$/.test(raw)) {
+                      setFormData({ ...formData, totalCost: raw });
+                    }
+                  }}
+                />
+                <Coins className="absolute right-4 top-4.5 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

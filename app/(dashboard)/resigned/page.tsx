@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Loader2, UserMinus, BadgeInfo, ChevronLeft, Scissors, Download, UserCheck, DollarSign, Building2, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Lock } from "lucide-react";
 import { useResignedEmployees } from "@/hooks/useEmployees";
 import ResignedEmployeesList from "@/components/ResignedEmployeesList";
@@ -19,6 +19,8 @@ export default function ResignedEmployeesPage() {
   const { data: allEmployees = [], isLoading, isError, error, settleEmployee, refetch, isFetching } = useResignedEmployees();
   
   // Modal states
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [selectedEmployeeForRehire, setSelectedEmployeeForRehire] = useState<Employee | null>(null);
   const [selectedEmployeeForSettlement, setSelectedEmployeeForSettlement] = useState<Employee | null>(null);
   const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
@@ -446,7 +448,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Loading State */}
-          {isLoading && (
+          {(!mounted || isLoading) && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="animate-spin text-[#C89355] mb-4" size={48} />
               <span className="font-black text-[#263544] text-lg animate-pulse">جاري تحميل بيانات المغادرين...</span>
@@ -454,7 +456,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Error State */}
-          {isError && !isLoading && (
+          {mounted && isError && !isLoading && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="p-4 bg-rose-50 rounded-2xl">
                 <AlertCircle className="text-rose-500" size={48} />
@@ -476,7 +478,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Content */}
-          {!isLoading && !isError && (
+          {mounted && !isLoading && !isError && (
             <>
               {/* قائمة الموظفين المستقيلين */}
               <ResignedEmployeesList

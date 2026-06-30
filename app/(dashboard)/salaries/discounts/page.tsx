@@ -124,6 +124,16 @@ export default function DiscountsPage() {
         { id: editingDiscount.id, payload: data },
         { onSuccess: () => setIsModalOpen(false) }
       );
+    } else if (data.employeeId === "ALL") {
+      if (!employees.length) {
+        alert("لا يمكن تطبيق الخصم على الجميع قبل تحميل الموظفين");
+        return;
+      }
+      Promise.all(
+        employees.map((emp) =>
+          createDiscount?.mutateAsync({ ...data, employeeId: emp.employeeId })
+        )
+      ).then(() => setIsModalOpen(false));
     } else {
       createDiscount?.mutate(data, {
         onSuccess: () => setIsModalOpen(false)

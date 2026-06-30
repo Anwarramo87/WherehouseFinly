@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
-import type { DashboardKpis } from '@/types/dashboard';
-import apiClient from '@/lib/api-client';
+import type { DashboardKpis } from "@/types/dashboard";
+import apiClient from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 
 const fallbackKpis: DashboardKpis = {
   totalEmployees: 0,
@@ -14,8 +15,8 @@ const fallbackKpis: DashboardKpis = {
 };
 
 const toNumber = (value: unknown) => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -55,13 +56,13 @@ export interface DashboardOvertimeEmployee {
 
 export const useDashboard = () => {
   const dashboardQuery = useQuery({
-    queryKey: ['dashboard', 'home'],
+    queryKey: queryKeys.dashboard.home(),
     queryFn: async () => {
       try {
-        const response = await apiClient.get('/dashboard/home');
+        const response = await apiClient.get("/dashboard/home");
         return response.data ?? null;
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error("Error fetching dashboard data:", error);
         return null;
       }
     },
