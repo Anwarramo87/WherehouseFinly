@@ -35,8 +35,9 @@ export function createQueryClient() {
           return failureCount < 2;
         },
         retryDelay: (attemptIndex: number) => Math.min(500 * Math.pow(2, attemptIndex), 5000),
-        // staleTime: 0 = دائماً stale → كل mount يُعيد الجلب (مناسب لبيانات HR المتغيرة)
-        staleTime: 0,
+        // staleTime: 30s = البيانات تبقى صالحة لمدة 30 ثانية (يقلل الطلبات المتكررة)
+        // الـ hooks التي تحتاج بيانات لحظية يمكنها override بـ 0
+        staleTime: 30 * 1000,
         // gcTime: البيانات تبقى في الذاكرة لمدة 10 دقائق
         gcTime: 10 * 60 * 1000,
         // إعادة fetch عند focus (لو زميل عدّل من تبويب آخر)

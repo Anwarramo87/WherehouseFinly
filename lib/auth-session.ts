@@ -1,8 +1,9 @@
 const USER_KEY = "auth_user_profile";
 const ACCESS_TOKEN_KEY = "auth_access_token";
+// Aligned with backend JWT_EXPIRE default (15 minutes)
+const ACCESS_TOKEN_COOKIE_MAX_AGE = 60 * 15; // 15 minutes
 
 const isBrowser = () => typeof window !== "undefined";
-const ACCESS_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 8; // 8 hours
 
 const getCookieValue = (name: string) => {
   if (!isBrowser()) return "";
@@ -26,6 +27,9 @@ const writeCookie = (name: string, value: string, maxAgeSeconds: number) => {
   const encodedName = encodeURIComponent(name);
   const encodedValue = encodeURIComponent(value);
 
+  // Note: HttpOnly cannot be set from JS — token is intentionally NOT HttpOnly here
+  // because the backend sets its own HttpOnly session cookie. This dev-only cookie
+  // is only written in non-production for Bearer token fallback.
   document.cookie = `${encodedName}=${encodedValue}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Strict${secureFlag}`;
 };
 

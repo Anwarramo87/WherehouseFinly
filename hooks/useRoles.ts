@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 
 // Roles rarely change — 10 minutes staleTime
 const STALE_TIME = 10 * 60 * 1000;
@@ -47,13 +48,13 @@ const resolveRoles = (payload: unknown): RoleOption[] => {
       : [];
 
   return rawRoles
-  .map((role: unknown) => normalizeRole(role))
-  .filter((role): role is RoleOption => Boolean(role));
+    .map((role: unknown) => normalizeRole(role))
+    .filter((role): role is RoleOption => Boolean(role));
 };
 
 export const useRoles = () => {
   return useQuery<RoleOption[]>({
-    queryKey: ["roles"],
+    queryKey: queryKeys.roles.all,
     queryFn: async () => {
       const response = await apiClient.get("/auth/roles");
       return resolveRoles(response.data);

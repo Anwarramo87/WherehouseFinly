@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import axios from "axios";
 import { Salary, SalaryInput } from "@/types/salary";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 import { toNumber } from "@/lib/number-utils";
 
@@ -17,14 +18,19 @@ const normalizeSalary = (raw: Record<string, unknown>): Salary => {
     lumpSumSalary: raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : undefined,
     livingAllowance: raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : undefined,
     responsibilityAllowance: toNumber(raw.responsibilityAllowance),
-    extraEffortAllowance: raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : undefined,
+    extraEffortAllowance:
+      raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : undefined,
     productionIncentive: toNumber(raw.productionIncentive),
     transportAllowance: toNumber(raw.transportAllowance),
     insuranceAmount: raw.insuranceAmount !== undefined ? toNumber(raw.insuranceAmount) : undefined,
-    roundingDifference: raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,
-    monthlySalary: raw.monthlySalary !== undefined
-      ? toNumber(raw.monthlySalary)
-      : (toNumber(raw.baseSalary ?? 0) + toNumber(raw.livingAllowance ?? 0) + toNumber(raw.lumpSumSalary ?? 0)) || undefined,
+    roundingDifference:
+      raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,
+    monthlySalary:
+      raw.monthlySalary !== undefined
+        ? toNumber(raw.monthlySalary)
+        : toNumber(raw.baseSalary ?? 0) +
+            toNumber(raw.livingAllowance ?? 0) +
+            toNumber(raw.lumpSumSalary ?? 0) || undefined,
   } as Salary;
 };
 
@@ -43,7 +49,7 @@ export const useSalaries = () => {
   const router = useRouter();
 
   const salariesQuery = useQuery<Salary[]>({
-    queryKey: ["salaries"],
+    queryKey: queryKeys.salaries.all,
     queryFn: async () => {
       const res = await apiClient.get("/salary");
       const data = res.data?.salaries ?? res.data;
@@ -118,9 +124,11 @@ export const useSalaries = () => {
     },
     onSuccess: async (_data, variables) => {
       // Only runs on HTTP 2xx — TanStack Query guarantees this
-      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
       if (variables?.employeeId) {
-        await queryClient.invalidateQueries({ queryKey: ["salary", variables.employeeId] });
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.salaries.detail(variables.employeeId),
+        });
       }
       router.refresh();
       toast.success("تم حفظ مكونات الراتب بنجاح \u2713");
@@ -135,9 +143,9 @@ export const useSalaries = () => {
       return await apiClient.delete(`/salary/${employeeId}`);
     },
     onSuccess: async (_data, employeeId) => {
-      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
       if (employeeId) {
-        await queryClient.invalidateQueries({ queryKey: ["salary", employeeId] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.detail(employeeId) });
       }
       router.refresh();
       toast.success("تم نقل بيانات الراتب إلى سلة المهملات");

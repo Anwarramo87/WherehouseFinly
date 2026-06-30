@@ -5,6 +5,8 @@ import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage } from "@/lib/http/error";
+import { queryKeys } from "@/lib/query-keys";
+import axios from "axios";
 
 /** Re-export for backwards-compat with components that import getErrorMessage from here */
 export const getErrorMessage = getApiErrorMessage;
@@ -57,7 +59,9 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 
   // التعديل الأول: إخفاء المستقيلين والمقالين من القائمة الرئيسية
   if (shouldExcludeTerminated) {
-    return employees.filter((employee) => employee.status !== "terminated" && employee.status !== "resigned");
+    return employees.filter(
+      (employee) => employee.status !== "terminated" && employee.status !== "resigned",
+    );
   }
 
   return employees;
@@ -74,16 +78,15 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
   // 1. جلب الموظفين
   const query = useQuery<Employee[]>({
-    queryKey: [
-      "employees",
-      options?.status || "all-statuses",
-      shouldExcludeTerminated ? "exclude-terminated" : "include-terminated",
-      options?.department || "all-departments",
-      options?.search || "no-search",
-      options?.page || 1,
-      safeLimit,
-      fetchAll ? "fetch-all" : "first-page-only",
-    ],
+    queryKey: queryKeys.employees.list({
+      status: options?.status || "all-statuses",
+      excludeTerminated: shouldExcludeTerminated,
+      department: options?.department || "all-departments",
+      search: options?.search || "no-search",
+      page: options?.page || 1,
+      limit: safeLimit,
+      fetchAll,
+    }),
     queryFn: async () => {
       const requestEmployees = async (page?: number) => {
         const params = {
@@ -201,58 +204,72 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       // Only send fields accepted by CreateEmployeeDto
       // forbidNonWhitelisted:true on the backend rejects any unknown fields
       const payload: Record<string, unknown> = {
-        employeeId:            newEmployee.employeeId,
-        name:                  newEmployee.name,
-        username:              (newEmployee as unknown as Record<string, unknown>).username,
-        password:              (newEmployee as unknown as Record<string, unknown>).password,
-        mobile:                newEmployee.mobile,
-        nationalId:            newEmployee.nationalId,
-        dateOfBirth:           newEmployee.dateOfBirth,
-        gender:                newEmployee.gender,
-        jobTitle:              newEmployee.jobTitle,
-        profession:            newEmployee.profession,
-        department:            newEmployee.department,
-        hourlyRate:            hourlyRate,
-        baseSalary:            typeof newEmployee.baseSalary === 'object' && newEmployee.baseSalary && '$numberDecimal' in newEmployee.baseSalary
-                                 ? Number((newEmployee.baseSalary as { $numberDecimal: string }).$numberDecimal)
-                                 : newEmployee.baseSalary,
-        lumpSumSalary:         typeof newEmployee.lumpSumSalary === 'object' && newEmployee.lumpSumSalary && '$numberDecimal' in newEmployee.lumpSumSalary
-                                 ? Number((newEmployee.lumpSumSalary as { $numberDecimal: string }).$numberDecimal)
-                                 : newEmployee.lumpSumSalary,
-        livingAllowance:       typeof newEmployee.livingAllowance === 'object' && newEmployee.livingAllowance && '$numberDecimal' in newEmployee.livingAllowance
-                                 ? Number((newEmployee.livingAllowance as { $numberDecimal: string }).$numberDecimal)
-                                 : newEmployee.livingAllowance,
-        roleId:                newEmployee.roleId,
-        scheduledStart:        newEmployee.scheduledStart,
-        scheduledEnd:          newEmployee.scheduledEnd,
-        employmentStartDate:   newEmployee.employmentStartDate,
-        gracePeriodMinutes:    newEmployee.gracePeriodMinutes,
-        workDaysInPeriod:      newEmployee.workDaysInPeriod,
-        hoursPerDay:           newEmployee.hoursPerDay,
-        residence:             newEmployee.residence,
+        employeeId: newEmployee.employeeId,
+        name: newEmployee.name,
+        username: (newEmployee as unknown as Record<string, unknown>).username,
+        password: (newEmployee as unknown as Record<string, unknown>).password,
+        mobile: newEmployee.mobile,
+        nationalId: newEmployee.nationalId,
+        dateOfBirth: newEmployee.dateOfBirth,
+        gender: newEmployee.gender,
+        jobTitle: newEmployee.jobTitle,
+        profession: newEmployee.profession,
+        department: newEmployee.department,
+        hourlyRate: hourlyRate,
+        baseSalary:
+          typeof newEmployee.baseSalary === "object" &&
+          newEmployee.baseSalary &&
+          "$numberDecimal" in newEmployee.baseSalary
+            ? Number((newEmployee.baseSalary as { $numberDecimal: string }).$numberDecimal)
+            : newEmployee.baseSalary,
+        lumpSumSalary:
+          typeof newEmployee.lumpSumSalary === "object" &&
+          newEmployee.lumpSumSalary &&
+          "$numberDecimal" in newEmployee.lumpSumSalary
+            ? Number((newEmployee.lumpSumSalary as { $numberDecimal: string }).$numberDecimal)
+            : newEmployee.lumpSumSalary,
+        livingAllowance:
+          typeof newEmployee.livingAllowance === "object" &&
+          newEmployee.livingAllowance &&
+          "$numberDecimal" in newEmployee.livingAllowance
+            ? Number((newEmployee.livingAllowance as { $numberDecimal: string }).$numberDecimal)
+            : newEmployee.livingAllowance,
+        roleId: newEmployee.roleId,
+        scheduledStart: newEmployee.scheduledStart,
+        scheduledEnd: newEmployee.scheduledEnd,
+        employmentStartDate: newEmployee.employmentStartDate,
+        gracePeriodMinutes: newEmployee.gracePeriodMinutes,
+        workDaysInPeriod: newEmployee.workDaysInPeriod,
+        hoursPerDay: newEmployee.hoursPerDay,
+        residence: newEmployee.residence,
       };
 
       // Remove undefined values so they don't get sent
-      Object.keys(payload).forEach(key => {
+      Object.keys(payload).forEach((key) => {
         if (payload[key] === undefined) delete payload[key];
       });
 
-      console.log('Creating employee with payload:', payload);
+      console.log("Creating employee with payload:", payload);
       const response = await apiClient.post("/employees", payload);
-      console.log('Employee created response:', response);
+      console.log("Employee created response:", response);
       return response;
     },
     onSuccess: async (_response) => {
-      console.log('onSuccess called, invalidating queries');
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      console.log("onSuccess called, invalidating queries");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       router.refresh();
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
-      console.error('Create employee error:', error);
+      console.error("Create employee error:", error);
       let finalMessage = getErrorMessage(error, "حدث خطأ غير متوقع");
+
+      // Log the raw error response for debugging
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Raw backend response:", error.response.data);
+      }
 
       if (finalMessage.includes("employeeId must match")) {
         finalMessage = "خطأ: يجب أن يبدأ كود الموظف بـ EMP متبوعاً بأرقام (مثال: EMP001)";
@@ -263,12 +280,12 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         finalMessage.includes("Employee ID already exists") ||
         (finalMessage.includes("already exists") && finalMessage.includes("Employee ID"))
       ) {
-        finalMessage = "خطأ: كود الموظف موجود مسبقاً. لازم يكون employeeId جديد (النظام لن يسمح بتكراره).";
+        finalMessage =
+          "خطأ: كود الموظف موجود مسبقاً. لازم يكون employeeId جديد (النظام لن يسمح بتكراره).";
       }
 
-
       toast.error(finalMessage, { duration: 8000 });
-    }
+    },
   });
 
   // 3. تعديل موظف (استخدمنا employeeId بناءً على الباك إند)
@@ -288,13 +305,13 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       return await apiClient.put(`/employees/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
       toast.success("تم تحديث بيانات الموظف بنجاح!");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل تحديث بيانات الموظف"));
-    }
+    },
   });
 
   // 4. حذف موظف
@@ -303,16 +320,15 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       return await apiClient.delete(`/employees/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
       toast.success("تم نقل الموظف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل حذف الموظف"));
-    }
+    },
   });
 
-  
   // 5. إقالة أو استقالة موظف
   const terminateMutation = useMutation<unknown, unknown, TerminateEmployeeVariables>({
     mutationFn: async ({ id, data }) => {
@@ -328,16 +344,22 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       return await apiClient.patch(`/employees/${id}/${endpoint}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       toast.success("تم نقل الموظف للأرشيف بنجاح!");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل في إنهاء الخدمة"));
-    }
+    },
   });
 
   const bulkTerminateDepartmentMutation = useMutation({
-    mutationFn: async (payload: { department: string; status: "terminated" | "resigned"; terminationDate: string; terminationReason?: string; notes?: string }) => {
+    mutationFn: async (payload: {
+      department: string;
+      status: "terminated" | "resigned";
+      terminationDate: string;
+      terminationReason?: string;
+      notes?: string;
+    }) => {
       const terminationType = payload.status === "resigned" ? "resignation" : "termination";
       return await apiClient.post("/employees/bulk-terminate-department", {
         department: payload.department,
@@ -348,9 +370,11 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       });
     },
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
-      const message = (response as unknown as { data?: { message?: string } }).data?.message || "تم الإقالة الجماعية بنجاح";
+      const message =
+        (response as unknown as { data?: { message?: string } }).data?.message ||
+        "تم الإقالة الجماعية بنجاح";
       toast.success(message);
     },
     onError: (error: unknown) => {
@@ -364,23 +388,23 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       return await apiClient.patch(`/employees/${id}/settle`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       toast.success("تم تصفية حقوق الموظف بنجاح وإغلاق ملفه المالي!");
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "فشل في تصفية الموظف"));
-    }
+    },
   });
 
   // التعديل الثالث: إرجاع كل الدوال لتعمل في الصفحة
-  return { 
-    ...query, 
-    createEmployee: createMutation, 
-    updateEmployee: updateMutation, 
+  return {
+    ...query,
+    createEmployee: createMutation,
+    updateEmployee: updateMutation,
     deleteEmployee: deleteMutation,
     terminateEmployee: terminateMutation,
     bulkTerminateDepartment: bulkTerminateDepartmentMutation,
-    settleEmployee: settleMutation
+    settleEmployee: settleMutation,
   };
 };
 
@@ -390,9 +414,9 @@ export const useResignedEmployees = () => {
   const queryClient = useQueryClient();
 
   const query = useQuery<Employee[]>({
-    queryKey: ['resigned-employees'],
+    queryKey: ["resigned-employees"],
     queryFn: async () => {
-      const response = await apiClient.get('/employees/resigned', {
+      const response = await apiClient.get("/employees/resigned", {
         params: { limit: 500, page: 1 },
       });
 

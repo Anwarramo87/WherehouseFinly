@@ -1,6 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/http/api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/http/api";
+import { queryKeys } from "@/lib/query-keys";
 
 interface Department {
   id: string;
@@ -19,11 +20,12 @@ export const useDepartments = () => {
   const router = useRouter();
 
   const listQuery = useQuery({
-    queryKey: ['departments'],
+    queryKey: queryKeys.departments.all,
     queryFn: async () => {
-      const data = await api.get<DepartmentsResponse | Department[]>('/departments');
+      const data = await api.get<DepartmentsResponse | Department[]>("/departments");
       // normalize shape
-      if (Array.isArray((data as DepartmentsResponse).departments)) return data as DepartmentsResponse;
+      if (Array.isArray((data as DepartmentsResponse).departments))
+        return data as DepartmentsResponse;
       // fallback: if API returns array directly
       return { departments: Array.isArray(data) ? data : [] };
     },
@@ -32,22 +34,29 @@ export const useDepartments = () => {
 
   const createMutation = useMutation({
     mutationFn: async (payload: { name: string; manager?: string; date?: string }) => {
-      // backend DTO accepts only { name }
-      return await api.post('/departments', { name: payload.name });
+      return await api.post("/departments", {
+        name: payload.name,
+        ...(payload.manager !== undefined && { manager: payload.manager }),
+        ...(payload.date !== undefined && { establishedAt: payload.date }),
+      });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['departments'] });
-      await queryClient.invalidateQueries({ queryKey: ['employees'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       router.refresh();
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, name, date }: { id: string; name: string; date?: string }) => {
-      return await api.put(`/departments/${id}`, { name, ...(date && { date }) });
+    mutationFn: async ({ id, name, manager, date }: { id: string; name: string; manager?: string; date?: string }) => {
+      return await api.put(`/departments/${id}`, {
+        name,
+        ...(manager !== undefined && { manager }),
+        ...(date !== undefined && { establishedAt: date }),
+      });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
       router.refresh();
     },
   });
@@ -57,7 +66,7 @@ export const useDepartments = () => {
       return await api.delete(`/departments/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
       router.refresh();
     },
   });

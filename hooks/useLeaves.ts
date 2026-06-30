@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 
 export type LeaveRequest = {
@@ -36,12 +37,25 @@ export type LeaveInput = {
   status?: string;
 };
 
-export const useLeaves = (params?: { employeeId?: string; status?: string; leaveType?: string; startDate?: string; endDate?: string }) => {
+export const useLeaves = (params?: {
+  employeeId?: string;
+  status?: string;
+  leaveType?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   const leavesQuery = useQuery<LeaveRequest[]>({
-    queryKey: ["leaves", params?.employeeId || "all", params?.status || "all-statuses", params?.leaveType || "all-types", params?.startDate || "no-start", params?.endDate || "no-end"],
+    queryKey: [
+      ...queryKeys.leaves.all,
+      params?.employeeId || "all",
+      params?.status || "all-statuses",
+      params?.leaveType || "all-types",
+      params?.startDate || "no-start",
+      params?.endDate || "no-end",
+    ],
     queryFn: async () => {
       const res = await apiClient.get("/leaves", {
         params: {
@@ -81,8 +95,8 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
       return await apiClient.post("/leaves", payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.leaves.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تمت إضافة طلب الإجازة بنجاح");
     },
@@ -96,8 +110,8 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
       return await apiClient.patch(`/leaves/${id}`, data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.leaves.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تم تحديث طلب الإجازة");
     },
@@ -111,8 +125,8 @@ export const useLeaves = (params?: { employeeId?: string; status?: string; leave
       return await apiClient.delete(`/leaves/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.leaves.all, exact: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       router.refresh();
       toast.success("تم نقل طلب الإجازة إلى سلة المهملات");
     },

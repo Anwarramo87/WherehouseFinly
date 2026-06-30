@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
@@ -111,6 +111,8 @@ export default function EmployeesPage() {
     [employees],
   );
   
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   
@@ -250,7 +252,10 @@ export default function EmployeesPage() {
     if (!selectedEmployee) {
       // Generate a safe username: use trimmed input OR fall back to employeeId (guaranteed unique)
       const rawUsername = formData.username.trim();
-      payload.username = rawUsername || normalizedEmployeeId;
+      // Auto-generate unique username to avoid conflicts
+      const baseUsername = rawUsername || formData.name.trim().split(" ")[0] || normalizedEmployeeId;
+      // Append employeeId suffix to ensure uniqueness
+      payload.username = `${baseUsername}_${normalizedEmployeeId}`;
     }
 
     try {
@@ -273,6 +278,7 @@ export default function EmployeesPage() {
         // Create employee with auto-retry on duplicate ID (backend may have IDs not in our cache)
         let currentPayload = { ...payload } as Employee;
         let currentId = normalizedEmployeeId;
+        let currentUsername = payload.username as string | undefined;
         const MAX_RETRIES = 5;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -289,7 +295,12 @@ export default function EmployeesPage() {
               const numMatch = currentId.match(/^EMP(\d+)$/i);
               const nextNum = numMatch ? parseInt(numMatch[1], 10) + 1 : attempt + 1;
               currentId = `EMP${String(nextNum).padStart(5, '0')}`;
-              currentPayload = { ...currentPayload, employeeId: currentId };
+              
+              // Also generate a new unique username
+              const baseUsername = (currentPayload.username as string | undefined)?.replace(/_EMP\d+$/, '') || formData.name.trim().split(" ")[0] || currentId;
+              currentUsername = `${baseUsername}_${currentId}`;
+              
+              currentPayload = { ...currentPayload, employeeId: currentId, username: currentUsername };
               console.warn(`Employee ID ${currentId} exists in DB but not in cache. Retrying with ${currentPayload.employeeId}`);
               continue;
             }
@@ -312,11 +323,11 @@ export default function EmployeesPage() {
     } catch (err) {
       const message = getErrorMessage(err, "فشل حفظ الموظف");
       console.error("Error saving employee:", err);
-      // Log the full response data from the backend for debugging
+      // Log the error message safely without exposing raw user input
       const responseData = (err as { response?: { data?: unknown; status?: number } })?.response;
       if (responseData) {
         console.error("Backend response status:", responseData.status);
-        console.error("Backend response data:", JSON.stringify(responseData.data, null, 2));
+        console.error("Backend error details: Failed to create employee");
       }
       toast.error(message, { duration: 8000 });
     }
@@ -463,7 +474,7 @@ export default function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/40">
-                  {isLoading ? (
+                  {!mounted || isLoading ? (
                     <tr>
                       <td colSpan={6} className="p-16 text-center">
                         <div className="flex flex-col items-center gap-3">

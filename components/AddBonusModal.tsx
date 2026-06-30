@@ -108,6 +108,7 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
   });
 
   const [selectedType, setSelectedType] = useState<string>("مكافأة");
+  const [includeDate, setIncludeDate] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string>("");
 
@@ -127,6 +128,8 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const [selectAll, setSelectAll] = useState(false);
 
   const filteredEmployees = useMemo(() => {
     if (!searchQueryInput) return employees;
@@ -276,6 +279,19 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
 
                 {isDropdownOpen && !isEditMode && (
                   <div className="absolute top-[calc(100%+8px)] left-0 w-full max-h-56 overflow-y-auto custom-scrollbar bg-[#1a2530]/95 backdrop-blur-xl border border-[#263544] rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.5)] z-50 p-2">
+                    <div
+                      onClick={() => {
+                        setForm((p) => ({ ...p, employeeId: "ALL" }));
+                        setSearchQueryInput("جميع الموظفين");
+                        setSelectAll(true);
+                        setIsDropdownOpen(false);
+                        setCalculationError("");
+                      }}
+                      className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98] border-b border-[#263544] mb-1"
+                    >
+                      <div className="bg-[#C89355]/20 px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355] border border-[#C89355]/30 shadow-sm">ALL</div>
+                      <span className="font-bold text-white text-sm">جميع الموظفين</span>
+                    </div>
                     {filteredEmployees.length === 0 ? (
                       <div className="p-4 text-center text-slate-500 font-bold text-sm">لا يوجد موظف بهذا الاسم أو الكود</div>
                     ) : (
@@ -299,13 +315,27 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">الفترة المستحقة</label>
               <div className="relative group">
                 <input
-                  type="month"
-                  value={form.period || ""}
-                  onChange={(e) => setForm((p) => ({ ...p, period: e.target.value }))}
+                  type={includeDate ? "date" : "month"}
+                  value={includeDate ? (form.period ? `${form.period}-01` : "") : (form.period || "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (includeDate) {
+                      setForm((p) => ({ ...p, period: val.slice(0, 7) }));
+                    } else {
+                      setForm((p) => ({ ...p, period: val }));
+                    }
+                  }}
                   className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#C89355]/20 focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 scheme-dark transition-all"
                 />
                 <Calendar className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />
               </div>
+              <button
+                type="button"
+                onClick={() => setIncludeDate(!includeDate)}
+                className="text-xs font-bold text-[#C89355]/70 hover:text-[#C89355] mt-1.5 transition-colors"
+              >
+                {includeDate ? "تحديد شهر فقط" : "تحديد يوم محدد"}
+              </button>
             </div>
 
             <div>
