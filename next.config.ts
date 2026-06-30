@@ -1,57 +1,12 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
-import { resolveApiUrl } from "./lib/api-url";
 
 const isProduction = process.env.NODE_ENV === "production";
-const upstreamApiBase = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
-const apiUrl = upstreamApiBase;
 
-const apiOrigin = (() => {
-  if (!apiUrl) return "";
-  try {
-    return new URL(apiUrl).origin;
-  } catch {
-    return "";
-  }
-})();
-
-const apiWsOrigin = (() => {
-  if (!apiOrigin) return "";
-  try {
-    const parsed = new URL(apiOrigin);
-    parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-    return parsed.origin;
-  } catch {
-    return "";
-  }
-})();
-
-const connectSources = ["'self'", apiOrigin, apiWsOrigin].filter(Boolean);
-if (isProduction) {
-  connectSources.push("https:", "wss:");
-} else {
-  connectSources.push("http:", "https:", "ws:", "wss:");
-}
-
-const cspDirectives = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  isProduction
-    ? "script-src 'self' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "worker-src 'self' blob:",
-  `connect-src ${connectSources.join(" ")}`,
-  ...(isProduction ? ["upgrade-insecure-requests"] : []),
-];
+// CSP is handled by proxy.ts with per-request nonces — see proxy.ts
 
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: cspDirectives.join("; ") },
+  // CSP is now handled by proxy.ts with per-request nonces
   { key: "X-Frame-Options", value: "DENY" }, // DENY أقوى من SAMEORIGIN
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -177,4 +132,3 @@ const nextConfig: NextConfig = {
 };
 
 export default withBundleAnalyzer(nextConfig);
-

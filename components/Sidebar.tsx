@@ -272,7 +272,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
                               key={sub.name}
                               href={sub.href}
                               prefetch={false}
-                              onMouseEnter={() => prefetchMap[sub.href ?? '']?.()}
+                              onMouseEnter={() => sub.href ? prefetchMap[sub.href]?.() : undefined}
                               onClick={() => {
                                 if (onClose && window.innerWidth < 1024) onClose();
                               }}
@@ -295,7 +295,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
               ) : (
                 <Link
                   href={item.href || '#'}
-                  onMouseEnter={() => prefetchMap[item.href ?? '']?.()}
+                  onMouseEnter={() => item.href ? prefetchMap[item.href]?.() : undefined}
                   onClick={() => {
                     setOpenMenu(null);
                     if (onClose && window.innerWidth < 1024) onClose();

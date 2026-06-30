@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 import { getApiErrorMessage as normalizeError } from "@/lib/http/error";
 
 export interface BusResponse {
@@ -39,27 +39,41 @@ export interface BusDetailsResponse extends BusResponse {
   passengers: PassengerResponse[];
 }
 
+const fetchBusDetails = async (busId: string): Promise<BusDetailsResponse> => {
+  const res = await apiClient.get(`/transportation/buses/${busId}`);
+  return res.data;
+};
 
+/**
+ * Hook to fetch details (passengers) for multiple buses in parallel via React Query.
+ * Replaces the manual useState + useEffect + fetchingRef pattern.
+ */
+export function useBusDetails(busIds: string[]) {
+  return useQueries({
+    queries: busIds.map((busId) => ({
+      queryKey: queryKeys.buses.detail(busId),
+      queryFn: () => fetchBusDetails(busId),
+      staleTime: QUERY_STALE_TIME.FAST,
+      gcTime: QUERY_GC_TIME.STANDARD,
+      enabled: !!busId,
+    })),
+  });
+}
 
 export function useTransportation() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   const query = useQuery<BusResponse[]>({
-    queryKey: ["buses"],
+    queryKey: queryKeys.buses.all,
     queryFn: async () => {
       const res = await apiClient.get("/transportation/buses");
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.FAST, // تقليل stale time لتحديث أسرع
+    staleTime: QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.STANDARD,
-    refetchOnWindowFocus: true, // تحديث تلقائي عند العودة للصفحة
+    refetchOnWindowFocus: true,
   });
-
-  const getBus = useCallback(async (busId: string): Promise<BusDetailsResponse> => {
-    const res = await apiClient.get(`/transportation/buses/${busId}`);
-    return res.data;
-  }, []);
 
   const createBus = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -76,7 +90,7 @@ export function useTransportation() {
       return await apiClient.post("/transportation/buses", payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
       router.refresh();
       toast.success("تم إضافة الباص بنجاح");
     },
@@ -94,14 +108,17 @@ export function useTransportation() {
       if (data.driverName !== undefined) payload.driverName = data.driverName;
       if (data.driverPhone !== undefined) payload.driverPhone = data.driverPhone;
       if (data.totalCost !== undefined) payload.totalCost = Number(data.totalCost);
-      if (data.discountPercent !== undefined) payload.companyDeductionPct = Number(data.discountPercent);
-      if (data.companyDeductionPct !== undefined) payload.companyDeductionPct = Number(data.companyDeductionPct);
-      if (data.employeeDeductionPct !== undefined) payload.employeeDeductionPct = Number(data.employeeDeductionPct);
+      if (data.discountPercent !== undefined)
+        payload.companyDeductionPct = Number(data.discountPercent);
+      if (data.companyDeductionPct !== undefined)
+        payload.companyDeductionPct = Number(data.companyDeductionPct);
+      if (data.employeeDeductionPct !== undefined)
+        payload.employeeDeductionPct = Number(data.employeeDeductionPct);
       if (data.capacity !== undefined) payload.capacity = Number(data.capacity);
       return await apiClient.put(`/transportation/buses/${id}`, payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
       router.refresh();
       toast.success("تم تحديث الباص بنجاح");
     },
@@ -115,7 +132,7 @@ export function useTransportation() {
       return await apiClient.delete(`/transportation/buses/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
       router.refresh();
       toast.success("تم نقل الباص إلى سلة المهملات");
     },
@@ -125,7 +142,13 @@ export function useTransportation() {
   });
 
   const addPassenger = useMutation({
-    mutationFn: async ({ busId, payload }: { busId: string; payload: { employeeId: string; name?: string; subscriptionDate?: string } }) => {
+    mutationFn: async ({
+      busId,
+      payload,
+    }: {
+      busId: string;
+      payload: { employeeId: string; name?: string; subscriptionDate?: string };
+    }) => {
       const body: Record<string, unknown> = { employeeId: payload.employeeId };
       if (payload.name !== undefined) body.name = payload.name;
       if (payload.subscriptionDate !== undefined) body.subscriptionDate = payload.subscriptionDate;
@@ -133,8 +156,9 @@ export function useTransportation() {
       return res.data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["buses"] });
-      await queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
+      await queryClient.invalidateQueries({ queryKey: ["bus"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all });
       router.refresh();
       toast.success("تمت إضافة الموظف للباص");
     },
@@ -148,8 +172,9 @@ export function useTransportation() {
       return await apiClient.delete(`/transportation/buses/${busId}/passengers/${employeeId}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["buses"] });
-      await queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
+      await queryClient.invalidateQueries({ queryKey: ["bus"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all });
       router.refresh();
       toast.success("تمت إزالة الموظف من الباص");
     },
@@ -165,7 +190,6 @@ export function useTransportation() {
     deleteBus,
     addPassenger,
     removePassenger,
-    getBus,
   };
 }
 

@@ -113,7 +113,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
       return {
         employeeId: employee.employeeId || "",
         name: employee.name || "",
-        username: employee.username || employee.name?.split(" ")[0] || "",
+        // Use employeeId as part of username to ensure uniqueness
+        username: (employee.username || employee.name?.split(" ")[0] || "") + "_" + employee.employeeId,
         mobile: employee.mobile || "",
         birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
         gender: employee.gender || "male",
@@ -177,10 +178,11 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, isPending, i
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
     
-    // Auto-fill username with first name if it hasn't been manually edited
+    // Auto-fill username with first name + employeeId if it hasn't been manually edited
     if (!isUsernameManuallyEdited) {
       const firstName = newName.trim().split(" ")[0] || "";
-      setFormData({ ...formData, name: newName, username: firstName });
+      const suggestedUsername = firstName && nextSuggestedId ? `${firstName}_${nextSuggestedId}` : firstName || nextSuggestedId;
+      setFormData({ ...formData, name: newName, username: suggestedUsername });
     } else {
       setFormData({ ...formData, name: newName });
     }

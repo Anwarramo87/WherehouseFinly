@@ -1,8 +1,9 @@
-import React from "react";
-import { Wallet, Receipt, ChevronLeft, Download } from "lucide-react";
-import type { Bonus } from "@/types/bonus";
-import type { DiscountRecord } from "@/hooks/useDiscounts";
-import type { PenaltyRecord } from "@/hooks/usePenalties";
+
+import React from 'react';
+import { Wallet, Receipt, HandCoins, ChevronLeft, Download, AlertTriangle } from 'lucide-react';
+import type { Bonus } from '@/types/bonus';
+import type { DiscountRecord } from '@/hooks/useDiscounts';
+import type { PenaltyRecord } from '@/hooks/usePenalties';
 
 // Define types directly in the component for simplicity
 // In a real app, these would be imported from a central types file
@@ -64,10 +65,11 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md"
       dir="rtl"
     >
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+      <div className="payslip-container bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 animate-in fade-in zoom-in-95 duration-200">
+
         {/* Modal header */}
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10 print:bg-transparent print:border-b-2 print:border-slate-800">
           <div className="flex items-center gap-4">
@@ -104,6 +106,7 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
 
         {/* Modal body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 bg-slate-50 p-6 sm:p-10 relative print:p-4 print:overflow-visible">
+
           {/* Employee info card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8 print:border-none print:shadow-none print:p-0 print:mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -114,7 +117,9 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 <p className="text-slate-800 text-2xl font-black print:text-black wrap-break-word">
                   {payslip.employeeName}
                 </p>
-                <p className="text-slate-400 text-sm font-bold mt-1">{payslip.department}</p>
+                <p className="text-slate-400 text-sm font-bold mt-1">
+                  {payslip.department}
+                </p>
               </div>
               <div className="text-right sm:text-left">
                 <p className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-widest print:text-black">
@@ -125,11 +130,21 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </p>
               </div>
             </div>
-
+            {payslip.anomalies.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm font-bold print:hidden">
+                <strong>ملاحظات النظام: </strong>
+                <ul className="list-disc list-inside ms-4 mt-1">
+                  {payslip.anomalies.map((an, idx) => (
+                    <li key={idx}>{an}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Earnings / Deductions grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 print:gap-4 print:grid-cols-2">
+
             {/* ── Earnings column ──────────────────────────────────────── */}
             <div className="space-y-6 print:space-y-4">
               <div className="flex items-center gap-3 border-b-2 border-emerald-100 pb-4 print:border-emerald-200">
@@ -150,30 +165,18 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                   <div className="space-y-4 text-slate-700 print:text-black">
                     {(
                       [
-                        {
-                          label: "الراتب الأساسي",
-                          value: toNumber(payslip.details.salaryConfig.baseSalary),
-                        },
-                        {
-                          label: "بدل المعيشة",
-                          value: toNumber(payslip.details.salaryConfig.livingAllowance),
-                        },
-                        {
-                          label: "تعويض المسؤولية",
-                          value: toNumber(payslip.details.salaryConfig.responsibilityAllowance),
-                        },
+                        { label: "الراتب الأساسي",          value: toNumber(payslip.details.salaryConfig.baseSalary) },
+                        { label: "الراتب المقطوع",           value: toNumber(payslip.details.salaryConfig.lumpSumSalary) },
+                        { label: "بدل المعيشة",              value: toNumber(payslip.details.salaryConfig.livingAllowance) },
+                        { label: "تعويض المسؤولية",          value: toNumber(payslip.details.salaryConfig.responsibilityAllowance) },
                         {
                           label: "تعويض الجهد الإضافي",
-                          value: toNumber(payslip.details.salaryConfig.extraEffortAllowance),
+                          value: toNumber(
+                            payslip.details.salaryConfig.extraEffortAllowance,
+                          ),
                         },
-                        {
-                          label: "حوافز الإنتاجية",
-                          value: toNumber(payslip.details.salaryConfig.productionIncentive),
-                        },
-                        {
-                          label: "بدل النقل",
-                          value: toNumber(payslip.details.salaryConfig.transportAllowance),
-                        },
+                        { label: "حوافز الإنتاجية",          value: toNumber(payslip.details.salaryConfig.productionIncentive) },
+                        { label: "بدل النقل",                value: toNumber(payslip.details.salaryConfig.transportAllowance) },
                       ] as { label: string; value: number }[]
                     )
                       .filter((row) => row.value > 0)
@@ -279,11 +282,11 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                   <div className="space-y-4 text-slate-700 print:text-black">
                     {payslip.details.deductions.map((ded, idx) => {
                       // Handle DiscountRecord (advances) and PenaltyRecord
-                      const isDiscount = "kind" in ded;
+                      const isDiscount = 'kind' in ded;
                       const amount = isDiscount ? toNumber(ded.amount) : toNumber(ded.amount);
                       const label = isDiscount
                         ? (ded as DiscountRecord).type
-                        : `عقوبة: ${(ded as PenaltyRecord).category || (ded as PenaltyRecord).reason || "عقوبة"}`;
+                        : `عقوبة: ${(ded as PenaltyRecord).category || (ded as PenaltyRecord).reason || 'عقوبة'}`;
                       return (
                         <div key={idx} className="flex justify-between items-center">
                           <span className="text-sm font-bold">{label}</span>
@@ -305,6 +308,21 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </div>
               )}
 
+              {/* ── Early Leave / Missing Minutes Deduction ──────────────────── */}
+              {(payslip?.earlyLeaveDeduction ?? 0) > 0 && (
+                <div className="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="flex items-center gap-2 text-sm font-bold text-amber-700 print:text-black">
+                      <AlertTriangle size={15} className="text-amber-500" />
+                      خصم دوام ناقص ({payslip?.totalEarlyLeaveMinutes ?? 0} دقيقة)
+                    </span>
+                    <span className="text-lg font-black text-red-600 font-mono print:text-black">
+                      -{payslip.earlyLeaveDeduction!.toLocaleString()} ل.س
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Authoritative total deductions (from backend) */}
               <div className="bg-rose-50 rounded-2xl p-6 border border-rose-200 shadow-sm print:shadow-none print:border-slate-400 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-2 h-full bg-rose-500" />
@@ -318,6 +336,16 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                 </div>
               </div>
 
+              {payslip.totalDeductions === 0 && (
+                <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100 print:hidden">
+                    <HandCoins className="text-slate-400" size={28} />
+                  </div>
+                  <p className="text-slate-500 font-bold text-base print:text-black">
+                    لا توجد أي خصومات مالية مسجلة لهذا الشهر.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -330,7 +358,8 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
             <div className="text-center">
               <p className="text-black text-xs font-black uppercase mb-1">الصافي للدفع</p>
               <p className="text-black text-2xl font-black font-mono">
-                {payslip.netPayRounded.toLocaleString()} <span className="text-sm">ل.س</span>
+                {payslip.netPayRounded.toLocaleString()}{" "}
+                <span className="text-sm">ل.س</span>
               </p>
             </div>
             <div className="text-center w-1/3">

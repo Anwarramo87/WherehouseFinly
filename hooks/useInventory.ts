@@ -3,6 +3,7 @@ import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { AdjustStockInput, InventoryItem, InventoryItemInput } from "@/types/inventory";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
+import { queryKeys } from "@/lib/query-keys";
 
 type InventoryListResponse = {
   products: Array<{
@@ -30,6 +31,7 @@ type StockBySkuResponse = {
 
 const STOCK_CACHE_TTL_MS = 45_000;
 const STOCK_CACHE_MAX_ITEMS = 1_000;
+const STOCK_CACHE_CLEANUP_INTERVAL_MS = 60_000; // clean up every 60s
 
 const stockQuantityCache = new Map<string, { quantity: number; expiresAt: number }>();
 const stockQuantityInFlight = new Map<string, Promise<number>>();
@@ -39,18 +41,25 @@ const now = () => Date.now();
 const pruneStockCache = () => {
   const currentTime = now();
 
+  // Remove expired entries
   for (const [sku, value] of stockQuantityCache.entries()) {
     if (value.expiresAt <= currentTime) {
       stockQuantityCache.delete(sku);
     }
   }
 
+  // Enforce max size (evict oldest)
   while (stockQuantityCache.size > STOCK_CACHE_MAX_ITEMS) {
     const oldestKey = stockQuantityCache.keys().next().value as string | undefined;
     if (!oldestKey) break;
     stockQuantityCache.delete(oldestKey);
   }
 };
+
+// Proactive cleanup: run periodically to prevent memory leaks
+if (typeof setInterval !== "undefined") {
+  setInterval(pruneStockCache, STOCK_CACHE_CLEANUP_INTERVAL_MS);
+}
 
 const getCachedStockQuantity = (sku: string): number | null => {
   const cached = stockQuantityCache.get(sku);
@@ -79,7 +88,10 @@ const fetchStockQuantityBySku = async (sku: string): Promise<number> => {
     try {
       const stockRes = await apiClient.get<StockBySkuResponse>(`/inventory/stock/${sku}`);
       const levels = Array.isArray(stockRes.data?.stockLevels) ? stockRes.data.stockLevels : [];
-      const quantity = levels.reduce((sum, level) => sum + Number(level.available ?? level.quantity ?? 0), 0);
+      const quantity = levels.reduce(
+        (sum, level) => sum + Number(level.available ?? level.quantity ?? 0),
+        0,
+      );
 
       stockQuantityCache.set(sku, {
         quantity,
@@ -99,7 +111,10 @@ const fetchStockQuantityBySku = async (sku: string): Promise<number> => {
   return request;
 };
 
-const toInventoryItem = (product: InventoryListResponse["products"][number], quantity: number): InventoryItem => ({
+const toInventoryItem = (
+  product: InventoryListResponse["products"][number],
+  quantity: number,
+): InventoryItem => ({
   id: product.id,
   name: product.name,
   sku: product.sku,
@@ -114,9 +129,15 @@ const extractMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.error?.message || err?.response?.data?.message || fallback;
 };
 
-export const useProducts = (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) => {
+export const useProducts = (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+  status?: string;
+}) => {
   return useQuery({
-    queryKey: ["inventory", "products", params],
+    queryKey: queryKeys.inventory.products(params),
     queryFn: async () => {
       const res = await apiClient.get<InventoryListResponse>("/inventory/products", { params });
       const products = Array.isArray(res.data?.products) ? res.data.products : [];
@@ -140,7 +161,9 @@ export const useProducts = (params?: { page?: number; limit?: number; search?: s
 
       return {
         products,
-        items: products.map((product) => toInventoryItem(product, quantityBySku.get(product.sku) || 0)),
+        items: products.map((product) =>
+          toInventoryItem(product, quantityBySku.get(product.sku) || 0),
+        ),
         pagination: res.data?.pagination,
       };
     },
@@ -150,7 +173,13 @@ export const useProducts = (params?: { page?: number; limit?: number; search?: s
   });
 };
 
-export const useInventory = (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) => {
+export const useInventory = (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+  status?: string;
+}) => {
   const queryClient = useQueryClient();
 
   const productsQuery = useProducts(params);
@@ -169,7 +198,7 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
       return await apiClient.post("/inventory/products", body);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
       toast.success("تمت إضافة الصنف بنجاح");
     },
     onError: (error: unknown) => {
@@ -191,7 +220,7 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
       return await apiClient.put(`/inventory/products/${id}`, body);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
       toast.success("تم تحديث الصنف بنجاح");
     },
     onError: (error: unknown) => {
@@ -205,7 +234,7 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
       return await apiClient.delete(`/inventory/products/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
       toast.success("تم نقل الصنف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
@@ -222,18 +251,18 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
       const productRes = await apiClient.get(`/inventory/products/${input.productId}`);
       const sku = productRes?.data?.product?.sku;
       if (!sku) {
-        throw new Error('تعذر تحديد SKU للصنف المحدد');
+        throw new Error("تعذر تحديد SKU للصنف المحدد");
       }
 
-      return await apiClient.post('/inventory/stock/adjust', {
+      return await apiClient.post("/inventory/stock/adjust", {
         sku,
-        location: input.location || 'MAIN',
+        location: input.location || "MAIN",
         change,
-        reason: input.note || (input.type === 'IN' ? 'إضافة مخزون' : 'صرف مخزون'),
+        reason: input.note || (input.type === "IN" ? "إضافة مخزون" : "صرف مخزون"),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
       toast.success("تم تعديل المخزون بنجاح");
     },
     onError: (error: unknown) => {
@@ -249,4 +278,3 @@ export const useInventory = (params?: { page?: number; limit?: number; search?: 
     adjustStock,
   };
 };
-

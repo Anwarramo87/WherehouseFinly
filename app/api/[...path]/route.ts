@@ -23,10 +23,24 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
+const ALLOWED_ORIGINS: Set<string> = new Set(
+  (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_APP_URL ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+);
+
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.size === 0) return true; // dev: no restriction configured
+  return ALLOWED_ORIGINS.has(origin);
+};
+
 const buildCorsHeaders = (request: NextRequest) => {
-  const origin = request.headers.get("origin") || "*";
+  const origin = request.headers.get("origin");
+  const allowedOrigin = isOriginAllowed(origin) ? origin! : "";
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
     "Access-Control-Allow-Headers":

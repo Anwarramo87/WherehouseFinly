@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Loader2, UserMinus, ChevronLeft, Scissors, Download, Building2, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Lock, Clock, CheckCircle } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Loader2, UserMinus, BadgeInfo, ChevronLeft, Scissors, Download, UserCheck, DollarSign, Building2, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Lock } from "lucide-react";
 import { useResignedEmployees } from "@/hooks/useEmployees";
 import ResignedEmployeesList from "@/components/ResignedEmployeesList";
 import RehireEmployeeModal from "@/components/RehireEmployeeModal";
@@ -14,12 +14,13 @@ import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { excelExportService } from "@/lib/excel-export";
 import { ExportResignedListGuard } from "@/components/PermissionGuard";
-import KpiCard from "@/components/KpiCard";
 
 export default function ResignedEmployeesPage() {
   const { data: allEmployees = [], isLoading, isError, error, settleEmployee, refetch, isFetching } = useResignedEmployees();
   
   // Modal states
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [selectedEmployeeForRehire, setSelectedEmployeeForRehire] = useState<Employee | null>(null);
   const [selectedEmployeeForSettlement, setSelectedEmployeeForSettlement] = useState<Employee | null>(null);
   const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
@@ -334,7 +335,7 @@ export default function ResignedEmployeesPage() {
             <div className="flex flex-wrap w-full md:w-auto justify-end gap-3">
               <div className="relative overflow-hidden inline-flex items-center gap-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-5 py-3 shadow-[0_10px_20px_rgba(38,53,68,0.05)] text-[#263544] text-sm font-black group hover:shadow-md transition-all">
                 <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-                <UserMinus size={18} className="text-[#C89355] group-hover:animate-pulse relative z-10" />
+                <BadgeInfo size={18} className="text-[#C89355] group-hover:animate-pulse relative z-10" />
                 <span className="relative z-10 tracking-wide">العدد الإجمالي: {statistics.totalResigned}</span>
               </div>
               
@@ -364,82 +365,62 @@ export default function ResignedEmployeesPage() {
 
           {/* لوحة الإحصائيات المتقدمة */}
           {!isLoading && !isError && resignedOrTerminated.length > 0 && (
-            <div className="mb-8 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-6">
-              <KpiCard
-                title="إجمالي المغادرين"
-                value={statistics.totalResigned}
-                description="إجمالي عدد الموظفين المقالين والمستقيلين"
-                icon={UserMinus}
-                valueColorClass="text-[#263544]"
-                borderColorClass="border-[#C89355]/30"
-                iconBgClass="bg-[#1a2530]"
-                iconColorClass="text-[#C89355]"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)]"
-              />
-              <KpiCard
-                title="استقالات"
-                value={statistics.resignations}
-                description="عدد الموظفين المستقيلين"
-                icon={TrendingUp}
-                valueColorClass="text-blue-600"
-                borderColorClass="border-blue-500/30"
-                iconBgClass="bg-blue-500/10"
-                iconColorClass="text-blue-600"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-              />
-              <KpiCard
-                title="إقالات"
-                value={statistics.terminations}
-                description="عدد الموظفين المقالين"
-                icon={TrendingDown}
-                valueColorClass="text-rose-600"
-                borderColorClass="border-rose-500/30"
-                iconBgClass="bg-rose-500/10"
-                iconColorClass="text-rose-600"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(239,68,68,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]"
-              />
-              <KpiCard
-                title="المغادرون هذا الشهر"
-                value={statistics.currentMonth}
-                description="عدد المغادرين خلال الشهر الحالي"
-                icon={UserMinus}
-                valueColorClass="text-purple-600"
-                borderColorClass="border-purple-500/30"
-                iconBgClass="bg-purple-500/10"
-                iconColorClass="text-purple-600"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(147,51,234,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(147,51,234,0.4)]"
-              />
-              <KpiCard
-                title="قيد التصفية"
-                value={statistics.pendingSettlement}
-                description="عدد التسويات المالية المعلقة"
-                icon={Clock}
-                valueColorClass="text-amber-700"
-                borderColorClass="border-amber-500/30"
-                iconBgClass="bg-amber-500/10"
-                iconColorClass="text-amber-600"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(217,119,6,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(245,158,11,0.4)]"
-              />
-              <KpiCard
-                title="تمت التصفية"
-                value={statistics.completedSettlement}
-                description="عدد التسويات المالية المكتملة"
-                icon={CheckCircle}
-                valueColorClass="text-emerald-700"
-                borderColorClass="border-emerald-500/30"
-                iconBgClass="bg-emerald-500/10"
-                iconColorClass="text-emerald-600"
-                hoverShadowClass="hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)]"
-                iconHoverShadowClass="group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-              />
+            <div className="mb-8 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {/* إجمالي المغادرين */}
+              <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <BadgeInfo size={16} className="text-[#C89355]" />
+                  <span className="text-xs font-bold text-slate-500">إجمالي المغادرين</span>
+                </div>
+                <p className="text-2xl font-black text-[#263544]">{statistics.totalResigned}</p>
+              </div>
+
+              {/* الاستقالات */}
+              <div className="bg-blue-50/60 backdrop-blur-xl border border-blue-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp size={16} className="text-blue-600" />
+                  <span className="text-xs font-bold text-blue-700">استقالات</span>
+                </div>
+                <p className="text-2xl font-black text-blue-700">{statistics.resignations}</p>
+              </div>
+
+              {/* الإقالات */}
+              <div className="bg-rose-50/60 backdrop-blur-xl border border-rose-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown size={16} className="text-rose-600" />
+                  <span className="text-xs font-bold text-rose-700">إقالات</span>
+                </div>
+                <p className="text-2xl font-black text-rose-700">{statistics.terminations}</p>
+              </div>
+
+              {/* هذا الشهر */}
+              <div className="bg-purple-50/60 backdrop-blur-xl border border-purple-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserMinus size={16} className="text-purple-600" />
+                  <span className="text-xs font-bold text-purple-700">هذا الشهر</span>
+                </div>
+                <p className="text-2xl font-black text-purple-700">{statistics.currentMonth}</p>
+              </div>
+
+              {/* قيد التصفية */}
+              <div className="bg-amber-50/60 backdrop-blur-xl border border-amber-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign size={16} className="text-amber-600" />
+                  <span className="text-xs font-bold text-amber-700">قيد التصفية</span>
+                </div>
+                <p className="text-2xl font-black text-amber-700">{statistics.pendingSettlement}</p>
+              </div>
+
+              {/* تمت التصفية */}
+              <div className="bg-emerald-50/60 backdrop-blur-xl border border-emerald-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck size={16} className="text-emerald-600" />
+                  <span className="text-xs font-bold text-emerald-700">تمت التصفية</span>
+                </div>
+                <p className="text-2xl font-black text-emerald-700">{statistics.completedSettlement}</p>
+              </div>
             </div>
-          )
-          }
+          )}
 
           {/* إحصائيات الأقسام */}
           {!isLoading && !isError && Object.keys(statistics.byDepartment).length > 1 && (
@@ -467,7 +448,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Loading State */}
-          {isLoading && (
+          {(!mounted || isLoading) && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="animate-spin text-[#C89355] mb-4" size={48} />
               <span className="font-black text-[#263544] text-lg animate-pulse">جاري تحميل بيانات المغادرين...</span>
@@ -475,7 +456,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Error State */}
-          {isError && !isLoading && (
+          {mounted && isError && !isLoading && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="p-4 bg-rose-50 rounded-2xl">
                 <AlertCircle className="text-rose-500" size={48} />
@@ -497,7 +478,7 @@ export default function ResignedEmployeesPage() {
           )}
 
           {/* Content */}
-          {!isLoading && !isError && (
+          {mounted && !isLoading && !isError && (
             <>
               {/* قائمة الموظفين المستقيلين */}
               <ResignedEmployeesList
