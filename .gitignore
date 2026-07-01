@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# local debug sessions (trae / IDE debug tooling)
+.dbg/
+
 # env files (can opt-in for committing if needed)
 .env*
 
