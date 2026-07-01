@@ -1,7 +1,12 @@
 /**
  * usePermissions Hook Tests
- * 
+ *
  * Tests for the client-side permission checking hook.
+ * Aligned to the current API in lib/permissions/hooks.ts:
+ *   - userRole (string | null, singular)
+ *   - isAdmin, permissions, hasPermission, hasAnyPermission
+ *   - canTerminateEmployee, canRehireEmployee, canProcessSettlement,
+ *     canViewResignedEmployees, canViewSettlement, canExportResignedList
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
@@ -19,203 +24,203 @@ describe("usePermissions Hook", () => {
     vi.clearAllMocks();
   });
 
+  // ---------------------------------------------------------------------------
+  // Unauthenticated
+  // ---------------------------------------------------------------------------
   describe("when user is not authenticated", () => {
     beforeEach(() => {
-      (useAuthStore as unknown as Mock).mockReturnValue({
-        user: null,
-        hasAnyRole: () => false,
-      });
+      (useAuthStore as unknown as Mock).mockReturnValue({ user: null });
     });
 
-    it("should return no permissions", () => {
+    it("should return null user and no role", () => {
       const { result } = renderHook(() => usePermissions());
-      
+
       expect(result.current.user).toBeNull();
-      expect(result.current.userRoles).toEqual([]);
+      expect(result.current.userRole).toBeNull();
       expect(result.current.isAdmin).toBe(false);
       expect(result.current.permissions).toEqual([]);
     });
 
-    it("should not have any specific permissions", () => {
+    it("should deny all specific permission checks", () => {
       const { result } = renderHook(() => usePermissions());
-      
+
       expect(result.current.canTerminateEmployee()).toBe(false);
       expect(result.current.canRehireEmployee()).toBe(false);
+      expect(result.current.canProcessSettlement()).toBe(false);
+      expect(result.current.canViewResignedEmployees()).toBe(false);
+      expect(result.current.canViewSettlement()).toBe(false);
+      expect(result.current.canExportResignedList()).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Admin — role-based bypass (no explicit permissions array needed)
+  // ---------------------------------------------------------------------------
+  describe("when user is authenticated as admin", () => {
+    beforeEach(() => {
+      (useAuthStore as unknown as Mock).mockReturnValue({
+        user: { id: "1", name: "Admin", role: "admin" },
+      });
+    });
+
+    it("should identify user as admin with correct role", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.isAdmin).toBe(true);
+      expect(result.current.userRole).toBe("admin");
+    });
+
+    it("should grant all permission checks via admin bypass", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canTerminateEmployee()).toBe(true);
+      expect(result.current.canRehireEmployee()).toBe(true);
+      expect(result.current.canProcessSettlement()).toBe(true);
+      expect(result.current.canViewResignedEmployees()).toBe(true);
+      expect(result.current.canViewSettlement()).toBe(true);
+      expect(result.current.canExportResignedList()).toBe(true);
+    });
+
+    it("should return true for hasPermission on any valid permission", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.hasPermission("edit_employees")).toBe(true);
+      expect(result.current.hasPermission("approve_payroll")).toBe(true);
+      expect(result.current.hasPermission("manage_backups")).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Non-admin with explicit permissions array (staff / scoped user)
+  // ---------------------------------------------------------------------------
+  describe("when user is staff with edit_employees permission", () => {
+    beforeEach(() => {
+      (useAuthStore as unknown as Mock).mockReturnValue({
+        user: {
+          id: "2",
+          name: "Staff",
+          role: "staff",
+          permissions: ["view_employees", "edit_employees"],
+        },
+      });
+    });
+
+    it("should not be admin", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.isAdmin).toBe(false);
+      expect(result.current.userRole).toBe("staff");
+    });
+
+    it("should allow canTerminateEmployee and canRehireEmployee (require edit_employees)", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canTerminateEmployee()).toBe(true);
+      expect(result.current.canRehireEmployee()).toBe(true);
+      expect(result.current.canViewResignedEmployees()).toBe(true);
+      expect(result.current.canExportResignedList()).toBe(true);
+    });
+
+    it("should deny canProcessSettlement (requires approve_payroll)", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canProcessSettlement()).toBe(false);
+    });
+  });
+
+  describe("when user is staff with payroll permissions only", () => {
+    beforeEach(() => {
+      (useAuthStore as unknown as Mock).mockReturnValue({
+        user: {
+          id: "3",
+          name: "Payroll Staff",
+          role: "staff",
+          permissions: ["view_payroll", "approve_payroll"],
+        },
+      });
+    });
+
+    it("should allow settlement-related checks", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canProcessSettlement()).toBe(true);
+      expect(result.current.canViewSettlement()).toBe(true);
+    });
+
+    it("should deny employee-management checks", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canTerminateEmployee()).toBe(false);
+      expect(result.current.canRehireEmployee()).toBe(false);
+    });
+  });
+
+  describe("when user has no permissions array", () => {
+    beforeEach(() => {
+      (useAuthStore as unknown as Mock).mockReturnValue({
+        user: { id: "4", name: "Limited", role: "staff" },
+      });
+    });
+
+    it("should deny all specific permission checks gracefully", () => {
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.canTerminateEmployee()).toBe(false);
       expect(result.current.canProcessSettlement()).toBe(false);
       expect(result.current.canViewResignedEmployees()).toBe(false);
     });
   });
 
-  describe("when user is authenticated as admin", () => {
-    beforeEach(() => {
+  // ---------------------------------------------------------------------------
+  // hasPermission
+  // ---------------------------------------------------------------------------
+  describe("hasPermission", () => {
+    it("should return true when user has the exact permission", () => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "1", name: "Admin", role: "admin" },
-        hasAnyRole: () => true,
+        user: { id: "5", role: "staff", permissions: ["edit_employees"] },
       });
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.hasPermission("edit_employees")).toBe(true);
     });
 
-    it("should identify user as admin", () => {
+    it("should return false when user does not have the permission", () => {
+      (useAuthStore as unknown as Mock).mockReturnValue({
+        user: { id: "5", role: "staff", permissions: ["view_employees"] },
+      });
       const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.isAdmin).toBe(true);
-      expect(result.current.userRoles).toContain("admin");
-    });
 
-    it("should have all permissions", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canTerminateEmployee()).toBe(true);
-      expect(result.current.canRehireEmployee()).toBe(true);
-      expect(result.current.canProcessSettlement()).toBe(true);
-      expect(result.current.canViewResignedEmployees()).toBe(true);
-      expect(result.current.canExportResignedList()).toBe(true);
+      expect(result.current.hasPermission("approve_payroll")).toBe(false);
     });
   });
 
-  describe("when user is authenticated as HR manager", () => {
-    beforeEach(() => {
+  // ---------------------------------------------------------------------------
+  // hasAnyPermission
+  // ---------------------------------------------------------------------------
+  describe("hasAnyPermission", () => {
+    it("should return true when user has at least one of the permissions", () => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "2", name: "HR Manager", role: "hr_manager" },
-        hasAnyRole: () => true,
+        user: { id: "6", role: "staff", permissions: ["edit_employees"] },
       });
-    });
-
-    it("should not be admin", () => {
       const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.isAdmin).toBe(false);
-    });
 
-    it("should have termination and rehire permissions", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canTerminateEmployee()).toBe(true);
-      expect(result.current.canRehireEmployee()).toBe(true);
-      expect(result.current.canViewResignedEmployees()).toBe(true);
-    });
-
-    it("should not have settlement process permission", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canProcessSettlement()).toBe(false);
-    });
-  });
-
-  describe("when user is authenticated as accountant", () => {
-    beforeEach(() => {
-      (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "3", name: "Accountant", role: "accountant" },
-        hasAnyRole: () => true,
-      });
-    });
-
-    it("should not be admin", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.isAdmin).toBe(false);
-    });
-
-    it("should have settlement permissions", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canProcessSettlement()).toBe(true);
-      expect(result.current.canViewSettlement()).toBe(true);
-    });
-
-    it("should not have termination permission", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canTerminateEmployee()).toBe(false);
-    });
-
-    it("should not have rehire permission", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canRehireEmployee()).toBe(false);
-    });
-  });
-
-  describe("when user has multiple roles", () => {
-    beforeEach(() => {
-      (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "4", name: "Multi Role User", roles: ["hr_manager", "accountant"] },
-        hasAnyRole: () => true,
-      });
-    });
-
-    it("should combine permissions from all roles", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      // HR manager permissions
-      expect(result.current.canTerminateEmployee()).toBe(true);
-      expect(result.current.canRehireEmployee()).toBe(true);
-      
-      // Accountant permissions
-      expect(result.current.canProcessSettlement()).toBe(true);
-    });
-  });
-
-  describe("hasPermission function", () => {
-    beforeEach(() => {
-      (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "5", name: "Test User", role: "hr_manager" },
-        hasAnyRole: () => true,
-      });
-    });
-
-    it("should return true for granted permission", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.hasPermission("termination:create")).toBe(true);
-    });
-
-    it("should return false for denied permission", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.hasPermission("settlement:process")).toBe(false);
-    });
-  });
-
-  describe("hasAnyPermission function", () => {
-    beforeEach(() => {
-      (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "6", name: "Test User", role: "manager" },
-        hasAnyRole: () => true,
-      });
-    });
-
-    it("should return true when user has any of the permissions", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.hasAnyPermission(["termination:create", "settlement:process"])).toBe(true);
+      expect(result.current.hasAnyPermission(["edit_employees", "approve_payroll"])).toBe(true);
     });
 
     it("should return false when user has none of the permissions", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.hasAnyPermission(["rehire:process", "settlement:process"])).toBe(false);
-    });
-  });
-
-  describe("canPerform function", () => {
-    beforeEach(() => {
       (useAuthStore as unknown as Mock).mockReturnValue({
-        user: { id: "7", name: "Test User", role: "hr_manager" },
-        hasAnyRole: () => true,
+        user: { id: "6", role: "staff", permissions: ["view_inventory"] },
       });
+      const { result } = renderHook(() => usePermissions());
+
+      expect(result.current.hasAnyPermission(["edit_employees", "approve_payroll"])).toBe(false);
     });
 
-    it("should return true for permitted operation", () => {
+    it("should return false for unauthenticated user", () => {
+      (useAuthStore as unknown as Mock).mockReturnValue({ user: null });
       const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canPerform("terminate_employee")).toBe(true);
-      expect(result.current.canPerform("rehire_employee")).toBe(true);
-    });
 
-    it("should return false for non-permitted operation", () => {
-      const { result } = renderHook(() => usePermissions());
-      
-      expect(result.current.canPerform("process_financial_settlement")).toBe(false);
+      expect(result.current.hasAnyPermission(["view_employees"])).toBe(false);
     });
   });
 });

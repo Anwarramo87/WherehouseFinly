@@ -26,6 +26,10 @@ export default function ResignedEmployeesPage() {
   const [isRehirePending, setIsRehirePending] = useState(false);
   const [isSettlementPending, setIsSettlementPending] = useState(false);
   
+  // Hydration guard — defer client-only rendering until after mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
