@@ -19,12 +19,17 @@ export default function DashboardLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const setUser = useAuthStore((state) => state.setUser);
+  const setStatus = useAuthStore((state) => state.setStatus);
   const clear = useAuthStore((state) => state.clear);
   const user = useAuthStore((state) => state.user);
   const router = useRouter();
 
   useEffect(() => {
-    if (user?.permissions) return;
+    if (user?.permissions) {
+      // permissions already loaded — mark as authenticated immediately
+      setStatus("authenticated");
+      return;
+    }
     apiClient.get('/auth/me').then((res) => {
       const data = res.data as Record<string, unknown>;
       if (data && data.permissions) {
@@ -32,6 +37,7 @@ export default function DashboardLayout({
           ...(user ?? {}),
           ...(data as { id?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] }),
         });
+        setStatus("authenticated");
       }
     }).catch((err: unknown) => {
       if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
@@ -39,7 +45,7 @@ export default function DashboardLayout({
         router.replace('/login');
       }
     });
-  }, [user, setUser, clear, router]);
+  }, [user, setUser, setStatus, clear, router]);
 
   const toggleCollapse = useCallback(() => setIsCollapsed((v: boolean) => !v), []);
 

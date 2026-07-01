@@ -58,15 +58,11 @@ export const useDashboard = () => {
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard.home(),
     queryFn: async () => {
-      try {
-        const response = await apiClient.get("/dashboard/home");
-        return response.data ?? null;
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        return null;
-      }
+      const response = await apiClient.get("/dashboard/home");
+      return response.data ?? null;
     },
     staleTime: 60_000,
+    retry: 1,
   });
 
   const dashboard = dashboardQuery.data as {

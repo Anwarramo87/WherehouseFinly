@@ -37,7 +37,7 @@ import { useBonuses } from "@/hooks/useBonuses";
 import { Employee } from "@/types/employee";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
@@ -135,21 +135,34 @@ interface LateEmployeeDetail {
   avatar?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bonus display type (defined outside component to avoid re-creation on render)
+// ─────────────────────────────────────────────────────────────────────────────
+interface BonusDisplay {
+  id: string;
+  employeeId: string;
+  name: string;
+  department: string;
+  amount: number;
+  reason: string;
+  date: string;
+}
+
 type ModalType = "present" | "absent" | "late" | "overtime" | null;
 
 export default function DashboardPage() {
-  const { kpis, isLoading, presentEmployees, absentEmployees, lateEmployees, overtimeEmployees } =
+  const { kpis, isLoading: isDashboardLoading, presentEmployees, absentEmployees, lateEmployees, overtimeEmployees } =
     useDashboard();
   const { data: employees = [] } = useEmployees({
-    includeTerminated: true,
-    fetchAll: true,
+    fetchAll: false,
     limit: 500,
   });
   const userPermissions = useAuthStore((state) => state.user?.permissions);
   const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
 
-  const isSkeleton = isLoading;
+  // Show skeleton only while dashboard KPIs are loading — not waiting for employees list
+  const isSkeleton = isDashboardLoading;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -164,7 +177,7 @@ export default function DashboardPage() {
   >(null);
   const [isDeletingDept, setIsDeletingDept] = useState<string | null>(null);
 
-  const _toNumber = (value: unknown) => {
+  const _toNumber = useCallback((value: unknown): number => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
     if (
       value &&
@@ -180,25 +193,25 @@ export default function DashboardPage() {
       return Number.isFinite(parsed) ? parsed : 0;
     }
     return 0;
-  };
+  }, []);
 
-  const formatTime = (timestamp?: string | null): string => {
+  const formatTime = useCallback((timestamp?: string | null): string => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return "";
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  };
+  }, []);
 
-  const handleCardClick = (type: ModalType) => {
+  const handleCardClick = useCallback((type: ModalType) => {
     if (type === null) return;
     setActiveModal(type);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setActiveModal(null);
-  };
+  }, []);
 
-  const handleDeleteDepartment = async (deptId: string | undefined, count: number) => {
+  const handleDeleteDepartment = useCallback(async (deptId: string | undefined, count: number) => {
     if (!deptId || count > 0) return;
     if (!window.confirm("هل أنت متأكد من نقل هذا القسم إلى سلة المهملات؟")) return;
     setIsDeletingDept(deptId);
@@ -210,9 +223,9 @@ export default function DashboardPage() {
     } finally {
       setIsDeletingDept(null);
     }
-  };
+  }, [queryClient]);
 
-  const handleEditDepartment = (dept: DepartmentData) => {
+  const handleEditDepartment = useCallback((dept: DepartmentData) => {
     setEditingDeptData({
       id: dept.id,
       name: dept.name,
@@ -222,7 +235,7 @@ export default function DashboardPage() {
     });
     setDeptMenuOpen(null);
     setIsDeptModalOpen(true);
-  };
+  }, []);
 
   const monthKey = useMemo(() => {
     const now = new Date();
@@ -306,16 +319,6 @@ export default function DashboardPage() {
       .filter((item): item is EmployeePenalty => Boolean(item));
   }, [penaltiesData, employeeListMemo, monthKey]);
 
-  interface BonusDisplay {
-    id: string;
-    employeeId: string;
-    name: string;
-    department: string;
-    amount: number;
-    reason: string;
-    date: string;
-  }
-
   const monthlyBonuses = useMemo<BonusDisplay[]>(() => {
     const records = Array.isArray(bonusesData) ? bonusesData : [];
     return records
@@ -358,7 +361,7 @@ export default function DashboardPage() {
     }));
   }, [deptsData]);
 
-  const stats = [
+  const stats = useMemo(() => [
     {
       title: "إجمالي الموظفين",
       value: kpis.totalEmployees,
@@ -406,7 +409,7 @@ export default function DashboardPage() {
       clickable: true,
       onClick: () => handleCardClick("overtime"),
     },
-  ];
+  ], [kpis, router, handleCardClick]);
 
   // const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
 

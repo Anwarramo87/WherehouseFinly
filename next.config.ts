@@ -41,6 +41,9 @@ const nextConfig: NextConfig = {
     removeConsole: isProduction,
   },
 
+  // silence workspace-root detection warning caused by multiple lockfiles
+  outputFileTracingRoot: require("path").join(__dirname),
+
   // تحسين أداء بيئة التطوير وتقليل استهلاك الـ RAM
   experimental: {
     optimizePackageImports: [
@@ -103,28 +106,31 @@ const nextConfig: NextConfig = {
             : []),
         ],
       },
-      {
-        // Cache للملفات الثابتة فقط (_next/static)
-        source: "/_next/static/:path*",
-        locale: false,
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      {
-        // منع Cache للصفحات الديناميكية
-        source: "/((?!_next/static).*)",
-        locale: false,
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
-          },
-        ],
-      },
+      // Static asset caching — production only to avoid breaking Next.js dev HMR
+      ...(isProduction
+        ? [
+            {
+              source: "/_next/static/:path*",
+              locale: false as const,
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "public, max-age=31536000, immutable",
+                },
+              ],
+            },
+            {
+              source: "/((?!_next/static).*)",
+              locale: false as const,
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "no-store, no-cache, must-revalidate, proxy-revalidate",
+                },
+              ],
+            },
+          ]
+        : []),
     ];
   },
 };

@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { Advance, AdvanceInput } from "@/types/advance";
@@ -9,7 +8,6 @@ import { queryKeys } from "@/lib/query-keys";
 
 export const useAdvances = (employeeId?: string, period?: string, enabled = true) => {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   const currentPeriod = new Date().toISOString().slice(0, 7);
   const isPastPeriod = period ? period < currentPeriod : false;
@@ -41,7 +39,6 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
-      router.refresh();
       toast.success("تمت إضافة السلفة بنجاح");
     },
     onError: (error: unknown) => {
@@ -64,7 +61,6 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
-      router.refresh();
       toast.success("تم تحديث السلفة");
     },
     onError: (error: unknown) => {
@@ -80,7 +76,6 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
       await queryClient.invalidateQueries({ queryKey: queryKeys.advances.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.discounts.all, exact: false });
       await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
-      router.refresh();
       toast.success("تم نقل السلفة إلى سلة المهملات");
     },
     onError: (error: unknown) => {
