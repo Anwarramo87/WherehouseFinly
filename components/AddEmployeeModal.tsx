@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -43,14 +43,14 @@ const asText = (value: unknown) => {
   return String(value);
 };
 
-// ØªÙ†Ø³ÙŠÙ‚ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… Ù…Ø¹ ÙÙˆØ§ØµÙ„ Ø§Ù„Ø¢Ù„Ø§Ù
+// تنسيق الأرقام مع فواصل الآلاف
 const formatNumberWithCommas = (val: string) => {
   if (!val) return "";
   const numericOnly = val.replace(/\D/g, "");
   return numericOnly.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
-// Ø¥Ø²Ø§Ù„Ø© Ø§Ù„ÙÙˆØ§ØµÙ„ Ù‚Ø¨Ù„ Ø§Ù„Ø¥Ø±Ø³Ø§Ù„ Ù„Ù„Ø³ÙŠØ±ÙØ±
+// إزالة الفواصل قبل الإرسال للسيرفر
 const removeCommas = (val: string) => {
   return val.replace(/,/g, "");
 };
@@ -96,7 +96,7 @@ const defaultFormState = {
   birthDate: "",
   gender: "male",
   jobTitle: "",
-  department: "Ù‚Ø³Ù… Ø§Ù„Ù‚Øµ",
+  department: "قسم القص",
   baseSalary: "",
   lumpSumSalary: "",
   livingAllowance: "",
@@ -119,7 +119,7 @@ export default function AddEmployeeModal({
   const [mobileError, setMobileError] = useState("");
   const [idError] = useState(() => {
     if (!initialData && existingIds.includes(nextSuggestedId)) {
-      return "ÙƒÙˆØ¯ Ø§Ù„Ù…ÙˆØ¸Ù Ù‡Ø°Ø§ Ù…ÙØ³ØªÙŽØ®Ø¯Ù… Ù…Ø³Ø¨Ù‚Ø§Ù‹. Ù„Ù† ÙŠØªÙ… Ø­ÙØ¸ Ø§Ù„Ù…ÙˆØ¸Ù Ø¨Ù‡Ø°Ø§ Ø§Ù„ÙƒÙˆØ¯.";
+      return "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود.";
     }
     return "";
   });
@@ -136,13 +136,13 @@ export default function AddEmployeeModal({
         return {
           employeeId: employee.employeeId || "",
           name: employee.name || "",
-          // ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¯Ù…Ø¬ Ù„ÙŠØ¹ÙˆØ¯ Ù„Ø£Ø®Ø° Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ø£ÙˆÙ„ ÙÙ‚Ø·
+          // تم إلغاء الدمج ليعود لأخذ الاسم الأول فقط
           username: employee.username || employee.name?.split(" ")[0] || "",
           mobile: employee.mobile || "",
           birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
           gender: employee.gender || "male",
           jobTitle: employee.jobTitle || employee.profession || "",
-          department: employee.department || "Ù‚Ø³Ù… Ø§Ù„Ù‚Øµ",
+          department: employee.department || "قسم القص",
           baseSalary: formatNumberWithCommas(asText(employee.baseSalary || "")),
           lumpSumSalary: asText(employee.lumpSumSalary || ""),
           livingAllowance: formatNumberWithCommas(asText(employee.livingAllowance || "")),
@@ -184,7 +184,7 @@ export default function AddEmployeeModal({
   const validateMobile = (number: string) => {
     const isValid = /^09[0-9]{8}$/.test(number);
     if (!isValid) {
-      setMobileError("ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø§Ù„Ø±Ù‚Ù… Ø³ÙˆØ±ÙŠ (10 Ø£Ø±Ù‚Ø§Ù… ÙˆÙŠØ¨Ø¯Ø£ Ø¨Ù€ 09)");
+      setMobileError("يجب أن يكون الرقم سوري (10 أرقام ويبدأ بـ 09)");
       return false;
     }
     setMobileError("");
@@ -202,7 +202,7 @@ export default function AddEmployeeModal({
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
 
-    // ØªÙ… Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ù†Ø·Ù‚ Ø§Ù„Ù‚Ø¯ÙŠÙ…: ØªØ¹Ø¨Ø¦Ø© Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø¨Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ø£ÙˆÙ„ ÙÙ‚Ø·
+    // تم إعادة المنطق القديم: تعبئة اسم المستخدم بالاسم الأول فقط
     if (!isUsernameManuallyEdited) {
       const firstName = newName.trim().split(" ")[0] || "";
       setFormData({ ...formData, name: newName, username: firstName });
@@ -223,15 +223,15 @@ export default function AddEmployeeModal({
     if (step === 1) {
       if (!validateMobile(formData.mobile)) return;
 
-      // ðŸŒŸ Ø§Ù„Ø­Ù…Ø§ÙŠØ© Ù…Ù† Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ: Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„ØªØ§Ø±ÙŠØ® ÙˆØ§Ù„Ø¹Ù…Ø± (10 Ø³Ù†ÙˆØ§Øª) ðŸŒŸ
+      // 🌟 الحماية من الكود الحالي: التحقق من التاريخ والعمر (10 سنوات) 🌟
       if (!formData.birthDate || formData.birthDate.length !== 10) {
-        toast.error("Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø§Ø®ØªÙŠØ§Ø± ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯ Ø¨Ø´ÙƒÙ„ ØµØ­ÙŠØ­");
+        toast.error("الرجاء اختيار تاريخ الميلاد بشكل صحيح");
         return;
       }
 
       const birthDateObj = new Date(formData.birthDate);
       if (isNaN(birthDateObj.getTime())) {
-        toast.error("Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø§Ø®ØªÙŠØ§Ø± ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯ Ø¨Ø´ÙƒÙ„ ØµØ­ÙŠØ­");
+        toast.error("الرجاء اختيار تاريخ الميلاد بشكل صحيح");
         return;
       }
 
@@ -244,18 +244,18 @@ export default function AddEmployeeModal({
         monthDifference < 0 ||
         (monthDifference === 0 && today.getDate() < birthDateObj.getDate())
       ) {
-        age--; // Ø·Ø±Ø­ Ø³Ù†Ø© Ø¥Ø°Ø§ Ù„Ù… ÙŠØ£ØªÙ Ø´Ù‡Ø±/ÙŠÙˆÙ… Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯ Ø¨Ø¹Ø¯ ÙÙŠ Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©
+        age--; // طرح سنة إذا لم يأتِ شهر/يوم الميلاد بعد في السنة الحالية
       }
 
       if (age < 10) {
-        toast.error("Ø¹Ù…Ø± Ø§Ù„Ù…ÙˆØ¸Ù ÙŠØ¬Ø¨ Ø£Ù† Ù„Ø§ ÙŠÙ‚Ù„ Ø¹Ù† 10 Ø³Ù†ÙˆØ§Øª. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯.");
-        return; // Ù†Ù…Ù†Ø¹ Ø§Ù„Ø§Ù†ØªÙ‚Ø§Ù„ Ù„Ù„Ø®Ø·ÙˆØ© Ø§Ù„ØªØ§Ù„ÙŠØ©
+        toast.error("عمر الموظف يجب أن لا يقل عن 10 سنوات. يرجى التأكد من تاريخ الميلاد.");
+        return; // نمنع الانتقال للخطوة التالية
       }
 
       setStep(2);
     } else {
       if (!resolvedRoleId) {
-        setRoleError("ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¯ÙˆØ± Ø§Ù„ÙˆØ¸ÙŠÙÙŠ");
+        setRoleError("يجب اختيار الدور الوظيفي");
         return;
       }
 
@@ -274,7 +274,7 @@ export default function AddEmployeeModal({
   return createPortal(
     <div
       className="fixed inset-0 bg-[#101720]/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all duration-300"
-      style={{zIndex: 9998}} // ðŸŒŸ Ø­Ù…Ø§ÙŠØ© Ø§Ù„Ù€ Pop-up Ù…Ù† Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ
+      style={{zIndex: 9998}} // 🌟 حماية الـ Pop-up من الكود الحالي
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 border border-white/5 outline-dashed outline-1 outline-[#C89355]/20 outline-offset-[-6px]">
@@ -285,7 +285,7 @@ export default function AddEmployeeModal({
               <UserCog className="text-[#C89355]" size={24} />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
-              {initialData ? "ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…ÙˆØ¸Ù" : "Ø¥Ø¶Ø§ÙØ© Ù…ÙˆØ¸Ù Ø¬Ø¯ÙŠØ¯"}
+              {initialData ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}
             </h2>
           </div>
           <button
@@ -311,12 +311,12 @@ export default function AddEmployeeModal({
             <span
               className={`transition-colors duration-300 ${step >= 1 ? "text-[#C89355]" : "text-slate-500"}`}
             >
-              Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø®ØµÙŠØ©
+              البيانات الشخصية
             </span>
             <span
               className={`transition-colors duration-300 ${step === 2 ? "text-[#C89355]" : "text-slate-500"}`}
             >
-              Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ÙˆØ¸ÙŠÙÙŠØ© ÙˆØ§Ù„Ù…Ø§Ù„ÙŠØ©
+              البيانات الوظيفية والمالية
             </span>
           </div>
         </div>
@@ -328,19 +328,19 @@ export default function AddEmployeeModal({
             onSubmit={handleFormSubmit}
             className="grid grid-cols-1 md:grid-cols-2 gap-5 text-right relative z-10"
           >
-            {/* â”€â”€â”€ Ø§Ù„Ø®Ø·ÙˆØ© Ø§Ù„Ø£ÙˆÙ„Ù‰: Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø®ØµÙŠØ© â”€â”€â”€ */}
+            {/* ─── الخطوة الأولى: البيانات الشخصية ─── */}
             <div
               className={`col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 transition-all duration-500 ${step === 1 ? "block animate-in slide-in-from-right-8" : "hidden"}`}
             >
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
-                  Ø§Ø³Ù… Ø§Ù„Ù…ÙˆØ¸Ù Ø§Ù„Ø«Ù„Ø§Ø«ÙŠ
+                  اسم الموظف الثلاثي
                 </label>
                 <div className="relative group">
                   <input
                     type="text"
                     required
-                    placeholder="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ø«Ù„Ø§Ø«ÙŠ"
+                    placeholder="أدخل الاسم الثلاثي"
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-12 placeholder:text-slate-500"
                     value={formData.name}
                     onChange={handleNameChange}
@@ -353,7 +353,7 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">Ø±Ù‚Ù… Ø§Ù„Ù…ÙˆØ¨Ø§ÙŠÙ„</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">رقم الموبايل</label>
                 <div className="relative group">
                   <input
                     type="tel"
@@ -380,11 +380,11 @@ export default function AddEmployeeModal({
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
-                  ÙƒÙˆØ¯ Ø§Ù„Ù…ÙˆØ¸Ù (ID)
+                  كود الموظف (ID)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ù…Ø«Ø§Ù„: EMP001"
+                  placeholder="مثال: EMP001"
                   required
                   pattern="^EMP[0-9]{3,}$"
                   readOnly
@@ -401,11 +401,11 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">Ù…ÙƒØ§Ù† Ø§Ù„Ø¥Ù‚Ø§Ù…Ø©</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">مكان الإقامة</label>
                 <div className="relative group">
                   <input
                     type="text"
-                    placeholder="Ù…Ø«Ø§Ù„: Ø¯ÙˆÙ…Ø§ØŒ Ø¯Ù…Ø´Ù‚"
+                    placeholder="مثال: دوما، دمشق"
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500"
                     value={formData.residence}
                     onChange={(e) => setFormData({ ...formData, residence: e.target.value })}
@@ -414,7 +414,7 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">اسم المستخدم</label>
                 <div className="relative group">
                   <input
                     type="text"
@@ -424,7 +424,7 @@ export default function AddEmployeeModal({
                       setIsUsernameManuallyEdited(true);
                       setFormData({ ...formData, username: e.target.value });
                     }}
-                    placeholder="Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ¹Ø§Ø± Ù„Ù„Ù†Ø¸Ø§Ù…"
+                    placeholder="الاسم المستعار للنظام"
                   />
                   <UserCircle
                     className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors"
@@ -433,9 +433,9 @@ export default function AddEmployeeModal({
                 </div>
               </div>
 
-              {/* ðŸŒŸ Ø­Ù‚Ù„ ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯ Ø¨Ø§Ù„ØªØµÙ…ÙŠÙ… Ø§Ù„Ø¯Ø§ÙƒÙ† Ø§Ù„Ø³Ù„ÙŠÙ… Ù…Ù† Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ ðŸŒŸ */}
+              {/* 🌟 حقل تاريخ الميلاد بالتصميم الداكن السليم من الكود الحالي 🌟 */}
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙŠÙ„Ø§Ø¯</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>
                 <div className="relative group">
                   <input
                     type="date"
@@ -453,7 +453,7 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">Ø§Ù„Ø¬Ù†Ø³</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">الجنس</label>
                 <div className="relative group">
                   <select
                     required
@@ -461,8 +461,8 @@ export default function AddEmployeeModal({
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                   >
-                    <option value="male">Ø°ÙƒØ±</option>
-                    <option value="female">Ø£Ù†Ø«Ù‰</option>
+                    <option value="male">ذكر</option>
+                    <option value="female">أنثى</option>
                   </select>
                   <Users
                     className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none"
@@ -472,13 +472,13 @@ export default function AddEmployeeModal({
               </div>
             </div>
 
-            {/* â”€â”€â”€ Ø§Ù„Ø®Ø·ÙˆØ© Ø§Ù„Ø«Ø§Ù†ÙŠØ©: Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ÙˆØ¸ÙŠÙÙŠØ© ÙˆØ§Ù„Ù…Ø§Ù„ÙŠØ© â”€â”€â”€ */}
+            {/* ─── الخطوة الثانية: البيانات الوظيفية والمالية ─── */}
             <div
               className={`col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 transition-all duration-500 ${step === 2 ? "block animate-in slide-in-from-left-8" : "hidden"}`}
             >
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
-                  Ø§Ù„Ù‚Ø³Ù… Ø§Ù„ØªØ§Ø¨Ø¹ Ù„Ù‡
+                  القسم التابع له
                 </label>
                 <select
                   className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
@@ -496,7 +496,7 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">Ø§Ù„Ø¯ÙˆØ± Ø§Ù„ÙˆØ¸ÙŠÙÙŠ</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">الدور الوظيفي</label>
                 {roleOptions.length > 0 ? (
                   <select
                     required={step === 2}
@@ -517,7 +517,7 @@ export default function AddEmployeeModal({
                   <input
                     type="text"
                     required={step === 2}
-                    placeholder="Ø£Ø¯Ø®Ù„ Role ID"
+                    placeholder="أدخل Role ID"
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
                     value={formData.roleId}
                     onChange={(e) => {
@@ -527,20 +527,20 @@ export default function AddEmployeeModal({
                   />
                 )}
                 {rolesLoading && (
-                  <p className="text-xs text-slate-400 font-semibold mt-1">Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø£Ø¯ÙˆØ§Ø±...</p>
+                  <p className="text-xs text-slate-400 font-semibold mt-1">جاري تحميل الأدوار...</p>
                 )}
                 {roleError && <p className="text-xs text-rose-400 font-bold mt-1.5">{roleError}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
-                  Ø§Ù„Ù…Ø³Ù…Ù‰ Ø§Ù„ÙˆØ¸ÙŠÙÙŠ
+                  المسمى الوظيفي
                 </label>
                 <div className="relative group">
                   <input
                     type="text"
                     required={step === 2}
-                    placeholder="Ù…Ø«Ø§Ù„: Ø­ÙˆÙŠØµØŒ Ø®ÙŠØ§Ø·ØŒ ÙƒÙˆØ§Ø¡..."
+                    placeholder="مثال: حويص، خياط، كواء..."
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner pr-11 placeholder:text-slate-500"
                     value={formData.jobTitle}
                     onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
@@ -555,7 +555,7 @@ export default function AddEmployeeModal({
               <div className="md:col-span-2 bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner mt-2">
                 <div className="flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
                   <Coins size={22} className="text-[#C89355]" />
-                  <span className="text-base font-bold text-white">Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø±Ø§ØªØ¨</span>
+                  <span className="text-base font-bold text-white">معلومات الراتب</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -564,7 +564,7 @@ export default function AddEmployeeModal({
                       htmlFor="baseSalary"
                       className="block text-xs font-bold text-[#C89355] mb-2"
                     >
-                      Ø§Ù„Ø±Ø§ØªØ¨ Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ (Ù„.Ø³)
+                      الراتب الأساسي (ل.س)
                     </label>
                     <input
                       id="baseSalary"
@@ -587,7 +587,7 @@ export default function AddEmployeeModal({
                       htmlFor="livingAllowance"
                       className="block text-xs font-bold text-[#C89355] mb-2"
                     >
-                      Ø¨Ø¯Ù„ ØºÙ„Ø§Ø¡ Ø§Ù„Ù…Ø¹ÙŠØ´Ø© (Ù„.Ø³)
+                      بدل غلاء المعيشة (ل.س)
                     </label>
                     <input
                       id="livingAllowance"
@@ -607,17 +607,17 @@ export default function AddEmployeeModal({
                 </div>
 
                 <p className="text-xs text-slate-500 mt-4 font-semibold">
-                  ðŸ’¡ ÙŠÙ…ÙƒÙ†Ùƒ ØªØ±Ùƒ Ø§Ù„Ø­Ù‚ÙˆÙ„ ÙØ§Ø±ØºØ© Ø¥Ø°Ø§ Ù„Ù… ØªÙƒÙ† Ù…Ø·Ù„ÙˆØ¨Ø© (Ø³ÙŠØªÙ… Ø­ÙØ¸Ù‡Ø§ ÙƒÙ‚ÙŠÙ…Ø© 0)
+                  💡 يمكنك ترك الحقول فارغة إذا لم تكن مطلوبة (سيتم حفظها كقيمة 0)
                 </p>
               </div>
 
               <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-6 shadow-inner">
                 <div className="col-span-2 flex items-center gap-2 border-b border-white/5 pb-4">
                   <CalendarDays size={22} className="text-[#C89355]" />
-                  <span className="text-base font-bold text-white">Ø£ÙˆÙ‚Ø§Øª Ø§Ù„Ø¯ÙˆØ§Ù… Ø§Ù„Ù…Ø¬Ø¯ÙˆÙ„Ø©</span>
+                  <span className="text-base font-bold text-white">أوقات الدوام المجدولة</span>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#C89355] mb-2">ÙˆÙ‚Øª Ø§Ù„Ø­Ø¶ÙˆØ±</label>
+                  <label className="block text-xs font-bold text-[#C89355] mb-2">وقت الحضور</label>
                   <input
                     type="time"
                     required={step === 2}
@@ -629,7 +629,7 @@ export default function AddEmployeeModal({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#C89355] mb-2">
-                    ÙˆÙ‚Øª Ø§Ù„Ø§Ù†ØµØ±Ø§Ù
+                    وقت الانصراف
                   </label>
                   <input
                     type="time"
@@ -653,7 +653,7 @@ export default function AddEmployeeModal({
               onClick={onClose}
               className="px-6 sm:px-8 py-3 rounded-xl font-bold text-slate-300 bg-[#263544] hover:bg-[#324559] hover:text-white border border-transparent active:scale-95 transition-all text-sm sm:text-base"
             >
-              Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¥Ø¶Ø§ÙØ©
+              إلغاء الإضافة
             </button>
           ) : (
             <button
@@ -661,7 +661,7 @@ export default function AddEmployeeModal({
               onClick={() => setStep(1)}
               className="px-6 sm:px-8 py-3 rounded-xl font-bold text-slate-300 bg-[#263544] border border-transparent hover:bg-[#324559] hover:text-white active:scale-95 transition-all flex items-center gap-2 text-sm sm:text-base shadow-sm"
             >
-              <ChevronRight size={18} /> Ø§Ù„Ø³Ø§Ø¨Ù‚
+              <ChevronRight size={18} /> السابق
             </button>
           )}
 
@@ -673,15 +673,15 @@ export default function AddEmployeeModal({
           >
             {step === 1 ? (
               <>
-                Ù…ØªØ§Ø¨Ø¹Ø© <ChevronLeft size={18} />
+                متابعة <ChevronLeft size={18} />
               </>
             ) : isPending ? (
               <>
-                <Loader2 className="animate-spin" size={20} /> Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø­ÙØ¸...
+                <Loader2 className="animate-spin" size={20} /> جاري الحفظ...
               </>
             ) : (
               <>
-                <Save size={20} /> Ø­ÙØ¸ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…ÙˆØ¸Ù
+                <Save size={20} /> حفظ بيانات الموظف
               </>
             )}
           </button>

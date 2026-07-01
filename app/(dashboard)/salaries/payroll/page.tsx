@@ -290,6 +290,9 @@ export default function PayrollPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPayslip, setSelectedPayslip] = useState<AggregatedPayroll | null>(null);
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
+  // Hydration guard — prevents server/client mismatch on loading state
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
 
   const { calculatePayroll } = usePayroll();
 
@@ -472,10 +475,6 @@ export default function PayrollPage() {
   const previewData = useMemo<AggregatedPayroll[]>(() => {
     // Generate preview data from active employees when no report exists
     // Dual-safeguard: (1) status must be 'active', (2) not in resigned/terminated set
-    console.log("[Payroll-Preview] Total bonuses fetched:", bonuses.length, "for month:", month);
-    if (bonuses.length > 0) {
-      console.log("[Payroll-Preview] Sample bonus:", bonuses[0]);
-    }
     return employees
       .filter((e) => e.status === "active" && !resignedEmployeeIds.has(e.employeeId))
       .map((emp) => {
@@ -573,20 +572,15 @@ export default function PayrollPage() {
         );
         earnedSalary = Math.max(0, rawEarned - insuranceAmount);
 
-        // Bonuses - filter by employee and calculate total
-        const employeeBonuses = bonuses.filter((b) => b.employeeId === employeeId);
+        // Bonuses - filter by employee, exclude permanent salary raises (already in baseSalary)
+        const employeeBonuses = bonuses.filter(
+          (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب"
+        );
         const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
           const bonusAmt = toNumber(bonus.bonusAmount);
           const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
           return sum + bonusAmt + assistAmt;
         }, 0);
-
-        // Debug logging for bonuses
-        if (employeeBonuses.length > 0) {
-          console.log(
-            `[Payroll-Preview] Employee ${employeeName} (${employeeId}) has ${employeeBonuses.length} bonus(es), total: ${variableEarnings}`,
-          );
-        }
 
         // Deductions — only advances (kind='advance') from discounts + penalties
         const employeeAdvances = discounts.filter((d) => {
@@ -660,10 +654,6 @@ export default function PayrollPage() {
 
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
     // If we have a payroll run, use backend data — but EXCLUDE resigned/terminated employees
-    console.log("[Payroll-Backend] Total bonuses fetched:", bonuses.length, "for month:", month);
-    if (bonuses.length > 0) {
-      console.log("[Payroll-Backend] Sample bonus:", bonuses[0]);
-    }
     const backendPayrollItems = reportData?.items || [];
     const filteredBackendPayrollItems = backendPayrollItems.filter((backendItem: PayrollItem) =>
       !resignedEmployeeIds.has(backendItem.employeeId)
@@ -779,19 +769,15 @@ export default function PayrollPage() {
           earnedSalary = Math.max(0, rawEarned - insuranceAmount);
         }
 
-        const employeeBonuses = bonuses.filter((b) => b.employeeId === employeeId);
+        // Bonuses - filter by employee, exclude permanent salary raises (already in baseSalary)
+        const employeeBonuses = bonuses.filter(
+          (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب"
+        );
         const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
           const bonusAmt = toNumber(bonus.bonusAmount);
           const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
           return sum + bonusAmt + assistAmt;
         }, 0);
-
-        // Debug logging for bonuses
-        if (employeeBonuses.length > 0) {
-          console.log(
-            `[Payroll-Backend] Employee ${employeeName} (${employeeId}) has ${employeeBonuses.length} bonus(es), total: ${variableEarnings}`,
-          );
-        }
 
         // Deductions — only advances (kind='advance') + penalties
         const employeeAdvancesDisc = discounts.filter((d) => {
@@ -984,26 +970,17 @@ export default function PayrollPage() {
   /** True when the report endpoint responded but no payroll run exists for this month. */
   const hasNoPayrollRun = !reportLoading && (!reportData?.items || reportData.items.length === 0);
 
+  // Show inline spinner when data is loading — rendered inside the same root
+  // wrapper to avoid SSR/client hydration mismatch (never return a different root element)
+  const showSpinner = !mounted || isLoading;
+
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  if (isLoading) {
-    return (
-      <div className="relative min-h-[85vh] w-full flex items-center justify-center animate-in fade-in duration-500">
-        <div className="flex flex-col items-center gap-4 relative z-10 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
-          <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
-          <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">
-            جاري تجميع بيانات الرواتب...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
-      className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
+      className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden"
       dir="rtl"
     >
       {/* grid watermark */}
@@ -1015,6 +992,16 @@ export default function PayrollPage() {
         }}
       />
 
+      {showSpinner ? (
+        <div className="flex-1 flex items-center justify-center p-16">
+          <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
+            <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
+            <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">
+              جاري تجميع بيانات الرواتب...
+            </p>
+          </div>
+        </div>
+      ) : (
       <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
         {/* ── Breadcrumb ──────────────────────────────────────────────────────── */}
         <nav className="mb-6 relative overflow-hidden flex items-center gap-2 text-xs font-black text-slate-500 bg-white/60 backdrop-blur-xl w-fit px-4 py-2.5 rounded-2xl border border-white/80 shadow-[0_5px_15px_rgba(38,53,68,0.05)] group">
@@ -1374,19 +1361,18 @@ export default function PayrollPage() {
           </div>
         )}
       </div>
+      )}
 
+      {/* Modals — outside the loading ternary, always rendered inside outer wrapper */}
       <RunPayrollModal
         isOpen={isPayrollModalOpen}
         onClose={() => setPayrollModalOpen(false)}
         isPending={calculatePayroll.isPending}
         initialMonth={month}
         onRun={async (payload) => {
-          console.log('[Payroll] Submitting payload:', payload);
           calculatePayroll.mutate(payload, {
             onSuccess: () => {
-              // Extract month from periodStart and switch to it
-              const calculatedMonth = payload.periodStart.slice(0, 7); // YYYY-MM
-              console.log('[Payroll] Success! Switching to month:', calculatedMonth);
+              const calculatedMonth = payload.periodStart.slice(0, 7);
               setMonth(calculatedMonth);
               router.push(`/salaries/payroll?period=${calculatedMonth}`);
               setPayrollModalOpen(false);
@@ -1394,13 +1380,10 @@ export default function PayrollPage() {
             },
             onError: (error) => {
               console.error('[Payroll] Calculation failed:', error);
-              // Don't close modal or change month on error
             }
           });
         }}
       />
-
-      {/* ─── Payslip Modal ────────────────────────────────────────────────────── */}
       {selectedPayslip && (
         <PayslipModal
           payslip={selectedPayslip}

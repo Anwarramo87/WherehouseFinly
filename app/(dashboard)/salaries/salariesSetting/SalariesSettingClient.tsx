@@ -8,9 +8,11 @@ import useSalaries from "@/hooks/useSalaries";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
-import type { Advance } from "@/types/advance";
-import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import apiClient from "@/lib/api-client";
+import type { Advance } from "@/types/advance";
+import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft, TrendingUp, X } from "lucide-react";
 import type { Salary } from "@/types/salary";
 import type { Employee } from "@/types/employee";
 import type { Bonus } from "@/types/bonus";
@@ -72,15 +74,46 @@ export default function SalariesSettingClient() {
   const activeTab = getTabFromQuery(requestedTab);
 
   const { data: salaries = [], isLoading, isError, error, updateSalary, deleteSalary } = useSalaries();
-  
   const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees({ limit: 200, status: "active", fetchAll: false });
-  
   const { data: resignedEmployees = [] } = useResignedEmployees();
-  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);  
+  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   const { data: advances = [] } = useAdvances();
+  const queryClient = useQueryClient();
 
   const period = useMemo(() => getLocalMonth(), []);
   const { data: bonuses = [] } = useBonuses({ period });
+
+  // ── Bulk Raise Modal state ──
+  const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
+  const [raiseAmount, setRaiseAmount] = useState("");
+  const [raiseNotes, setRaiseNotes] = useState("");
+  const [isRaisePending, setIsRaisePending] = useState(false);
+
+  const handleBulkRaise = async () => {
+    const amount = Number(raiseAmount.replace(/,/g, ""));
+    if (!amount || amount <= 0) {
+      toast.error("أدخل مبلغ صحيح أكبر من صفر");
+      return;
+    }
+    setIsRaisePending(true);
+    try {
+      const res = await apiClient.post("/salary/bulk-raise", {
+        amount,
+        notes: raiseNotes || "زيادة عامة في الرواتب",
+      });
+      const data = res.data as { updated?: number; message?: string };
+      await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success(data.message ?? `تمت الزيادة لـ ${data.updated ?? 0} موظف`);
+      setIsRaiseModalOpen(false);
+      setRaiseAmount("");
+      setRaiseNotes("");
+    } catch {
+      toast.error("حدث خطأ أثناء تطبيق الزيادة");
+    } finally {
+      setIsRaisePending(false);
+    }
+  };
 
   const employeeNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -232,13 +265,24 @@ export default function SalariesSettingClient() {
 
             {/* Smart Header Button */}
             {actionButtonConfig && (
-              <button
-                onClick={openFloatingAction}
-                className="bg-[#1a2530] text-[#C89355] hover:bg-[#263544] px-5 py-3 rounded-2xl font-black flex items-center gap-2 transition-all shadow-[0_8px_30px_rgba(38,53,68,0.1)] border border-[#C89355]/30 hover:scale-105"
-              >
-                {actionButtonConfig.icon}
-                <span>{actionButtonConfig.text}</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {activeTab === "salary-config" && (
+                  <button
+                    onClick={() => setIsRaiseModalOpen(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black flex items-center gap-2 transition-all shadow-[0_8px_30px_rgba(16,185,129,0.2)] border border-emerald-500/30 hover:scale-105"
+                  >
+                    <TrendingUp size={18} />
+                    <span>زيادة عامة في الرواتب</span>
+                  </button>
+                )}
+                <button
+                  onClick={openFloatingAction}
+                  className="bg-[#1a2530] text-[#C89355] hover:bg-[#263544] px-5 py-3 rounded-2xl font-black flex items-center gap-2 transition-all shadow-[0_8px_30px_rgba(38,53,68,0.1)] border border-[#C89355]/30 hover:scale-105"
+                >
+                  {actionButtonConfig.icon}
+                  <span>{actionButtonConfig.text}</span>
+                </button>
+              </div>
             )}
           </header>
 
@@ -385,6 +429,83 @@ allIds.map((id: string) => {
       {isModalOpen && <ManageSalaryModal key={`${isModalOpen}-${selected?.employeeId ?? preselectedEmployeeId ?? "new"}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={selected} preselectedEmployeeId={preselectedEmployeeId} employees={employees} isPending={updateSalary.isPending} onSave={handleSave} allSalariesMap={salaryMap} />}
       {isAdvanceModalOpen && <AddAdvanceModal isOpen={isAdvanceModalOpen} onClose={() => setIsAdvanceModalOpen(false)} employees={employeesForFinanceModals} isPending={false} onSave={() => { }} />}
       {isBonusModalOpen && <AddBonusModal isOpen={isBonusModalOpen} onClose={() => setIsBonusModalOpen(false)} employees={employees} salaries={salaries} isPending={false} onSave={() => { }} />}
+
+      {/* ── Bulk Raise Modal ── */}
+      {isRaiseModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" dir="rtl">
+          <div className="bg-[#101720] rounded-[2rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.6)] w-full max-w-md border border-white/10 outline-dashed outline-1 outline-emerald-500/30 outline-offset-[-6px] animate-in fade-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
+                  <TrendingUp className="text-emerald-500" size={22} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white">زيادة عامة في الرواتب</h2>
+                  <p className="text-xs text-slate-400 font-bold mt-0.5">تُضاف على الراتب الأساسي لكل الموظفين بشكل دائم</p>
+                </div>
+              </div>
+              <button onClick={() => setIsRaiseModalOpen(false)} className="text-slate-500 hover:text-rose-400 bg-[#263544] p-2 rounded-xl transition-all">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-black text-emerald-400 mb-2">مبلغ الزيادة (ل.س)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="مثال: 10000"
+                  className="w-full p-4 bg-emerald-500/5 border border-emerald-500/30 rounded-xl focus:border-emerald-500 outline-none text-emerald-400 text-2xl font-mono font-black placeholder:text-slate-600 text-left"
+                  dir="ltr"
+                  value={raiseAmount}
+                  onChange={(e) => setRaiseAmount(e.target.value.replace(/[^0-9,]/g, ""))}
+                />
+                {raiseAmount && Number(raiseAmount.replace(/,/g, "")) > 0 && (
+                  <p className="text-xs text-emerald-500/70 font-bold mt-2">
+                    مثال: موظف راتبه 20,000 ← سيصبح {(20000 + Number(raiseAmount.replace(/,/g, ""))).toLocaleString()} ل.س
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-[#C89355] mb-2">سبب الزيادة (اختياري)</label>
+                <input
+                  type="text"
+                  placeholder="مثال: زيادة سنوية 2026"
+                  className="w-full p-3 bg-[#1a2530] border border-[#263544] rounded-xl focus:border-[#C89355] outline-none text-white font-bold placeholder:text-slate-500"
+                  value={raiseNotes}
+                  onChange={(e) => setRaiseNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs font-bold text-amber-400">
+                ⚠️ هذا الإجراء يعدل الراتب الأساسي بشكل دائم لكل الموظفين النشطين. لا يمكن التراجع عنه إلا بعمل تعديل يدوي.
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-white/5 flex justify-between gap-3">
+              <button
+                onClick={() => setIsRaiseModalOpen(false)}
+                className="px-6 py-3 rounded-xl font-bold text-slate-400 bg-[#263544] hover:text-white transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleBulkRaise}
+                disabled={isRaisePending || !raiseAmount || Number(raiseAmount.replace(/,/g, "")) <= 0}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+              >
+                {isRaisePending ? (
+                  <><Loader2 className="animate-spin" size={18} /> جاري التطبيق...</>
+                ) : (
+                  <><TrendingUp size={18} /> تطبيق الزيادة على كل الموظفين</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

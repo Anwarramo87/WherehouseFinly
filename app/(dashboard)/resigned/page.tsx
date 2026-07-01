@@ -12,7 +12,6 @@ import type { SettlementData } from "@/components/FinancialSettlementModal";
 import type { ResignedEmployeesStatistics } from "@/types/resignation";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
-import { excelExportService } from "@/lib/excel-export";
 import { ExportResignedListGuard } from "@/components/PermissionGuard";
 
 export default function ResignedEmployeesPage() {
@@ -271,9 +270,10 @@ export default function ResignedEmployeesPage() {
     }
   }, [selectedEmployeeForSettlement]);
 
-  // Export to Excel
-  const handleExportToExcel = useCallback(() => {
+  // Export to Excel — xlsx loaded lazily so it doesn't block the page compile
+  const handleExportToExcel = useCallback(async () => {
     try {
+      const { excelExportService } = await import("@/lib/excel-export");
       excelExportService.exportResignedEmployees(filteredEmployees, {
         filters: {
           searchQuery,
