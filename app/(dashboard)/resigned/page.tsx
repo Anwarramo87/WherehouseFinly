@@ -274,7 +274,7 @@ export default function ResignedEmployeesPage() {
   const handleExportToExcel = useCallback(async () => {
     try {
       const { excelExportService } = await import("@/lib/excel-export");
-      excelExportService.exportResignedEmployees(filteredEmployees, {
+      await excelExportService.exportResignedEmployees(filteredEmployees, {
         filters: {
           searchQuery,
           department: departmentFilter || undefined,

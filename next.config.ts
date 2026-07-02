@@ -56,6 +56,9 @@ const nextConfig: NextConfig = {
   },
 
   // تحسينات Webpack لبيئة الإنتاج
+  // Note: Turbopack (default in dev) doesn't use this webpack config
+  // This only applies to production builds with webpack
+  // In Next.js 16+, Turbopack is enabled by default - use turbopack: {} to silence warnings
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       config.optimization = {
@@ -87,7 +90,8 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // webpack override only runs in production builds, so no conflict with Turbopack in dev
+  // Turbopack config to silence warnings in Next.js 16+
+  turbopack: {},
 
   async headers() {
     return [

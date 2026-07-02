@@ -7,9 +7,18 @@
  * Implements Requirement 10.5: Export resigned employees list to Excel.
  */
 
-import * as XLSX from 'xlsx';
 import type { Employee } from '@/types/employee';
 import type { FilterOptions } from '@/types/resignation';
+
+// Lazy load xlsx only when needed
+let XLSX: typeof import('xlsx') | null = null;
+
+async function loadXLSX() {
+  if (!XLSX) {
+    XLSX = await import('xlsx');
+  }
+  return XLSX;
+}
 
 // ============================================================================
 // Types and Interfaces
@@ -100,7 +109,7 @@ export const EXCEL_EXPORT_ERROR_CODES = {
  * Column width configuration (in characters).
  * Order must match the keys in ResignedEmployeeExportRow.
  */
-const COLUMN_WIDTHS: XLSX.ColInfo[] = [
+const COLUMN_WIDTHS: Array<{ wch: number }> = [
   { wch: 14 }, // رقم الموظف
   { wch: 30 }, // الاسم
   { wch: 20 }, // القسم
@@ -149,10 +158,10 @@ export class ExcelExportService {
    *
    * Validates: Requirement 10.5
    */
-  exportResignedEmployees(
+  async exportResignedEmployees(
     employees: Employee[],
     options: ExcelExportOptions = {}
-  ): ExcelExportResult {
+  ): Promise<ExcelExportResult> {
     if (employees.length === 0) {
       throw new ExcelExportError(
         'لا توجد بيانات للتصدير',
@@ -170,22 +179,23 @@ export class ExcelExportService {
     const fullFileName = `${fileName}.xlsx`;
 
     try {
+      const xlsx = await loadXLSX();
       // 1. Build the workbook
-      const workbook = XLSX.utils.book_new();
+      const workbook = xlsx.utils.book_new();
 
       // 2. Build and append the main data sheet
       const rows = this.buildExportRows(employees);
-      const dataSheet = this.buildDataSheet(rows);
-      XLSX.utils.book_append_sheet(workbook, dataSheet, sheetName);
+      const dataSheet = this.buildDataSheet(rows, xlsx);
+      xlsx.utils.book_append_sheet(workbook, dataSheet, sheetName);
 
       // 3. Optionally append a filters metadata sheet
       if (filters) {
-        const filtersSheet = this.buildFiltersSheet(filters, employees.length);
-        XLSX.utils.book_append_sheet(workbook, filtersSheet, 'الفلاتر المطبقة');
+        const filtersSheet = this.buildFiltersSheet(filters, employees.length, xlsx);
+        xlsx.utils.book_append_sheet(workbook, filtersSheet, 'الفلاتر المطبقة');
       }
 
       // 4. Write the file (triggers browser download)
-      XLSX.writeFile(workbook, fullFileName);
+      xlsx.writeFile(workbook, fullFileName);
 
       return {
         success: true,
@@ -312,8 +322,8 @@ export class ExcelExportService {
    * Build the main data worksheet from export rows.
    * Sets column widths and marks the sheet as RTL.
    */
-  private buildDataSheet(rows: ResignedEmployeeExportRow[]): XLSX.WorkSheet {
-    const sheet = XLSX.utils.json_to_sheet(rows);
+  private buildDataSheet(rows: ResignedEmployeeExportRow[], xlsx: typeof import('xlsx')): { [key: string]: any } {
+    const sheet = xlsx.utils.json_to_sheet(rows);
 
     // Column widths
     sheet['!cols'] = COLUMN_WIDTHS;
@@ -329,8 +339,9 @@ export class ExcelExportService {
    */
   private buildFiltersSheet(
     filters: NonNullable<ExcelExportOptions['filters']>,
-    rowCount: number
-  ): XLSX.WorkSheet {
+    rowCount: number,
+    xlsx: typeof import('xlsx')
+  ): { [key: string]: any } {
     const typeLabel =
       filters.terminationType === 'resignation'
         ? 'استقالة'
@@ -354,7 +365,7 @@ export class ExcelExportService {
       { 'البيان': 'الحالة المالية', 'القيمة': financialLabel },
     ];
 
-    const sheet = XLSX.utils.json_to_sheet(metaRows);
+    const sheet = xlsx.utils.json_to_sheet(metaRows);
     sheet['!cols'] = [{ wch: 25 }, { wch: 30 }];
     sheet['!views'] = [{ rightToLeft: true }];
     return sheet;

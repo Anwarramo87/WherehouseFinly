@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
@@ -16,6 +17,7 @@ export const usePenalties = (params?: {
   period?: string;
 }) => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const currentPeriod = new Date().toISOString().slice(0, 7);
   const isPastPeriod = params?.period ? params.period < currentPeriod : false;
