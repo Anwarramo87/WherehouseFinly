@@ -56,7 +56,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
   const [phoneError, setPhoneError] = useState("");
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const safeEmployees = Array.isArray(employees) ? employees : [];
+  const safeEmployees = useMemo(() => Array.isArray(employees) ? employees : [], [employees]);
 
   const [formData, setFormData] = useState<BusFormData>(() => {
     if (initialData) {

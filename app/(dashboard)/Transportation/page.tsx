@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Plus, Bus, ChevronLeft, Edit2, Scissors, Trash2 } from "lucide-react";
 import useTransportation, {
   useBusDetails,
   type BusDetailsResponse,
 } from "@/hooks/useTransportation";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 
 const AddBusModal = dynamic(() => import("@/components/AddBusModal"), { loading: () => null });
 const AddPassengerModal = dynamic(() => import("@/components/AddPassengerModal"), {
@@ -105,10 +105,27 @@ export default function TransportationPage() {
     addPassenger,
     removePassenger,
   } = useTransportation();
-  const { data: employees = [] } = useEmployees({ fetchAll: true });
+  
+  // Apply proper filtering pattern - same as rewards/discounts pages
+  const { data: rawEmployees = [] } = useEmployees({ 
+    limit: 200, 
+    status: "active", 
+    fetchAll: false 
+  });
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const resignedIds = useMemo(() => 
+    new Set(resignedEmployees.map(e => e.employeeId)), 
+    [resignedEmployees]
+  );
+  
+  // Filter out resigned employees for operational use
+  const employees = useMemo(() => {
+    const allEmployees = Array.isArray(rawEmployees) ? rawEmployees : [];
+    return allEmployees.filter(emp => !resignedIds.has(emp.employeeId));
+  }, [rawEmployees, resignedIds]);
 
   // React Query handles fetching, caching, and deduping bus details
-  const safeBuses = Array.isArray(buses) ? buses : [];
+  const safeBuses = useMemo(() => Array.isArray(buses) ? buses : [], [buses]);
   const busIds = useMemo(() => safeBuses.map((b) => b.id), [safeBuses]);
   const busDetailQueries = useBusDetails(busIds);
 
@@ -134,14 +151,20 @@ export default function TransportationPage() {
   const [isAddPassengerOpen, setIsAddPassengerOpen] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusData | null>(null);
   const [editingBus, setEditingBus] = useState<BusData | null>(null);
-  const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
+  const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(null);
+
+  // Load from sessionStorage after component mounts (client-side only)
+  useEffect(() => {
     try {
-      return sessionStorage.getItem("lastAddedPassengerId");
+      const stored = sessionStorage.getItem("lastAddedPassengerId");
+      if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLastAddedPassengerId(stored);
+      }
     } catch {
-      return null;
+      // ignore sessionStorage errors
     }
-  });
+  }, []);
 
   const safeEmployees = Array.isArray(employees) ? employees : [];
   const employeeNameMap = new Map(
@@ -157,6 +180,10 @@ export default function TransportationPage() {
 
   const isOrphanedPassenger = (passenger: Passenger) => {
     return !passenger.name && !employeeNameMap.has(passenger.employeeId);
+  };
+
+  const isResignedPassenger = (passenger: Passenger) => {
+    return resignedIds.has(passenger.employeeId);
   };
 
   // Global Pooling Logic — compute from buses directly (available immediately)
@@ -472,6 +499,11 @@ export default function TransportationPage() {
                           {passengers.filter((p: Passenger) => isOrphanedPassenger(p)).length > 0 && (
                             <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                               {passengers.filter((p: Passenger) => isOrphanedPassenger(p)).length} غير موجود
+                            </span>
+                          )}
+                          {passengers.filter((p: Passenger) => isResignedPassenger(p)).length > 0 && (
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
+                              {passengers.filter((p: Passenger) => isResignedPassenger(p)).length} مستقيل
                             </span>
                           )}
                           <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2.5 py-1 rounded-lg">

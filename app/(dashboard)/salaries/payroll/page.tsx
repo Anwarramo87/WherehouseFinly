@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -446,23 +446,91 @@ export default function PayrollPage() {
     discountsLoading ||
     penaltiesLoading;
   // ── All resigned/terminated employees for the payroll page ──
+  // Only show employees with pending financial settlement
   const allResignedList = useMemo<Employee[]>(() => {
     return allResignedEmployees.filter(
-      (emp) => emp.status === "resigned" || emp.status === "terminated",
+      (emp) =>
+        (emp.status === "resigned" || emp.status === "terminated") &&
+        !emp.isSettled &&
+        emp.financialSettlementStatus !== "completed",
     );
   }, [allResignedEmployees]);
 
-  // Set of resigned/terminated employee IDs — used to exclude them from the active payroll table
+  // Set of ALL resigned/terminated employee IDs — used to exclude them from the active payroll table
   const resignedEmployeeIds = useMemo(() => {
-    return new Set(allResignedList.map((emp) => emp.employeeId));
-  }, [allResignedList]);
+    return new Set(allResignedEmployees.map((emp) => emp.employeeId));
+  }, [allResignedEmployees]);
 
-  const resignedPendingCount = useMemo(
-    () =>
-      allResignedList.filter((e) => e.financialSettlementStatus === "pending" && !e.isSettled)
-        .length,
-    [allResignedList],
-  );
+  const resignedPendingCount = allResignedList.length;
+
+  // ── Calculate full net pay for resigned employees (same logic as previewData) ──
+  const resignedPayrollMap = useMemo(() => {
+    const map = new Map<string, { earnedSalary: number; bonusesTotal: number; discountsTotal: number; netPayRounded: number }>();
+    for (const emp of allResignedList) {
+      const employeeId = emp.employeeId;
+      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross =
+          toNumber(salaryConfig.baseSalary) +
+          toNumber(salaryConfig.lumpSumSalary) +
+          toNumber(salaryConfig.livingAllowance) +
+          toNumber(salaryConfig.responsibilityAllowance) +
+          toNumber(salaryConfig.extraEffortAllowance) +
+          toNumber(salaryConfig.productionIncentive) +
+          toNumber(salaryConfig.transportAllowance);
+      }
+      if (calcGross <= 0) {
+        calcGross =
+          toNumber((emp as { baseSalary?: number }).baseSalary) ||
+          toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+      }
+
+      // Prorated present days based on termination date
+      let presentDays = localPresentDaysMap.get(employeeId) ?? 0;
+      if (emp.terminationDate && presentDays === 0) {
+        const termDate = new Date(emp.terminationDate);
+        const periodStartDate = new Date(termDate.getFullYear(), termDate.getMonth(), 1);
+        presentDays = Math.max(1, Math.ceil((termDate.getTime() - periodStartDate.getTime()) / 86400000) + 1);
+      }
+
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+      const autoInput = autoDeductions.find((d: AttendanceDeductionBreakdown) => d.employeeId === employeeId);
+      const hasManualInput = !!manualInput;
+      const leaveData = employeeLeavesMap.get(employeeId);
+
+      const autoLateMinutes = autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
+      const lateMinutes = hasManualInput && (manualInput.lateMinutes ?? 0) > 0 ? (manualInput.lateMinutes ?? 0) : autoLateMinutes;
+
+      const sickLeaveDays = Math.max(hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0, leaveData?.sickLeaveDays ?? 0);
+      const paidLeaveDays = Math.max(hasManualInput ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0) : 0, leaveData?.paidLeaveDays ?? 0);
+      const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
+
+      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const totalOvertimeMinutes = hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0 ? (manualInput.overtimeRegularMinutes ?? 0) : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeDays = hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0 ? (manualInput.overtimeWeekendDays ?? 0) : (autoInput?.overtimeWeekendDays ?? 0);
+
+      const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
+      const rawEarned = calcEarnedSalary(calcGross, presentDays, effectivePaidLeaveDays, lateMinutes, earlyLeaveMinutes, totalOvertimeMinutes, totalOvertimeDays);
+      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+
+      const empBonuses = bonuses.filter((b) => b.employeeId === employeeId);
+      const bonusesTotal = empBonuses.reduce((sum, b) => sum + toNumber(b.bonusAmount) + toNumber((b as { assistanceAmount?: number }).assistanceAmount), 0);
+
+      const empAdvances = discounts.filter((d) => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month));
+      const empPenalties = penalties.filter((p) => p.employeeId === employeeId && p.issueDate.startsWith(month));
+      const discountsTotal = empAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) + empPenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
+
+      const dailyRate = calcGross / STANDARD_WORK_DAYS;
+      const earlyLeaveDed = earlyLeaveMinutes * (dailyRate / (HOURS_PER_DAY * 60));
+      const netPay = earnedSalary + bonusesTotal - discountsTotal - earlyLeaveDed;
+      const netPayRounded = Math.ceil(netPay / 1000) * 1000;
+
+      map.set(employeeId, { earnedSalary, bonusesTotal, discountsTotal, netPayRounded });
+    }
+    return map;
+  }, [allResignedList, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localLateMinutesMap, localPresentDaysMap, employeeLeavesMap]);
 
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
@@ -984,11 +1052,16 @@ export default function PayrollPage() {
   /** True when the report endpoint responded but no payroll run exists for this month. */
   const hasNoPayrollRun = !reportLoading && (!reportData?.items || reportData.items.length === 0);
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsClient(true);
+  }, []);
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  if (isLoading) {
+  if (isLoading || !isClient) {
     return (
       <div className="relative min-h-[85vh] w-full flex items-center justify-center animate-in fade-in duration-500">
         <div className="flex flex-col items-center gap-4 relative z-10 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
@@ -1301,14 +1374,14 @@ export default function PayrollPage() {
                       <th className="p-4 font-black text-xs uppercase tracking-wider text-center">
                         الراتب الأساسي
                       </th>
+                      <th className="p-4 font-black text-xs uppercase tracking-wider text-center">
+                        الراتب المقوض
+                      </th>
                       <th className="p-4 text-center font-black text-xs uppercase tracking-wider">
                         تاريخ الإنهاء
                       </th>
                       <th className="p-4 text-center font-black text-xs uppercase tracking-wider">
                         نوع الإنهاء
-                      </th>
-                      <th className="p-4 text-center font-black text-xs uppercase tracking-wider">
-                        حالة التصفية
                       </th>
                     </tr>
                   </thead>
@@ -1320,18 +1393,13 @@ export default function PayrollPage() {
                       const terminationColor = isFired
                         ? "text-rose-700 bg-rose-100/80 border-rose-300"
                         : "text-amber-700 bg-amber-100/80 border-amber-300";
-                      const isSettled =
-                        employee.isSettled || employee.financialSettlementStatus === "completed";
-                      const settlementLabel = isSettled ? "تمت التصفية" : "قيد التصفية";
-                      const settlementColor = isSettled
-                        ? "text-emerald-700 bg-emerald-100/80 border-emerald-300"
-                        : "text-orange-700 bg-orange-100/80 border-orange-300";
                       const baseSalaryVal = toNumber(employee.baseSalary ?? employee.hourlyRate);
+                      const resignedCalc = resignedPayrollMap.get(employee.employeeId);
 
                       return (
                         <tr
                           key={employee.employeeId}
-                          className={`transition-all duration-300 group/row ${isSettled ? "bg-white/40 opacity-70" : "bg-white/60 hover:bg-white/90"}`}
+                          className="transition-all duration-300 group/row bg-white/60 hover:bg-white/90"
                         >
                           <td className="p-4 text-center font-mono text-sm font-black text-amber-900/70 group-hover/row:text-amber-700 transition-colors">
                             {employee.employeeId}
@@ -1345,6 +1413,9 @@ export default function PayrollPage() {
                           <td className="p-4 text-center font-mono font-black text-slate-700 text-sm">
                             {baseSalaryVal > 0 ? `${baseSalaryVal.toLocaleString()} ل.س` : "—"}
                           </td>
+                          <td className="p-4 text-center font-mono font-black text-emerald-700 text-sm">
+                            {resignedCalc ? `${resignedCalc.netPayRounded.toLocaleString()} ل.س` : "—"}
+                          </td>
                           <td className="p-4 text-center font-mono font-bold text-slate-700 text-sm">
                             {employee.terminationDate
                               ? new Date(employee.terminationDate).toLocaleDateString("ar-SY")
@@ -1355,13 +1426,6 @@ export default function PayrollPage() {
                               className={`inline-block px-3 py-1.5 rounded-xl text-xs font-black border shadow-sm ${terminationColor}`}
                             >
                               {terminationType}
-                            </span>
-                          </td>
-                          <td className="p-4 text-center">
-                            <span
-                              className={`inline-block px-3 py-1.5 rounded-xl text-xs font-black border shadow-sm ${settlementColor}`}
-                            >
-                              {settlementLabel}
                             </span>
                           </td>
                         </tr>

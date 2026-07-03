@@ -85,7 +85,7 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
 // If it isn't available in the current codebase, keep compilation working.
 const reportDebug: undefined | ((...args: unknown[]) => void) = undefined;
 
-export async function handler(request: NextRequest) {
+async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
   const pathParts = path.split("/").filter(Boolean);

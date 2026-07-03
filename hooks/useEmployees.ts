@@ -345,6 +345,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
       toast.success("تم نقل الموظف للأرشيف بنجاح!");
     },
     onError: (error: unknown) => {
@@ -432,11 +433,10 @@ export const useResignedEmployees = () => {
       }
       return [];
     },
-    staleTime: QUERY_STALE_TIME.RELAXED,
-    gcTime: QUERY_GC_TIME.RELAXED,
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
   });
 
-  // تصفية مستحقات موظف (للمحاسب)
   const settleMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiClient.patch(`/employees/${id}/settle`);

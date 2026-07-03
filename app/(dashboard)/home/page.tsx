@@ -17,7 +17,6 @@ import {
   CalendarX,
   ClockAlert,
   Banknote,
-  Gavel,
   UserCog,
   Briefcase,
   ArrowLeftRight,
@@ -30,7 +29,7 @@ import {
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import useDepartments from "@/hooks/useDepartments";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useAdvances } from "@/hooks/useAdvances";
 import { usePenalties } from "@/hooks/usePenalties";
 import { useBonuses } from "@/hooks/useBonuses";
@@ -165,6 +164,7 @@ export default function DashboardPage() {
   const isSkeleton = isDashboardLoading;
 
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
@@ -193,13 +193,6 @@ export default function DashboardPage() {
       return Number.isFinite(parsed) ? parsed : 0;
     }
     return 0;
-  }, []);
-
-  const formatTime = useCallback((timestamp?: string | null): string => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return "";
-    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   }, []);
 
   const handleCardClick = useCallback((type: ModalType) => {
@@ -242,6 +235,9 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
+
   const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
   const { data: penaltiesData = [] } = usePenalties();
   const { data: bonusesData = [] } = useBonuses({ period: monthKey });
@@ -254,7 +250,7 @@ export default function DashboardPage() {
     return advances
       .filter((advance) => {
         const advanceDate = advance.issueDate || advance.createdAt || "";
-        return advanceDate.startsWith(monthKey);
+        return advanceDate.startsWith(monthKey) && !resignedIds.has(advance.employeeId);
       })
       .slice()
       .sort((a, b) =>
@@ -281,7 +277,7 @@ export default function DashboardPage() {
         };
       })
       .filter((item): item is SalaryAdvance => Boolean(item));
-  }, [advances, employeeListMemo, monthKey]);
+  }, [advances, employeeListMemo, monthKey, resignedIds]);
 
   const recentPenalties = useMemo<EmployeePenalty[]>(() => {
     const monthRecords = penaltiesData.filter((record) =>
@@ -290,6 +286,7 @@ export default function DashboardPage() {
     const source = monthRecords.length > 0 ? monthRecords : penaltiesData;
 
     return source
+      .filter((penalty) => !resignedIds.has(penalty.employeeId))
       .sort((a, b) =>
         (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""),
       )
@@ -317,15 +314,15 @@ export default function DashboardPage() {
         };
       })
       .filter((item): item is EmployeePenalty => Boolean(item));
-  }, [penaltiesData, employeeListMemo, monthKey]);
+  }, [penaltiesData, employeeListMemo, monthKey, resignedIds]);
 
   const monthlyBonuses = useMemo<BonusDisplay[]>(() => {
     const records = Array.isArray(bonusesData) ? bonusesData : [];
     return records
-      .filter((b: { bonusAmount?: unknown; assistanceAmount?: unknown }) => {
+      .filter((b: { bonusAmount?: unknown; assistanceAmount?: unknown; employeeId?: string }) => {
         const bonus = Number(b.bonusAmount || 0);
         const assist = Number(b.assistanceAmount || 0);
-        return bonus + assist > 0;
+        return bonus + assist > 0 && !resignedIds.has(b.employeeId || "");
       })
       .slice()
       .sort((a: { createdAt?: string }, b: { createdAt?: string }) =>
@@ -346,7 +343,7 @@ export default function DashboardPage() {
         };
       })
       .filter((item): item is BonusDisplay => Boolean(item));
-  }, [bonusesData, employeeListMemo]);
+  }, [bonusesData, employeeListMemo, resignedIds]);
 
   const { data: deptsData } = useDepartments();
 
@@ -388,7 +385,7 @@ export default function DashboardPage() {
     },
     {
       title: "اجمالي المقبوض",
-      value: kpis.totalReceivedSalaries.toLocaleString("en-US"),
+      value: Math.round(kpis.totalReceivedSalaries).toLocaleString("en-US", { maximumFractionDigits: 0 }),
       subValue: "ليرة سورية",
       icon: HandCoins,
       clickable: false,
@@ -572,7 +569,7 @@ export default function DashboardPage() {
                   .slice(0, 8)
                   .map((item) => (
                     <div
-                      key={`${item._type}-${(item as any).advanceId || (item as any).penaltyId || (item as any).id}`}
+                      key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
                       className="group flex items-center justify-between p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-2"
                     >
                       <div className="flex items-center gap-2 min-w-0">

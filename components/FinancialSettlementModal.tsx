@@ -150,7 +150,7 @@ const isMounted = typeof document !== "undefined";
   if (!isOpen || !isMounted) return null;
 
   // Calculate total settlement
-  const totalSettlement = formData.finalSalaryAmount + formData.bonuses - formData.deductions;
+  const totalSettlement = Math.round((formData.finalSalaryAmount + formData.bonuses - formData.deductions) / 1000) * 1000;
   const isNegativeSettlement = totalSettlement < 0;
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -341,7 +341,7 @@ const isMounted = typeof document !== "undefined";
                   <span className={`font-mono font-black text-xl sm:text-2xl ${
                     isNegativeSettlement ? 'text-rose-400' : 'text-emerald-400'
                   }`}>
-                    {totalSettlement.toLocaleString('ar-SY')}
+                    {totalSettlement.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                     <span className="text-xs font-bold text-slate-500 mr-1">ل.س</span>
                   </span>
                 )}
