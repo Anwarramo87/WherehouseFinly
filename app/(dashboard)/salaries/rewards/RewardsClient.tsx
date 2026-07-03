@@ -8,6 +8,9 @@ import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp 
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import apiClient from "@/lib/api-client";
 import type { Bonus, BonusInput } from "@/types/bonus";
 
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
@@ -20,13 +23,14 @@ export default function RewardsClient() {
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   const { data: salaries = [] } = useSalaries();
+  const queryClient = useQueryClient();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
-  // لا تستخدم period هنا — فقط إذا وُجد ?date= صريح بالـ URL
   const initialDate = searchParams.get("date") ?? "";
   const initialAllEmployees = searchParams.get("allEmployees") === "true";
-  // المودال يفتح فقط إذا أُرسل رابط مباشر بـ params صريحة، وليس عند كل زيارة عادية
   const shouldOpenOnLoad = Boolean(initialEmployeeId || initialType || initialAllEmployees);
+
+  const [isRaisePending, setIsRaisePending] = useState(false);
 
   type RewardRecord = {
     id: string;
@@ -162,36 +166,56 @@ export default function RewardsClient() {
 
   const handleSaveReward = async (data: BonusInput) => {
     const period = data.period || "";
-    const basePayload: BonusInput = {
-      employeeId: data.employeeId,
-      bonusAmount: data.bonusAmount,
-      assistanceAmount: data.assistanceAmount || 0,
-      bonusReason: data.bonusReason || "مكافأة",
-      period,
-    };
+    const isRaise = data.bonusReason === "زيادة في الراتب";
 
     try {
-      if (data.employeeId === "ALL") {
-        if (!employees.length) {
-          alert("لا يمكن تطبيق المكافأة على الجميع قبل تحميل الموظفين");
-          return;
-        }
-
-        await Promise.all(
-          employees.map((emp) =>
-            createBonus.mutateAsync({
-              ...basePayload,
-              employeeId: emp.employeeId,
-            }),
-          ),
+      if (isRaise) {
+        // زيادة دائمة على الراتب الأساسي — تستدعي endpoint مخصص
+        setIsRaisePending(true);
+        await apiClient.post("/salary/bulk-raise", {
+          amount: data.bonusAmount,
+          employeeId: data.employeeId === "ALL" ? undefined : data.employeeId,
+          notes: data.bonusReason,
+        });
+        // تحديث cache الرواتب
+        await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+        await queryClient.invalidateQueries({ queryKey: ["employees"] });
+        toast.success(
+          data.employeeId === "ALL"
+            ? `تمت إضافة ${Number(data.bonusAmount).toLocaleString()} ل.س على الراتب الأساسي لكل الموظفين بشكل دائم`
+            : `تمت إضافة ${Number(data.bonusAmount).toLocaleString()} ل.س على الراتب الأساسي بشكل دائم`,
         );
       } else {
-        await createBonus.mutateAsync(basePayload);
+        // مكافأة عادية أو بدل — تُحفظ كـ bonus record
+        const basePayload: BonusInput = {
+          employeeId: data.employeeId,
+          bonusAmount: data.bonusAmount,
+          assistanceAmount: data.assistanceAmount || 0,
+          bonusReason: data.bonusReason || "مكافأة",
+          period,
+        };
+
+        if (data.employeeId === "ALL") {
+          if (!employees.length) {
+            alert("لا يمكن تطبيق المكافأة على الجميع قبل تحميل الموظفين");
+            return;
+          }
+          await Promise.all(
+            employees.map((emp) =>
+              createBonus.mutateAsync({ ...basePayload, employeeId: emp.employeeId }),
+            ),
+          );
+        } else {
+          await createBonus.mutateAsync(basePayload);
+        }
       }
 
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error saving reward:", error);
+      toast.error("حدث خطأ أثناء حفظ البيانات");
+    } finally {
+      setIsRaisePending(false);
     }
   };
 
@@ -381,7 +405,7 @@ export default function RewardsClient() {
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onSave={handleSaveReward}
-            isPending={createBonus.isPending}
+            isPending={createBonus.isPending || isRaisePending}
             employees={Array.isArray(employees) ? employees : []}
             salaries={Array.isArray(salaries) ? salaries : []}
             initialData={undefined}

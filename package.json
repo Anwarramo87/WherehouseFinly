@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --turbo",
     "dev:webpack": "next dev",
     "dev:local": "node scripts/switch-backend.js local && npm run dev",
     "dev:remote": "node scripts/switch-backend.js remote && npm run dev",

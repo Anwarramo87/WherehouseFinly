@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import type { Penalty } from "@/types/penalty";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";

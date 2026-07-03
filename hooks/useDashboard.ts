@@ -1,8 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 
 import type { DashboardKpis } from "@/types/dashboard";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+
+// Max time to show skeleton — after this show zeros rather than spinning forever
+const SKELETON_TIMEOUT_MS = 4_000;
 
 const fallbackKpis: DashboardKpis = {
   totalEmployees: 0,
@@ -65,6 +69,16 @@ export const useDashboard = () => {
     retry: 1,
   });
 
+  // Hard cap on skeleton time — if backend is slow, show zeros after timeout
+  // rather than leaving the page stuck in skeleton state indefinitely
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    if (!dashboardQuery.isLoading) return;
+    setTimedOut(false);
+    const t = setTimeout(() => setTimedOut(true), SKELETON_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [dashboardQuery.isLoading]);
+
   const dashboard = dashboardQuery.data as {
     totalEmployees?: number;
     attendance?: { count?: number; employees?: DashboardPresentEmployee[] };
@@ -97,7 +111,7 @@ export const useDashboard = () => {
 
   return {
     kpis,
-    isLoading: dashboardQuery.isLoading,
+    isLoading: dashboardQuery.isLoading && !timedOut,
     isError: dashboardQuery.isError,
     presentEmployees: dashboard?.attendance?.employees ?? [],
     absentEmployees: dashboard?.absence?.employees ?? [],
