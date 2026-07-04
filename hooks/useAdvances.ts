@@ -16,8 +16,7 @@ export const useAdvances = (employeeId?: string, period?: string, enabled = true
     queryKey: queryKeys.advances.list(employeeId, period),
     queryFn: async () => {
       const res = await apiClient.get("/advances", { params: { employeeId, period } });
-      console.log("Advances API response:", res.data);
-      return Array.isArray(res.data) ? res.data : [];
+      return Array.isArray(res.data) ? res.data : (res.data?.data && Array.isArray(res.data.data) ? res.data.data : []);
     },
     enabled,
     staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,

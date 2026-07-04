@@ -80,6 +80,9 @@ export default function SalariesSettingClient() {
   const { data: advances = [] } = useAdvances();
   const queryClient = useQueryClient();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const period = useMemo(() => getLocalMonth(), []);
   const { data: bonuses = [] } = useBonuses({ period });
 
@@ -103,7 +106,9 @@ export default function SalariesSettingClient() {
       });
       const data = res.data as { updated?: number; message?: string };
       await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      await queryClient.refetchQueries({ queryKey: ["salaries"] });
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      await queryClient.refetchQueries({ queryKey: ["employees"] });
       toast.success(data.message ?? `تمت الزيادة لـ ${data.updated ?? 0} موظف`);
       setIsRaiseModalOpen(false);
       setRaiseAmount("");
@@ -160,24 +165,26 @@ export default function SalariesSettingClient() {
     return m;
   }, [salaries]);
 
-  // 🟢 الفلتر الحديدي: جلب الموظفين النشطين فقط وتجاهل أي شخص مستقيل أو مقال
+  // نبني القائمة من salaries أولاً (تظهر فوراً)، ثم نضيف الموظفين النشطين بدون راتب
   const allIds = useMemo(() => {
     const set = new Set<string>();
-    
-    (employees || []).forEach((e) => { 
-      if (!e?.employeeId) return;
 
-      // التحقق الصارم: إذا كان الموظف في قائمة المستقيلين، أو حالته صراحة "resigned" أو "terminated"
+    // 1. كل من له راتب محفوظ (ما عدا المستقيلين)
+    (salaries || []).forEach((s) => {
+      if (!s?.employeeId) return;
+      if (resignedIds.has(s.employeeId)) return;
+      set.add(s.employeeId);
+    });
+
+    // 2. الموظفون النشطون الذين ليس لهم راتب بعد
+    (employees || []).forEach((e) => {
+      if (!e?.employeeId) return;
       const isTerminated = resignedIds.has(e.employeeId) || e.status === "resigned" || e.status === "terminated";
-      
-      // نضيفه للقائمة فقط إذا كان على رأس عمله تماماً
-      if (!isTerminated) {
-        set.add(e.employeeId);
-      }
+      if (!isTerminated) set.add(e.employeeId);
     });
 
     return Array.from(set);
-  }, [employees, resignedIds]);
+  }, [salaries, employees, resignedIds]);
 
   const employeesForFinanceModals = useMemo(
     () => (employees || []).map((emp) => ({ employeeId: emp.employeeId, name: emp.name })),
@@ -290,7 +297,7 @@ export default function SalariesSettingClient() {
           {activeTab === "salary-config" && (
             <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden mt-6 group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0" />
-              {isLoading ? (
+              {!mounted || isLoading ? (
                 <SkeletonRows />
               ) : isError ? (
                 <div className="p-8 text-center font-bold text-rose-600">خطأ: {error?.message ?? "فشل تحميل البيانات"}</div>

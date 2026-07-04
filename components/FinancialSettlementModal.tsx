@@ -95,7 +95,6 @@ const isMounted = typeof document !== "undefined";
 
     const controller = new AbortController();
     const fetchSettlement = async () => {
-      console.log('[FinancialSettlementModal] Fetching for employeeId:', currentEmployeeId, 'date:', formData.settlementDate);
       setIsLoadingSalary(true);
       setIsLoadingExtras(true);
       
@@ -108,19 +107,11 @@ const isMounted = typeof document !== "undefined";
           signal: controller.signal,
         });
 
-        console.log('[FinancialSettlementModal] API response:', JSON.stringify(res.data));
-
-        // اختراق تغليف NestJS: إذا كانت البيانات داخل data.data نستخرجها، وإلا نأخذها مباشرة
         const payload = res.data?.data || res.data || {};
-        
-        console.log('[FinancialSettlementModal] Payload:', JSON.stringify(payload));
 
-        // دعم لعدة مسميات محتملة من الباك إند (earnedSalary أو finalSalaryAmount)
         const earned = parseFloat(String(payload.earnedSalary ?? payload.finalSalaryAmount ?? 0)) || 0;
         const bonuses = parseFloat(String(payload.bonuses ?? 0)) || 0;
         const deductions = parseFloat(String(payload.deductions ?? 0)) || 0;
-
-        console.log('[FinancialSettlementModal] Parsed values:', { earned, bonuses, deductions });
 
         setFormData(prev => ({ 
           ...prev, 

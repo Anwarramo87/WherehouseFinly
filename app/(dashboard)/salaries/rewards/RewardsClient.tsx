@@ -115,8 +115,8 @@ export default function RewardsClient() {
       const totalAmount = bonusAmount + assistanceAmount;
       const periodDate = bonus.period ? `${bonus.period}-01` : new Date().toISOString();
 
-      // فقط عرض السجلات التي فيها مكافآت
-      if (totalAmount <= 0) return null;
+      // فقط عرض السجلات التي فيها مكافآت (استبعد سجلات الزيادة لأنها تظهر في الرواتب)
+      if (totalAmount <= 0 || bonus.bonusReason === 'زيادة راتب') return null;
 
       return {
         id: String(rewardId),
@@ -177,9 +177,11 @@ export default function RewardsClient() {
           employeeId: data.employeeId === "ALL" ? undefined : data.employeeId,
           notes: data.bonusReason,
         });
-        // تحديث cache الرواتب
+        // تحديث cache الرواتب وإعادة الجلب فوراً
         await queryClient.invalidateQueries({ queryKey: ["salaries"] });
+        await queryClient.refetchQueries({ queryKey: ["salaries"] });
         await queryClient.invalidateQueries({ queryKey: ["employees"] });
+        await queryClient.refetchQueries({ queryKey: ["employees"] });
         toast.success(
           data.employeeId === "ALL"
             ? `تمت إضافة ${Number(data.bonusAmount).toLocaleString()} ل.س على الراتب الأساسي لكل الموظفين بشكل دائم`

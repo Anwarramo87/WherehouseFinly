@@ -1,0 +1,1 @@
+{"success":false,"error":{"statusCode":401,"message":"Unauthorized","code":"UNAUTHORIZED"},"metadata":{"correlationId":"d367fcdf-7607-4c4c-ae94-c4724dc7ea85","timestamp":"2026-07-04T10:06:14.451Z","path":"/api/v1/salary/bulk-raise","method":"POST"}}
