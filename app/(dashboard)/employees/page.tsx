@@ -584,8 +584,8 @@ export default function EmployeesPage() {
           )}
 
           {isBulkTerminateModalOpen && (
-            <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" dir="rtl">
-              <div className="bg-[#101720] rounded-[2rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-lg border border-rose-500/20">
+            <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" dir="rtl">
+              <div className="bg-[#101720] rounded-4xl shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-lg border border-rose-500/20">
                 <div className="p-5 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80">
                   <div className="flex items-center gap-3">
                     <div className="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">

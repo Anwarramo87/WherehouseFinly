@@ -141,7 +141,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-md transition-all duration-300" dir="rtl" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-md transition-all duration-300" dir="rtl" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-white rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(38,53,68,0.4)] w-full max-w-3xl overflow-hidden flex flex-col border-2 border-dashed border-[#C89355]/40 animate-in fade-in zoom-in-95 duration-300">
 
         <div className="p-6 sm:p-8 border-b border-[#263544]/10 flex justify-between items-center bg-slate-50">

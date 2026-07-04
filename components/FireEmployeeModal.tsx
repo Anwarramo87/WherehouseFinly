@@ -489,8 +489,8 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
   const themeColor = isResigned ? "amber" : "rose";
 
   return createPortal(
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
-      <div className={`bg-[#101720] rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-${themeColor}-500/20 outline-dashed outline-1 outline-${themeColor}-500/30 -outline-offset-8`}>
+    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
+      <div className={`bg-[#101720] rounded-4xl sm:rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-${themeColor}-500/20 outline-dashed outline-1 outline-${themeColor}-500/30 -outline-offset-8`}>
         
         <div className="p-4 sm:p-5 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
           <div className="flex items-center gap-3 sm:gap-4">

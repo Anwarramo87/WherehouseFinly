@@ -137,7 +137,7 @@ export default function ResignedEmployeesList({
               {count}
             </span>
           </div>
-          <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2rem] shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 p-8 text-center flex flex-col items-center justify-center space-y-4 min-h-[150px] group">
+          <div className="relative bg-white/60 backdrop-blur-2xl rounded-4xl shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 p-8 text-center flex flex-col items-center justify-center space-y-4 min-h-37.5 group">
             <div className="absolute inset-1.5 rounded-[1.7rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-70 relative z-10"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p className="text-slate-500 font-bold text-lg relative z-10">لا يوجد موظفين مستقيلين هذا الشهر .</p>
@@ -155,7 +155,7 @@ export default function ResignedEmployeesList({
           </span>
         </div>
         
-        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2rem] shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
+        <div className="relative bg-white/60 backdrop-blur-2xl rounded-4xl shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
           <div className="absolute inset-1.5 rounded-[1.7rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
           
           <div className="relative z-10 w-full overflow-x-auto custom-scrollbar">

@@ -87,7 +87,7 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
 
   return createPortal(
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[99999] p-4 sm:p-6 transition-all duration-200" 
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-99999 p-4 sm:p-6 transition-all duration-200" 
       dir="rtl"
       onClick={(e) => { 
         if (e.target === e.currentTarget) handleClose(); 
@@ -205,7 +205,7 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
               type="submit"
               form="payrollForm"
               disabled={isPending}
-              className="flex-[2] sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-[#C89355] text-[#101720] flex items-center justify-center gap-2 hover:bg-[#b07f45] active:scale-[0.98] transition-all disabled:opacity-60 shadow-[0_0_20px_rgba(200,147,85,0.3)]"
+              className="flex-2 sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-[#C89355] text-[#101720] flex items-center justify-center gap-2 hover:bg-[#b07f45] active:scale-[0.98] transition-all disabled:opacity-60 shadow-[0_0_20px_rgba(200,147,85,0.3)]"
             >
               {isPending ? (
                 <>

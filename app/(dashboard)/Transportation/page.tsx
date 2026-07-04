@@ -453,7 +453,7 @@ export default function TransportationPage() {
                   </div>
 
                   {/* ── Gold Accent Bar ── */}
-                  <div className="h-1 bg-gradient-to-l from-[#C89355] via-[#C89355]/80 to-transparent" />
+                  <div className="h-1 bg-linear-to-l from-[#C89355] via-[#C89355]/80 to-transparent" />
 
                   {/* ── Card Body ── */}
                   <div className="p-6 flex flex-col flex-1">
@@ -515,7 +515,7 @@ export default function TransportationPage() {
                       {passengers.length > 0 ? (
                         <div className="border border-slate-200 rounded-2xl overflow-hidden">
                           <table className="w-full text-right">
-                            <thead className="bg-[#1a2530]/[0.03]">
+                            <thead className="bg-[#1a2530]/3">
                               <tr className="border-b border-slate-100">
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">
                                   الكود

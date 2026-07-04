@@ -636,7 +636,7 @@ export default function DashboardPage() {
                         <MoreVertical size={16} className="text-[#263544]/60" />
                       </button>
                       {deptMenuOpen === dept.id && (
-                        <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-200 py-1 min-w-[140px] z-50">
+                        <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-200 py-1 min-w-35 z-50">
                           <button
                             onClick={() => handleEditDepartment(dept)}
                             className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-[#263544] hover:bg-[#C89355]/10 transition-colors"
