@@ -214,6 +214,8 @@ export default function ResignedEmployeesPage() {
       
       toast.success('تم إعادة تعيين الموظف بنجاح!');
       queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] }); // Invalidate all employee queries to refresh the main employee list
+
       setIsRehireModalOpen(false);
       setSelectedEmployeeForRehire(null);
     } catch (error: unknown) {

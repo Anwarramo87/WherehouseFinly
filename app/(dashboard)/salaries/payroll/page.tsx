@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -291,8 +291,7 @@ export default function PayrollPage() {
   const [selectedPayslip, setSelectedPayslip] = useState<AggregatedPayroll | null>(null);
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
   // Hydration guard — prevents server/client mismatch on loading state
-  const [mounted, setMounted] = useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  const mounted = typeof window !== 'undefined';
 
   const { calculatePayroll } = usePayroll();
 
