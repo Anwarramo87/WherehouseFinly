@@ -17,6 +17,7 @@ export default function Filter({ searchTerm, onSearchChange, selectedDept, onDep
 
   // Avoid hydration mismatch by only rendering select options after client hydration
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 

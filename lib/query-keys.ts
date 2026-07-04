@@ -64,6 +64,7 @@ export const queryKeys = {
   },
   payroll: {
     all: ["payroll"] as const,
+    receipts: (month?: string) => [...queryKeys.payroll.all, "receipts", month ?? null] as const,
   },
   "attendance-deductions": {
     all: ["attendance-deductions"] as const,

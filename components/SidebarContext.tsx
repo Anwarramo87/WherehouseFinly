@@ -25,6 +25,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   // Set hydrated after mount to avoid hydration mismatch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 

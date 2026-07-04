@@ -129,8 +129,6 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const [selectAll, setSelectAll] = useState(false);
-
   const filteredEmployees = useMemo(() => {
     if (!searchQueryInput) return employees;
     return employees.filter(emp =>
@@ -283,7 +281,6 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
                       onClick={() => {
                         setForm((p) => ({ ...p, employeeId: "ALL" }));
                         setSearchQueryInput("جميع الموظفين");
-                        setSelectAll(true);
                         setIsDropdownOpen(false);
                         setCalculationError("");
                       }}

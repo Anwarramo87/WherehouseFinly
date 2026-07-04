@@ -30,7 +30,6 @@ interface ResignedEmployeesListProps {
   onFilterFinancialStatus?: (status: 'pending' | 'completed' | 'all') => void;
   onFilterDateRange?: (startDate: string, endDate: string) => void;
   onPageChange?: (page: number) => void;
-  onSettle?: (employeeId: string) => void;
   onRehire?: (employeeId: string) => void;
   onFinancialSettlement?: (employeeId: string) => void;
   departments?: string[];
@@ -48,7 +47,6 @@ export default function ResignedEmployeesList({
   onFilterFinancialStatus,
   onFilterDateRange,
   onPageChange,
-  onSettle,
   onRehire,
   onFinancialSettlement,
   departments = []
@@ -129,14 +127,6 @@ export default function ResignedEmployeesList({
     }
   };
 
-  const handleSettle = async (employeeId: string) => {
-    if (confirm("هل أنت متأكد من تسليم المستحقات وتصفية هذا الموظف مالياً؟ هذا الإجراء لا يمكن التراجع عنه.")) {
-      if (onSettle) {
-        onSettle(employeeId);
-      }
-    }
-  };
-
   const renderEmployeeTable = (employeesList: Employee[], title: string, count: number) => {
     if (employeesList.length === 0) {
       return (
@@ -147,8 +137,10 @@ export default function ResignedEmployeesList({
               {count}
             </span>
           </div>
-          <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-8 text-center border border-white/60">
-            <p className="text-slate-500 font-bold">لا يوجد موظفون في هذا القسم</p>
+          <div className="relative bg-white/60 backdrop-blur-2xl rounded-4xl shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 p-8 text-center flex flex-col items-center justify-center space-y-4 min-h-37.5 group">
+            <div className="absolute inset-1.5 rounded-[1.7rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-70 relative z-10"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p className="text-slate-500 font-bold text-lg relative z-10">لا يوجد موظفين مستقيلين هذا الشهر .</p>
           </div>
         </div>
       );
@@ -163,7 +155,7 @@ export default function ResignedEmployeesList({
           </span>
         </div>
         
-        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2rem] shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
+        <div className="relative bg-white/60 backdrop-blur-2xl rounded-4xl shadow-[0_15px_40px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
           <div className="absolute inset-1.5 rounded-[1.7rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
           
           <div className="relative z-10 w-full overflow-x-auto custom-scrollbar">
@@ -279,30 +271,7 @@ export default function ResignedEmployeesList({
                             )}
                           </ProcessSettlementGuard>
 
-                          {/* اعتماد التصفية السريع */}
-                          <ProcessSettlementGuard
-                            fallback={
-                              <button
-                                disabled
-                                className="inline-flex items-center gap-1.5 bg-slate-300 text-slate-500 px-3 py-2 rounded-xl text-[11px] font-black cursor-not-allowed"
-                                title="ليس لديك صلاحية اعتماد التصفية"
-                              >
-                                <Lock size={14} />
-                                اعتماد التصفية
-                              </button>
-                            }
-                          >
-                            {!employee.isSettled && employee.financialSettlementStatus !== 'completed' && (
-                              <button 
-                                onClick={() => handleSettle(employee.employeeId)}
-                                className="inline-flex items-center gap-1.5 bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-sm border border-[#C89355]/40 active:scale-95"
-                                title="الضغط هنا يعني أن الموظف استلم كافة رواتبه ومستحقاته"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-                                اعتماد التصفية
-                              </button>
-                            )}
-                          </ProcessSettlementGuard>
+
 
                           {employee.isSettled || employee.financialSettlementStatus === 'completed' ? (
                             <span className="text-slate-400 text-xs font-bold">تمت التصفية</span>

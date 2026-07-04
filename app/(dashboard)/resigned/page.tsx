@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Loader2, UserMinus, BadgeInfo, ChevronLeft, Scissors, Download, UserCheck, DollarSign, Building2, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Lock } from "lucide-react";
 import { useResignedEmployees } from "@/hooks/useEmployees";
+import { useQueryClient } from "@tanstack/react-query";
 import ResignedEmployeesList from "@/components/ResignedEmployeesList";
 import RehireEmployeeModal from "@/components/RehireEmployeeModal";
 import FinancialSettlementModal from "@/components/FinancialSettlementModal";
@@ -15,7 +16,8 @@ import apiClient from "@/lib/api-client";
 import { ExportResignedListGuard } from "@/components/PermissionGuard";
 
 export default function ResignedEmployeesPage() {
-  const { data: allEmployees = [], isLoading, isError, error, settleEmployee, refetch, isFetching } = useResignedEmployees();
+  const { data: allEmployees = [], isLoading, isError, error, refetch, isFetching } = useResignedEmployees();
+  const queryClient = useQueryClient();
   
   // Modal states
   const [selectedEmployeeForRehire, setSelectedEmployeeForRehire] = useState<Employee | null>(null);
@@ -25,8 +27,9 @@ export default function ResignedEmployeesPage() {
   const [isRehirePending, setIsRehirePending] = useState(false);
   const [isSettlementPending, setIsSettlementPending] = useState(false);
   
-  // Hydration guard — defer client-only rendering until after mount
-  const [mounted, setMounted] = useState(false);
+  // Hydration guard — defer client-only rendering until after mount      
+  const [mounted, setMounted] = useState(false); 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   // Filter states
@@ -186,16 +189,6 @@ export default function ResignedEmployeesPage() {
     totalPages
   };
 
-  // Handle quick settle (simple button in table)
-  const handleSettle = useCallback(async (id: string) => {
-    try {
-      await settleEmployee.mutateAsync(id);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'فشل في تصفية الموظف';
-      toast.error(msg);
-    }
-  }, [settleEmployee]);
-
   // Handle rehire
   const handleRehire = useCallback((employeeId: string) => {
     const employee = resignedOrTerminated.find(emp => emp.employeeId === employeeId);
@@ -220,6 +213,9 @@ export default function ResignedEmployeesPage() {
       await apiClient.post('/employees/rehire', payload);
       
       toast.success('تم إعادة تعيين الموظف بنجاح!');
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] }); // Invalidate all employee queries to refresh the main employee list
+
       setIsRehireModalOpen(false);
       setSelectedEmployeeForRehire(null);
     } catch (error: unknown) {
@@ -230,7 +226,7 @@ export default function ResignedEmployeesPage() {
     } finally {
       setIsRehirePending(false);
     }
-  }, [selectedEmployeeForRehire]);
+  }, [selectedEmployeeForRehire, queryClient]);
 
   // Handle financial settlement — open modal (data fetching is handled by the modal)
   const handleFinancialSettlement = useCallback((employeeId: string) => {
@@ -258,6 +254,7 @@ export default function ResignedEmployeesPage() {
       await apiClient.post('/employees/financial-settlement', payload);
       
       toast.success('تم إجراء التصفية المالية بنجاح!');
+      queryClient.invalidateQueries({ queryKey: ["resigned-employees"] });
       setIsSettlementModalOpen(false);
       setSelectedEmployeeForSettlement(null);
     } catch (error: unknown) {
@@ -268,7 +265,7 @@ export default function ResignedEmployeesPage() {
     } finally {
       setIsSettlementPending(false);
     }
-  }, [selectedEmployeeForSettlement]);
+  }, [selectedEmployeeForSettlement, queryClient]);
 
   // Export to Excel — xlsx loaded lazily so it doesn't block the page compile
   const handleExportToExcel = useCallback(async () => {
@@ -369,142 +366,152 @@ export default function ResignedEmployeesPage() {
             </div>
           </header>
 
-          {/* لوحة الإحصائيات المتقدمة */}
-          {!isLoading && !isError && resignedOrTerminated.length > 0 && (
-            <div className="mb-8 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {/* إجمالي المغادرين */}
-              <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <BadgeInfo size={16} className="text-[#C89355]" />
-                  <span className="text-xs font-bold text-slate-500">إجمالي المغادرين</span>
-                </div>
-                <p className="text-2xl font-black text-[#263544]">{statistics.totalResigned}</p>
-              </div>
-
-              {/* الاستقالات */}
-              <div className="bg-blue-50/60 backdrop-blur-xl border border-blue-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp size={16} className="text-blue-600" />
-                  <span className="text-xs font-bold text-blue-700">استقالات</span>
-                </div>
-                <p className="text-2xl font-black text-blue-700">{statistics.resignations}</p>
-              </div>
-
-              {/* الإقالات */}
-              <div className="bg-rose-50/60 backdrop-blur-xl border border-rose-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingDown size={16} className="text-rose-600" />
-                  <span className="text-xs font-bold text-rose-700">إقالات</span>
-                </div>
-                <p className="text-2xl font-black text-rose-700">{statistics.terminations}</p>
-              </div>
-
-              {/* هذا الشهر */}
-              <div className="bg-purple-50/60 backdrop-blur-xl border border-purple-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserMinus size={16} className="text-purple-600" />
-                  <span className="text-xs font-bold text-purple-700">هذا الشهر</span>
-                </div>
-                <p className="text-2xl font-black text-purple-700">{statistics.currentMonth}</p>
-              </div>
-
-              {/* قيد التصفية */}
-              <div className="bg-amber-50/60 backdrop-blur-xl border border-amber-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign size={16} className="text-amber-600" />
-                  <span className="text-xs font-bold text-amber-700">قيد التصفية</span>
-                </div>
-                <p className="text-2xl font-black text-amber-700">{statistics.pendingSettlement}</p>
-              </div>
-
-              {/* تمت التصفية */}
-              <div className="bg-emerald-50/60 backdrop-blur-xl border border-emerald-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserCheck size={16} className="text-emerald-600" />
-                  <span className="text-xs font-bold text-emerald-700">تمت التصفية</span>
-                </div>
-                <p className="text-2xl font-black text-emerald-700">{statistics.completedSettlement}</p>
-              </div>
-            </div>
-          )}
-
-          {/* إحصائيات الأقسام */}
-          {!isLoading && !isError && Object.keys(statistics.byDepartment).length > 1 && (
-            <div className="mb-8 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 size={18} className="text-[#C89355]" />
-                <h3 className="font-black text-[#263544]">توزيع المغادرين حسب الأقسام</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(statistics.byDepartment)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([dept, count]) => (
-                    <div
-                      key={dept}
-                      className="inline-flex items-center gap-2 bg-[#1a2530]/5 backdrop-blur-md border border-[#263544]/10 rounded-xl px-4 py-2"
-                    >
-                      <span className="font-bold text-[#263544] text-sm">{dept}</span>
-                      <span className="bg-[#C89355] text-white text-xs font-black px-2 py-0.5 rounded-lg">
-                        {count}
-                      </span>
+          {/* Content based on mounted state for hydration */}
+          {mounted ? (
+            <>
+              {/* لوحة الإحصائيات المتقدمة */}
+              {!isLoading && !isError && resignedOrTerminated.length > 0 && (
+                <div className="mb-8 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {/* إجمالي المغادرين */}
+                  <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BadgeInfo size={16} className="text-[#C89355]" />
+                      <span className="text-xs font-bold text-slate-500">إجمالي المغادرين</span>
                     </div>
-                  ))}
-              </div>
-            </div>
-          )}
+                    <p className="text-2xl font-black text-[#263544]">{statistics.totalResigned}</p>
+                  </div>
 
-          {/* Loading State */}
-          {isLoading && (
+                  {/* الاستقالات */}
+                  <div className="bg-blue-50/60 backdrop-blur-xl border border-blue-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp size={16} className="text-blue-600" />
+                      <span className="text-xs font-bold text-blue-700">استقالات</span>
+                    </div>
+                    <p className="text-2xl font-black text-blue-700">{statistics.resignations}</p>
+                  </div>
+
+                  {/* الإقالات */}
+                  <div className="bg-rose-50/60 backdrop-blur-xl border border-rose-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingDown size={16} className="text-rose-600" />
+                      <span className="text-xs font-bold text-rose-700">إقالات</span>
+                    </div>
+                    <p className="text-2xl font-black text-rose-700">{statistics.terminations}</p>
+                  </div>
+
+                  {/* هذا الشهر */}
+                  <div className="bg-purple-50/60 backdrop-blur-xl border border-purple-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <UserMinus size={16} className="text-purple-600" />
+                      <span className="text-xs font-bold text-purple-700">هذا الشهر</span>
+                    </div>
+                    <p className="text-2xl font-black text-purple-700">{statistics.currentMonth}</p>
+                  </div>
+
+                  {/* قيد التصفية */}
+                  <div className="bg-amber-50/60 backdrop-blur-xl border border-amber-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign size={16} className="text-amber-600" />
+                      <span className="text-xs font-bold text-amber-700">قيد التصفية</span>
+                    </div>
+                    <p className="text-2xl font-black text-amber-700">{statistics.pendingSettlement}</p>
+                  </div>
+
+                  {/* تمت التصفية */}
+                  <div className="bg-emerald-50/60 backdrop-blur-xl border border-emerald-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <UserCheck size={16} className="text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-700">تمت التصفية</span>
+                    </div>
+                    <p className="text-2xl font-black text-emerald-700">{statistics.completedSettlement}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* إحصائيات الأقسام */}
+              {!isLoading && !isError && Object.keys(statistics.byDepartment).length > 1 && (
+                <div className="mb-8 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Building2 size={18} className="text-[#C89355]" />
+                    <h3 className="font-black text-[#263544]">توزيع المغادرين حسب الأقسام</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(statistics.byDepartment)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([dept, count]) => (
+                        <div
+                          key={dept}
+                          className="inline-flex items-center gap-2 bg-[#1a2530]/5 backdrop-blur-md border border-[#263544]/10 rounded-xl px-4 py-2"
+                        >
+                          <span className="font-bold text-[#263544] text-sm">{dept}</span>
+                          <span className="bg-[#C89355] text-white text-xs font-black px-2 py-0.5 rounded-lg">
+                            {count}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <Loader2 className="animate-spin text-[#C89355] mb-4" size={48} />
+                  <span className="font-black text-[#263544] text-lg animate-pulse">جاري تحميل بيانات المغادرين...</span>
+                </div>
+              )}
+
+              {/* Error State */}
+              {isError && !isLoading && (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="p-4 bg-rose-50 rounded-2xl">
+                    <AlertCircle className="text-rose-500" size={48} />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="font-black text-[#263544] text-xl mb-2">حدث خطأ في تحميل البيانات</h3>
+                    <p className="text-slate-600 text-sm mb-4">
+                      {error instanceof Error ? error.message : 'فشل في تحميل بيانات المغادرين'}
+                    </p>
+                    <button
+                      onClick={handleRetry}
+                      className="inline-flex items-center gap-2 bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl shadow-lg transition-all active:scale-95 text-sm font-black"
+                    >
+                      <RefreshCw size={18} />
+                      <span>إعادة المحاولة</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Content */}
+              {!isLoading && !isError && (
+                <>
+                  {/* قائمة الموظفين المستقيلين */}
+                  <ResignedEmployeesList
+                    employees={paginatedEmployees}
+                    statistics={statistics}
+                    pagination={paginationInfo}
+                    loading={isFetching}
+                    error={null}
+                    onSearch={(q) => { setSearchQuery(q); setCurrentPage(1); }}
+                    onFilterDepartment={(d) => { setDepartmentFilter(d); setCurrentPage(1); }}
+                    onFilterType={(t) => { setTypeFilter(t); setCurrentPage(1); }}
+                    onFilterFinancialStatus={(s) => { setFinancialStatusFilter(s); setCurrentPage(1); }}
+                    onFilterDateRange={(start, end) => { setDateRangeStart(start); setDateRangeEnd(end); setCurrentPage(1); }}
+                    onPageChange={setCurrentPage}
+                    onRehire={handleRehire}
+                    onFinancialSettlement={handleFinancialSettlement}
+                    departments={departments}
+                  />
+                </>
+              )}
+            </>
+          ) : (
+            // Initial loading state for SSR, before client mounts and fetches data
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="animate-spin text-[#C89355] mb-4" size={48} />
               <span className="font-black text-[#263544] text-lg animate-pulse">جاري تحميل بيانات المغادرين...</span>
             </div>
-          )}
-
-          {/* Error State */}
-          {isError && !isLoading && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="p-4 bg-rose-50 rounded-2xl">
-                <AlertCircle className="text-rose-500" size={48} />
-              </div>
-              <div className="text-center">
-                <h3 className="font-black text-[#263544] text-xl mb-2">حدث خطأ في تحميل البيانات</h3>
-                <p className="text-slate-600 text-sm mb-4">
-                  {error instanceof Error ? error.message : 'فشل في تحميل بيانات المغادرين'}
-                </p>
-                <button
-                  onClick={handleRetry}
-                  className="inline-flex items-center gap-2 bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl shadow-lg transition-all active:scale-95 text-sm font-black"
-                >
-                  <RefreshCw size={18} />
-                  <span>إعادة المحاولة</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Content */}
-          {!isLoading && !isError && (
-            <>
-              {/* قائمة الموظفين المستقيلين */}
-              <ResignedEmployeesList
-                employees={paginatedEmployees}
-                statistics={statistics}
-                pagination={paginationInfo}
-                loading={isFetching}
-                error={null}
-                onSearch={(q) => { setSearchQuery(q); setCurrentPage(1); }}
-                onFilterDepartment={(d) => { setDepartmentFilter(d); setCurrentPage(1); }}
-                onFilterType={(t) => { setTypeFilter(t); setCurrentPage(1); }}
-                onFilterFinancialStatus={(s) => { setFinancialStatusFilter(s); setCurrentPage(1); }}
-                onFilterDateRange={(start, end) => { setDateRangeStart(start); setDateRangeEnd(end); setCurrentPage(1); }}
-                onPageChange={setCurrentPage}
-                onSettle={handleSettle}
-                onRehire={handleRehire}
-                onFinancialSettlement={handleFinancialSettlement}
-                departments={departments}
-              />
-            </>
           )}
 
         </div>

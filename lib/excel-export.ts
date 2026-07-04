@@ -322,7 +322,7 @@ export class ExcelExportService {
    * Build the main data worksheet from export rows.
    * Sets column widths and marks the sheet as RTL.
    */
-  private buildDataSheet(rows: ResignedEmployeeExportRow[], xlsx: typeof import('xlsx')): { [key: string]: any } {
+  private buildDataSheet(rows: ResignedEmployeeExportRow[], xlsx: typeof import('xlsx')): import('xlsx').WorkSheet {
     const sheet = xlsx.utils.json_to_sheet(rows);
 
     // Column widths
@@ -341,7 +341,7 @@ export class ExcelExportService {
     filters: NonNullable<ExcelExportOptions['filters']>,
     rowCount: number,
     xlsx: typeof import('xlsx')
-  ): { [key: string]: any } {
+  ): import('xlsx').WorkSheet {
     const typeLabel =
       filters.terminationType === 'resignation'
         ? 'استقالة'

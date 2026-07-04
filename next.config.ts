@@ -42,6 +42,7 @@ const nextConfig: NextConfig = {
   },
 
   // silence workspace-root detection warning caused by multiple lockfiles
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   outputFileTracingRoot: require("path").join(__dirname),
 
   // تحسين أداء بيئة التطوير وتقليل استهلاك الـ RAM

@@ -72,11 +72,15 @@ export const useDashboard = () => {
   // Hard cap on skeleton time — if backend is slow, show zeros after timeout
   // rather than leaving the page stuck in skeleton state indefinitely
   const [timedOut, setTimedOut] = useState(false);
+
   useEffect(() => {
-    if (!dashboardQuery.isLoading) return;
-    setTimedOut(false);
-    const t = setTimeout(() => setTimedOut(true), SKELETON_TIMEOUT_MS);
-    return () => clearTimeout(t);
+    if (dashboardQuery.isLoading) {
+      const t = setTimeout(() => setTimedOut(true), SKELETON_TIMEOUT_MS);
+      return () => {
+        clearTimeout(t);
+        setTimedOut(false);
+      };
+    }
   }, [dashboardQuery.isLoading]);
 
   const dashboard = dashboardQuery.data as {

@@ -50,6 +50,18 @@ export interface PayrollReportTotals {
   totalNetPay: number;
 }
 
+export interface PayrollReceipt {
+  id?: string;
+  employeeId: string;
+  month: string;
+  payrollRunId?: string | null;
+  isReceived: boolean;
+  receivedAt?: string | null;
+  receivedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PayrollReportResponse {
   month: string;
   period: {

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Building2, UserCog, CalendarDays, Save, Loader2, Search, ChevronLeft, Check } from "lucide-react";
 import useDepartments from "@/hooks/useDepartments";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 
 export interface DeptFormData {
   name: string;
@@ -37,7 +37,11 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
   const empInputRef = useRef<HTMLInputElement>(null);
   const { createDepartment, updateDepartment } = useDepartments();
   const { data: rawEmployees = [] } = useEmployees({ fetchAll: true });
-  const allEmployees = useMemo(() => (Array.isArray(rawEmployees) ? rawEmployees : []), [rawEmployees]);
+  const { data: resignedEmployees = [] } = useResignedEmployees();
+  const allEmployees = useMemo(() => {
+    const resignedIds = new Set(resignedEmployees.map(e => e.employeeId));
+    return (Array.isArray(rawEmployees) ? rawEmployees : []).filter(e => !resignedIds.has(e.employeeId));
+  }, [rawEmployees, resignedEmployees]);
 
   const normalize = useCallback((s: string) => {
     if (!s) return "";
