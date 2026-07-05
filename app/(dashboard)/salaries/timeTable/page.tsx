@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Clock, ChevronLeft, Search, Edit2, Banknote, Loader2, CalendarPlus, AlertTriangle, CalendarDays } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -128,6 +128,12 @@ const _calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod =
 
 export default function TimeTablePage() {
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // FIX: نضمن أن employees دائماً مصفوفة بغض النظر عن شكل الـ response
   const { data: rawEmployees } = useEmployees({ limit: 200, status: "active" });
   const employees = useMemo(
@@ -600,6 +606,19 @@ export default function TimeTablePage() {
   };
 
   const selectedInputData = getSelectedInputData();
+
+  if (!mounted) {
+    return (
+      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+        <div className="flex items-center justify-center h-full min-h-[85vh]">
+          <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
+            <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin" />
+            <p className="text-[#263544] font-black animate-pulse text-sm">جاري تجهيز الصفحة...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

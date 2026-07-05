@@ -290,8 +290,8 @@ export default function PayrollPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPayslip, setSelectedPayslip] = useState<AggregatedPayroll | null>(null);
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
-  // Hydration guard — prevents server/client mismatch on loading state
-  const mounted = typeof window !== 'undefined';
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
 
   const { calculatePayroll } = usePayroll();
 

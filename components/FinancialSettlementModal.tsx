@@ -8,7 +8,7 @@ import type { Employee } from "@/types/employee";
 import type { PayrollInput } from "@/types/payroll";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { Salary } from "@/types/salary";
-import type { Leave } from "@/types/leave";
+import type { Leave } from "../types/leave";
 
 const STANDARD_WORK_DAYS = 26;
 const HOURS_PER_DAY = 8;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Trash2, RotateCcw, XCircle, Search,
@@ -39,17 +39,24 @@ const ENTITY_COLORS: Record<string, string> = {
 export default function TrashPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
-const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const { data: types = [] } = useQuery<{ entityType: string; count: number }[]>({
+  const { data: typesRaw } = useQuery({
     queryKey: ["trash", "types", period],
     queryFn: () => apiClient.get("/trash/types", { params: { period } }).then((r) => r.data),
   });
+  const types: { entityType: string; count: number }[] = Array.isArray(typesRaw)
+    ? typesRaw
+    : Array.isArray(typesRaw?.data)
+    ? typesRaw.data
+    : [];
 
   const { data: trashData, isLoading } = useQuery({
      queryKey: ["trash", "list", typeFilter, period],
@@ -202,29 +209,33 @@ const queryClient = useQueryClient();
 
         {/* Type filter chips */}
         <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setTypeFilter("")}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-              !typeFilter
-                ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
-                : "bg-white/60 text-slate-500 border-white/80 hover:bg-white/80"
-            }`}
-          >
-            الكل ({types.reduce((sum, t) => sum + t.count, 0)})
-          </button>
-          {types.map((t) => (
-            <button
-              key={t.entityType}
-              onClick={() => setTypeFilter(t.entityType)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-                typeFilter === t.entityType
-                  ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
-                  : "bg-white/60 text-slate-500 border-white/80 hover:bg-white/80"
-              }`}
-            >
-              {ENTITY_LABELS[t.entityType] || t.entityType} ({t.count})
-            </button>
-          ))}
+          {mounted && (
+            <>
+              <button
+                onClick={() => setTypeFilter("")}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                  !typeFilter
+                    ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
+                    : "bg-white/60 text-slate-500 border-white/80 hover:bg-white/80"
+                }`}
+              >
+                الكل ({types.reduce((sum, t) => sum + t.count, 0)})
+              </button>
+              {types.map((t) => (
+                <button
+                  key={t.entityType}
+                  onClick={() => setTypeFilter(t.entityType)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                    typeFilter === t.entityType
+                      ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
+                      : "bg-white/60 text-slate-500 border-white/80 hover:bg-white/80"
+                  }`}
+                >
+                  {ENTITY_LABELS[t.entityType] || t.entityType} ({t.count})
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Records table */}
@@ -241,7 +252,7 @@ const queryClient = useQueryClient();
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/40">
-                {isLoading ? (
+                {!mounted || isLoading ? (
                   <tr>
                     <td colSpan={4} className="p-16 text-center">
                       <Loader2 size={32} className="text-[#C89355] animate-spin mx-auto mb-3" />

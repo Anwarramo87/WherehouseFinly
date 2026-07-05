@@ -86,7 +86,7 @@ export default function DashboardLayout({
       </div>
 
       {/* ── Main content ── */}
-      <main className="flex-1 min-w-0 overflow-y-auto relative">
+      <main className="flex-1 min-w-0 overflow-y-auto relative" suppressHydrationWarning>
         {/* Mobile menu button */}
         <button
           onClick={openMobile}

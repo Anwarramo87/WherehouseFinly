@@ -1,3 +1,27 @@
+export interface PayrollInput {
+  id?: string;
+  employeeId: string;
+  periodStart?: string;
+  periodEnd?: string;
+  lateMinutes?: number;
+  earlyLeaveMinutes?: number;
+  absenceDays?: number;
+  sickLeaveDays?: number;
+  adminLeaveDays?: number;
+  unpaidLeaveDays?: number;
+  deathLeaveDays?: number;
+  unpaidHours?: number;
+  overtimeRegularMinutes?: number;
+  overtimeWeekendDays?: number;
+  penaltyAmount?: number;
+  clothingDeduction?: number;
+  bonusAdjustment?: number;
+  advanceAmount?: number;
+  insuranceAmount?: number;
+  transportAllowanceOverride?: number;
+  notes?: string;
+}
+
 export interface PayrollRun {
   id: string;
   runId: string;

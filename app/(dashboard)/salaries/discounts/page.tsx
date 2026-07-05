@@ -20,6 +20,9 @@ export default function DiscountsPage() {
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
   const { createAdvance, updateAdvance } = useAdvances(undefined, period);
@@ -193,7 +196,7 @@ export default function DiscountsPage() {
               <div className="relative z-10 flex flex-col">
                 <span className="text-xs font-black text-[#C89355] uppercase tracking-wider mb-0.5">المجموع النهائي (المعروض)</span>
                 <span className="text-2xl font-mono font-black text-white drop-shadow-md">
-                  {totalSum.toLocaleString()} <span className="text-xs text-white/70">ل.س</span>
+                  {mounted ? totalSum.toLocaleString() : "0"} <span className="text-xs text-white/70">ل.س</span>
                 </span>
               </div>
             </div>
@@ -256,8 +259,8 @@ export default function DiscountsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/40">
-                {groupedDiscounts.length === 0 ? (
-                  <tr><td colSpan={5} className="p-16 text-center text-[#263544]/60 font-black">لا توجد سجلات خصومات أو سلف مسجلة.</td></tr>
+                {!mounted || groupedDiscounts.length === 0 ? (
+                  <tr><td colSpan={5} className="p-16 text-center text-[#263544]/60 font-black">{mounted ? "لا توجد سجلات خصومات أو سلف مسجلة." : ""}</td></tr>
                 ) : (
                   groupedDiscounts.map((group) => {
                     const isExpanded = expandedRows[group.employeeId];

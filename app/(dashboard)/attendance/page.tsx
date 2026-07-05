@@ -93,6 +93,7 @@ export default function AttendancePage() {
   const searchParams = useSearchParams();
   const today = getToday();
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
   const [period, setPeriod] = useState(searchParams.get("period") || today.slice(0, 7));
   const [liveAttendanceEvent, setLiveAttendanceEvent] = useState<AttendanceRealtimeEventPayload | null>(null);
@@ -105,6 +106,10 @@ export default function AttendancePage() {
     field: "checkIn" | "checkOut" | null;
     value: string;
   }>({ isOpen: false, row: null, field: null, value: "" });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: employees = [], isLoading: employeesLoading } = useEmployees();
   const { data: leaves = [], isLoading: leavesLoading } = useLeaves({
@@ -279,6 +284,15 @@ export default function AttendancePage() {
       },
     });
   };
+
+  if (!mounted) return (
+    <div className="relative min-h-[85vh] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
+        <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin" />
+        <p className="text-[#263544] font-black animate-pulse text-sm">جاري تجهيز الصفحة...</p>
+      </div>
+    </div>
+  );
 
   if (employeesLoading || leavesLoading || dailyViewLoading) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">

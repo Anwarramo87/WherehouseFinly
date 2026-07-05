@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
@@ -18,6 +18,7 @@ const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { load
 export default function RewardsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
@@ -31,6 +32,10 @@ export default function RewardsClient() {
   const shouldOpenOnLoad = Boolean(initialEmployeeId || initialType || initialAllEmployees);
 
   const [isRaisePending, setIsRaisePending] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   type RewardRecord = {
     id: string;
@@ -231,6 +236,19 @@ export default function RewardsClient() {
     }
   };
 
+  if (!mounted) {
+    return (
+      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+        <div className="flex items-center justify-center h-full min-h-[85vh]">
+          <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
+            <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin" />
+            <p className="text-[#263544] font-black animate-pulse text-sm">جاري تجهيز الصفحة...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
       
@@ -372,7 +390,7 @@ export default function RewardsClient() {
                                       <tr key={record.id} className="hover:bg-white transition-colors">
                                         <td className="py-3 px-4 font-bold text-slate-700">{record.type}</td>
                                         <td className="py-3 px-4 font-mono font-black text-emerald-600 text-center">+{record.amount.toLocaleString()}</td>
-                                        <td className="py-3 px-4 font-mono text-slate-500 text-center">{new Date(record.date).toLocaleDateString("ar-EG")}</td>
+                                        <td className="py-3 px-4 font-mono text-slate-500 text-center">{record.date?.slice(0, 10).replace(/-/g, "/") || "—"}</td>
                                         <td className="py-3 px-4 text-xs font-medium text-slate-500 max-w-50 truncate">{record.notes || "—"}</td>
                                         <td className="py-3 px-4 text-center">
                                           <button

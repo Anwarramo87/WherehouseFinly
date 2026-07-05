@@ -16,12 +16,15 @@ export type { InventoryItem, StockMovement, InventoryItemInput, AdjustStockInput
 
 // Payroll and attendance types
 export type {
+  PayrollInput,
   PayrollRun,
   PayrollItem,
   CalculatePayrollInput,
   PayrollReportTotals,
   PayrollReportResponse
 } from './payroll';
+
+export type { Leave } from './leave';
 
 export type {
   AttendanceRecord,
