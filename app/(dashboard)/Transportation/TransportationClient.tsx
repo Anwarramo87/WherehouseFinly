@@ -7,7 +7,7 @@ import useTransportation, {
   useBusDetails,
   type BusDetailsResponse,
 } from "@/hooks/useTransportation";
-import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
+import { useEmployees } from "@/hooks/useEmployees";
 
 const AddBusModal = dynamic(() => import("@/components/AddBusModal"), { loading: () => null });
 const AddPassengerModal = dynamic(() => import("@/components/AddPassengerModal"), {
@@ -20,6 +20,7 @@ export interface Passenger {
   employeeId: string;
   name?: string;
   subscriptionDate?: string;
+  employeeStatus?: string;
 }
 
 export interface BusData {
@@ -64,6 +65,7 @@ function normalizeBusDetails(details: BusDetailsResponse): BusData {
       id: passenger.id,
       employeeId: passenger.employeeId,
       name: passenger.name || passenger.employeeId,
+      employeeStatus: passenger.employeeStatus ?? 'active',
       subscriptionDate:
         (passenger as { subscriptionDate?: string }).subscriptionDate ?? passenger.joinDate,
     })),
@@ -105,24 +107,12 @@ export default function TransportationClient() {
     addPassenger,
     removePassenger,
   } = useTransportation();
-  
-  // Apply proper filtering pattern - same as rewards/discounts pages
-  const { data: rawEmployees = [] } = useEmployees({ 
-    limit: 200, 
-    status: "active", 
-    fetchAll: false 
-  });
-  const { data: resignedEmployees = [] } = useResignedEmployees();
-  const resignedIds = useMemo(() => 
-    new Set(resignedEmployees.map(e => e.employeeId)), 
-    [resignedEmployees]
+
+  const { data: rawEmployees = [] } = useEmployees({ limit: 200, status: "active" });
+  const employees = useMemo(
+    () => (Array.isArray(rawEmployees) ? rawEmployees : []),
+    [rawEmployees],
   );
-  
-  // Filter out resigned employees for operational use
-  const employees = useMemo(() => {
-    const allEmployees = Array.isArray(rawEmployees) ? rawEmployees : [];
-    return allEmployees.filter(emp => !resignedIds.has(emp.employeeId));
-  }, [rawEmployees, resignedIds]);
 
   // React Query handles fetching, caching, and deduping bus details
   const safeBuses = useMemo(() => Array.isArray(buses) ? buses : [], [buses]);
@@ -183,7 +173,7 @@ export default function TransportationClient() {
   };
 
   const isResignedPassenger = (passenger: Passenger) => {
-    return resignedIds.has(passenger.employeeId);
+    return passenger.employeeStatus === 'resigned' || passenger.employeeStatus === 'terminated';
   };
 
   // Global Pooling Logic — compute from buses directly (available immediately)

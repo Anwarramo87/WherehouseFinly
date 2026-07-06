@@ -9,6 +9,7 @@ interface Department {
   manager?: string;
   employeeCount?: number;
   createdAt?: string;
+  establishedAt?: string;
 }
 
 interface DepartmentsResponse {
