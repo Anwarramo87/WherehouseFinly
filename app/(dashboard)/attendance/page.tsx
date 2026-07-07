@@ -21,6 +21,7 @@ import {
 } from "@/lib/realtime/attendance-socket";
 import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModal";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
+import PunchesModal from "@/components/PunchesModal";
 
 const LeaveRequestModal = dynamic(
   () => import("@/components/LeaveRequestModal"),
@@ -100,6 +101,7 @@ export default function AttendancePage() {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
 
+  const [punchesModal, setPunchesModal] = useState<{ employeeId: string; employeeName: string } | null>(null);
   const [timeModal, setTimeModal] = useState<{
     isOpen: boolean;
     row: AttendanceTableRow | null;
@@ -514,6 +516,13 @@ export default function AttendancePage() {
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
+                              onClick={() => setPunchesModal({ employeeId: row.employeeId, employeeName: row.employeeName })}
+                              className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black active:scale-95 transition-all"
+                            >
+                              <Fingerprint size={14} className="relative z-10" />
+                              <span className="relative z-10">البصمات</span>
+                            </button>
+                            <button
                               onClick={() => handleOpenTimeModal(row, "checkIn")}
                               disabled={markAttendance.isPending}
                               className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black disabled:opacity-50 active:scale-95 transition-all"
@@ -642,6 +651,16 @@ export default function AttendancePage() {
         onClose={() => setIsLeaveModalOpen(false)}
         employees={employeeList}
       />
+
+      {/* Punches Modal */}
+      {punchesModal && (
+        <PunchesModal
+          employeeId={punchesModal.employeeId}
+          employeeName={punchesModal.employeeName}
+          date={selectedDate}
+          onClose={() => setPunchesModal(null)}
+        />
+      )}
 
       {/* Leave Manage Modal — يفتح عند النقر على بادج الإجازة */}
       {selectedLeave && (

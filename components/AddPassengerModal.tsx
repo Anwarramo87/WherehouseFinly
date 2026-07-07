@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Save, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Check, AlertCircle, Bus as BusIcon } from "lucide-react";
-import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/page";
+import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/TransportationClient";
 import type { Employee } from "@/types/employee";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import apiClient from "@/lib/api-client";
