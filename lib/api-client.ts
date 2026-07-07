@@ -35,12 +35,24 @@ const AUTH_ENDPOINT_PREFIXES = [
   '/auth/logout',
   '/auth/me',
   '/auth/register',
+  '/auth/refresh',
   '/auth/biometric/',
 ] as const;
 
 const isAuthEndpoint = (pathname: string) => {
   return AUTH_ENDPOINT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 };
+
+let isRefreshing = false;
+let refreshSubscribers: Array<(success: boolean) => void> = [];
+
+const onRefreshComplete = (success: boolean) => {
+  refreshSubscribers.forEach((cb) => cb(success));
+  refreshSubscribers = [];
+};
+
+const waitForRefresh = (): Promise<boolean> =>
+  new Promise((resolve) => refreshSubscribers.push(resolve));
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -65,24 +77,58 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+const forceLogout = () => {
+  clearAuthAccessToken();
+  clearAuthSession();
+  useAuthStore.getState().clear();
+  resetAuthVerificationCache();
+
+  const now = Date.now();
+  if (typeof window !== 'undefined' && now - lastLoginRedirectAt > LOGIN_REDIRECT_COOLDOWN_MS && window.location.pathname !== '/login') {
+    lastLoginRedirectAt = now;
+    window.location.href = '/login';
+  }
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
     const requestPathname = getRequestPathname(error?.config?.url);
+    const originalConfig = error?.config;
 
-    if (status === 401 && typeof window !== 'undefined' && !isAuthEndpoint(requestPathname)) {
-      clearAuthAccessToken();
-      clearAuthSession();
-      useAuthStore.getState().clear();
-      resetAuthVerificationCache();
+    // فقط عند 401 وخارج نقاط المصادقة وبدون retry سابق
+    if (
+      status === 401 &&
+      typeof window !== 'undefined' &&
+      !isAuthEndpoint(requestPathname) &&
+      !originalConfig?._retry
+    ) {
+      if (isRefreshing) {
+        // انتظر حتى ينتهي الـ refresh الجاري
+        const success = await waitForRefresh();
+        if (success) {
+          originalConfig._retry = true;
+          return apiClient(originalConfig);
+        }
+        forceLogout();
+        return Promise.reject(error);
+      }
 
-      const now = Date.now();
-      const canRedirect = now - lastLoginRedirectAt > LOGIN_REDIRECT_COOLDOWN_MS;
+      isRefreshing = true;
+      originalConfig._retry = true;
 
-      if (canRedirect && window.location.pathname !== '/login') {
-        lastLoginRedirectAt = now;
-        window.location.href = '/login';
+      try {
+        await apiClient.post('/auth/refresh', {}, { timeout: 8_000 });
+        isRefreshing = false;
+        onRefreshComplete(true);
+        // أعد تنفيذ الطلب الأصلي بعد نجاح الـ refresh
+        return apiClient(originalConfig);
+      } catch {
+        isRefreshing = false;
+        onRefreshComplete(false);
+        forceLogout();
+        return Promise.reject(error);
       }
     }
 

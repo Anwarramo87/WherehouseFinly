@@ -53,7 +53,7 @@ export default function DashboardLayout({
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
 
   return (
-    <div className="flex min-h-screen h-screen overflow-hidden" dir="rtl">
+    <div className="flex min-h-screen h-screen overflow-clip" dir="rtl">
       <SessionRefresh />
       {/* ── Desktop Sidebar ── */}
       <div

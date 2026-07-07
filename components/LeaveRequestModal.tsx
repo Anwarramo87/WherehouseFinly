@@ -87,6 +87,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
   const [form, setForm] = useState(buildDefaultForm);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
   
   // حالة جديدة للتحكم بظهور حقل "إلى تاريخ"
   const [isMultiDay, setIsMultiDay] = useState(false);
@@ -174,6 +175,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       return;
     }
 
+    setInlineError(null);
     setIsSubmitting(true);
 
     const reason =
@@ -211,14 +213,35 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
             ? "تم حفظ طلب الإجازة بنجاح"
             : `تم حفظ ${succeeded} طلب إجازة بنجاح`
         );
+
+        // عرض تحذير التعارض مع الحضور إن وُجد
+        const warnings = bulkResults
+          .map((r: { employeeId: string; warning?: { message: string } }) => r.warning)
+          .filter(Boolean);
+        if (warnings.length > 0) {
+          setTimeout(() => {
+            toast(
+              (t) => (
+                <div dir="rtl" className="flex flex-col gap-1">
+                  <span className="font-black text-amber-700 text-sm">⚠️ تنبيه: تعارض مع الحضور</span>
+                  {warnings.map((w: { message: string } | undefined, i: number) => (
+                    <span key={i} className="text-xs text-slate-700 leading-relaxed">{w?.message}</span>
+                  ))}
+                </div>
+              ),
+              { duration: 8000, icon: null, style: { background: "#fef3c7", border: "1px solid #f59e0b", maxWidth: 420 } }
+            );
+          }, 400);
+        }
+
         void queryClient.invalidateQueries({ queryKey: ["leaves"], exact: false });
         void queryClient.invalidateQueries({ queryKey: ["employeeMonthlyLeaves"], exact: false });
         setForm(buildDefaultForm());
-        setIsMultiDay(false); // إعادة تعيين حالة الأيام
+        setIsMultiDay(false);
         onClose();
       } else {
         if (succeeded > 0) toast.success(`نجح ${succeeded} طلب`);
-        const firstFailed = bulkResults.find((r) => !r.success);
+        const firstFailed = bulkResults.find((r: { success: boolean; error?: string }) => !r.success);
         toast.error(`فشل ${failed} طلب: ${firstFailed?.error ?? "خطأ غير معروف"}`);
       }
     } catch (err: unknown) {
@@ -231,13 +254,14 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       } else if (status === 403) {
         toast.error("ليس لديك صلاحية لإنشاء طلبات إجازة.");
       } else if (status === 400) {
-        // عرض رسالة الخطأ من الباك إند بشكل واضح ولطيف
         const errorMessage = Array.isArray(msg) ? msg.join("\n") : (msg ?? "تحقق من البيانات");
-        
-        // إذا كانت الرسالة تحتوي على كلمة "تداخل" نعرض رسالة أكثر ودية
+        const friendlyMessage = "⚠️ الموظف لديه إجازة بالفعل في هذه التواريخ. يرجى اختيار تواريخ مختلفة.";
+
         if (typeof errorMessage === 'string' && errorMessage.includes('تداخل')) {
-          toast.error("⚠️ الموظف لديه إجازة بالفعل في هذه التواريخ. يرجى اختيار تواريخ مختلفة.", { duration: 5000 });
+          setInlineError(friendlyMessage);
+          toast.error(friendlyMessage, { duration: 5000 });
         } else {
+          setInlineError(errorMessage);
           toast.error(errorMessage, { duration: 5000 });
         }
       } else if (status === 500) {
@@ -500,6 +524,12 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                     onChange={(e) => setForm({ ...form, endTime: e.target.value })}
                   />
                 </div>
+              </div>
+            )}
+
+            {inlineError && (
+              <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-right">
+                <p className="text-sm font-black text-amber-300">{inlineError}</p>
               </div>
             )}
 
