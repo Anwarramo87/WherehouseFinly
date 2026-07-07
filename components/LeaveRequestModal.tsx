@@ -3,8 +3,17 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, CalendarDays, FileText, Save, CheckSquare, Square,
-  Loader2, Check, Search, Info, Plus
+  X,
+  CalendarDays,
+  FileText,
+  Save,
+  CheckSquare,
+  Square,
+  Loader2,
+  Check,
+  Search,
+  Info,
+  Plus,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,16 +97,16 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  
+
   // حالة جديدة للتحكم بظهور حقل "إلى تاريخ"
   const [isMultiDay, setIsMultiDay] = useState(false);
-  
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   const currentConfig = useMemo(
     () => LEAVE_TYPES.find((t) => t.label === form.leaveTypeLabel) ?? LEAVE_TYPES[0],
-    [form.leaveTypeLabel]
+    [form.leaveTypeLabel],
   );
 
   const isHourlyLeave = !!currentConfig.isHourly;
@@ -113,14 +122,16 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       employees.filter(
         (emp) =>
           emp.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          emp.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
+          emp.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
-    [employees, searchQuery]
+    [employees, searchQuery],
   );
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -178,10 +189,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
     setInlineError(null);
     setIsSubmitting(true);
 
-    const reason =
-      form.leaveTypeLabel === "أخرى"
-        ? form.customReason
-        : form.leaveTypeLabel;
+    const reason = form.leaveTypeLabel === "أخرى" ? form.customReason : form.leaveTypeLabel;
 
     // اللوجيك بقي كما هو دون أي تغيير ليطابق الباك إند
     const items = form.employeeIds.map((empId) => ({
@@ -192,16 +200,22 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       isPaid: currentConfig.isPaidLocked ? currentConfig.isPaidDefault : form.isPaid,
       reason,
       status: "APPROVED",
-      ...(isHourlyLeave ? {
-        isHourly: true,
-        startTime: form.startTime,
-        endTime: form.endTime,
-      } : {}),
+      ...(isHourlyLeave
+        ? {
+            isHourly: true,
+            startTime: form.startTime,
+            endTime: form.endTime,
+          }
+        : {}),
     }));
 
     try {
       const res = await apiClient.post("/leaves/bulk", { items });
-      const { succeeded, failed, results: bulkResults } = res.data as {
+      const {
+        succeeded,
+        failed,
+        results: bulkResults,
+      } = res.data as {
         succeeded: number;
         failed: number;
         results: Array<{ employeeId: string; success: boolean; error?: string }>;
@@ -209,9 +223,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
       if (failed === 0) {
         toast.success(
-          items.length === 1
-            ? "تم حفظ طلب الإجازة بنجاح"
-            : `تم حفظ ${succeeded} طلب إجازة بنجاح`
+          items.length === 1 ? "تم حفظ طلب الإجازة بنجاح" : `تم حفظ ${succeeded} طلب إجازة بنجاح`,
         );
 
         // عرض تحذير التعارض مع الحضور إن وُجد
@@ -223,13 +235,21 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
             toast(
               (t) => (
                 <div dir="rtl" className="flex flex-col gap-1">
-                  <span className="font-black text-amber-700 text-sm">⚠️ تنبيه: تعارض مع الحضور</span>
+                  <span className="font-black text-amber-700 text-sm">
+                    ⚠️ تنبيه: تعارض مع الحضور
+                  </span>
                   {warnings.map((w: { message: string } | undefined, i: number) => (
-                    <span key={i} className="text-xs text-slate-700 leading-relaxed">{w?.message}</span>
+                    <span key={i} className="text-xs text-slate-700 leading-relaxed">
+                      {w?.message}
+                    </span>
                   ))}
                 </div>
               ),
-              { duration: 8000, icon: null, style: { background: "#fef3c7", border: "1px solid #f59e0b", maxWidth: 420 } }
+              {
+                duration: 8000,
+                icon: null,
+                style: { background: "#fef3c7", border: "1px solid #f59e0b", maxWidth: 420 },
+              },
             );
           }, 400);
         }
@@ -241,11 +261,18 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         onClose();
       } else {
         if (succeeded > 0) toast.success(`نجح ${succeeded} طلب`);
-        const firstFailed = bulkResults.find((r: { success: boolean; error?: string }) => !r.success);
+        const firstFailed = bulkResults.find(
+          (r: { success: boolean; error?: string }) => !r.success,
+        );
         toast.error(`فشل ${failed} طلب: ${firstFailed?.error ?? "خطأ غير معروف"}`);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { message?: string | string[]; error?: { message?: string } } } };
+      const axiosErr = err as {
+        response?: {
+          status?: number;
+          data?: { message?: string | string[]; error?: { message?: string } };
+        };
+      };
       const status = axiosErr?.response?.status;
       const msg = axiosErr?.response?.data?.message || axiosErr?.response?.data?.error?.message;
 
@@ -255,9 +282,10 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         toast.error("ليس لديك صلاحية لإنشاء طلبات إجازة.");
       } else if (status === 400) {
         const errorMessage = Array.isArray(msg) ? msg.join("\n") : (msg ?? "تحقق من البيانات");
-        const friendlyMessage = "⚠️ الموظف لديه إجازة بالفعل في هذه التواريخ. يرجى اختيار تواريخ مختلفة.";
+        const friendlyMessage =
+          "⚠️ الموظف لديه إجازة بالفعل في هذه التواريخ. يرجى اختيار تواريخ مختلفة.";
 
-        if (typeof errorMessage === 'string' && errorMessage.includes('تداخل')) {
+        if (typeof errorMessage === "string" && errorMessage.includes("تداخل")) {
           setInlineError(friendlyMessage);
           toast.error(friendlyMessage, { duration: 5000 });
         } else {
@@ -265,7 +293,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
           toast.error(errorMessage, { duration: 5000 });
         }
       } else if (status === 500) {
-        toast.error(`خطأ في الخادم: ${typeof msg === 'string' ? msg : "حدث خطأ غير متوقع. تحقق من logs الباك إند."}`);
+        toast.error(
+          `خطأ في الخادم: ${typeof msg === "string" ? msg : "حدث خطأ غير متوقع. تحقق من logs الباك إند."}`,
+        );
       } else {
         toast.error("تعذر الاتصال بالخادم. تأكد من تشغيل الباك إند.");
       }
@@ -280,7 +310,6 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       dir="rtl"
     >
       <div className="bg-[#101720] rounded-[2.5rem] shadow-[0_30px_90px_-15px_rgba(200,147,85,0.15)] w-full max-w-xl overflow-hidden flex flex-col border border-white/10 outline-dashed outline-1 outline-[#C89355]/30 -outline-offset-8 max-h-[95vh]">
-
         {/* Header */}
         <div className="p-6 sm:p-8 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0">
           <div className="flex items-center gap-4">
@@ -288,7 +317,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
               <FileText className="text-[#C89355]" size={24} />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">إدارة الإجازات والعطل</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+                إدارة الإجازات والعطل
+              </h2>
               <p className="text-xs text-slate-400 font-bold mt-0.5">
                 {form.employeeIds.length > 0
                   ? `${form.employeeIds.length} موظف محدد`
@@ -296,7 +327,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
               </p>
             </div>
           </div>
-          
+
           {/* زر الإغلاق مع تأثير الطاحونة */}
           <button
             onClick={onClose}
@@ -308,8 +339,11 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
         {/* Body */}
         <div className="overflow-y-auto custom-scrollbar flex-1 p-6 sm:p-8">
-          <form id="leaveForm" onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 text-right">
-
+          <form
+            id="leaveForm"
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 gap-5 text-right"
+          >
             {/* ── تحديد الموظفين ── */}
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -325,10 +359,11 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                     {isAllSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
                   </span>
                   <div className="text-[#C89355] transition-colors duration-300">
-                    {isAllSelected
-                      ? <CheckSquare size={16} />
-                      : <Square size={16} className="text-slate-500 group-hover:text-[#C89355]" />
-                    }
+                    {isAllSelected ? (
+                      <CheckSquare size={16} />
+                    ) : (
+                      <Square size={16} className="text-slate-500 group-hover:text-[#C89355]" />
+                    )}
                   </div>
                 </button>
               </div>
@@ -341,17 +376,27 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner pr-12 text-sm"
                     value={searchQuery}
                     onFocus={() => setIsDropdownOpen(true)}
-                    onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(true); }}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
                   />
-                  <Search className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={20} />
+                  <Search
+                    className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none"
+                    size={20}
+                  />
                 </div>
 
                 {isDropdownOpen && (
                   <div className="absolute z-50 w-full mt-2 max-h-48 overflow-y-auto bg-[#1a2530] border border-[#263544] rounded-2xl shadow-2xl p-2 custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
                     {employees.length === 0 ? (
-                      <p className="p-4 text-xs text-center text-slate-500 font-bold">لا يوجد موظفون في القائمة</p>
+                      <p className="p-4 text-xs text-center text-slate-500 font-bold">
+                        لا يوجد موظفون في القائمة
+                      </p>
                     ) : filteredEmployees.length === 0 ? (
-                      <p className="p-4 text-xs text-center text-slate-500 font-bold">لا توجد نتائج مطابقة</p>
+                      <p className="p-4 text-xs text-center text-slate-500 font-bold">
+                        لا توجد نتائج مطابقة
+                      </p>
                     ) : (
                       filteredEmployees.map((emp) => {
                         const isSelected = form.employeeIds.includes(emp.employeeId);
@@ -367,7 +412,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                           >
                             <span>
                               {emp.name}{" "}
-                              <span className="font-mono text-[10px] text-slate-500">({emp.employeeId})</span>
+                              <span className="font-mono text-[10px] text-slate-500">
+                                ({emp.employeeId})
+                              </span>
                             </span>
                             {isSelected && <Check size={14} />}
                           </div>
@@ -405,7 +452,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
             {/* ── نوع الإجازة ── */}
             <div>
-              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">نوع الإجازة</label>
+              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                نوع الإجازة
+              </label>
               <div className="relative group">
                 <select
                   required
@@ -414,16 +463,23 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                   onChange={(e) => handleLeaveTypeChange(e.target.value)}
                 >
                   {LEAVE_TYPES.map((t) => (
-                    <option key={t.label} value={t.label}>{t.label}</option>
+                    <option key={t.label} value={t.label}>
+                      {t.label}
+                    </option>
                   ))}
                 </select>
-                <FileText className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={22} />
+                <FileText
+                  className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors pointer-events-none"
+                  size={22}
+                />
               </div>
             </div>
 
             {/* ── حقول التاريخ أو الساعات ── */}
             {!isHourlyLeave ? (
-              <div className={`grid grid-cols-1 ${isMultiDay ? 'sm:grid-cols-2' : ''} gap-4 animate-in fade-in duration-300`}>
+              <div
+                className={`grid grid-cols-1 ${isMultiDay ? "sm:grid-cols-2" : ""} gap-4 animate-in fade-in duration-300`}
+              >
                 <div>
                   <div className="flex justify-between items-end mb-2">
                     <label className="block text-xs font-black text-[#C89355] uppercase">
@@ -432,22 +488,26 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                   </div>
                   <div className="relative group">
                     <input
-                      type="date" required
+                      type="date"
+                      required
                       className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 text-sm transition-all"
                       value={form.startDate}
                       onChange={(e) => {
                         const newDate = e.target.value;
-                        setForm({ 
-                          ...form, 
+                        setForm({
+                          ...form,
                           startDate: newDate,
                           // مزامنة حقل إلى تاريخ في حال كان يوم واحد فقط لكي لا ينكسر طلب الـ API
-                          endDate: isMultiDay ? form.endDate : newDate
+                          endDate: isMultiDay ? form.endDate : newDate,
                         });
                       }}
                     />
-                    <CalendarDays className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={20} />
+                    <CalendarDays
+                      className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none"
+                      size={20}
+                    />
                   </div>
-                  
+
                   {/* زر إضافة إجازة متعددة الأيام بتصميم جديد */}
                   {!isMultiDay && (
                     <button
@@ -466,13 +526,15 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                 {isMultiDay && (
                   <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-xs font-black text-[#C89355] uppercase">إلى تاريخ</label>
+                      <label className="block text-xs font-black text-[#C89355] uppercase">
+                        إلى تاريخ
+                      </label>
                       <button
                         type="button"
                         onClick={() => {
                           setIsMultiDay(false);
                           // إعادة تعيين تاريخ النهاية ليطابق البداية
-                          setForm(prev => ({ ...prev, endDate: prev.startDate }));
+                          setForm((prev) => ({ ...prev, endDate: prev.startDate }));
                         }}
                         className="text-[10px] font-bold text-rose-400/80 hover:text-rose-400 transition-colors"
                       >
@@ -481,13 +543,17 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                     </div>
                     <div className="relative group">
                       <input
-                        type="date" required
+                        type="date"
+                        required
                         min={form.startDate}
                         className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 text-sm transition-all"
                         value={form.endDate}
                         onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                       />
-                      <CalendarDays className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={20} />
+                      <CalendarDays
+                        className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none"
+                        size={20}
+                      />
                     </div>
                   </div>
                 )}
@@ -495,30 +561,42 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
             ) : (
               <div className="grid grid-cols-3 gap-3 animate-in slide-in-from-top-3 duration-300">
                 <div>
-                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">تاريخ اليوم</label>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                    تاريخ اليوم
+                  </label>
                   <div className="relative group">
                     <input
-                      type="date" required
+                      type="date"
+                      required
                       className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold text-xs transition-all pr-9"
                       value={form.startDate}
                       onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                     />
-                    <CalendarDays className="absolute right-3 top-3.5 text-slate-500 pointer-events-none" size={16} />
+                    <CalendarDays
+                      className="absolute right-3 top-3.5 text-slate-500 pointer-events-none"
+                      size={16}
+                    />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">من الساعة</label>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                    من الساعة
+                  </label>
                   <input
-                    type="time" required
+                    type="time"
+                    required
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold text-xs transition-all text-center"
                     value={form.startTime}
                     onChange={(e) => setForm({ ...form, startTime: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">إلى الساعة</label>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                    إلى الساعة
+                  </label>
                   <input
-                    type="time" required
+                    type="time"
+                    required
                     className="w-full p-3.5 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-mono font-bold text-xs transition-all text-center"
                     value={form.endTime}
                     onChange={(e) => setForm({ ...form, endTime: e.target.value })}
@@ -536,7 +614,9 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
             {/* ── سبب الإجازة (عند اختيار "أخرى") ── */}
             {form.leaveTypeLabel === "أخرى" && (
               <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">السبب بالتفصيل</label>
+                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                  السبب بالتفصيل
+                </label>
                 <textarea
                   required
                   placeholder="يرجى كتابة سبب الإجازة هنا..."
@@ -562,17 +642,17 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                 className="flex items-center gap-3 group w-fit"
               >
                 <div className="text-[#C89355] transition-colors duration-300">
-                  {form.isPaid
-                    ? <CheckSquare size={24} />
-                    : <Square size={24} className="text-slate-500 group-hover:text-[#C89355]" />
-                  }
+                  {form.isPaid ? (
+                    <CheckSquare size={24} />
+                  ) : (
+                    <Square size={24} className="text-slate-500 group-hover:text-[#C89355]" />
+                  )}
                 </div>
                 <span className="text-sm font-black text-white select-none transition-colors group-hover:text-[#C89355]">
                   {form.isPaid ? "إجازة مأجورة" : "إجازة غير مأجورة"}
                 </span>
               </button>
             )}
-
           </form>
         </div>
 
@@ -597,13 +677,12 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
               ? "جارٍ الحفظ..."
               : form.employeeIds.length > 1
                 ? `حفظ ${form.employeeIds.length} طلبات`
-                : "حفظ الطلب"
-            }
+                : "حفظ الطلب"}
           </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
