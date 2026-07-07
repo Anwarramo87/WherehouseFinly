@@ -2,7 +2,19 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Save, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Check, AlertCircle, Bus as BusIcon } from "lucide-react";
+import {
+  X,
+  Save,
+  Search,
+  Calendar,
+  CheckSquare,
+  Square,
+  Users,
+  ChevronLeft,
+  Check,
+  AlertCircle,
+  Bus as BusIcon,
+} from "lucide-react";
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/TransportationClient";
 import type { Employee } from "@/types/employee";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
@@ -18,10 +30,12 @@ interface Props {
 export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
-  const [subscriptionDate, setSubscriptionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [subscriptionDate, setSubscriptionDate] = useState(new Date().toISOString().split("T")[0]);
   const [isClosing, setIsClosing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [activeSubscribers, setActiveSubscribers] = useState<Record<string, { route: string; plateNumber: string }>>({});
+  const [activeSubscribers, setActiveSubscribers] = useState<
+    Record<string, { route: string; plateNumber: string }>
+  >({});
 
   // Focus trap and body scroll lock
   useEffect(() => {
@@ -30,40 +44,43 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsClosing(false);
       setTimeout(() => searchInputRef.current?.focus(), 100);
-      // Fetch active subscribers to disable already-subscribed employees  
-      apiClient.get("/transportation/active-subscribers")
-        .then(res => setActiveSubscribers(res.data ?? {}))
+      // Fetch active subscribers to disable already-subscribed employees
+      apiClient
+        .get("/transportation/active-subscribers")
+        .then((res) => setActiveSubscribers(res.data ?? {}))
         .catch(() => setActiveSubscribers({}));
     } else {
       document.body.style.overflow = "unset";
     }
-    return () => { document.body.style.overflow = "unset"; };
+    return () => {
+      document.body.style.overflow = "unset";
+    };
   }, [isOpen]);
 
   const routeText = useMemo(() => busData?.route?.trim() || "", [busData]);
-  
+
   // Use proper filtering pattern - same as rewards/discounts pages
-  const { data: rawEmployees = [], isLoading } = useEmployees({ 
-    limit: 200, 
-    status: "active", 
-    fetchAll: false 
+  const { data: rawEmployees = [], isLoading } = useEmployees({
+    limit: 200,
+    status: "active",
+    fetchAll: false,
   });
   const { data: resignedEmployees = [] } = useResignedEmployees();
-  const resignedIds = useMemo(() => 
-    new Set(resignedEmployees.map(e => e.employeeId)), 
-    [resignedEmployees]
+  const resignedIds = useMemo(
+    () => new Set(resignedEmployees.map((e) => e.employeeId)),
+    [resignedEmployees],
   );
-  
+
   // Filter out resigned employees from available selections
   const allEmployees = useMemo(() => {
     const employees = Array.isArray(rawEmployees) ? rawEmployees : [];
-    return employees.filter(emp => !resignedIds.has(emp.employeeId));
+    return employees.filter((emp) => !resignedIds.has(emp.employeeId));
   }, [rawEmployees, resignedIds]);
-  
+
   // Employees already subscribed to THIS bus
   const existingEmployeeIds = useMemo(
-    () => new Set((busData.passengers || []).map(p => p.employeeId)),
-    [busData.passengers]
+    () => new Set((busData.passengers || []).map((p) => p.employeeId)),
+    [busData.passengers],
   );
 
   // Employees subscribed to OTHER buses (cannot be added here)
@@ -100,9 +117,12 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
     for (const emp of allEmployees) {
       if (!emp || existingEmployeeIds.has(emp.employeeId)) continue;
       const residenceNorm = normalize(emp.residence || "");
-      const isMatch = normRoute && residenceNorm && 
-        (normRoute.includes(residenceNorm) || residenceNorm.includes(normRoute) || 
-         residenceNorm.split(" ").some(token => normRoute.includes(token)));
+      const isMatch =
+        normRoute &&
+        residenceNorm &&
+        (normRoute.includes(residenceNorm) ||
+          residenceNorm.includes(normRoute) ||
+          residenceNorm.split(" ").some((token) => normRoute.includes(token)));
 
       if (isMatch) matched.push(emp);
       else others.push(emp);
@@ -121,21 +141,30 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
   }, [allEmployees, routeText, existingEmployeeIds, normalize]);
 
   // Live search filter
-  const filterByQuery = useCallback((employees: Employee[]) => {
-    if (!searchQuery.trim()) return employees;
-    const q = searchQuery.trim().toLowerCase();
-    return employees.filter(emp =>
-      emp.employeeId.toLowerCase().includes(q) || emp.name.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
+  const filterByQuery = useCallback(
+    (employees: Employee[]) => {
+      if (!searchQuery.trim()) return employees;
+      const q = searchQuery.trim().toLowerCase();
+      return employees.filter(
+        (emp) => emp.employeeId.toLowerCase().includes(q) || emp.name.toLowerCase().includes(q),
+      );
+    },
+    [searchQuery],
+  );
 
-  const filteredMatched = useMemo(() => filterByQuery(matchedEmployees), [filterByQuery, matchedEmployees]);
-  const filteredOthers = useMemo(() => filterByQuery(otherEmployees), [filterByQuery, otherEmployees]);
+  const filteredMatched = useMemo(
+    () => filterByQuery(matchedEmployees),
+    [filterByQuery, matchedEmployees],
+  );
+  const filteredOthers = useMemo(
+    () => filterByQuery(otherEmployees),
+    [filterByQuery, otherEmployees],
+  );
 
   const toggleSelect = (empId: string) => {
     if (subscribedElsewhere.has(empId)) return; // prevent selecting employees subscribed elsewhere
     if (resignedIds.has(empId)) return; // prevent selecting resigned employees
-    setSelectedEmployeeIds(prev => {
+    setSelectedEmployeeIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(empId)) newSet.delete(empId);
       else newSet.add(empId);
@@ -144,9 +173,9 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
   };
 
   const selectAll = (employees: Employee[]) => {
-    setSelectedEmployeeIds(prev => {
+    setSelectedEmployeeIds((prev) => {
       const newSet = new Set(prev);
-      employees.forEach(emp => {
+      employees.forEach((emp) => {
         if (!subscribedElsewhere.has(emp.employeeId) && !resignedIds.has(emp.employeeId)) {
           newSet.add(emp.employeeId);
         }
@@ -156,9 +185,9 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
   };
 
   const deselectAll = (employees: Employee[]) => {
-    setSelectedEmployeeIds(prev => {
+    setSelectedEmployeeIds((prev) => {
       const newSet = new Set(prev);
-      employees.forEach(emp => newSet.delete(emp.employeeId));
+      employees.forEach((emp) => newSet.delete(emp.employeeId));
       return newSet;
     });
   };
@@ -177,7 +206,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
     }
 
     for (const empId of selectedEmployeeIds) {
-      const employee = allEmployees.find(emp => emp.employeeId === empId);
+      const employee = allEmployees.find((emp) => emp.employeeId === empId);
       if (!employee) continue;
       const generatedId = `${busData.id}-${empId}-${Date.now()}-${Math.random()}`;
       onSave({
@@ -198,26 +227,36 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
     }, 200);
   };
 
-  const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isOpen && !isClosing) onClose();
-  }, [isOpen, onClose, isClosing]);
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !isClosing) onClose();
+    },
+    [isOpen, onClose, isClosing],
+  );
 
   useEffect(() => {
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [handleEscape]);
 
   if (!isOpen && !isClosing) return null;
   if (typeof document === "undefined") return null;
 
   // Render employee list with checkboxes
-  const renderEmployeeList = (employees: Employee[], title: string, variant: 'matched' | 'other') => {
+  const renderEmployeeList = (
+    employees: Employee[],
+    title: string,
+    variant: "matched" | "other",
+  ) => {
     if (employees.length === 0) return null;
     return (
-      <div className="animate-fadeInUp" style={{ animationDelay: variant === 'matched' ? '0.05s' : '0.1s' }}>
+      <div
+        className="animate-fadeInUp"
+        style={{ animationDelay: variant === "matched" ? "0.05s" : "0.1s" }}
+      >
         <div className="flex justify-between items-center mb-3">
           <div className="flex items-center gap-2">
-            {variant === 'matched' && (
+            {variant === "matched" && (
               <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow"></span>
             )}
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -246,62 +285,67 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
             const isSubscribedElsewhere = subscribedElsewhere.has(emp.employeeId);
             const subInfo = subscribedElsewhere.get(emp.employeeId);
             const isResignedButExisting = resignedIds.has(emp.employeeId);
-            
+
             return (
-            <label
-              key={emp.employeeId}
-              className={`flex items-center justify-between px-4 py-3 transition-all duration-150 group ${
-                isSubscribedElsewhere
-                  ? 'opacity-60 cursor-not-allowed bg-rose-500/5'
-                  : isResignedButExisting
-                    ? 'opacity-70 cursor-not-allowed bg-amber-500/5'
-                    : selectedEmployeeIds.has(emp.employeeId)
-                      ? 'cursor-pointer bg-[#C89355]/5 hover:bg-white/5'
-                      : 'cursor-pointer hover:bg-white/5'
-              }`}
-              style={{ animationDelay: `${idx * 0.01}s` }}
-            >
-              <div className="flex items-center gap-4 flex-1">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={selectedEmployeeIds.has(emp.employeeId)}
-                    disabled={isSubscribedElsewhere || isResignedButExisting}
-                    onChange={() => toggleSelect(emp.employeeId)}
-                    className="w-5 h-5 rounded-md border-2 border-slate-500 bg-transparent checked:bg-[#C89355] checked:border-[#C89355] focus:ring-2 focus:ring-[#C89355]/50 focus:ring-offset-0 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              <label
+                key={emp.employeeId}
+                className={`flex items-center justify-between px-4 py-3 transition-all duration-150 group ${
+                  isSubscribedElsewhere
+                    ? "opacity-60 cursor-not-allowed bg-rose-500/5"
+                    : isResignedButExisting
+                      ? "opacity-70 cursor-not-allowed bg-amber-500/5"
+                      : selectedEmployeeIds.has(emp.employeeId)
+                        ? "cursor-pointer bg-[#C89355]/5 hover:bg-white/5"
+                        : "cursor-pointer hover:bg-white/5"
+                }`}
+                style={{ animationDelay: `${idx * 0.01}s` }}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={selectedEmployeeIds.has(emp.employeeId)}
+                      disabled={isSubscribedElsewhere || isResignedButExisting}
+                      onChange={() => toggleSelect(emp.employeeId)}
+                      className="w-5 h-5 rounded-md border-2 border-slate-500 bg-transparent checked:bg-[#C89355] checked:border-[#C89355] focus:ring-2 focus:ring-[#C89355]/50 focus:ring-offset-0 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    {selectedEmployeeIds.has(emp.employeeId) && (
+                      <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white pointer-events-none" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span className="font-mono text-sm font-bold text-white tracking-wide">
+                        {emp.employeeId}
+                      </span>
+                      <span className="text-xs text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">
+                        {emp.residence || "بدون سكن"}
+                      </span>
+                      {isSubscribedElsewhere && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                          <BusIcon size={10} />
+                          مشترك بباص &ldquo;{subInfo?.route}&rdquo; ({subInfo?.plateNumber})
+                        </span>
+                      )}
+                      {isResignedButExisting && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                          <AlertCircle size={10} />
+                          موظف مستقيل - لا يمكن إضافته
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-slate-300 mt-0.5 group-hover:text-white transition-colors">
+                      {emp.name}
+                    </div>
+                  </div>
+                </div>
+                {!isSubscribedElsewhere && !isResignedButExisting && (
+                  <ChevronLeft
+                    size={16}
+                    className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
                   />
-                  {selectedEmployeeIds.has(emp.employeeId) && (
-                    <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white pointer-events-none" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className="font-mono text-sm font-bold text-white tracking-wide">{emp.employeeId}</span>
-                    <span className="text-xs text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">
-                      {emp.residence || 'بدون سكن'}
-                    </span>
-                    {isSubscribedElsewhere && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
-                        <BusIcon size={10} />
-                        مشترك بباص &ldquo;{subInfo?.route}&rdquo; ({subInfo?.plateNumber})
-                      </span>
-                    )}
-                    {isResignedButExisting && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                        <AlertCircle size={10} />
-                        موظف مستقيل - لا يمكن إضافته
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm text-slate-300 mt-0.5 group-hover:text-white transition-colors">
-                    {emp.name}
-                  </div>
-                </div>
-              </div>
-              {!isSubscribedElsewhere && !isResignedButExisting && (
-                <ChevronLeft size={16} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-              )}
-            </label>
+                )}
+              </label>
             );
           })}
         </div>
@@ -310,16 +354,16 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
   };
 
   return createPortal(
-    <div 
+    <div
       className={`fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 transition-all duration-300 ${
-        isClosing ? 'opacity-0 backdrop-blur-none' : 'opacity-100 backdrop-blur-md'
+        isClosing ? "opacity-0 backdrop-blur-none" : "opacity-100 backdrop-blur-md"
       }`}
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
       dir="rtl"
     >
-      <div 
+      <div
         className={`bg-gradient-to-br from-[#0f1720] to-[#0a0f15] rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border border-white/10 transition-all duration-300 ${
-          isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+          isClosing ? "scale-95 opacity-0" : "scale-100 opacity-100"
         }`}
       >
         {/* Header with enhanced gradient and glow */}
@@ -343,7 +387,9 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                   </span>
                   {selectedEmployeeIds.size > 0 && (
                     <span className="text-xs text-slate-400">
-                      • تم اختيار <span className="text-[#C89355] font-bold">{selectedEmployeeIds.size}</span> موظف
+                      • تم اختيار{" "}
+                      <span className="text-[#C89355] font-bold">{selectedEmployeeIds.size}</span>{" "}
+                      موظف
                     </span>
                   )}
                 </div>
@@ -375,11 +421,14 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={20} />
+                <Search
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#C89355] transition-colors"
+                  size={20}
+                />
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => setSearchQuery("")}
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                   >
                     <X size={16} />
@@ -396,14 +445,22 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
               </div>
             ) : (
               <div className="space-y-6">
-                {filteredMatched.length > 0 && renderEmployeeList(filteredMatched, `✨ مطابقون للرحلة (${routeText || 'بدون مسار'})`, 'matched')}
-                {filteredOthers.length > 0 && renderEmployeeList(filteredOthers, 'جميع الموظفين الآخرين', 'other')}
+                {filteredMatched.length > 0 &&
+                  renderEmployeeList(
+                    filteredMatched,
+                    `✨ مطابقون للرحلة (${routeText || "بدون مسار"})`,
+                    "matched",
+                  )}
+                {filteredOthers.length > 0 &&
+                  renderEmployeeList(filteredOthers, "جميع الموظفين الآخرين", "other")}
                 {filteredMatched.length === 0 && filteredOthers.length === 0 && (
                   <div className="text-center py-12 bg-white/5 rounded-2xl border border-dashed border-white/10">
                     {searchQuery ? (
                       <>
                         <AlertCircle className="mx-auto text-slate-500 mb-2" size={32} />
-                        <p className="text-slate-400">لا توجد نتائج مطابقة لـ &ldquo;{searchQuery}&rdquo;</p>
+                        <p className="text-slate-400">
+                          لا توجد نتائج مطابقة لـ &ldquo;{searchQuery}&rdquo;
+                        </p>
                       </>
                     ) : (
                       <>
@@ -442,7 +499,9 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full">
                 <span className="text-xs text-slate-400">المحددون</span>
-                <span className="text-[#C89355] font-black text-lg">{selectedEmployeeIds.size}</span>
+                <span className="text-[#C89355] font-black text-lg">
+                  {selectedEmployeeIds.size}
+                </span>
               </div>
               {selectedEmployeeIds.size > 0 && (
                 <button
@@ -483,7 +542,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #C89355;
+          background: #c89355;
           border-radius: 10px;
         }
         @keyframes fadeInUp {
@@ -501,6 +560,6 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
         }
       `}</style>
     </div>,
-    document.body
+    document.body,
   );
 }
