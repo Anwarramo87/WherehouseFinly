@@ -165,7 +165,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
 
   return (
     <aside
-      className={`h-full relative bg-[#101720]/80 backdrop-blur-3xl border-y border-l border-white/5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] rounded-l-[2.5rem] flex flex-col transition-all duration-300 ease-out overflow-visible ${isCollapsed ? 'w-20' : 'w-72'}`}
+      className={`h-full relative z-40 bg-[#101720]/80 backdrop-blur-3xl border-y border-l border-white/5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] rounded-l-[2.5rem] flex flex-col transition-all duration-300 ease-out overflow-visible ${isCollapsed ? 'w-20' : 'w-72'}`}
       dir="rtl"
     >
       {/* ── زر إغلاق للموبايل ── */}

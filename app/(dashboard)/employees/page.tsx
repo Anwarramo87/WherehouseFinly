@@ -172,37 +172,21 @@ export default function EmployeesPage() {
     });
   }, [visibleEmployees, searchTerm, selectedDept]);
 
-  // --- حساب كود الموظف بطريقة آمنة جداً (البحث عن أكبر رقم مستخدم) ---
-  const suggestedEmployeeId = useMemo(() => {
-    // Use ALL employees (including terminated) to avoid suggesting an already-used ID
-    const allEmps = Array.isArray(allEmployeesForId) ? allEmployeesForId : [];
-    if (allEmps.length === 0) return "EMP00001";
-    
-    // استخراج كل الأرقام من أكواد الموظفين الموجودة
-    const existingIds = allEmps.map(e => e.employeeId);
-    let maxNumber = 0;
+  const [suggestedEmployeeId, setSuggestedEmployeeId] = useState("EMP00001");
 
-    existingIds.forEach(id => {
-      const match = id.match(/^EMP(\d+)$/i); // استخراج الرقم بغض النظر عن طوله
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNumber) {
-          maxNumber = num;
-        }
-      }
-    });
-
-    let nextNumber = maxNumber + 1;
-    let nextId = `EMP${String(nextNumber).padStart(5, '0')}`;
-
-    // حلقة تأكيدية: التأكد التام أن الـ ID الجديد غير موجود (للحماية من أي ثغرة)
-    while (existingIds.includes(nextId)) {
-      nextNumber++;
-      nextId = `EMP${String(nextNumber).padStart(5, '0')}`;
+  const computeNextId = (empList: Employee[]) => {
+    if (!empList.length) return "EMP00001";
+    let max = 0;
+    for (const e of empList) {
+      const m = e.employeeId.match(/^EMP(\d+)$/i);
+      if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
     }
-
-    return nextId;
-  }, [allEmployeesForId]);
+    const existingSet = new Set(empList.map(e => e.employeeId));
+    let next = max + 1;
+    let id = `EMP${String(next).padStart(5, "0")}`;
+    while (existingSet.has(id)) { next++; id = `EMP${String(next).padStart(5, "0")}`; }
+    return id;
+  };
 
   // الإجراءات
   const handleEditClick = (emp: Employee) => {
@@ -422,8 +406,13 @@ export default function EmployeesPage() {
                 <button 
                   onClick={async () => {
                     setSelectedEmployee(null);
-                    // Force refetch to get latest employee IDs before opening modal
-                    try { await refetchAllEmployees(); } catch { /* best-effort */ }
+                    try {
+                      const result = await refetchAllEmployees();
+                      const freshList = Array.isArray(result.data) ? result.data : [];
+                      setSuggestedEmployeeId(computeNextId(freshList));
+                    } catch {
+                      setSuggestedEmployeeId(computeNextId(Array.isArray(allEmployeesForId) ? allEmployeesForId : []));
+                    }
                     setIsModalOpen(true);
                   }}
                   className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group"

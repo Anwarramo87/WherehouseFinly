@@ -54,6 +54,7 @@ interface DepartmentData {
   name: string;
   count: number;
   manager: string;
+  establishedAt?: string;
   createdAt?: string;
 }
 
@@ -150,8 +151,14 @@ interface BonusDisplay {
 type ModalType = "present" | "absent" | "late" | "overtime" | null;
 
 export default function DashboardPage() {
-  const { kpis, isLoading: isDashboardLoading, presentEmployees, absentEmployees, lateEmployees, overtimeEmployees } =
-    useDashboard();
+  const {
+    kpis,
+    isLoading: isDashboardLoading,
+    presentEmployees,
+    absentEmployees,
+    lateEmployees,
+    overtimeEmployees,
+  } = useDashboard();
   const { data: employees = [] } = useEmployees({
     fetchAll: false,
     limit: 500,
@@ -165,7 +172,9 @@ export default function DashboardPage() {
 
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   const queryClient = useQueryClient();
@@ -204,26 +213,33 @@ export default function DashboardPage() {
     setActiveModal(null);
   }, []);
 
-  const handleDeleteDepartment = useCallback(async (deptId: string | undefined, count: number) => {
-    if (!deptId || count > 0) return;
-    if (!window.confirm("هل أنت متأكد من نقل هذا القسم إلى سلة المهملات؟")) return;
-    setIsDeletingDept(deptId);
-    try {
-      await apiClient.delete(`/departments/${deptId}`);
-      queryClient.invalidateQueries({ queryKey: ["departments"] });
-    } catch (err) {
-      console.error("Error deleting department:", err);
-    } finally {
-      setIsDeletingDept(null);
-    }
-  }, [queryClient]);
+  const handleDeleteDepartment = useCallback(
+    async (deptId: string | undefined, count: number) => {
+      if (!deptId || count > 0) return;
+      if (!window.confirm("هل أنت متأكد من نقل هذا القسم إلى سلة المهملات؟")) return;
+      setIsDeletingDept(deptId);
+      try {
+        await apiClient.delete(`/departments/${deptId}`);
+        queryClient.invalidateQueries({ queryKey: ["departments"] });
+      } catch (err) {
+        console.error("Error deleting department:", err);
+      } finally {
+        setIsDeletingDept(null);
+      }
+    },
+    [queryClient],
+  );
 
   const handleEditDepartment = useCallback((dept: DepartmentData) => {
     setEditingDeptData({
       id: dept.id,
       name: dept.name,
       manager: dept.manager || "",
-      date: dept.createdAt ? dept.createdAt.slice(0, 10) : new Date().toISOString().split("T")[0],
+      date: dept.establishedAt
+        ? dept.establishedAt.slice(0, 10)
+        : dept.createdAt
+          ? dept.createdAt.slice(0, 10)
+          : new Date().toISOString().split("T")[0],
       originalName: dept.name,
     });
     setDeptMenuOpen(null);
@@ -236,7 +252,10 @@ export default function DashboardPage() {
   }, []);
 
   const { data: resignedEmployees = [] } = useResignedEmployees();
-  const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
+  const resignedIds = useMemo(
+    () => new Set(resignedEmployees.map((e) => e.employeeId)),
+    [resignedEmployees],
+  );
 
   const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
   const { data: penaltiesData = [] } = usePenalties();
@@ -329,19 +348,29 @@ export default function DashboardPage() {
         (b.createdAt || "").localeCompare(a.createdAt || ""),
       )
       .slice(0, 6)
-      .map((bonus: { id: string; employeeId: string; bonusAmount?: unknown; assistanceAmount?: unknown; bonusReason?: string | null; period?: string | null; createdAt?: string }): BonusDisplay | null => {
-        const employee = employeeListMemo.find((emp) => emp.employeeId === bonus.employeeId);
-        const amount = Number(bonus.bonusAmount || 0) + Number(bonus.assistanceAmount || 0);
-        return {
-          id: bonus.id,
-          employeeId: bonus.employeeId,
-          name: employee?.name || bonus.employeeId,
-          department: employee?.department || "",
-          amount,
-          reason: bonus.bonusReason || "مكافأة",
-          date: bonus.period ? `${bonus.period}-01` : (bonus.createdAt || "").slice(0, 10),
-        };
-      })
+      .map(
+        (bonus: {
+          id: string;
+          employeeId: string;
+          bonusAmount?: unknown;
+          assistanceAmount?: unknown;
+          bonusReason?: string | null;
+          period?: string | null;
+          createdAt?: string;
+        }): BonusDisplay | null => {
+          const employee = employeeListMemo.find((emp) => emp.employeeId === bonus.employeeId);
+          const amount = Number(bonus.bonusAmount || 0) + Number(bonus.assistanceAmount || 0);
+          return {
+            id: bonus.id,
+            employeeId: bonus.employeeId,
+            name: employee?.name || bonus.employeeId,
+            department: employee?.department || "",
+            amount,
+            reason: bonus.bonusReason || "مكافأة",
+            date: bonus.period ? `${bonus.period}-01` : (bonus.createdAt || "").slice(0, 10),
+          };
+        },
+      )
       .filter((item): item is BonusDisplay => Boolean(item));
   }, [bonusesData, employeeListMemo, resignedIds]);
 
@@ -354,59 +383,65 @@ export default function DashboardPage() {
       name: d.name,
       count: Number(d.employeeCount ?? 0),
       manager: d.manager ?? "",
+      establishedAt: (d as any).establishedAt,
       createdAt: d.createdAt,
     }));
   }, [deptsData]);
 
-  const stats = useMemo(() => [
-    {
-      title: "إجمالي الموظفين",
-      value: kpis.totalEmployees,
-      subValue: "مسجل في النظام",
-      icon: Users,
-      clickable: true,
-      onClick: () => router.push("/employees"),
-    },
-    {
-      title: "حضور اليوم",
-      value: kpis.activeToday,
-      subValue: "موظف على رأس عمله",
-      icon: UserCheck,
-      clickable: true,
-      onClick: () => handleCardClick("present"),
-    },
-    {
-      title: "إجمالي الغياب",
-      value: kpis.totalAbsentToday,
-      subValue: "موظف غائب اليوم",
-      icon: UserX,
-      clickable: true,
-      onClick: () => handleCardClick("absent"),
-    },
-    {
-      title: "اجمالي المقبوض",
-      value: Math.round(kpis.totalReceivedSalaries).toLocaleString("en-US", { maximumFractionDigits: 0 }),
-      subValue: "ليرة سورية",
-      icon: HandCoins,
-      clickable: false,
-    },
-    {
-      title: "دقائق التأخير",
-      value: kpis.totalLateMinutesToday,
-      subValue: "إجمالي تأخير اليوم",
-      icon: Clock,
-      clickable: true,
-      onClick: () => handleCardClick("late"),
-    },
-    {
-      title: "العمل الإضافي",
-      value: kpis.totalOvertimeMinutesToday,
-      subValue: "دقيقة عمل إضافية",
-      icon: Timer,
-      clickable: true,
-      onClick: () => handleCardClick("overtime"),
-    },
-  ], [kpis, router, handleCardClick]);
+  const stats = useMemo(
+    () => [
+      {
+        title: "إجمالي الموظفين",
+        value: kpis.totalEmployees,
+        subValue: "مسجل في النظام",
+        icon: Users,
+        clickable: true,
+        onClick: () => router.push("/employees"),
+      },
+      {
+        title: "حضور اليوم",
+        value: kpis.activeToday,
+        subValue: "موظف على رأس عمله",
+        icon: UserCheck,
+        clickable: true,
+        onClick: () => handleCardClick("present"),
+      },
+      {
+        title: "إجمالي الغياب",
+        value: kpis.totalAbsentToday,
+        subValue: "موظف غائب اليوم",
+        icon: UserX,
+        clickable: true,
+        onClick: () => handleCardClick("absent"),
+      },
+      {
+        title: "اجمالي المقبوض",
+        value: Math.round(kpis.totalReceivedSalaries).toLocaleString("en-US", {
+          maximumFractionDigits: 0,
+        }),
+        subValue: "ليرة سورية",
+        icon: HandCoins,
+        clickable: false,
+      },
+      {
+        title: "دقائق التأخير",
+        value: kpis.totalLateMinutesToday,
+        subValue: "إجمالي تأخير اليوم",
+        icon: Clock,
+        clickable: true,
+        onClick: () => handleCardClick("late"),
+      },
+      {
+        title: "العمل الإضافي",
+        value: kpis.totalOvertimeMinutesToday,
+        subValue: "دقيقة عمل إضافية",
+        icon: Timer,
+        clickable: true,
+        onClick: () => handleCardClick("overtime"),
+      },
+    ],
+    [kpis, router, handleCardClick],
+  );
 
   // const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
 
@@ -514,35 +549,38 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-black text-[#263544]">المكافآت والبدلات هذا الشهر</h2>
               </div>
               <div className="flex flex-col gap-3 flex-1 overflow-y-auto custom-scrollbar pr-2 relative z-10">
-                {mounted && monthlyBonuses.map((bonus) => (
-                  <div
-                    key={bonus.id}
-                    className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-emerald-300 shadow-sm hover:shadow-[0_8px_20px_rgba(16,185,129,0.15)] transition-all duration-300 gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-xs font-black text-emerald-700 shadow-md">
-                        {bonus.name[0]}
+                {mounted &&
+                  monthlyBonuses.map((bonus) => (
+                    <div
+                      key={bonus.id}
+                      className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-emerald-300 shadow-sm hover:shadow-[0_8px_20px_rgba(16,185,129,0.15)] transition-all duration-300 gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-xs font-black text-emerald-700 shadow-md">
+                          {bonus.name[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-[#263544]">{bonus.name}</p>
+                          <p className="text-[11px] font-bold text-[#263544]/60 mt-0.5">
+                            {bonus.department}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-1">{bonus.reason}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-black text-[#263544]">{bonus.name}</p>
-                        <p className="text-[11px] font-bold text-[#263544]/60 mt-0.5">
-                          {bonus.department}
-                        </p>
-                        <p className="text-[10px] text-slate-500 mt-1">{bonus.reason}</p>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl shadow-md border border-emerald-200">
+                          +{bonus.amount.toLocaleString()} ل.س
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-bold">
+                          {bonus.date.slice(0, 7)}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl shadow-md border border-emerald-200">
-                        +{bonus.amount.toLocaleString()} ل.س
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-bold">
-                        {bonus.date.slice(0, 7)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
                 {(!mounted || monthlyBonuses.length === 0) && (
-                  <p className="text-slate-400 text-sm font-bold text-center py-8">لا توجد مكافآت هذا الشهر</p>
+                  <p className="text-slate-400 text-sm font-bold text-center py-8">
+                    لا توجد مكافآت هذا الشهر
+                  </p>
                 )}
               </div>
             </div>
@@ -561,38 +599,57 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col gap-2 flex-1 overflow-y-auto custom-scrollbar pr-2 relative z-10">
                 {/* Combined advances and penalties sorted by date */}
-                {mounted && [
-                  ...monthlyAdvances.map((a) => ({ ...a, _type: "سلفة" as const, _sortDate: a.approvalDate })),
-                  ...recentPenalties.map((p) => ({ ...p, _type: "عقوبة" as const, _sortDate: p.date })),
-                ]
-                  .sort((a, b) => b._sortDate.localeCompare(a._sortDate))
-                  .slice(0, 8)
-                  .map((item) => (
-                    <div
-                      key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
-                      className="group flex items-center justify-between p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-2"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-8 h-8 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-[10px] font-black ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}>
-                          {item.name[0]}
+                {mounted &&
+                  [
+                    ...monthlyAdvances.map((a) => ({
+                      ...a,
+                      _type: "سلفة" as const,
+                      _sortDate: a.approvalDate,
+                    })),
+                    ...recentPenalties.map((p) => ({
+                      ...p,
+                      _type: "عقوبة" as const,
+                      _sortDate: p.date,
+                    })),
+                  ]
+                    .sort((a, b) => b._sortDate.localeCompare(a._sortDate))
+                    .slice(0, 8)
+                    .map((item) => (
+                      <div
+                        key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
+                        className="group flex items-center justify-between p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-[10px] font-black ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}
+                          >
+                            {item.name[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-[#263544] truncate">
+                              {item.name}
+                            </p>
+                            <span
+                              className={`text-[9px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
+                            >
+                              {item._type}
+                            </span>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-black text-[#263544] truncate">{item.name}</p>
-                          <span className={`text-[9px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}>
-                            {item._type}
+                        <div className="flex flex-col items-end gap-0.5 shrink-0">
+                          <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                            -{item.amount.toLocaleString()} ل.س
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold">
+                            {item._sortDate}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-0.5 shrink-0">
-                        <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-                          -{item.amount.toLocaleString()} ل.س
-                        </span>
-                        <span className="text-[9px] text-slate-500 font-bold">{item._sortDate}</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 {(!mounted || (monthlyAdvances.length === 0 && recentPenalties.length === 0)) && (
-                  <p className="text-slate-400 text-sm font-bold text-center py-8">لا توجد سلف أو عقوبات هذا الشهر</p>
+                  <p className="text-slate-400 text-sm font-bold text-center py-8">
+                    لا توجد سلف أو عقوبات هذا الشهر
+                  </p>
                 )}
               </div>
             </div>
@@ -616,86 +673,102 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {mounted && departmentSummary.map((dept, index) => (
-                <div
-                  key={index}
-                  className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden"
-                >
-                  <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
-                  {/* 3-dot Context Menu */}
-                  {canViewFinancialRecords && (
-                    <div className="absolute top-4 left-4 z-20">
-                      <button
-                        onClick={() => {
-                          const id = dept.id;
-                          if (!id) return;
-                          setDeptMenuOpen(deptMenuOpen === id ? null : id);
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-[#263544]/10 transition-all opacity-0 group-hover:opacity-100"
-                      >
-                        <MoreVertical size={16} className="text-[#263544]/60" />
-                      </button>
-                      {deptMenuOpen === dept.id && (
-                        <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-200 py-1 min-w-35 z-50">
-                          <button
-                            onClick={() => handleEditDepartment(dept)}
-                            className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-[#263544] hover:bg-[#C89355]/10 transition-colors"
-                          >
-                            <Pencil size={14} className="text-[#C89355]" />
-                            تعديل
-                          </button>
-                          {dept.count === 0 && (
+              {mounted &&
+                departmentSummary.map((dept, index) => (
+                  <div
+                    key={index}
+                    className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-3xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] hover:shadow-[0_20px_40px_rgba(200,147,85,0.15)] hover:-translate-y-1 transition-all duration-500 overflow-hidden"
+                  >
+                    <div className="absolute inset-1.5 rounded-3xl border border-dashed border-[#C89355]/30 pointer-events-none z-0 group-hover:border-[#C89355]/50 transition-colors duration-500" />
+                    {/* 3-dot Context Menu */}
+                    {canViewFinancialRecords && (
+                      <div className="absolute top-4 left-4 z-20">
+                        <button
+                          onClick={() => {
+                            const id = dept.id;
+                            if (!id) return;
+                            setDeptMenuOpen(deptMenuOpen === id ? null : id);
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-[#263544]/10 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <MoreVertical size={16} className="text-[#263544]/60" />
+                        </button>
+                        {deptMenuOpen === dept.id && (
+                          <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-200 py-1 min-w-35 z-50">
                             <button
-                              onClick={() => {
-                                setDeptMenuOpen(null);
-                                handleDeleteDepartment(dept.id, dept.count);
-                              }}
-                              disabled={isDeletingDept === dept.id}
-                              className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              onClick={() => handleEditDepartment(dept)}
+                              className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-[#263544] hover:bg-[#C89355]/10 transition-colors"
                             >
-                              <Trash2 size={14} className="text-red-400" />
-                              {isDeletingDept === dept.id ? "جارٍ الحذف..." : "حذف"}
+                              <Pencil size={14} className="text-[#C89355]" />
+                              تعديل
                             </button>
-                          )}
-                        </div>
+                            {dept.count === 0 && (
+                              <button
+                                onClick={() => {
+                                  setDeptMenuOpen(null);
+                                  handleDeleteDepartment(dept.id, dept.count);
+                                }}
+                                disabled={isDeletingDept === dept.id}
+                                className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 size={14} className="text-red-400" />
+                                {isDeletingDept === dept.id ? "جارٍ الحذف..." : "حذف"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
+                        <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">
+                          {dept.name}
+                        </h3>
+                      </div>
+                      <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">
+                        {dept.count}
+                      </p>
+                      <p className="text-[11px] font-bold text-slate-500">موظف</p>
+                      {dept.manager && (
+                        <p className="text-[11px] font-bold text-slate-600 mt-1 flex items-center gap-1.5">
+                          <UserCog size={13} className="text-[#C89355]" />
+                          {(() => {
+                            const supervisor = employeeListMemo.find(
+                              (emp) => emp.employeeId === dept.manager,
+                            );
+                            return supervisor ? (
+                              <>
+                                <span>{supervisor.name}</span>
+                                <span className="text-slate-400">({dept.manager})</span>
+                              </>
+                            ) : (
+                              dept.manager
+                            );
+                          })()}
+                        </p>
+                      )}
+                      {(dept.establishedAt || dept.createdAt) && (
+                        <p
+                          className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1"
+                          dir="ltr"
+                        >
+                          <CalendarDays size={12} />
+                          <span className="font-mono">
+                            {new Date(dept.establishedAt || dept.createdAt!).toLocaleDateString(
+                              "en-GB",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        </p>
                       )}
                     </div>
-                  )}
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-3 h-3 rounded-full bg-[#C89355] shadow-[0_0_10px_rgba(200,147,85,0.6)] group-hover:scale-125 transition-transform duration-300" />
-                      <h3 className="text-base font-black text-[#263544] group-hover:text-[#C89355] transition-colors">
-                        {dept.name}
-                      </h3>
-                    </div>
-                    <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">
-                      {dept.count}
-                    </p>
-                    <p className="text-[11px] font-bold text-slate-500">موظف</p>
-                    {dept.manager && (
-                      <p className="text-[11px] font-bold text-slate-600 mt-1 flex items-center gap-1.5">
-                        <UserCog size={13} className="text-[#C89355]" />
-                        {dept.manager}
-                      </p>
-                    )}
-                    {dept.createdAt && (
-                      <p
-                        className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1"
-                        dir="ltr"
-                      >
-                        <CalendarDays size={12} />
-                        <span className="font-mono">
-                          {new Date(dept.createdAt).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </p>
-                    )}
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>

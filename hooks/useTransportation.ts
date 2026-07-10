@@ -33,6 +33,7 @@ export interface PassengerResponse {
   isManual?: boolean;
   joinDate?: string;
   status?: string;
+  employeeStatus?: string;
 }
 
 export interface BusDetailsResponse extends BusResponse {

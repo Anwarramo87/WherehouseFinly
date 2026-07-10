@@ -22,11 +22,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     const [cleanup] = persistQueryClient({
       queryClient,
       persister,
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      maxAge: 1000 * 60 * 30, // 30 minutes — بيانات حضور وموظفين تتقادم بسرعة
       dehydrateOptions: {
         shouldDehydrateQuery: (query) => {
-          // Only persist successful queries that have data
-          return query.state.status === "success" && query.state.data !== undefined;
+          if (query.state.status !== "success" || query.state.data === undefined) return false;
+          const key = query.queryKey[0] as string;
+          // لا نحفظ بيانات الحضور اليومي والبصمات — دائماً تحتاج fresh data
+          if (key === "attendance") return false;
+          return true;
         },
       },
     });
