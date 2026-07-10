@@ -43,6 +43,7 @@ export interface PayrollItem {
   employeeId: string;
   employeeName: string;
   department?: string | null;
+  attendanceBasedSalary: number | string | { $numberDecimal: string };
   hoursWorked: number | string | { $numberDecimal: string };
   hourlyRate: number | string | { $numberDecimal: string };
   grossPay: number | string | { $numberDecimal: string };

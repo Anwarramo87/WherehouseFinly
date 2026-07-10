@@ -11,9 +11,10 @@ export type FireEmployeePayload = {
   fireDate: string;
   reason: string;
   notes: string;
-  dueSalary: number;
+  dueSalary: number; // This is earnedSalary from backend
   bonus: number;
   totalDues: number;
+  provisionalTotal: number; // This is the net provisional total from backend
   status: "terminated" | "resigned";
 };
 
@@ -23,16 +24,14 @@ interface Props {
   employee: Employee | null;
   onConfirm: (data: FireEmployeePayload) => void;
   isPending: boolean;
-}
+};
 
-const STANDARD_WORK_DAYS = 26;
-const HOURS_PER_DAY = 8;
-
-type AttendanceEventRecord = {
-  employeeId?: string;
-  timestamp?: string;
-  date?: string;
-  type?: string;
+type ProvisionalSettlementData = {
+  earnedSalary: number;
+  bonuses: number;
+  deductions: number;
+  provisionalTotal: number;
+  hasData: boolean;
 };
 
 const toNum = (v: unknown): number => {
@@ -43,191 +42,15 @@ const toNum = (v: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const toMinutes = (value?: string): number | null => {
-  if (!value) return null;
-  const normalized = value.slice(0, 5);
-  const [hours, minutes] = normalized.split(":").map(Number);
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-  return (hours * 60) + minutes;
-};
-
-const toLocalDateKey = (value?: string): string => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const toHHmm = (value?: string): string => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
-};
-
-const calcLateMinutes = (checkIn: string, scheduledStart: string, gracePeriod = 5): number => {
-  const checkInMinutes = toMinutes(checkIn);
-  const scheduledStartMinutes = toMinutes(scheduledStart || "08:00");
-  if (checkInMinutes === null || scheduledStartMinutes === null) return 0;
-  return Math.max(0, checkInMinutes - scheduledStartMinutes - gracePeriod);
-};
-
-const extractArrayResponse = (payload: unknown): unknown[] => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object") return [];
-
-  const objectPayload = payload as {
-    data?: unknown;
-    records?: unknown;
-    items?: unknown;
-  };
-
-  if (Array.isArray(objectPayload.data)) return objectPayload.data;
-  if (Array.isArray(objectPayload.records)) return objectPayload.records;
-  if (Array.isArray(objectPayload.items)) return objectPayload.items;
-
-  return [];
-};
-
-const extractPaginationPages = (payload: unknown): number => {
-  if (!payload || typeof payload !== "object") return 1;
-
-  const objectPayload = payload as {
-    pages?: unknown;
-    pagination?: { pages?: unknown };
-  };
-
-  return Math.max(
-    1,
-    toNum(objectPayload.pagination?.pages ?? objectPayload.pages ?? 1),
-  );
-};
-
-const fetchAllAttendanceRecords = async (
-  employeeId: string,
-  startDate: string,
-  endDate: string,
-  signal: AbortSignal,
-): Promise<AttendanceEventRecord[]> => {
-  const limit = 100;
-  const requestPage = async (page?: number) => {
-    const response = await apiClient.get("/attendance", {
-      params: {
-        employeeId,
-        startDate,
-        endDate,
-        page,
-        limit,
-      },
-      signal,
-    });
-
-    const payload = response.data;
-    return {
-      records: extractArrayResponse(payload) as AttendanceEventRecord[],
-      pages: extractPaginationPages(payload),
-    };
-  };
-
-  const firstPage = await requestPage(1);
-  let records = firstPage.records;
-
-  for (let page = 2; page <= firstPage.pages; page += 1) {
-    const nextPage = await requestPage(page);
-    records = records.concat(nextPage.records);
-  }
-
-  return records;
-};
-
-const summarizeAttendance = (
-  records: AttendanceEventRecord[],
-  employeeId: string,
-  scheduledStart: string,
-  scheduledEnd: string,
-  gracePeriod = 5,
-) => {
-  const dailyMap = new Map<string, { ins: string[]; outs: string[] }>();
-
-  records.forEach((record) => {
-    if (record.employeeId !== employeeId) return;
-
-    const dateKey = record.date || toLocalDateKey(record.timestamp);
-    if (!dateKey) return;
-
-    const current = dailyMap.get(dateKey) || { ins: [], outs: [] };
-    const recordType = String(record.type || "").toUpperCase();
-
-    if (recordType === "IN" && record.timestamp) current.ins.push(record.timestamp);
-    if (recordType === "OUT" && record.timestamp) current.outs.push(record.timestamp);
-
-    dailyMap.set(dateKey, current);
-  });
-
-  let presentDays = 0;
-  let lateMinutes = 0;
-  let earlyLeaveMinutes = 0;
-  let overtimeMinutes = 0;
-  let overtimeWeekendDays = 0;
-
-  dailyMap.forEach((daily, dateKey) => {
-    if (daily.ins.length === 0) return;
-
-    presentDays += 1;
-
-    const firstIn = [...daily.ins].sort()[0];
-    const lastOut = [...daily.outs].sort().at(-1);
-
-    if (firstIn) {
-      lateMinutes += calcLateMinutes(toHHmm(firstIn), scheduledStart, gracePeriod);
-    }
-
-    if (lastOut) {
-      const scheduledEndMinutes = toMinutes(scheduledEnd || "16:00");
-      const checkOutMinutes = toMinutes(toHHmm(lastOut));
-
-      if (scheduledEndMinutes !== null && checkOutMinutes !== null) {
-        if (checkOutMinutes > scheduledEndMinutes) {
-          overtimeMinutes += checkOutMinutes - scheduledEndMinutes;
-        } else if (checkOutMinutes < scheduledEndMinutes) {
-          earlyLeaveMinutes += scheduledEndMinutes - checkOutMinutes;
-        }
-      }
-    }
-
-    const weekDay = new Date(`${dateKey}T00:00:00`).getDay();
-    if (weekDay === 5) {
-      overtimeWeekendDays += 1;
-    }
-  });
-
-  return {
-    presentDays,
-    lateMinutes,
-    earlyLeaveMinutes,
-    overtimeMinutes,
-    overtimeWeekendDays,
-  };
-};
-
-const getToday = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm, isPending }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [departureType, setDepartureType] = useState<"terminated" | "resigned">("terminated");
-  const [fireDate, setFireDate] = useState(getToday());
+  const [fireDate, setFireDate] = useState(new Date().toISOString().slice(0, 10));
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [bonus, setBonus] = useState<string>("");
-  const [provisionalData, setProvisionalData] = useState<{ earnedSalary: number; bonuses: number; deductions: number; hasData: boolean } | null>(null);
+  const [provisionalData, setProvisionalData] = useState<ProvisionalSettlementData | null>(null);
   const [salaryLoading, setSalaryLoading] = useState(false);
   const prevDateRef = useRef<string>("");
 
@@ -251,197 +74,32 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
     const fetchSettlement = async () => {
       setSalaryLoading(true);
       try {
-        const month = fireDate.substring(0, 7);
-        const [yearStr, monthStr] = month.split('-');
-        const periodStart = `${yearStr}-${monthStr}-01`;
-        const periodEnd = fireDate;
+        // const month = fireDate.substring(0, 7);
+        // const [yearStr, monthStr] = month.split('-');
+        // const periodStart = `${yearStr}-${monthStr}-01`;
+        // const periodEnd = fireDate;
 
         // جلب البيانات اللازمة من نفس مصادر صفحة سجل الدوام مع pagination للحضور
-        const [provisionalRes, payrollInputsRes, deductionsRes, salariesRes, attendanceRes, leavesRes] = await Promise.allSettled([
+        const [provisionalRes] = await Promise.allSettled([
           apiClient.get('/payroll/provisional-settlement', {
             params: { employeeId: employee.employeeId, terminationDate: fireDate },
             signal: controller.signal,
           }),
-          apiClient.get('/payroll/inputs', {
-            params: { periodStart, periodEnd },
-            signal: controller.signal,
-          }),
-          apiClient.post('/attendance/calculate-deductions', {
-            periodStart,
-            periodEnd,
-            employeeId: employee.employeeId,
-          }, { signal: controller.signal }),
-          apiClient.get('/salaries', { signal: controller.signal }),
-          fetchAllAttendanceRecords(employee.employeeId, periodStart, periodEnd, controller.signal),
-          apiClient.get('/leaves', {
-            params: { startDate: periodStart, endDate: periodEnd },
-            signal: controller.signal,
-          }),
         ]);
 
-        // bonuses + deductions من provisional فقط
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
         console.log('[FireModal] provisional response:', provPayload);
-        const bonusesFromAPI = parseFloat(String(provPayload.bonuses ?? 0)) || 0;
-        const deductionsFromAPI = parseFloat(String(provPayload.deductions ?? 0)) || 0;
-
-        // payrollInput اليدوي لهذا الموظف
-        const inputsRaw = payrollInputsRes.status === 'fulfilled'
-          ? (Array.isArray(payrollInputsRes.value.data) ? payrollInputsRes.value.data : (payrollInputsRes.value.data?.data || []))
-          : [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const manualInput = inputsRaw.find((i: any) => i.employeeId === employee.employeeId);
-
-        // autoDeductions من calculate-deductions
-        const deductionsRaw = deductionsRes.status === 'fulfilled'
-          ? (deductionsRes.value.data?.data || deductionsRes.value.data || [])
-          : [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const autoInput = Array.isArray(deductionsRaw) ? deductionsRaw.find((d: any) => d.employeeId === employee.employeeId) : null;
-
-        // salary record
-        const salariesRaw = salariesRes.status === 'fulfilled'
-          ? (Array.isArray(salariesRes.value.data) ? salariesRes.value.data : (salariesRes.value.data?.data || []))
-          : [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const salaryRecord = salariesRaw.find((s: any) => s.employeeId === employee.employeeId);
-
-        // grossSalary - نفس calcGrossSalary في TimeTablePage
-        let grossSalary = 0;
-        if (salaryRecord) {
-          grossSalary = toNum(salaryRecord.baseSalary) + toNum(salaryRecord.lumpSumSalary)
-            + toNum(salaryRecord.livingAllowance) + toNum(salaryRecord.responsibilityAllowance)
-            + toNum(salaryRecord.extraEffortAllowance) + toNum(salaryRecord.productionIncentive)
-            + toNum(salaryRecord.transportAllowance);
-        }
-        if (grossSalary <= 0) {
-          grossSalary = toNum((employee as Employee & { baseSalary?: unknown }).baseSalary)
-            || toNum(employee.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
-        }
-
-        const attendanceRaw = attendanceRes.status === "fulfilled"
-          ? attendanceRes.value
-          : [];
-        const attendanceSummary = summarizeAttendance(
-          attendanceRaw,
-          employee.employeeId,
-          employee.scheduledStart || "08:00",
-          employee.scheduledEnd || "16:00",
-          typeof employee.gracePeriodMinutes === "number" ? employee.gracePeriodMinutes : 5,
-        );
-
-        // نفس لوجيك TimeTablePage مع fallback محلي من سجلات الحضور نفسها
-        const hasManual = !!manualInput;
-        const lateMinutes = (hasManual && (manualInput.lateMinutes ?? 0) > 0)
-          ? Number(manualInput.lateMinutes)
-          : Math.max(
-              Number(autoInput?.delayMinutes ?? 0),
-              attendanceSummary.lateMinutes,
-            );
-        const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? Math.max(
-          Number(autoInput?.earlyLeaveMinutes ?? 0),
-          attendanceSummary.earlyLeaveMinutes,
-        );
-        const overtimeMinutes = (hasManual && (manualInput.overtimeRegularMinutes ?? 0) > 0)
-          ? Number(manualInput.overtimeRegularMinutes)
-          : Math.max(
-              Number(autoInput?.overtimeMinutes ?? 0),
-              attendanceSummary.overtimeMinutes,
-            );
-        const overtimeWeekendDays = (hasManual && (manualInput.overtimeWeekendDays ?? 0) > 0)
-          ? Number(manualInput.overtimeWeekendDays)
-          : Math.max(
-              Number(autoInput?.overtimeWeekendDays ?? 0),
-              attendanceSummary.overtimeWeekendDays,
-            );
-
-        const backendPresentDays = autoInput?.presentDays ?? 0;
-        const presentDays = Math.max(backendPresentDays, attendanceSummary.presentDays);
-
-        // leaves records
-        const leavesRaw = leavesRes.status === 'fulfilled'
-          ? (Array.isArray(leavesRes.value.data) ? leavesRes.value.data : (leavesRes.value.data?.data || []))
-          : [];
-        
-        let paidLeaveDaysFromAPI = 0;
-        let adminLeaveFromAPI = 0;
-        let deathLeaveFromAPI = 0;
-        let sickLeaveFromAPI = 0;
-        const countedDates = new Set<string>();
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        leavesRaw.forEach((leave: any) => {
-          if (leave.employeeId !== employee.employeeId) return;
-          if (leave.status && leave.status !== "APPROVED") return;
-
-          const leaveStart = leave.startDate?.slice(0, 10);
-          const leaveEnd = leave.endDate?.slice(0, 10);
-          if (!leaveStart || !leaveEnd) return;
-
-          const effectiveStart = leaveStart < periodStart ? periodStart : leaveStart;
-          const effectiveEnd = leaveEnd > periodEnd ? periodEnd : leaveEnd;
-          if (effectiveStart > effectiveEnd) return;
-
-          const cur = new Date(effectiveStart);
-          const endD = new Date(effectiveEnd);
-          while (cur <= endD) {
-            const dateStr = cur.toISOString().slice(0, 10);
-            if (!countedDates.has(dateStr)) {
-              countedDates.add(dateStr);
-              if (leave.leaveType === "SICK") {
-                sickLeaveFromAPI++;
-              } else if (leave.isPaid) {
-                paidLeaveDaysFromAPI++;
-              }
-              if (leave.leaveType === "ADMIN") {
-                adminLeaveFromAPI++;
-              } else if (leave.leaveType === "DEATH") {
-                deathLeaveFromAPI++;
-              }
-            }
-            cur.setDate(cur.getDate() + 1);
-          }
-        });
-
-        const sickLeaveDays = Math.max(
-          hasManual ? (manualInput.sickLeaveDays ?? 0) : 0,
-          sickLeaveFromAPI
-        );
-        const adminLeaveDays = Math.max(
-          hasManual ? (manualInput.adminLeaveDays ?? 0) : 0,
-          adminLeaveFromAPI
-        );
-        const deathLeaveDays = Math.max(
-          hasManual ? (manualInput.deathLeaveDays ?? 0) : 0,
-          deathLeaveFromAPI
-        );
-        const paidLeaveDaysManual = adminLeaveDays + deathLeaveDays;
-        const paidLeaveDays = Math.max(paidLeaveDaysManual, paidLeaveDaysFromAPI);
-        const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
-
-        const insuranceAmount = salaryRecord ? toNum(salaryRecord.insuranceAmount) : 0;
-
-        // نفس calcEarnedSalary في TimeTablePage
-        let earnedSalary = 0;
-        if (grossSalary > 0) {
-          const dailyRate = grossSalary / STANDARD_WORK_DAYS;
-          const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-          const paidDays = Math.min(presentDays + effectivePaidLeaveDays, STANDARD_WORK_DAYS);
-          earnedSalary = Math.max(0,
-            dailyRate * paidDays
-            - lateMinutes * minuteRate * 1.5
-            - earlyLeaveMinutes * minuteRate
-            + overtimeMinutes * minuteRate * 1.5
-            + dailyRate * overtimeWeekendDays * 1.5
-            - insuranceAmount
-          );
-        }
+        const earnedSalary = toNum(provPayload.earnedSalary);
+        const bonuses = toNum(provPayload.bonuses);
+        const deductions = toNum(provPayload.deductions);
+        const provisionalTotal = toNum(provPayload.provisionalTotal);
 
         setProvisionalData({
           earnedSalary,
-          bonuses: bonusesFromAPI,
-          deductions: deductionsFromAPI,
-          hasData: grossSalary > 0,
+          bonuses,
+          deductions,
+          provisionalTotal,
+          hasData: provisionalTotal > 0, // Assuming provisionalTotal > 0 means valid data
         });
 
       } catch (err: unknown) {
@@ -458,10 +116,10 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
 
   if (!isOpen || typeof document === "undefined" || !employee) return null;
 
-  const dueSalary = Math.round((provisionalData?.earnedSalary ?? 0) / 1000) * 1000;
-  const apiDeductions = Math.round(provisionalData?.deductions ?? 0);
-  const apiBonuses = Math.round(provisionalData?.bonuses ?? 0);
-  const totalDues = Math.round(dueSalary + apiBonuses + (Number(bonus) || 0) - apiDeductions);
+  const dueSalary = provisionalData?.earnedSalary ?? 0;
+  const apiDeductions = provisionalData?.deductions ?? 0;
+  const apiBonuses = provisionalData?.bonuses ?? 0;
+  const totalDues = (provisionalData?.provisionalTotal ?? 0) + (Number(bonus) || 0);
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -478,9 +136,10 @@ export default function FireEmployeeModal({ isOpen, onClose, employee, onConfirm
       fireDate,
       reason,
       notes,
-      dueSalary,
+      dueSalary: provisionalData?.earnedSalary ?? 0,
       bonus: Number(bonus) || 0,
-      totalDues,
+      totalDues: totalDues,
+      provisionalTotal: provisionalData?.provisionalTotal ?? 0,
       status: departureType
     });
   };

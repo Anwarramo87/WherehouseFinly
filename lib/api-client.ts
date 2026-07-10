@@ -45,7 +45,7 @@ const isAuthEndpoint = (pathname: string) => {
 const apiClient = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
-  timeout: 10000, // 10 ثواني timeout
+  timeout: 30000, // 30 ثواني timeout
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',

@@ -74,6 +74,7 @@ interface AggregatedPayroll {
   netPayRounded: number;
   roundingDifference: number;
   anomalies: string[];
+  attendanceBasedSalary: number;
 
   // 💰 Earned salary based on actual work days (hoursWorked × hourlyRate) — from attendance
   bonusesTotal: number;
@@ -291,7 +292,8 @@ export default function PayrollPage() {
   const [selectedPayslip, setSelectedPayslip] = useState<AggregatedPayroll | null>(null);
   const [isPayrollModalOpen, setPayrollModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
 
   const { calculatePayroll } = usePayroll();
 
@@ -687,6 +689,7 @@ export default function PayrollPage() {
           netPayRounded,
           roundingDifference,
           anomalies: [],
+          attendanceBasedSalary: earnedSalary,
           earnedSalary,
           bonusesTotal: variableEarnings,
           discountsTotal: variableDeductions,
@@ -888,6 +891,7 @@ export default function PayrollPage() {
           netPayRounded: computedNetPayRounded,
           roundingDifference: computedRoundingDiff,
           anomalies,
+          attendanceBasedSalary: toNumber(backendItem.attendanceBasedSalary),
           earnedSalary,
           bonusesTotal: variableEarnings,
           discountsTotal: variableDeductions,
@@ -1124,10 +1128,20 @@ export default function PayrollPage() {
 
             <Link
               href={`/vouchers?month=${month}`}
-              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 transition-all active:scale-95 group"
+              className="bg-emerald-100 border border-emerald-200 text-emerald-800 hover:bg-emerald-200 shadow-sm rounded-xl relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 transition-all active:scale-95 group"
             >
-              <div className="absolute inset-1 rounded-xl border border-dashed border-[#263544]/10 pointer-events-none transition-colors group-hover:border-[#C89355]/30" />
-              <span className="relative z-10">قسائم القبض</span>
+              <div className="absolute inset-1 rounded-xl border border-dashed border-emerald-300/50 pointer-events-none transition-colors group-hover:border-emerald-400/70" />
+              <Receipt size={16} className="relative z-10" />
+              <span className="relative z-10">طباعة جميع القسائم</span>
+            </Link>
+
+            <Link
+              href={`/vouchers?month=${month}&unreceived=true`}
+              className="bg-amber-100 border border-amber-200 text-amber-800 hover:bg-amber-200 shadow-sm rounded-xl relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 transition-all active:scale-95 group"
+            >
+              <div className="absolute inset-1 rounded-xl border border-dashed border-amber-300/50 pointer-events-none transition-colors group-hover:border-amber-400/70" />
+              <Receipt size={16} className="relative z-10" />
+              <span className="relative z-10">القسائم غير المقبوضة فقط</span>
             </Link>
 
             <button

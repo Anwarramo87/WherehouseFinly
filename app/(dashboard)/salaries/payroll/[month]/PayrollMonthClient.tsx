@@ -95,7 +95,7 @@ export default function PayrollMonthClient() {
               <th className="p-3">كود الموظف</th>
               <th className="p-3">الاسم</th>
               <th className="p-3">القسم</th>
-              <th className="p-3">إجمالي</th>
+              <th className="p-3">الراتب المستحق</th>
               <th className="p-3">خصومات</th>
               <th className="p-3">صافي</th>
             </tr>
@@ -107,7 +107,7 @@ export default function PayrollMonthClient() {
                   <td className="p-3 font-mono">{item.employeeId}</td>
                   <td className="p-3">{item.employeeName}</td>
                   <td className="p-3">{item.department || "—"}</td>
-                  <td className="p-3">{toNumber(item.grossPay).toLocaleString()}</td>
+                  <td className="p-3">{toNumber(item.attendanceBasedSalary).toLocaleString()}</td>
                   <td className="p-3 text-rose-700">{toNumber(item.totalDeductions).toLocaleString()}</td>
                   <td className="p-3 font-semibold text-emerald-700">{toNumber(item.netPay).toLocaleString()}</td>
                 </tr>

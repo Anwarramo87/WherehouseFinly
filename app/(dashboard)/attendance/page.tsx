@@ -108,6 +108,7 @@ export default function AttendancePage() {
   }>({ isOpen: false, row: null, field: null, value: "" });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

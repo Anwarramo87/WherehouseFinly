@@ -7,6 +7,7 @@ import {
   CalendarCheck2,
   CheckCircle2,
   ChevronLeft,
+  Filter,
   Printer,
   Receipt,
   RotateCcw,
@@ -14,7 +15,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -107,10 +108,35 @@ const formatDate = (date: string | null | undefined) => {
   return new Date(`${date}T00:00:00`).toLocaleDateString("ar-SY");
 };
 
-const isPendingSettlementEmployee = (employee: Employee) => {
-  const isDeparted = employee.status === "resigned" || employee.status === "terminated";
+const isPendingSettlementEmployee = (employee: Employee): boolean => {
+  // Defensive check: Ensure employee object is valid and has a status
+  if (!employee || typeof employee.status === 'undefined' || employee.status === null) {
+    return false;
+  }
+
+  const normalizedStatus = String(employee.status).toLowerCase();
+
+  // Define statuses that are considered 'departed' for settlement purposes  
+  const departedStatuses = ["resigned", "terminated", "inactive"];
+
+  const isDeparted = departedStatuses.includes(normalizedStatus);
+
+  // If the employee is not in a 'departed' status, they don't need pending settlement check
   if (!isDeparted) return false;
-  return !employee.isSettled && !employee.isFinanciallySettled && employee.financialSettlementStatus !== "completed";
+
+  // A departed employee is considered pending settlement if:
+  // 1. They are NOT marked as settled (isSettled !== true)
+  // 2. They are NOT marked as financially settled (isFinanciallySettled !== true) 
+  // 3. Their financial settlement status is NOT 'completed'
+  // 
+  // The key change: We treat null/undefined financial settlement status as 'pending'
+  // This ensures all departed employees show up unless explicitly marked as completed
+  const isSettled = employee.isSettled === true;
+  const isFinanciallySettled = employee.isFinanciallySettled === true;
+  const hasCompletedSettlement = employee.financialSettlementStatus?.toLowerCase() === "completed";
+  
+  // Return true if employee needs settlement (any of the settlement flags indicate not completed)
+  return !isSettled && !isFinanciallySettled && !hasCompletedSettlement;
 };
 
 const getDepartureLabel = (employee: Pick<AggregatedPayroll, "employeeStatus" | "terminationType">) => {
@@ -131,10 +157,12 @@ export default function VouchersClient() {
   const searchParams = useSearchParams();
   const requestedMonth = searchParams.get("month");
   const month = requestedMonth || getLocalMonth();
+  const shouldShowUnreceived = searchParams.get("unreceived") === "true";
 
   const [searchTerm, setSearchTerm] = useState("");
   const [bulkReceiptDate, setBulkReceiptDate] = useState(getTodayDate());
   const [draftReceiptDates, setDraftReceiptDates] = useState<Record<string, string>>({});
+  const [showOnlyUnreceived, setShowOnlyUnreceived] = useState(shouldShowUnreceived);
 
   const handleMonthChange = (nextMonth: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -147,11 +175,27 @@ export default function VouchersClient() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const { data: allEmployees = [], isLoading: employeesLoading } = useEmployees({
-    includeTerminated: true,
+  // ⚠️ ملاحظة هامة: GET /employees في الباك إند يستثني resigned/terminated دائماً
+  // (Prisma: where.status = { notIn: ['terminated', 'resigned'] }) عندما لا يوجد
+  // status صريح في الطلب، ولا توجد أي آلية في EmployeesListQueryDto لتجاوز هذا
+  // (includeTerminated غير مدعوم من الباك إند). لذلك لا يمكن الاعتماد على استدعاء
+  // واحد لـ useEmployees لجلب الموظفين الفعّالين + المغادرين معاً.
+  //
+  // الحل: دمج مصدرين —
+  //   1) useEmployees() → الموظفون الفعّالون (السلوك الافتراضي للباك إند)
+  //   2) useResignedEmployees() → GET /employees/resigned (endpoint مخصص جاهز
+  //      يُرجع resigned/terminated مع كل الحقول المالية اللازمة)
+  const { data: activeEmployees = [], isLoading: activeEmployeesLoading } = useEmployees({
     fetchAll: true,
     limit: 500,
   });
+  const { data: departedEmployees = [], isLoading: departedEmployeesLoading } = useResignedEmployees();
+
+  const allEmployees = useMemo(
+    () => [...activeEmployees, ...departedEmployees],
+    [activeEmployees, departedEmployees],
+  );
+  const employeesLoading = activeEmployeesLoading || departedEmployeesLoading;
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
   const { data: advances = [], isLoading: advancesLoading } = useAdvances();
@@ -394,10 +438,22 @@ export default function VouchersClient() {
 
   const filteredVouchers = useMemo(() => {
     let filtered = payrollData.filter((voucher) => {
+      // Always include employees pending financial settlement, regardless of their pay amounts
       if (voucher.isPendingSettlement) return true;
+      
+      // For active employees, only include if they have meaningful financial activity
       if (voucher.netPay <= 0 && voucher.fixedEarnings === 0 && voucher.variableEarnings === 0) return false;
+      
       return true;
     });
+
+    // Apply unreceived filter if enabled
+    if (showOnlyUnreceived) {
+      filtered = filtered.filter((voucher) => {
+        const receiptEntry = receiptMap[voucher.employeeId];
+        return !receiptEntry?.isReceived; // Show only employees who haven't received their salary
+      });
+    }
 
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
@@ -408,7 +464,7 @@ export default function VouchersClient() {
       );
     }
     return filtered;
-  }, [payrollData, searchTerm]);
+  }, [payrollData, searchTerm, showOnlyUnreceived, receiptMap]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -435,6 +491,62 @@ export default function VouchersClient() {
       return changed ? next : current;
     });
   }, [payrollData, receiptMap]);
+
+  // Debugging block to check useEmployees / useResignedEmployees hooks
+  useEffect(() => {
+    console.group("Employee Data Debugging - useEmployees Hook");
+    console.log(
+      "Active source (useEmployees):", activeEmployees.length,
+      "| Departed source (useResignedEmployees):", departedEmployees.length,
+    );
+    console.log("Total employees (merged):", allEmployees.length);
+
+    const activeEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "active");
+    const resignedEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "resigned");
+    const terminatedEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "terminated");
+    const inactiveEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "inactive");
+    const otherStatusEmployees = allEmployees.filter(emp =>
+      emp.status?.toLowerCase() !== "active" &&
+      emp.status?.toLowerCase() !== "resigned" &&
+      emp.status?.toLowerCase() !== "terminated" &&
+      emp.status?.toLowerCase() !== "inactive" &&
+      emp.status !== undefined && emp.status !== null
+    );
+
+    console.log("Active Employees:", activeEmployeesCount.length, activeEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
+    console.log("Resigned Employees:", resignedEmployeesCount.length, resignedEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
+    console.log("Terminated Employees:", terminatedEmployeesCount.length, terminatedEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
+    console.log("Inactive Employees (if any):", inactiveEmployeesCount.length, inactiveEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
+    console.log("Employees with other statuses:", otherStatusEmployees.length, otherStatusEmployees.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
+
+    // Detailed check for pending settlement status among departed employees
+    const potentiallyPendingSettlement = allEmployees.filter(employee => {
+      const normalizedStatus = String(employee.status).toLowerCase();
+      const departedStatuses = ["resigned", "terminated", "inactive"];
+      const isDeparted = departedStatuses.includes(normalizedStatus);
+
+      return isDeparted;
+    });
+
+    console.log("All Potentially Pending Settlement Employees (all departed, before filtering):", potentiallyPendingSettlement.length, potentiallyPendingSettlement.map(e => ({ 
+      id: e.employeeId, 
+      status: e.status, 
+      isSettled: e.isSettled, 
+      isFinanciallySettled: e.isFinanciallySettled, 
+      financialSettlementStatus: e.financialSettlementStatus,
+      passesFilter: isPendingSettlementEmployee(e)
+    })));
+
+    // Show eligible employees after filtering
+    console.log("Eligible employees for payroll:", eligibleEmployees.length, eligibleEmployees.map(e => ({ 
+      id: e.employeeId, 
+      status: e.status, 
+      isPendingSettlement: isPendingSettlementEmployee(e)
+    })));
+
+    console.groupEnd();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEmployees, eligibleEmployees]); // Dependency array includes allEmployees to re-run when data changes
 
   const getReceiptEntry = (employeeId: string) => receiptMap[employeeId];
 
@@ -471,6 +583,48 @@ export default function VouchersClient() {
       isReceived: true,
       receivedAt: effectiveDate,
     });
+  };
+
+  const handlePrint = () => {
+    console.log('🖨️ Print initiated');
+    console.log('📋 Total vouchers to print:', filteredVouchers.length);
+    console.log('📄 Vouchers data:', filteredVouchers.map(v => ({ id: v.employeeId, name: v.employeeName })));
+    
+    // Add print-ready class to body
+    document.body.classList.add('print-mode');
+    
+    // Force layout recalculation
+    const vouchersGrid = document.querySelector('.vouchers-grid') as HTMLElement;
+    const voucherCards = document.querySelectorAll('.voucher-card');
+    
+    console.log('🎯 Found voucher cards in DOM:', voucherCards.length);
+    
+    if (vouchersGrid) {
+      vouchersGrid.style.display = 'block';
+      vouchersGrid.style.pageBreakInside = 'auto';
+    }
+    
+    // Apply print styles to all voucher cards
+    voucherCards.forEach((card, index) => {
+      (card as HTMLElement).style.pageBreakInside = 'avoid';
+      (card as HTMLElement).style.breakInside = 'avoid';
+      (card as HTMLElement).style.marginBottom = '5mm';
+      if (index === voucherCards.length - 1) {
+        (card as HTMLElement).style.marginBottom = '0';
+      }
+    });
+    
+    // Small delay to ensure styles are applied
+    setTimeout(() => {
+      console.log('🚀 Calling window.print()');
+      window.print();
+    }, 200);
+    
+    // Clean up after printing
+    setTimeout(() => {
+      document.body.classList.remove('print-mode');
+      console.log('✅ Print cleanup completed');
+    }, 1000);
   };
 
   const resetVisibleAsUnreceived = async () => {
@@ -534,7 +688,7 @@ export default function VouchersClient() {
               <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">قسائم القبض المجمعة</h1>
             </div>
             <p className="text-slate-600 text-sm font-bold pr-14 mt-1">
-              تشمل الموظفين الفعالين وكل مستقيل أو مقال لم تُنجز تصفيته المالية بعد، مع تتبّع حالة القبض وتاريخه لكل موظف.
+              يشمل جميع الموظفين الفعالين وكل مستقيل أو مقال لم تتم تصفيته المالية بعد. يظهر المستقيلون حتى لو لم يكن لهم راتب في هذا الشهر لإنهاء تصفيتهم المالية.
             </p>
           </div>
 
@@ -552,7 +706,7 @@ export default function VouchersClient() {
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="relative overflow-hidden inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-emerald-600/90 backdrop-blur-md text-white font-black text-lg hover:bg-emerald-700 transition-all shadow-[0_15px_30px_rgba(5,150,105,0.4)] active:scale-95 border border-emerald-500 group"
             >
               <div className="absolute inset-1 rounded-xl border border-dashed border-white/30 pointer-events-none" />
@@ -575,7 +729,10 @@ export default function VouchersClient() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
           <div className="bg-white/70 border border-white/90 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-black text-slate-500 mb-1">إجمالي القسائم الظاهرة</p>
+            <p className="text-xs font-black text-slate-500 mb-1">
+              إجمالي القسائم الظاهرة
+              {showOnlyUnreceived && <span className="text-amber-600"> (غير المقبوضة فقط)</span>}
+            </p>
             <p className="text-3xl font-black text-[#263544]">{receiptStats.total}</p>
           </div>
           <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 shadow-sm">
@@ -602,6 +759,19 @@ export default function VouchersClient() {
           </div>
 
           <div className="bg-white/70 border border-white/90 rounded-2xl p-4 shadow-sm flex flex-wrap items-end gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showOnlyUnreceived}
+                onChange={(e) => setShowOnlyUnreceived(e.target.checked)}
+                className="w-4 h-4 text-emerald-600 bg-white border-slate-300 rounded focus:ring-emerald-500 focus:ring-2"
+              />
+              <span className="text-sm font-black text-[#263544] flex items-center gap-1">
+                <Filter size={16} className="text-[#C89355]" />
+                عرض غير المقبوضة فقط
+              </span>
+            </label>
+            
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-black text-slate-500">تاريخ القبض الجماعي</span>
               <input
@@ -645,8 +815,8 @@ export default function VouchersClient() {
         )}
       </div>
 
-      <div className="vouchers-grid max-w-7xl mx-auto px-4 pb-8 grid grid-cols-1 gap-6 print:gap-0 print:px-0 print:pb-0">
-        {filteredVouchers.map((voucher) => {
+      <div className="vouchers-grid max-w-7xl mx-auto px-4 pb-8 grid grid-cols-1 gap-6 print:gap-0 print:px-0 print:pb-0 print:block">
+        {filteredVouchers.map((voucher, index) => {
           const receiptEntry = getReceiptEntry(voucher.employeeId);
           const receiptDate = receiptEntry?.receivedAt || "";
           const draftReceiptDate = draftReceiptDates[voucher.employeeId] || receiptDate || getTodayDate();
@@ -656,7 +826,10 @@ export default function VouchersClient() {
           return (
             <article
               key={voucher.employeeId}
-              className="voucher-card relative bg-white rounded-3xl border-4 border-[#1a2530] shadow-[0_10px_30px_rgba(38,53,68,0.15)] overflow-hidden print:rounded-none print:shadow-none print:border-2 print:page-break-inside-avoid print:max-h-[48vh] print:mb-2 flex flex-col"
+              className={`voucher-card relative bg-white rounded-3xl border-4 border-[#1a2530] shadow-[0_10px_30px_rgba(38,53,68,0.15)] overflow-hidden flex flex-col
+                print:rounded-none print:shadow-none print:border print:border-gray-400 print:mb-2 print:break-inside-avoid
+                ${index > 0 ? 'print:mt-2' : ''}
+              `}
             >
               <div className="bg-linear-to-br from-[#1a2530] to-[#263544] p-6 border-b-4 border-[#C89355] print:p-4 print:border-b-2">
                 <div className="flex justify-between items-start gap-4">
@@ -893,10 +1066,22 @@ export default function VouchersClient() {
 
                 <div className="text-center mb-6 print:mb-3">
                   <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع</p>
-                  <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
-                    {voucher.netPay.toLocaleString()}
-                    <span className="text-xl mr-2 print:text-sm">ل.س</span>
-                  </p>
+                  {voucher.isPendingSettlement && voucher.netPay === 0 ? (
+                    <>
+                      <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
+                        0
+                        <span className="text-xl mr-2 print:text-sm">ل.س</span>
+                      </p>
+                      <p className="text-amber-700 text-sm font-bold mt-2 print:text-xs">
+                        {departureLabel} - يتطلب تصفية مالية لإنهاء الملف
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
+                      {voucher.netPay.toLocaleString()}
+                      <span className="text-xl mr-2 print:text-sm">ل.س</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t-2 border-[#1a2530]/20 print:gap-2 print:pt-2">
@@ -924,18 +1109,28 @@ export default function VouchersClient() {
       <style jsx global>{`
         @page {
           size: A4 portrait;
-          margin: 10mm;
+          margin: 15mm 10mm;
         }
 
         @media print {
-          .print\\:hidden {
-            display: none !important;
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
 
           body {
             background: white !important;
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          .print\\:block {
+            display: block !important;
           }
 
           .vouchers-grid {
@@ -946,46 +1141,129 @@ export default function VouchersClient() {
           }
 
           .voucher-card {
+            width: 100% !important;
+            max-width: 100% !important;
             page-break-inside: avoid !important;
-            page-break-after: auto !important;
-            height: auto !important;
-            min-height: 48vh !important;
-            margin-bottom: 5mm !important;
+            break-inside: avoid !important;
+            margin-bottom: 8mm !important;
             border-radius: 0 !important;
             box-shadow: none !important;
-            border-width: 2px !important;
+            border: 1px solid #666 !important;
+            background: white !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
 
+          .voucher-card:last-child {
+            margin-bottom: 0 !important;
+          }
+
+          /* Remove forced page breaks */
           .voucher-card:nth-child(2n) {
-            page-break-after: always !important;
+            page-break-after: auto !important;
           }
 
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
-            line-height: 1.3 !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
+          /* Compact spacing for print */
+          .voucher-card .p-6 {
+            padding: 12px !important;
           }
 
+          .voucher-card .p-4 {
+            padding: 8px !important;
+          }
+
+          .voucher-card .p-3 {
+            padding: 6px !important;
+          }
+
+          .voucher-card .mb-6 {
+            margin-bottom: 12px !important;
+          }
+
+          .voucher-card .mb-4 {
+            margin-bottom: 8px !important;
+          }
+
+          .voucher-card .mb-3 {
+            margin-bottom: 6px !important;
+          }
+
+          .voucher-card .gap-6 {
+            gap: 12px !important;
+          }
+
+          .voucher-card .gap-4 {
+            gap: 8px !important;
+          }
+
+          .voucher-card .gap-3 {
+            gap: 6px !important;
+          }
+
+          /* Responsive font sizes for print */
+          .voucher-card .text-5xl {
+            font-size: 24px !important;
+          }
+
+          .voucher-card .text-3xl {
+            font-size: 20px !important;
+          }
+
+          .voucher-card .text-2xl {
+            font-size: 18px !important;
+          }
+
+          .voucher-card .text-xl {
+            font-size: 16px !important;
+          }
+
+          .voucher-card .text-lg {
+            font-size: 14px !important;
+          }
+
+          .voucher-card .text-sm {
+            font-size: 12px !important;
+          }
+
+          .voucher-card .text-xs {
+            font-size: 10px !important;
+          }
+
+          /* Utility classes */
           .grid {
             display: grid !important;
           }
 
+          .grid-cols-1 {
+            grid-template-columns: 1fr !important;
+          }
+
           .grid-cols-2 {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            grid-template-columns: 1fr 1fr !important;
           }
 
           .grid-cols-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            grid-template-columns: 1fr 1fr 1fr !important;
           }
 
           .flex {
             display: flex !important;
           }
 
+          .flex-col {
+            flex-direction: column !important;
+          }
+
           .justify-between {
             justify-content: space-between !important;
+          }
+
+          .items-center {
+            align-items: center !important;
+          }
+
+          .text-center {
+            text-align: center !important;
           }
 
           .font-black {
@@ -996,28 +1274,21 @@ export default function VouchersClient() {
             font-weight: 700 !important;
           }
 
-          .backdrop-blur-sm,
-          [class*="backdrop-blur"],
-          [class*="shadow-"] {
-            backdrop-filter: none !important;
-            box-shadow: none !important;
-          }
-
+          /* Remove animations and effects */
           *,
           *::before,
           *::after {
             animation: none !important;
             transition: none !important;
             transform: none !important;
+            backdrop-filter: none !important;
+            box-shadow: none !important;
           }
 
+          /* Ensure SVG icons are visible */
           svg {
-            width: 1rem !important;
-            height: 1rem !important;
-          }
-
-          .border-dashed {
-            border-style: dashed !important;
+            width: 14px !important;
+            height: 14px !important;
           }
         }
       `}</style>

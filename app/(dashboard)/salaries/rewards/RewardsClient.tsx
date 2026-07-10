@@ -33,9 +33,8 @@ export default function RewardsClient() {
 
   const [isRaisePending, setIsRaisePending] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
 
   type RewardRecord = {
     id: string;

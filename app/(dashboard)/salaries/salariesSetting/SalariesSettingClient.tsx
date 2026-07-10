@@ -81,7 +81,8 @@ export default function SalariesSettingClient() {
   const queryClient = useQueryClient();
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
 
   const period = useMemo(() => getLocalMonth(), []);
   const { data: bonuses = [] } = useBonuses({ period });

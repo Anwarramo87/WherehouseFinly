@@ -40,7 +40,8 @@ export default function TrashPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const queryClient = useQueryClient();
 

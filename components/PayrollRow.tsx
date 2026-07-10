@@ -11,7 +11,7 @@ interface AggregatedPayroll {
   netPayRounded: number;
   roundingDifference: number;
   anomalies: string[];
-  earnedSalary: number;
+  attendanceBasedSalary: number;
   bonusesTotal: number;
   discountsTotal: number;
   totalEarlyLeaveMinutes?: number;
@@ -55,7 +55,7 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
       <div className="w-[15%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
         <div className="flex flex-col items-center gap-1">
           <span className="text-sm font-bold text-slate-800 font-mono">
-            {item.earnedSalary.toLocaleString()}
+            {item.attendanceBasedSalary.toLocaleString()}
           </span>
           <span className="text-[10px] text-slate-500 font-medium">
             ل.س

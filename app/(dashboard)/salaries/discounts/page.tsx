@@ -21,7 +21,8 @@ export default function DiscountsPage() {
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
   
   const [mounted, setMounted] = useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
 
   const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);

@@ -317,9 +317,9 @@ describe('ExcelExportService', () => {
       expect(XLSX.writeFile).toHaveBeenCalledOnce();
     });
 
-    it('uses a custom fileName when provided', () => {
+    it('uses a custom fileName when provided', async () => {
       const emp = makeEmployee();
-      const result = service.exportResignedEmployees([emp], { fileName: 'تقرير_مخصص' });
+      const result = await service.exportResignedEmployees([emp], { fileName: 'تقرير_مخصص' });
 
       expect(result.fileName).toBe('تقرير_مخصص.xlsx');
       const [, fileName] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -354,9 +354,9 @@ describe('ExcelExportService', () => {
       expect(workbook.SheetNames[0]).toBe('تقرير مخصص');
     });
 
-    it('default file name contains today\'s date', () => {
+    it('default file name contains today\'s date', async () => {
       const emp = makeEmployee();
-      const result = service.exportResignedEmployees([emp]);
+      const result = await service.exportResignedEmployees([emp]);
       const today = new Date().toISOString().split('T')[0];
       expect(result.fileName).toContain(today);
     });

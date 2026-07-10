@@ -130,9 +130,8 @@ export default function TimeTablePage() {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); }, []);
 
   // FIX: نضمن أن employees دائماً مصفوفة بغض النظر عن شكل الـ response
   const { data: rawEmployees } = useEmployees({ limit: 200, status: "active" });
