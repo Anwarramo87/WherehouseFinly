@@ -2,30 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { DataDrilldownModal } from "@/components/DataDrilldownModal";
 import {
-  Users,
-  Clock,
-  Timer,
-  AlertTriangle,
-  UserCheck,
-  UserX,
-  Building2,
-  TrendingUp,
-  Scissors,
-  User,
-  CalendarX,
-  ClockAlert,
-  Banknote,
-  UserCog,
-  Briefcase,
-  ArrowLeftRight,
-  X,
-  HandCoins,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  CalendarDays,
+  Users, Clock, Timer, AlertTriangle, UserCheck, UserX,
+  Building2, TrendingUp, Scissors, User, CalendarX, ClockAlert,
+  Banknote, UserCog, Briefcase, ArrowLeftRight, X, HandCoins,
+  MoreVertical, Pencil, Trash2, CalendarDays,
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import useDepartments from "@/hooks/useDepartments";
@@ -37,12 +18,13 @@ import { Employee } from "@/types/employee";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useState, useMemo, useEffect, useCallback } from "react";
-
 import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 
+import { DataDrilldownModalLazy as DataDrilldownModal } from "@/components/DataDrilldownModalLazy";
+
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
-  loading: () => null,
+  ssr: false,
 });
 
 // ============================================================================
@@ -171,9 +153,9 @@ export default function DashboardPage() {
   const isSkeleton = isDashboardLoading;
 
   const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    setMounted(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true); // intentional: client-only hydration guard
   }, []);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
@@ -383,7 +365,7 @@ export default function DashboardPage() {
       name: d.name,
       count: Number(d.employeeCount ?? 0),
       manager: d.manager ?? "",
-      establishedAt: (d as any).establishedAt,
+      establishedAt: (d as { establishedAt?: string }).establishedAt,
       createdAt: d.createdAt,
     }));
   }, [deptsData]);
@@ -684,6 +666,7 @@ export default function DashboardPage() {
                     {canViewFinancialRecords && (
                       <div className="absolute top-4 left-4 z-20">
                         <button
+                          aria-label={`خيارات قسم ${dept.name}`}
                           onClick={() => {
                             const id = dept.id;
                             if (!id) return;

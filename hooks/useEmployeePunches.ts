@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { getApiErrorMessage } from "@/lib/http/error";
-import { toLocalDateString } from "@/lib/date-time";
 
 export interface RawPunch {
   id: string;

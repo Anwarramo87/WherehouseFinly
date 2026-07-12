@@ -1,37 +1,8 @@
-/* @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-} */
-
 @import "tailwindcss";
 
 :root {
-  /* ثبتنا اللون الأبيض للخلفية */
-  --background: #ffffff; 
-  /* ثبتنا اللون الرمادي الغامق (Slate-800) للنصوص */
-  --foreground: #1e293b; 
+  --background: #ffffff;
+  --foreground: #1e293b;
 }
 
 @theme inline {
@@ -71,68 +42,10 @@ body {
   background: #94a3b8;
 }
 
-/* تم حذف الـ @media الخاصة بالـ Dark Mode من هنا */
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-text-size-adjust: 100%;
   -webkit-overflow-scrolling: touch;
-}
-
-/* Print styles for vouchers */
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 15mm 10mm;
-  }
-  
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  
-  body {
-    background: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  .vouchers-grid {
-    display: block !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  
-  .voucher-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-bottom: 5mm !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    border: 1px solid #666 !important;
-    background: white !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  
-  .voucher-card:last-child {
-    margin-bottom: 0 !important;
-  }
-}
-
-/* Enhanced print mode */
-body.print-mode .vouchers-grid {
-  display: block !important;
-}
-
-body.print-mode .voucher-card {
-  page-break-inside: avoid !important;
-  break-inside: avoid !important;
-  margin-bottom: 5mm !important;
 }

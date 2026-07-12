@@ -60,7 +60,23 @@ const buildUpstreamHeaders = (request: NextRequest) => {
   return headers;
 };
 
-const buildResponseHeaders = (response: Response, request: NextRequest) => {
+// Low-volatility endpoints that can benefit from short-lived caching
+const CACHEABLE_PATHS = new Set([
+  "/departments",
+  "/roles",
+]);
+
+const isCacheablePath = (apiPath: string): boolean => {
+  // Check if the path starts with any cacheable prefix
+  for (const path of CACHEABLE_PATHS) {
+    if (apiPath === path || apiPath.startsWith(`${path}?`) || apiPath.startsWith(`${path}/`)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const buildResponseHeaders = (response: Response, request: NextRequest, apiPath: string) => {
   const headers = new Headers();
 
   response.headers.forEach((value, key) => {
@@ -73,9 +89,15 @@ const buildResponseHeaders = (response: Response, request: NextRequest) => {
     headers.set(key, value);
   });
 
-  // ─── إجبار المتصفح وأي CDN على عدم كوشرة استجابات الـ API ───────────────
-  headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  headers.set("Pragma", "no-cache");
+  // ─── Selective caching for low-volatility endpoints ───────────────────────
+  if (isCacheablePath(apiPath)) {
+    // Short-lived cache: private (browser only), stale-while-revalidate for better UX
+    headers.set("Cache-Control", "private, max-age=0, s-maxage=60, stale-while-revalidate=120");
+  } else {
+    // Default: no caching for volatile data (attendance, payroll, inventory, etc.)
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    headers.set("Pragma", "no-cache");
+  }
   // ─────────────────────────────────────────────────────────────────────────
 
   return headers;
@@ -112,7 +134,7 @@ async function handler(request: NextRequest) {
 
     return new NextResponse(response.body, {
       status: response.status,
-      headers: buildResponseHeaders(response, request),
+      headers: buildResponseHeaders(response, request, apiPath),
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

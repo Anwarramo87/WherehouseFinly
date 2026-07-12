@@ -30,13 +30,18 @@ export type PayrollInputRecord = {
 
 export type UpsertPayrollInputPayload = Omit<PayrollInputRecord, 'id'>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const normalizeError = (error: any): string => {
-  const message = error?.response?.data?.message || error?.message || "حدث خطأ غير معروف";
-  if (Array.isArray(message)) {
-    return message.join(" | ");
+const normalizeError = (error: unknown): string => {
+  if (error && typeof error === 'object') {
+    const err = error as { response?: { data?: { message?: unknown } }; message?: unknown };
+    const message = err.response?.data?.message ?? err.message ?? "حدث خطأ غير معروف";
+    if (Array.isArray(message)) {
+      return message.join(" | ");
+    }
+    if (typeof message === 'string') {
+      return message;
+    }
   }
-  return message;
+  return "حدث خطأ غير معروف";
 };
 
 export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
@@ -53,30 +58,32 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
 
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.map((item: any) => ({
-        id: item.id,
-        employeeId: item.employeeId,
-        periodStart: item.periodStart?.split("T")[0] || periodStart,
-        periodEnd: item.periodEnd?.split("T")[0] || periodEnd,
-        lateMinutes: Number(item.lateMinutes || 0),
-        earlyLeaveMinutes: Number(item.earlyLeaveMinutes || 0),
-        absenceDays: Number(item.absenceDays || 0),
-        sickLeaveDays: Number(item.sickLeaveDays || 0),
-        adminLeaveDays: Number(item.adminLeaveDays || 0),
-        unpaidLeaveDays: Number(item.unpaidLeaveDays || 0),
-        deathLeaveDays: Number(item.deathLeaveDays || 0),
-        unpaidHours: Number(item.unpaidHours || 0),
-        overtimeRegularMinutes: Number(item.overtimeRegularMinutes || 0),
-        overtimeWeekendDays: Number(item.overtimeWeekendDays || 0),
-        penaltyAmount: Number(item.penaltyAmount || 0),
-        clothingDeduction: Number(item.clothingDeduction || 0),
-        bonusAdjustment: Number(item.bonusAdjustment || 0),
-        advanceAmount: Number(item.advanceAmount || 0),
-        insuranceAmount: item.insuranceAmount ? Number(item.insuranceAmount) : undefined,
-        transportAllowanceOverride: item.transportAllowanceOverride ? Number(item.transportAllowanceOverride) : undefined,
-        notes: item.notes || "",
-      }));
+      return data.map((item: unknown) => {
+        const record = item as Record<string, unknown>;
+        return {
+          id: record.id as string | undefined,
+          employeeId: record.employeeId as string,
+          periodStart: (record.periodStart as string | undefined)?.split("T")[0] || periodStart,
+          periodEnd: (record.periodEnd as string | undefined)?.split("T")[0] || periodEnd,
+          lateMinutes: Number(record.lateMinutes || 0),
+          earlyLeaveMinutes: Number(record.earlyLeaveMinutes || 0),
+          absenceDays: Number(record.absenceDays || 0),
+          sickLeaveDays: Number(record.sickLeaveDays || 0),
+          adminLeaveDays: Number(record.adminLeaveDays || 0),
+          unpaidLeaveDays: Number(record.unpaidLeaveDays || 0),
+          deathLeaveDays: Number(record.deathLeaveDays || 0),
+          unpaidHours: Number(record.unpaidHours || 0),
+          overtimeRegularMinutes: Number(record.overtimeRegularMinutes || 0),
+          overtimeWeekendDays: Number(record.overtimeWeekendDays || 0),
+          penaltyAmount: Number(record.penaltyAmount || 0),
+          clothingDeduction: Number(record.clothingDeduction || 0),
+          bonusAdjustment: Number(record.bonusAdjustment || 0),
+          advanceAmount: Number(record.advanceAmount || 0),
+          insuranceAmount: record.insuranceAmount ? Number(record.insuranceAmount) : undefined,
+          transportAllowanceOverride: record.transportAllowanceOverride ? Number(record.transportAllowanceOverride) : undefined,
+          notes: (record.notes as string | undefined) || "",
+        };
+      });
     },
     enabled: !!periodStart && !!periodEnd,
     staleTime: QUERY_STALE_TIME.RELAXED,
@@ -100,8 +107,7 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
       router.refresh();
       toast.success("تم الحفظ بنجاح!");
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error(normalizeError(error));
     }
   });

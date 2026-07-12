@@ -1,7 +1,4 @@
 import apiClient from "@/lib/api-client";
-import { clearAuthAccessToken, clearAuthSession } from "@/lib/auth-session";
-import { resetAuthVerificationCache } from "@/lib/auth-verify";
-import { useAuthStore } from "@/stores/auth-store";
 
 const REFRESH_INTERVAL_MS = 14 * 60 * 1000; // 14 دقيقة — قبل انتهاء الـ token بدقيقة
 

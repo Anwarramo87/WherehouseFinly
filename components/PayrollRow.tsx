@@ -1,20 +1,19 @@
 import React from 'react';
 
-// Assuming AggregatedPayroll is defined in a types file
-import { PayrollItem } from '@/types/payroll';
+import type { AggregatedPayroll } from '@/types/payroll-aggregated';
 
 interface PayrollRowProps {
-  item: PayrollItem;
-  onSelectPayslip: (item: PayrollItem) => void;
+  item: AggregatedPayroll;
+  onSelectPayslip: (item: AggregatedPayroll) => void;
   style: React.CSSProperties;
 }
 
 const areEqual = (prevProps: PayrollRowProps, nextProps: PayrollRowProps) => {
   // For virtualization, style prop changes on every scroll, so we ignore it.
   // We only care if the actual item data has changed.
-  return prevProps.item.id === nextProps.item.id && // Using id for better comparison
+  return prevProps.item.employeeId === nextProps.item.employeeId &&
          prevProps.item.netPayRounded === nextProps.item.netPayRounded &&
-         prevProps.item.anomalies.length === nextProps.item.anomalies.length;
+         (prevProps.item.anomalies ?? []).length === (nextProps.item.anomalies ?? []).length;
 };
 
 const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style }) => {
@@ -51,25 +50,23 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
 
       {/* المكافآت - Bonuses */}
       <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        {item.totalBonuses > 0 ? (
+        {item.bonusesTotal > 0 ? (
           <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
-            +{Number(item.totalBonuses).toLocaleString()}
+            +{Number(item.bonusesTotal).toLocaleString()}
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
-
         )}
       </div>
 
       {/* الخصومات - Deductions */}
       <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        {item.totalDeductions > 0 ? (
+        {item.discountsTotal > 0 ? (
           <span className="text-sm font-semibold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
-            -{Number(item.totalDeductions).toLocaleString()}
+            -{Number(item.discountsTotal).toLocaleString()}
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
-
         )}
       </div>
 

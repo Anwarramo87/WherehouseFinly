@@ -43,19 +43,22 @@ export const usePayrollReport = (month: string) => {
           totalNetPay: Number(payload?.totals?.totalNetPay || 0),
         },
         items: Array.isArray(payload?.items)
-          ? payload.items.map((item: any) => ({
-              ...item,
-              attendanceBasedSalary: convertToDecimalString(item.attendanceBasedSalary),
-              hoursWorked: convertToDecimalString(item.hoursWorked),
-              hourlyRate: convertToDecimalString(item.hourlyRate),
-              grossPay: convertToDecimalString(item.grossPay),
-              totalBonuses: convertToDecimalString(item.totalBonuses),
-              totalDeductions: convertToDecimalString(item.totalDeductions),
-              netPay: convertToDecimalString(item.netPay),
-              netPayRounded: convertToDecimalString(item.netPayRounded),
-              roundingDifference: convertToDecimalString(item.roundingDifference),
-              earlyLeaveDeduction: convertToDecimalString(item.earlyLeaveDeduction),
-            }))
+          ? payload.items.map((item: unknown) => {
+              const record = item as Record<string, unknown>;
+              return {
+                ...record,
+                attendanceBasedSalary: convertToDecimalString(record.attendanceBasedSalary as number | string | { $numberDecimal: string } | undefined),
+                hoursWorked: convertToDecimalString(record.hoursWorked as number | string | { $numberDecimal: string } | undefined),
+                hourlyRate: convertToDecimalString(record.hourlyRate as number | string | { $numberDecimal: string } | undefined),
+                grossPay: convertToDecimalString(record.grossPay as number | string | { $numberDecimal: string } | undefined),
+                totalBonuses: convertToDecimalString(record.totalBonuses as number | string | { $numberDecimal: string } | undefined),
+                totalDeductions: convertToDecimalString(record.totalDeductions as number | string | { $numberDecimal: string } | undefined),
+                netPay: convertToDecimalString(record.netPay as number | string | { $numberDecimal: string } | undefined),
+                netPayRounded: convertToDecimalString(record.netPayRounded as number | string | { $numberDecimal: string } | undefined),
+                roundingDifference: convertToDecimalString(record.roundingDifference as number | string | { $numberDecimal: string } | undefined),
+                earlyLeaveDeduction: convertToDecimalString(record.earlyLeaveDeduction as number | string | { $numberDecimal: string } | undefined),
+              };
+            })
           : [],
       };
     },

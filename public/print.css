@@ -1,0 +1,55 @@
+/* Print-only styles — imported with media="print" to avoid blocking initial render */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 10mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .vouchers-grid {
+    display: block !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .voucher-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 5mm !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #666 !important;
+    background: white !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .voucher-card:last-child {
+    margin-bottom: 0 !important;
+  }
+}
+
+/* Enhanced print mode class */
+body.print-mode .vouchers-grid {
+  display: block !important;
+}
+
+body.print-mode .voucher-card {
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+  margin-bottom: 5mm !important;
+}

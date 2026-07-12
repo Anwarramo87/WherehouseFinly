@@ -44,9 +44,9 @@ export function MonthPeriodSelector({
   })();
 
   const isCurrentMonth = value === currentMonth;
-  const effectiveDate = selectedDate || today;
+  const _effectiveDate = selectedDate || today;
 
-  const daysInMonth = useMemo(() => {
+  const _daysInMonth = useMemo(() => {
     const [y, m] = value.split("-").map(Number);
     const count = new Date(y, m, 0).getDate();
     const result: { value: string; label: string }[] = [];
@@ -93,12 +93,14 @@ export function MonthPeriodSelector({
     new Date(isDaily ? selectedDate! : `${value}-01`)
   );
 
+  // Reset cursor and view whenever the picker opens
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
-    if (isOpen) {
-      setCursorDate(new Date(isDaily ? selectedDate! : `${value}-01`));
-      setView(isDaily ? "days" : "months");
-    }
-  }, [isOpen, isDaily, selectedDate, value]);
+    if (!isOpen) return;
+    setCursorDate(new Date(isDaily ? selectedDate! : `${value}-01`));
+    setView(isDaily ? "days" : "months");
+  }, [isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   useEffect(() => {
     if (view === "years" && isOpen) {

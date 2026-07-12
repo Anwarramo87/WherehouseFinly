@@ -233,7 +233,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
         if (warnings.length > 0) {
           setTimeout(() => {
             toast(
-              (t) => (
+              (_t) => (
                 <div dir="rtl" className="flex flex-col gap-1">
                   <span className="font-black text-amber-700 text-sm">
                     ⚠️ تنبيه: تعارض مع الحضور

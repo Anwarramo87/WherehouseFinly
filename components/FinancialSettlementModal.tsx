@@ -10,8 +10,8 @@ import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction"
 import type { Salary } from "@/types/salary";
 import type { Leave } from "../types/leave";
 
-const STANDARD_WORK_DAYS = 26;
-const HOURS_PER_DAY = 8;
+const STANDARD_WORK_DAYS = 26; // eslint-disable-line @typescript-eslint/no-unused-vars
+const HOURS_PER_DAY = 8; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 type AttendanceEventRecord = {
   employeeId?: string;
@@ -367,23 +367,23 @@ const isMounted = typeof document !== "undefined";
         );
 
         const hasManual = !!manualInput;
-        const lateMinutes = (hasManual && (manualInput.lateMinutes ?? 0) > 0)
+        const _lateMinutes = (hasManual && (manualInput.lateMinutes ?? 0) > 0)
           ? Number(manualInput.lateMinutes)
           : Math.max(
               Number(autoInput?.delayMinutes ?? 0),
               attendanceSummary.lateMinutes,
             );
-        const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? Math.max(
+        const _earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? Math.max(
           Number(autoInput?.earlyLeaveMinutes ?? 0),
           attendanceSummary.earlyLeaveMinutes,
         );
-        const overtimeMinutes = (hasManual && (manualInput.overtimeRegularMinutes ?? 0) > 0)
+        const _overtimeMinutes = (hasManual && (manualInput.overtimeRegularMinutes ?? 0) > 0)
           ? Number(manualInput.overtimeRegularMinutes)
           : Math.max(
               Number(autoInput?.overtimeMinutes ?? 0),
               attendanceSummary.overtimeMinutes,
             );
-        const overtimeWeekendDays = (hasManual && (manualInput.overtimeWeekendDays ?? 0) > 0)
+        const _overtimeWeekendDays = (hasManual && (manualInput.overtimeWeekendDays ?? 0) > 0)
           ? Number(manualInput.overtimeWeekendDays)
           : Math.max(
               Number(autoInput?.overtimeWeekendDays ?? 0),
@@ -391,7 +391,7 @@ const isMounted = typeof document !== "undefined";
             );
 
         const backendPresentDays = autoInput?.presentDays ?? 0;
-        const presentDays = Math.max(backendPresentDays, attendanceSummary.presentDays);
+        const _presentDays = Math.max(backendPresentDays, attendanceSummary.presentDays);
 
         const leavesRaw = leavesRes.status === 'fulfilled'
           ? (Array.isArray(leavesRes.value.data) ? leavesRes.value.data : (leavesRes.value.data?.data || []))
@@ -450,9 +450,9 @@ const isMounted = typeof document !== "undefined";
         );
         const paidLeaveDaysManual = adminLeaveDays + deathLeaveDays;
         const paidLeaveDays = Math.max(paidLeaveDaysManual, paidLeaveDaysFromAPI);
-        const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
+        const _effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
 
-        const insuranceAmount = salaryRecord ? toNum(salaryRecord.insuranceAmount) : 0;
+        const _insuranceAmount = salaryRecord ? toNum(salaryRecord.insuranceAmount) : 0;
 
 
 

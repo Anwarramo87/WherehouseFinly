@@ -52,8 +52,14 @@ const nextConfig: NextConfig = {
       "recharts",
       "@tanstack/react-query",
       "@tanstack/react-table",
+      "@tanstack/react-virtual",
+      "react-hot-toast",
+      "sonner",
+      "xlsx",
     ],
     optimizeServerReact: true,
+    // Reduce dev overlay overhead
+    webVitalsAttribution: ["CLS", "LCP"],
   },
 
   // تحسينات Webpack لبيئة الإنتاج
