@@ -50,23 +50,14 @@ export default function TrashPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: typesRaw } = useQuery({
-    queryKey: ["trash", "types"],
-    queryFn: () => apiClient.get("/trash/types").then((r) => r.data),
+    queryKey: ["trash", "types", period],
+    queryFn: () => apiClient.get("/trash/types", { params: { period } }).then((r) => r.data),
   });
-  const types: { entityType: string; count: number }[] = useMemo(() => {
-    const raw: { entityType: string; count: number }[] = Array.isArray(typesRaw)
-      ? typesRaw
-      : Array.isArray(typesRaw?.data)
-      ? typesRaw.data
-      : [];
-    // deduplicate by entityType in case of unexpected duplicates
-    const seen = new Set<string>();
-    return raw.filter((t) => {
-      if (seen.has(t.entityType)) return false;
-      seen.add(t.entityType);
-      return true;
-    });
-  }, [typesRaw]);
+  const types: { entityType: string; count: number }[] = Array.isArray(typesRaw)
+    ? typesRaw
+    : Array.isArray(typesRaw?.data)
+    ? typesRaw.data
+    : [];
 
   const { data: trashData, isLoading } = useQuery({
      queryKey: ["trash", "list", typeFilter, period],

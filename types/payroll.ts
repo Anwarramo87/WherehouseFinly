@@ -47,6 +47,7 @@ export interface PayrollItem {
   hoursWorked: number | string | { $numberDecimal: string };
   hourlyRate: number | string | { $numberDecimal: string };
   grossPay: number | string | { $numberDecimal: string };
+  totalBonuses: number | string | { $numberDecimal: string };
   totalDeductions: number | string | { $numberDecimal: string };
   netPay: number | string | { $numberDecimal: string };
   /** صافي الراتب مقرباً لأقرب ألف — القيمة المدفوعة فعلياً للموظف */

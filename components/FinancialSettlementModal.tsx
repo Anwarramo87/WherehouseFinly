@@ -207,9 +207,11 @@ const getToday = () => {
 
 export interface SettlementData {
   settlementDate: string;
-  finalSalaryAmount: number;
+  finalSalaryAmount: number; // This will be netPayRounded
   deductions: number;
-  bonuses: number;
+  bonuses: number; // This will be totalBonuses
+  earnedSalary: number; // This will be attendanceBasedSalary
+  netPayRounded: number; // Explicitly added for clarity
   notes?: string;
 }
 
@@ -228,6 +230,8 @@ const defaultFormState: SettlementData = {
   finalSalaryAmount: 0,
   deductions: 0,
   bonuses: 0,
+  earnedSalary: 0, // New field
+  netPayRounded: 0, // New field
   notes: '',
 };
 
@@ -258,7 +262,7 @@ const isMounted = typeof document !== "undefined";
   }));
   const [isLoadingSalary, setIsLoadingSalary] = useState(false);
   const [isLoadingExtras, setIsLoadingExtras] = useState(false);
-  const [provisionalData, setProvisionalData] = useState<{ earnedSalary: number; bonuses: number; deductions: number; hasData: boolean } | null>(null);
+  const [provisionalData, setProvisionalData] = useState<{ earnedSalary: number; bonuses: number; deductions: number; netPayRounded: number; hasData: boolean } | null>(null);
   const [finalSalaryError, setFinalSalaryError] = useState("");
   const [deductionsError, setDeductionsError] = useState("");
   const [bonusesError, setBonusesError] = useState("");
@@ -329,8 +333,10 @@ const isMounted = typeof document !== "undefined";
         ]);
 
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
-        const bonusesFromAPI = parseFloat(String(provPayload.bonuses ?? 0)) || 0;
-        const deductionsFromAPI = parseFloat(String(provPayload.deductions ?? 0)) || 0;
+        const attendanceBasedSalaryFromAPI = toNum(provPayload.attendanceBasedSalary ?? 0);
+        const totalBonusesFromAPI = toNum(provPayload.totalBonuses ?? 0);
+        const totalDeductionsFromAPI = toNum(provPayload.totalDeductions ?? 0);
+        const netPayRoundedFromAPI = toNum(provPayload.netPayRounded ?? 0);
 
         const inputsRaw = payrollInputsRes.status === 'fulfilled'
           ? (Array.isArray(payrollInputsRes.value.data) ? payrollInputsRes.value.data : (payrollInputsRes.value.data?.data || []))
@@ -347,17 +353,7 @@ const isMounted = typeof document !== "undefined";
           : [];
         const salaryRecord = salariesRaw.find((s: Salary) => s.employeeId === currentEmployeeId);
 
-        let grossSalary = 0;
-        if (salaryRecord) {
-          grossSalary = toNum(salaryRecord.baseSalary) + toNum(salaryRecord.lumpSumSalary)
-            + toNum(salaryRecord.livingAllowance) + toNum(salaryRecord.responsibilityAllowance)
-            + toNum(salaryRecord.extraEffortAllowance) + toNum(salaryRecord.productionIncentive)
-            + toNum(salaryRecord.transportAllowance);
-        }
-        if (grossSalary <= 0) {
-          grossSalary = toNum((employee as Employee & { baseSalary?: unknown }).baseSalary)
-            || toNum(employee.hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
-        }
+
 
         const attendanceRaw = attendanceRes.status === 'fulfilled'
           ? attendanceRes.value
@@ -458,34 +454,24 @@ const isMounted = typeof document !== "undefined";
 
         const insuranceAmount = salaryRecord ? toNum(salaryRecord.insuranceAmount) : 0;
 
-        let earnedSalary = 0;
-        if (grossSalary > 0) {
-          const dailyRate = grossSalary / STANDARD_WORK_DAYS;
-          const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-          const paidDays = Math.min(presentDays + effectivePaidLeaveDays, STANDARD_WORK_DAYS);
-          earnedSalary = Math.max(0,
-            dailyRate * paidDays
-            - lateMinutes * minuteRate * 1.5
-            - earlyLeaveMinutes * minuteRate
-            + overtimeMinutes * minuteRate * 1.5
-            + dailyRate * overtimeWeekendDays * 1.5
-            - insuranceAmount
-          );
-        }
+
 
         setProvisionalData({
-          earnedSalary,
-          bonuses: bonusesFromAPI,
-          deductions: deductionsFromAPI,
-          hasData: grossSalary > 0,
+          earnedSalary: attendanceBasedSalaryFromAPI,
+          bonuses: totalBonusesFromAPI,
+          deductions: totalDeductionsFromAPI,
+          netPayRounded: netPayRoundedFromAPI,
+          hasData: attendanceBasedSalaryFromAPI > 0,
         });
 
         // Update formData with the newly calculated provisional data
         setFormData(prev => ({
           ...prev,
-          finalSalaryAmount: earnedSalary,
-          bonuses: bonusesFromAPI,
-          deductions: deductionsFromAPI,
+          finalSalaryAmount: netPayRoundedFromAPI, // Map finalSalaryAmount to netPayRounded
+          bonuses: totalBonusesFromAPI,
+          deductions: totalDeductionsFromAPI,
+          earnedSalary: attendanceBasedSalaryFromAPI,
+          netPayRounded: netPayRoundedFromAPI,
         }));
 
       } catch (err: unknown) {
@@ -504,10 +490,10 @@ const isMounted = typeof document !== "undefined";
   if (!isOpen || !isMounted) return null;
 
   // Calculate total settlement
-  const dueSalary = Math.round((provisionalData?.earnedSalary ?? 0) / 1000) * 1000;
-  const apiDeductions = Math.round(provisionalData?.deductions ?? 0);
-  const apiBonuses = Math.round(provisionalData?.bonuses ?? 0);
-  const totalSettlement = Math.round(dueSalary + apiBonuses - apiDeductions);
+  const dueSalary = provisionalData?.earnedSalary ?? 0;
+  const apiDeductions = provisionalData?.deductions ?? 0;
+  const apiBonuses = provisionalData?.bonuses ?? 0;
+  const totalSettlement = provisionalData?.netPayRounded ?? 0;
   const isNegativeSettlement = totalSettlement < 0;
 
   const handleFormSubmit = (e: React.FormEvent) => {

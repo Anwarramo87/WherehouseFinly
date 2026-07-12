@@ -25,10 +25,10 @@ export type FireEmployeePayload = {
   fireDate: string;
   reason: string;
   notes: string;
-  dueSalary: number; // This is earnedSalary from backend
-  bonus: number;
-  totalDues: number;
-  provisionalTotal: number; // This is the net provisional total from backend
+  attendanceBasedSalary: number; // Mapped from backend
+  totalBonuses: number; // Mapped from backend
+  totalDeductions: number; // Mapped from backend
+  netPayRounded: number; // Mapped from backend
   status: "terminated" | "resigned";
 };
 
@@ -41,10 +41,10 @@ interface Props {
 };
 
 type ProvisionalSettlementData = {
-  earnedSalary: number;
-  bonuses: number;
-  deductions: number;
-  provisionalTotal: number;
+  attendanceBasedSalary: number;
+  totalBonuses: number;
+  totalDeductions: number;
+  netPayRounded: number;
   hasData: boolean;
 };
 
@@ -115,17 +115,17 @@ export default function FireEmployeeModal({
 
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
         console.log('[FireModal] provisional response:', provPayload);
-        const earnedSalary = toNum(provPayload.earnedSalary);
-        const bonuses = toNum(provPayload.bonuses);
-        const deductions = toNum(provPayload.deductions);
-        const provisionalTotal = toNum(provPayload.provisionalTotal);
+        const attendanceBasedSalary = toNum(provPayload.attendanceBasedSalary);
+        const totalBonuses = toNum(provPayload.totalBonuses);
+        const totalDeductions = toNum(provPayload.totalDeductions);
+        const netPayRounded = toNum(provPayload.netPayRounded);
 
         setProvisionalData({
-          earnedSalary,
-          bonuses,
-          deductions,
-          provisionalTotal,
-          hasData: provisionalTotal > 0, // Assuming provisionalTotal > 0 means valid data
+          attendanceBasedSalary,
+          totalBonuses,
+          totalDeductions,
+          netPayRounded,
+          hasData: netPayRounded > 0, // Use netPayRounded for data validity check
         });
       } catch (err: unknown) {
         if (
@@ -145,10 +145,10 @@ export default function FireEmployeeModal({
 
   if (!isOpen || typeof document === "undefined" || !employee) return null;
 
-  const dueSalary = provisionalData?.earnedSalary ?? 0;
-  const apiDeductions = provisionalData?.deductions ?? 0;
-  const apiBonuses = provisionalData?.bonuses ?? 0;
-  const totalDues = (provisionalData?.provisionalTotal ?? 0) + (Number(bonus) || 0);
+  const dueSalary = provisionalData?.attendanceBasedSalary ?? 0;
+  const apiDeductions = provisionalData?.totalDeductions ?? 0;
+  const apiBonuses = provisionalData?.totalBonuses ?? 0;
+  const totalDues = provisionalData?.netPayRounded ?? 0; // Directly use netPayRounded as per architectural constraint
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,10 +165,10 @@ export default function FireEmployeeModal({
       fireDate,
       reason,
       notes,
-      dueSalary: provisionalData?.earnedSalary ?? 0,
-      bonus: Number(bonus) || 0,
-      totalDues: totalDues,
-      provisionalTotal: provisionalData?.provisionalTotal ?? 0,
+      attendanceBasedSalary: provisionalData?.attendanceBasedSalary ?? 0,
+      totalBonuses: provisionalData?.totalBonuses ?? 0,
+      totalDeductions: provisionalData?.totalDeductions ?? 0,
+      netPayRounded: provisionalData?.netPayRounded ?? 0,
       status: departureType
     });
   };

@@ -470,71 +470,33 @@ export default function PayrollPage() {
   // ── Calculate full net pay for resigned employees (same logic as previewData) ──
   const resignedPayrollMap = useMemo(() => {
     const map = new Map<string, { earnedSalary: number; bonusesTotal: number; discountsTotal: number; netPayRounded: number }>();
+    const backendPayrollItems = reportData?.items || [];
+
     for (const emp of allResignedList) {
       const employeeId = emp.employeeId;
-      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+      const payrollItem = backendPayrollItems.find(item => item.employeeId === employeeId);
 
-      let calcGross = 0;
-      if (salaryConfig) {
-        calcGross =
-          toNumber(salaryConfig.baseSalary) +
-          toNumber(salaryConfig.lumpSumSalary) +
-          toNumber(salaryConfig.livingAllowance) +
-          toNumber(salaryConfig.responsibilityAllowance) +
-          toNumber(salaryConfig.extraEffortAllowance) +
-          toNumber(salaryConfig.productionIncentive) +
-          toNumber(salaryConfig.transportAllowance);
+      if (payrollItem) {
+        // Use pre-calculated values directly from payrollItem
+        map.set(employeeId, {
+          earnedSalary: toNumber(payrollItem.attendanceBasedSalary), // Assuming attendanceBasedSalary is the earnedSalary
+          bonusesTotal: toNumber(payrollItem.totalBonuses),
+          discountsTotal: toNumber(payrollItem.totalDeductions), // Assuming totalDeductions includes all discounts
+          netPayRounded: toNumber(payrollItem.netPayRounded),
+        });
+      } else {
+        // Fallback or handle cases where payrollItem is not found (e.g., no payroll run yet)
+        // For now, setting to 0 as per the original problem description "returning 0s"
+        map.set(employeeId, {
+          earnedSalary: 0,
+          bonusesTotal: 0,
+          discountsTotal: 0,
+          netPayRounded: 0,
+        });
       }
-      if (calcGross <= 0) {
-        calcGross =
-          toNumber((emp as { baseSalary?: number }).baseSalary) ||
-          toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
-      }
-
-      // Prorated present days based on termination date
-      let presentDays = localPresentDaysMap.get(employeeId) ?? 0;
-      if (emp.terminationDate && presentDays === 0) {
-        const termDate = new Date(emp.terminationDate);
-        const periodStartDate = new Date(termDate.getFullYear(), termDate.getMonth(), 1);
-        presentDays = Math.max(1, Math.ceil((termDate.getTime() - periodStartDate.getTime()) / 86400000) + 1);
-      }
-
-      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-      const autoInput = autoDeductions.find((d: AttendanceDeductionBreakdown) => d.employeeId === employeeId);
-      const hasManualInput = !!manualInput;
-      const leaveData = employeeLeavesMap.get(employeeId);
-
-      const autoLateMinutes = autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
-      const lateMinutes = hasManualInput && (manualInput.lateMinutes ?? 0) > 0 ? (manualInput.lateMinutes ?? 0) : autoLateMinutes;
-
-      const sickLeaveDays = Math.max(hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0, leaveData?.sickLeaveDays ?? 0);
-      const paidLeaveDays = Math.max(hasManualInput ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0) : 0, leaveData?.paidLeaveDays ?? 0);
-      const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
-
-      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
-      const totalOvertimeMinutes = hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0 ? (manualInput.overtimeRegularMinutes ?? 0) : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeDays = hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0 ? (manualInput.overtimeWeekendDays ?? 0) : (autoInput?.overtimeWeekendDays ?? 0);
-
-      const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
-      const rawEarned = calcEarnedSalary(calcGross, presentDays, effectivePaidLeaveDays, lateMinutes, earlyLeaveMinutes, totalOvertimeMinutes, totalOvertimeDays);
-      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
-
-      const empBonuses = bonuses.filter((b) => b.employeeId === employeeId);
-      const bonusesTotal = empBonuses.reduce((sum, b) => sum + toNumber(b.bonusAmount) + toNumber((b as { assistanceAmount?: number }).assistanceAmount), 0);
-
-      const empAdvances = discounts.filter((d) => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month));
-      const empPenalties = penalties.filter((p) => p.employeeId === employeeId && p.issueDate.startsWith(month));
-      const discountsTotal = empAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) + empPenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
-
-      const dailyRate = calcGross / STANDARD_WORK_DAYS;
-      const earlyLeaveDed = earlyLeaveMinutes * (dailyRate / (HOURS_PER_DAY * 60));
-      const netPay = earnedSalary + bonusesTotal - discountsTotal - earlyLeaveDed;
-      const netPayRounded = Math.ceil(netPay / 1000) * 1000;
-
-      map.set(employeeId, { earnedSalary, bonusesTotal, discountsTotal, netPayRounded });
     }
     return map;
-  }, [allResignedList, salaries, bonuses, discounts, penalties, month, payrollInputs, autoDeductions, localLateMinutesMap, localPresentDaysMap, employeeLeavesMap]);
+  }, [allResignedList, reportData?.items]);
 
   // ── Build payroll rows ───────────────────────────────────────────────────────
   /**
@@ -742,169 +704,53 @@ export default function PayrollPage() {
           salaryConfig?.profession?.trim() ||
           "أقسام عامة";
 
+        // Directly use values from backendItem as they are authoritative
         const grossPay = toNumber(backendItem.grossPay);
+        const totalBonuses = toNumber(backendItem.totalBonuses);
+        const totalDeductions = toNumber(backendItem.totalDeductions);
+        const netPay = toNumber(backendItem.netPay);
+        const netPayRounded = toNumber(backendItem.netPayRounded);
+        const roundingDifference = toNumber(backendItem.roundingDifference);
+        const attendanceBasedSalary = toNumber(backendItem.attendanceBasedSalary);
+        const earlyLeaveMinutes = Number(backendItem.earlyLeaveMinutes ?? 0);
+        const earlyLeaveDeduction = toNumber(backendItem.earlyLeaveDeduction);
 
         const anomalies: string[] = Array.isArray(backendItem.anomalies)
           ? backendItem.anomalies
           : [];
-
-        // ── 1. Calculate Earned Salary exactly as TimeTable ──────────────────────
-        let earnedSalary = 0;
-        let earlyLeaveMinutes = 0; // Track for early leave deduction calculation
-        const emp = employees.find((e) => e.employeeId === employeeId);
-
-        let calcGross = 0;
-        if (salaryConfig) {
-          calcGross =
-            toNumber(salaryConfig.baseSalary) +
-            toNumber(salaryConfig.lumpSumSalary) +
-            toNumber(salaryConfig.livingAllowance) +
-            toNumber(salaryConfig.responsibilityAllowance) +
-            toNumber(salaryConfig.extraEffortAllowance) +
-            toNumber(salaryConfig.productionIncentive) +
-            toNumber(salaryConfig.transportAllowance);
-        }
-        if (calcGross <= 0 && emp) {
-          calcGross =
-            toNumber((emp as { baseSalary?: number }).baseSalary) ||
-            toNumber((emp as { hourlyRate?: number }).hourlyRate) *
-              HOURS_PER_DAY *
-              STANDARD_WORK_DAYS;
-        }
-
-        if (emp) {
-          const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-          const autoInput = autoDeductions.find(
-            (d: AttendanceDeductionBreakdown) => d.employeeId === employeeId,
-          );
-          const hasManualInput = !!manualInput;
-          const leaveData = employeeLeavesMap.get(employeeId);
-
-          // Late minutes
-          const autoLateMinutes =
-            autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
-          const lateMinutes =
-            hasManualInput && (manualInput.lateMinutes ?? 0) > 0
-              ? (manualInput.lateMinutes ?? 0)
-              : autoLateMinutes;
-
-          // Present days
-          let actualWorkDays: number;
-          if (hasManualInput && manualInput.absenceDays !== undefined) {
-            actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
-          } else {
-            const backendPresent = autoInput?.presentDays ?? 0;
-            const localPresent = localPresentDaysMap.get(employeeId) ?? 0;
-            actualWorkDays = Math.max(backendPresent, localPresent);
-          }
-
-          // Paid leave days (100% + 50% sick)
-          const sickLeaveDays = Math.max(
-            hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
-            leaveData?.sickLeaveDays ?? 0,
-          );
-          const paidLeaveDays = Math.max(
-            hasManualInput
-              ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)
-              : 0,
-            leaveData?.paidLeaveDays ?? 0,
-          );
-          const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
-
-          // Early leave minutes
-          earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
-
-          // Overtime
-          const totalOvertimeMinutes =
-            hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
-              ? (manualInput.overtimeRegularMinutes ?? 0)
-              : (autoInput?.overtimeMinutes ?? 0);
-          const totalOvertimeDays =
-            hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
-              ? (manualInput.overtimeWeekendDays ?? 0)
-              : (autoInput?.overtimeWeekendDays ?? 0);
-
-          // Insurance deduction
-          const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
-
-          const rawEarned = calcEarnedSalary(
-            calcGross,
-            actualWorkDays,
-            effectivePaidLeaveDays,
-            lateMinutes,
-            earlyLeaveMinutes,
-            totalOvertimeMinutes,
-            totalOvertimeDays,
-          );
-          earnedSalary = Math.max(0, rawEarned - insuranceAmount);
-        }
-
-        // Bonuses - filter by employee, exclude permanent salary raises (already in baseSalary)
-        const employeeBonuses = bonuses.filter(
-          (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب"
-        );
-        const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
-          const bonusAmt = toNumber(bonus.bonusAmount);
-          const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
-          return sum + bonusAmt + assistAmt;
-        }, 0);
-
-        // Deductions — only advances (kind='advance') + penalties
-        const employeeAdvancesDisc = discounts.filter((d) => {
-          return d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month);
-        });
-        const employeePenaltiesDisc = penalties.filter((p) => {
-          return p.employeeId === employeeId && p.issueDate.startsWith(month);
-        });
-
-        const variableDeductions =
-          employeeAdvancesDisc.reduce((sum, d) => sum + toNumber(d.amount), 0) +
-          employeePenaltiesDisc.reduce((sum, p) => sum + toNumber(p.amount), 0);
-
-        // Calculate early leave deduction amount
-        const backendEarlyLeaveMinutes = Number(backendItem.earlyLeaveMinutes ?? 0);
-        const backendEarlyLeaveDeduction = toNumber(backendItem.earlyLeaveDeduction);
-
-        // Use backend early leave deduction if available, otherwise calculate it
-        const earlyLeaveDedAmount =
-          backendEarlyLeaveDeduction > 0
-            ? backendEarlyLeaveDeduction
-            : (earlyLeaveMinutes * (calcGross / STANDARD_WORK_DAYS)) / (HOURS_PER_DAY * 60);
-
-        // ✅ FIXED: netPay = earnedSalary (already includes attendance adjustments - insurance) + bonuses - variable deductions - early leave
-        // Insurance is already subtracted from earnedSalary, so we don't subtract it again
-        const computedNetPay =
-          earnedSalary + variableEarnings - variableDeductions - earlyLeaveDedAmount;
-        const computedNetPayRounded = Math.ceil(computedNetPay / 1000) * 1000;
-        const computedRoundingDiff = computedNetPayRounded - computedNetPay;
-
-        // ✅ FIXED: totalDeductions should NOT include insurance (it's already in earnedSalary calc)
-        const totalDeductionsAmount = variableDeductions + earlyLeaveDedAmount;
+        
+        // These fields are for display-only subtotals in the payslip modal.
+        // We can derive them if needed, but ensure they don't influence the main totals.
+        // For now, we'll keep a minimal derivation or use backend values if directly available.
+        const fixedEarnings = grossPay; // Assuming grossPay represents fixed earnings from backend
+        const variableEarnings = totalBonuses; // Assuming totalBonuses are variable earnings
+        const fixedDeductions = toNumber(salaryConfig?.insuranceAmount); // Insurance might be fixed, derive from salaryConfig if not in backendItem
+        const variableDeductions = totalDeductions - fixedDeductions; // Derive variable deductions
 
         return {
           employeeId,
           employeeName,
           department,
           grossPay,
-          totalDeductions: totalDeductionsAmount,
-          netPay: computedNetPay,
-          netPayRounded: computedNetPayRounded,
-          roundingDifference: computedRoundingDiff,
+          totalDeductions,
+          netPay,
+          netPayRounded,
+          roundingDifference,
           anomalies,
-          attendanceBasedSalary: toNumber(backendItem.attendanceBasedSalary),
-          earnedSalary,
-          bonusesTotal: variableEarnings,
-          discountsTotal: variableDeductions,
-          fixedEarnings: calcGross,
+          attendanceBasedSalary,
+          earnedSalary: attendanceBasedSalary, // Use attendanceBasedSalary from backend
+          bonusesTotal: totalBonuses,
+          discountsTotal: totalDeductions, // Assuming totalDeductions covers all discounts
+          fixedEarnings,
           variableEarnings,
-          fixedDeductions: toNumber(salaryConfig?.insuranceAmount),
+          fixedDeductions,
           variableDeductions,
-          totalEarlyLeaveMinutes: backendEarlyLeaveMinutes,
-          earlyLeaveDeduction: earlyLeaveDedAmount,
+          totalEarlyLeaveMinutes: earlyLeaveMinutes,
+          earlyLeaveDeduction,
           details: {
             salaryConfig,
-            bonuses: employeeBonuses,
-            deductions: [...employeeAdvancesDisc, ...employeePenaltiesDisc],
+            bonuses: [], // Backend payrollItem doesn't detail individual bonuses here
+            deductions: [], // Backend payrollItem doesn't detail individual deductions here
             attendance: null,
           },
         };

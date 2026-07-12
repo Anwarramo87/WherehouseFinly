@@ -1,38 +1,24 @@
 import React from 'react';
 
 // Assuming AggregatedPayroll is defined in a types file
-interface AggregatedPayroll {
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  grossPay: number;
-  totalDeductions: number;
-  netPay: number;
-  netPayRounded: number;
-  roundingDifference: number;
-  anomalies: string[];
-  attendanceBasedSalary: number;
-  bonusesTotal: number;
-  discountsTotal: number;
-  totalEarlyLeaveMinutes?: number;
-  earlyLeaveDeduction?: number;
-}
+import { PayrollItem } from '@/types/payroll';
 
 interface PayrollRowProps {
-  item: AggregatedPayroll;
-  onSelectPayslip: (item: AggregatedPayroll) => void;
+  item: PayrollItem;
+  onSelectPayslip: (item: PayrollItem) => void;
   style: React.CSSProperties;
 }
 
 const areEqual = (prevProps: PayrollRowProps, nextProps: PayrollRowProps) => {
   // For virtualization, style prop changes on every scroll, so we ignore it.
   // We only care if the actual item data has changed.
-  return prevProps.item.employeeId === nextProps.item.employeeId &&
+  return prevProps.item.id === nextProps.item.id && // Using id for better comparison
          prevProps.item.netPayRounded === nextProps.item.netPayRounded &&
          prevProps.item.anomalies.length === nextProps.item.anomalies.length;
 };
 
 const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style }) => {
+  console.log('PayrollRow item:', item);
   return (
     <div
       style={style}
@@ -65,9 +51,9 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
 
       {/* المكافآت - Bonuses */}
       <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        {item.bonusesTotal > 0 ? (
+        {item.totalBonuses > 0 ? (
           <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
-            +{item.bonusesTotal.toLocaleString()}
+            +{Number(item.totalBonuses).toLocaleString()}
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
@@ -77,9 +63,9 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
 
       {/* الخصومات - Deductions */}
       <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        {item.discountsTotal > 0 ? (
+        {item.totalDeductions > 0 ? (
           <span className="text-sm font-semibold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
-            -{item.discountsTotal.toLocaleString()}
+            -{Number(item.totalDeductions).toLocaleString()}
           </span>
         ) : (
           <span className="text-sm text-slate-400">—</span>
@@ -90,14 +76,14 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
       {/* المجموع - Total */}
       <div className="w-[15%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
         <span className="text-sm font-bold text-slate-800 font-mono">
-          {item.netPay.toLocaleString()}
+          {Number(item.netPay).toLocaleString()}
         </span>
       </div>
 
       {/* الفرق - Difference */}
       <div className="w-[10%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
         <span className="text-xs font-bold text-amber-600 font-mono">
-          {item.roundingDifference.toLocaleString()}
+          {Number(item.roundingDifference).toLocaleString()}
         </span>
       </div>
 
