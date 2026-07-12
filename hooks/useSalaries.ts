@@ -10,29 +10,69 @@ import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 import { toNumber } from "@/lib/number-utils";
 
 const normalizeSalary = (raw: Record<string, unknown>): Salary => {
+  const baseSalary = toNumber(raw.baseSalary);
+  const lumpSumSalary = raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : 0;
+  const livingAllowance = raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : 0;
+  const responsibilityAllowance = toNumber(raw.responsibilityAllowance);
+  const extraEffortAllowance =
+    raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : 0;
+  const productionIncentive = toNumber(raw.productionIncentive);
+  const transportAllowance = toNumber(raw.transportAllowance);
+
+  const calculatedMonthlySalary =
+    baseSalary +
+    lumpSumSalary +
+    livingAllowance +
+    responsibilityAllowance +
+    extraEffortAllowance +
+    productionIncentive +
+    transportAllowance;
+
   return {
     id: String(raw.id ?? ""),
     employeeId: String(raw.employeeId ?? ""),
     profession: raw.profession ? String(raw.profession) : undefined,
-    baseSalary: toNumber(raw.baseSalary),
+    baseSalary,
     lumpSumSalary: raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : undefined,
     livingAllowance: raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : undefined,
-    responsibilityAllowance: toNumber(raw.responsibilityAllowance),
+    responsibilityAllowance,
     extraEffortAllowance:
       raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : undefined,
-    productionIncentive: toNumber(raw.productionIncentive),
-    transportAllowance: toNumber(raw.transportAllowance),
+    productionIncentive,
+    transportAllowance,
     insuranceAmount: raw.insuranceAmount !== undefined ? toNumber(raw.insuranceAmount) : undefined,
     roundingDifference:
       raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,
     monthlySalary:
-      raw.monthlySalary !== undefined
-        ? toNumber(raw.monthlySalary)
-        : toNumber(raw.baseSalary ?? 0) +
-            toNumber(raw.livingAllowance ?? 0) +
-            toNumber(raw.lumpSumSalary ?? 0) || undefined,
+      raw.monthlySalary !== undefined ? toNumber(raw.monthlySalary) : calculatedMonthlySalary,
   } as Salary;
 };
+
+export const useEmployeeSalary = (employeeId?: string) =>
+  useQuery<Salary | null>({
+    queryKey: queryKeys.salaries.detail(employeeId || ""),
+    enabled: !!employeeId,
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get(`/salary/${employeeId}`);
+        const raw = res.data;
+        console.log("useEmployeeSalary raw data:", raw);
+        const normalized = raw ? normalizeSalary(raw as Record<string, unknown>) : null;
+        console.log("useEmployeeSalary normalized data:", normalized);
+        return normalized;
+      } catch (error: unknown) {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+        // 404/400 means no salary record yet — return null silently
+        if (status === 404 || status === 400) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    retry: false,
+    staleTime: QUERY_STALE_TIME.RELAXED,
+    gcTime: QUERY_GC_TIME.RELAXED,
+  });
 
 /**
  * Hook that provides salaries list + helpers for single salary + mutations.
@@ -52,37 +92,17 @@ export const useSalaries = () => {
     queryKey: queryKeys.salaries.all,
     queryFn: async () => {
       const res = await apiClient.get("/salary");
+      console.log("useSalaries api response:", res);
       const data = res.data?.salaries ?? res.data;
+      console.log("useSalaries data:", data);
       const rawArray = Array.isArray(data) ? data : [];
-      return rawArray.map((raw) => normalizeSalary(raw as Record<string, unknown>));
+      const normalized = rawArray.map((raw) => normalizeSalary(raw as Record<string, unknown>));
+      console.log("useSalaries normalized:", normalized);
+      return normalized;
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
-
-  /** Convenience hook for a single employee's salary record. */
-  const useEmployeeSalary = (employeeId?: string) =>
-    useQuery<Salary | null>({
-      queryKey: ["salary", employeeId],
-      enabled: !!employeeId,
-      queryFn: async () => {
-        try {
-          const res = await apiClient.get(`/salary/${employeeId}`);
-          const raw = res.data;
-          return raw ? normalizeSalary(raw as Record<string, unknown>) : null;
-        } catch (error: unknown) {
-          const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-          // 404/400 means no salary record yet — return null silently
-          if (status === 404 || status === 400) {
-            return null;
-          }
-          throw error;
-        }
-      },
-      retry: false,
-      staleTime: QUERY_STALE_TIME.RELAXED,
-      gcTime: QUERY_GC_TIME.RELAXED,
-    });
 
   const updateSalary = useMutation({
     mutationFn: async ({ employeeId, data }: { employeeId: string; data: SalaryInput }) => {

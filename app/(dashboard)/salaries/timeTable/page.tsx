@@ -51,10 +51,10 @@ const calcGrossSalary = (
   if (salaryRecord) {
     const gross =
       safeToNumber(salaryRecord.baseSalary) +
-      safeToNumber(salaryRecord.lumpSumSalary) +
-      safeToNumber(salaryRecord.livingAllowance) +
+      (safeToNumber(salaryRecord.lumpSumSalary) || 0) +
+      (safeToNumber(salaryRecord.livingAllowance) || 0) +
       safeToNumber(salaryRecord.responsibilityAllowance) +
-      safeToNumber(salaryRecord.extraEffortAllowance) +
+      (safeToNumber(salaryRecord.extraEffortAllowance) || 0) +
       safeToNumber(salaryRecord.productionIncentive) +
       safeToNumber(salaryRecord.transportAllowance);
     if (gross > 0) return gross;

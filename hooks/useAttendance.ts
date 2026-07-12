@@ -249,14 +249,25 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         });
       };
 
-      const requestParams = {
+      const requestParams: {
+        employeeId?: string;
+        date?: string;
+        startDate?: string;
+        endDate?: string;
+        page?: number;
+        limit: number;
+      } = {
         employeeId: params?.employeeId,
-        date: requestDate,
-        startDate: periodStart,
-        endDate: periodEnd,
         page: params?.page,
         limit: safeLimit,
       };
+
+      if (requestDate && resolvedStartDate === requestDate && resolvedEndDate === requestDate) {
+        requestParams.date = requestDate;
+      } else {
+        requestParams.startDate = resolvedStartDate;
+        requestParams.endDate = resolvedEndDate;
+      }
 
       try {
         const res = await requestList(requestParams);

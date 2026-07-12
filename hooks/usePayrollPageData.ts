@@ -205,28 +205,32 @@ export function usePayrollPageData(month: string) {
 
   // ── Preview data (when no backend payroll run yet) ─────────────────────────
   const previewData = useMemo<AggregatedPayroll[]>(() => {
+    console.log("usePayrollPageData employees:", employees);
+    console.log("usePayrollPageData salaries:", salaries);
     return employees
       .filter((e) => e.status === "active" && !resignedEmployeeIds.has(e.employeeId))
       .map((emp) => {
         const employeeId = emp.employeeId;
         const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+        console.log("usePayrollPageData salaryConfig for", employeeId, ":", salaryConfig);
         const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
 
         let calcGross = 0;
         if (salaryConfig) {
           calcGross =
             toNumber(salaryConfig.baseSalary) +
-            toNumber(salaryConfig.lumpSumSalary) +
-            toNumber(salaryConfig.livingAllowance) +
+            (toNumber(salaryConfig.lumpSumSalary) || 0) +
+            (toNumber(salaryConfig.livingAllowance) || 0) +
             toNumber(salaryConfig.responsibilityAllowance) +
-            toNumber(salaryConfig.extraEffortAllowance) +
+            (toNumber(salaryConfig.extraEffortAllowance) || 0) +
             toNumber(salaryConfig.productionIncentive) +
             toNumber(salaryConfig.transportAllowance);
+          console.log("usePayrollPageData calcGross for", employeeId, ":", calcGross);
         }
         if (calcGross <= 0) {
           calcGross =
             toNumber((emp as { baseSalary?: number }).baseSalary) ||
-            toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS;
+            (toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS);
         }
 
         const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
