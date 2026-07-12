@@ -271,11 +271,12 @@ export default function TimeTablePage() {
     periodEnd: periodEnd ?? "",
   });
 
-  // جلب سجلات الحضور الشهرية لحساب التأخير بـ local time
+  // جلب سجلات الحضور الشهرية — نفس مصدر بيانات صفحة الحضور
+  // limit=500 + auto-pagination يضمن جلب كل السجلات
   const { data: monthlyAttendanceData, markAttendance: _markAttendance } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
-    limit: 200,
+    limit: 500,
   });
 
   // جلب الإجازات الشهرية لعرض حالتها وإضافة الإجازات المدفوعة للراتب
@@ -288,11 +289,13 @@ export default function TimeTablePage() {
   // سيتم عرض presentDays/absentDays فقط القادمة من backend عبر useAttendanceDeductions
   // لتوحيد منطق CalendarModal مع جدول الدوام.
 
-  // حساب أيام الحضور الفعلية مباشرة من سجلات البصمة (بديل عن backend calculate-deductions)
+  // حساب أيام الحضور الفعلية من dailyRecords — نفس منطق صفحة /attendance
+  // dailyRecords تُبنى من نفس سجلات البصمة الخام (IN/OUT) بنفس الطريقة
   const localPresentDaysMap = useMemo(() => {
     const map = new Map<string, number>();
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
+      // نعتبر اليوم حضوراً إذا وُجد checkIn فقط (نفس منطق attendance page)
       if (!dr.checkIn) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
@@ -448,13 +451,15 @@ export default function TimeTablePage() {
       const totalDelayMinutes = lateMinutes;
       const totalEarlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
 
-      // أيام الحضور الفعلية من البصمة — نحسبها من السجلات مباشرة
-      // نستخدم الأكبر بين local و backend لتجنب فقدان بيانات
-      const backendPresentDays = autoInput?.presentDays ?? 0;
+      // أيام الحضور الفعلية — نعتمد على dailyRecords (نفس مصدر صفحة /attendance)
+      // إذا لم تتوفر بيانات محلية نرجع للـ backend كـ fallback
       const localPresentDays = localPresentDaysMap.get(emp.employeeId) ?? 0;
-      const actualWorkDays: number | null = Math.max(backendPresentDays, localPresentDays) > 0
-        ? Math.max(backendPresentDays, localPresentDays)
-        : null;
+      const backendPresentDays = autoInput?.presentDays ?? 0;
+      const actualWorkDays: number | null = localPresentDays > 0
+        ? localPresentDays
+        : backendPresentDays > 0
+          ? backendPresentDays
+          : null;
 
       // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
       const autoOvertimeMinutes = autoInput?.overtimeMinutes ?? 0;
