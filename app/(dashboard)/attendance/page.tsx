@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon, ChevronLeft, Fingerprint, PencilLine,
-  Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck, CalendarPlus,
+  Clock3, LogIn, LogOut, Loader2, X, ClipboardCheck, CalendarPlus, UserPlus,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAttendance } from "@/hooks/useAttendance";
@@ -107,6 +107,15 @@ export default function AttendancePage() {
     value: string;
   }>({ isOpen: false, row: null, field: null, value: "" });
 
+  // نموذج تسجيل حضور يدوي (للتجربة فقط — الأساسي يبقى عبر البصمة)
+  const [manualModal, setManualModal] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    date: string;
+    type: "IN" | "OUT";
+    time: string;
+  }>({ isOpen: false, employeeId: "", date: today, type: "IN", time: timeNow() });
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
@@ -127,7 +136,7 @@ export default function AttendancePage() {
     return d >= start && d <= end;
   };
   const { data: dailyView, isLoading: dailyViewLoading, isFetching: dailyViewFetching, isError: dailyViewError, error: dailyViewErrorObj } = useAttendanceDailyView(selectedDate);
-  const { markAttendance } = useAttendance({ period, limit: 200 });
+  const { markAttendance, createAttendance } = useAttendance({ period, limit: 200 });
 
   const employeeList = useMemo(
     () => (Array.isArray(employees) ? employees : []),
@@ -286,6 +295,52 @@ export default function AttendancePage() {
     });
   };
 
+  // بناء timestamp بنفس منطق useAttendance (مع offset محلي لمنع انحراف الساعات)
+  const buildManualTimestamp = (date: string, hhmm: string) => {
+    const localDateTime = new Date(`${date}T${hhmm}:00`);
+    const offsetMinutes = -localDateTime.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absOffset = Math.abs(offsetMinutes);
+    const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, "0");
+    const offsetMins = String(absOffset % 60).padStart(2, "0");
+    return `${date}T${hhmm}:00${sign}${offsetHours}:${offsetMins}`;
+  };
+
+  // تسجيل نبضة يدوية مستقلة (IN أو OUT) — للتجربة (محاكاة أكثر من بصمة)
+  // نستخدم createAttendance (POST) حتى لا يتم دمج النبضات في أول IN / آخر OUT،
+  // مما يسمح بتسجيل عدة أزواج IN/OUT في نفس اليوم كما في أجهزة البصمة المتعددة.
+  const handleCreateManualPunch = () => {
+    const employeeId = manualModal.employeeId;
+    const { date, type, time } = manualModal;
+    if (!EMPLOYEE_ID_REGEX.test(employeeId)) {
+      toast.error("الرجاء اختيار موظف صالح (صيغة EMPxxx)");
+      return;
+    }
+    if (!HH_MM_REGEX.test(time)) {
+      toast.error("صيغة الوقت غير صحيحة. الرجاء استخدام HH:mm");
+      return;
+    }
+    createAttendance.mutate(
+      {
+        employeeId,
+        timestamp: buildManualTimestamp(date, time),
+        type,
+        source: "manual",
+        notes: "تسجيل يدوي تجريبي",
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            type === "IN"
+              ? `تم تسجيل دخول تجريبي للموظف ${employeeId} الساعة ${time}`
+              : `تم تسجيل خروج تجريبي للموظف ${employeeId} الساعة ${time}`,
+          );
+          queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
+        },
+      },
+    );
+  };
+
   if (!mounted) return (
     <div className="relative min-h-[85vh] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
@@ -332,14 +387,25 @@ export default function AttendancePage() {
               <ChevronLeft size={14} className="text-[#C89355] relative z-10" />
               <span className="text-[#263544] relative z-10 font-black">سجل الحضور</span>
             </nav>
-            <button
-              onClick={() => setIsLeaveModalOpen(true)}
-              className="group/btn relative overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black active:scale-95 transition-all shadow-sm"
-            >
-              <div className="absolute inset-0.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
-              <CalendarPlus size={15} className="relative z-10" />
-              <span className="relative z-10">طلب إجازة</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setManualModal((m) => ({ ...m, isOpen: true, date: selectedDate, time: timeNow() }))}
+                className="group/btn relative overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-xs font-black active:scale-95 transition-all shadow-sm"
+                title="تسجيل نبضة يدوية تجريبية (دخول/خروج) — الأساسي يبقى عبر البصمة"
+              >
+                <div className="absolute inset-0.5 rounded-xl border border-dashed border-emerald-300/50 pointer-events-none" />
+                <UserPlus size={15} className="relative z-10" />
+                <span className="relative z-10">تسجيل يدوي (تجربة)</span>
+              </button>
+              <button
+                onClick={() => setIsLeaveModalOpen(true)}
+                className="group/btn relative overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black active:scale-95 transition-all shadow-sm"
+              >
+                <div className="absolute inset-0.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
+                <CalendarPlus size={15} className="relative z-10" />
+                <span className="relative z-10">طلب إجازة</span>
+              </button>
+            </div>
           </div>
 
           {/* Header */}
@@ -631,6 +697,126 @@ export default function AttendancePage() {
               </p>
               <p className="text-sm font-black text-[#263544] bg-[#C89355]/10 px-3 py-2 rounded-xl border border-[#C89355]/20">
                 {timeModal.row.employeeName}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Manual Punch Modal (testing only) ── */}
+      {manualModal.isOpen && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#101720]/70 backdrop-blur-sm p-4">
+          <div
+            className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_30px_80px_rgba(0,0,0,0.4)] border-2 border-white/80 w-full max-w-lg overflow-hidden flex flex-col md:flex-row relative"
+            dir="rtl"
+          >
+            <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0" />
+
+            <div className="p-8 flex-1 order-2 md:order-1 relative z-10">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-[#263544] flex items-center gap-2">
+                  <UserPlus size={20} className="text-[#C89355]" />
+                  تسجيل حضور يدوي (تجربة)
+                </h3>
+                <button
+                  onClick={() => setManualModal((m) => ({ ...m, isOpen: false }))}
+                  className="text-slate-400 hover:text-rose-500 transition-colors bg-white hover:bg-rose-50 p-1.5 rounded-full border border-slate-100"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p className="text-[11px] text-slate-500 font-bold mb-5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-xl">
+                هذا الزر للاختبار فقط. التسجيل الأساسي للحضور يبقى عبر أجهزة البصمة.
+              </p>
+
+              <label className="block text-sm font-black text-[#263544]/80 mb-2">الموظف</label>
+              <select
+                value={manualModal.employeeId}
+                onChange={(e) => setManualModal((m) => ({ ...m, employeeId: e.target.value }))}
+                className="w-full p-3 bg-white/80 border-2 border-slate-200 focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none font-black text-[#263544] rounded-2xl mb-4"
+              >
+                <option value="">— اختر موظفاً —</option>
+                {employeeList
+                  .filter((e) => e?.employeeId && EMPLOYEE_ID_REGEX.test(e.employeeId))
+                  .map((e) => (
+                    <option key={e.employeeId} value={e.employeeId}>
+                      {e.name} ({e.employeeId})
+                    </option>
+                  ))}
+              </select>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-sm font-black text-[#263544]/80 mb-2">التاريخ</label>
+                  <input
+                    type="date"
+                    value={manualModal.date}
+                    onChange={(e) => setManualModal((m) => ({ ...m, date: e.target.value }))}
+                    className="w-full p-3 bg-white/80 border-2 border-slate-200 focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none font-mono font-black text-[#263544] rounded-2xl"
+                    dir="ltr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-black text-[#263544]/80 mb-2">الوقت</label>
+                  <input
+                    type="time"
+                    value={manualModal.time}
+                    onChange={(e) => setManualModal((m) => ({ ...m, time: e.target.value }))}
+                    className="w-full p-3 bg-white/80 border-2 border-slate-200 focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none font-mono font-black text-[#263544] rounded-2xl"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mb-8">
+                <button
+                  onClick={() => setManualModal((m) => ({ ...m, type: "IN" }))}
+                  className={`relative overflow-hidden flex-1 py-3 rounded-xl font-black transition-all border active:scale-95 ${
+                    manualModal.type === "IN"
+                      ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none" />
+                  <LogIn size={15} className="relative z-10 inline mr-1" />
+                  <span className="relative z-10">دخول (IN)</span>
+                </button>
+                <button
+                  onClick={() => setManualModal((m) => ({ ...m, type: "OUT" }))}
+                  className={`relative overflow-hidden flex-1 py-3 rounded-xl font-black transition-all border active:scale-95 ${
+                    manualModal.type === "OUT"
+                      ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/40"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none" />
+                  <LogOut size={15} className="relative z-10 inline mr-1" />
+                  <span className="relative z-10">خروج (OUT)</span>
+                </button>
+              </div>
+
+              <button
+                onClick={handleCreateManualPunch}
+                disabled={createAttendance.isPending}
+                className="relative overflow-hidden w-full bg-[#1a2530] hover:bg-[#263544] active:scale-95 text-[#C89355] font-black py-3 rounded-xl transition-all border border-[#C89355]/40 group disabled:opacity-50"
+              >
+                <div className="absolute inset-1 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none" />
+                <span className="relative z-10">
+                  {createAttendance.isPending ? (
+                    <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> جارٍ الحفظ...</span>
+                  ) : (
+                    "حفظ النبضة"
+                  )}
+                </span>
+              </button>
+            </div>
+
+            <div className="bg-[#263544]/5 p-8 md:w-2/5 border-b md:border-b-0 md:border-r border-[#C89355]/20 flex flex-col justify-center items-center text-center order-1 md:order-2 relative z-10">
+              <Fingerprint size={40} className="text-[#C89355] mb-4" />
+              <p className="text-xs text-[#263544]/70 font-black leading-relaxed">
+                كل نبضة تُحفظ كسجل مستقل، فيمكنك تسجيل عدة أزواج دخول/خروج لنفس الموظف في اليوم —
+                كما في حالة أجهزة بصمة متعددة.
               </p>
             </div>
           </div>

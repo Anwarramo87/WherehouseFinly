@@ -10,6 +10,15 @@ export interface AttendanceDeductionBreakdown {
   // أيام الحضور الفعلية (عدد الأيام التي بصم فيها الموظف)
   presentDays: number;
 
+  // دقائق العمل الفعلية (من أزواج IN/OUT — الفجوة بين البصمتين بدون أجر)
+  workedMinutes: number;
+
+  // دقائق الإجازة المرضية الجزئية (منتصف اليوم) المحسوبة بنصف الأجر
+  sickRemainderMinutes: number;
+
+  // أيام مرضية كاملة (بلا حضور) — تُحتسب بنصف الأجر كيوم كامل
+  sickLeaveDays: number;
+
   // أيام الغياب = elapsedWorkDays - presentDays
   absentDays: number;
 

@@ -110,7 +110,7 @@ export default function LoginPage() {
         username: normalizedUsername,
         password: normalizedPassword,
       }, {
-        timeout: 15_000,
+        timeout: 60_000, // allow Neon cold-start / slow DB without tripping the timeout
       });
 
       const authResponse = response.data as {
@@ -163,7 +163,18 @@ export default function LoginPage() {
             : "بيانات الدخول غير صحيحة");
         }
       } else if (axios.isAxiosError(error) && error.request) {
-          setErrorMessage("تعذر الوصول لخادم المصادقة. تحقق من تشغيل الخادم الخلفي وإعدادات CORS/Proxy.");
+        const isTimeout =
+          error.code === "ECONNABORTED" ||
+          /timeout/i.test(error.message);
+        if (isTimeout) {
+          setErrorMessage(
+            "استغرق خادم المصادقة وقتاً أطول من المتوقع (قاعدة البيانات بطيئة/نائمة). تأكد من تشغيل قاعدة البيانات ثم أعد المحاولة.",
+          );
+        } else {
+          setErrorMessage(
+            "تعذر الوصول لخادم المصادقة. تحقق من تشغيل الخادم الخلفي وإعدادات CORS/Proxy.",
+          );
+        }
       } else if (error instanceof Error) {
           setErrorMessage(error.message || "حدث خطأ غير متوقع.");
       } else {

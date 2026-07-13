@@ -11,22 +11,9 @@ import { toNumber } from "@/lib/number-utils";
 
 const normalizeSalary = (raw: Record<string, unknown>): Salary => {
   const baseSalary = toNumber(raw.baseSalary);
-  const lumpSumSalary = raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : 0;
   const livingAllowance = raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : 0;
-  const responsibilityAllowance = toNumber(raw.responsibilityAllowance);
-  const extraEffortAllowance =
-    raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : 0;
-  const productionIncentive = toNumber(raw.productionIncentive);
-  const transportAllowance = toNumber(raw.transportAllowance);
 
-  const calculatedMonthlySalary =
-    baseSalary +
-    lumpSumSalary +
-    livingAllowance +
-    responsibilityAllowance +
-    extraEffortAllowance +
-    productionIncentive +
-    transportAllowance;
+  const calculatedMonthlySalary = baseSalary + livingAllowance;
 
   return {
     id: String(raw.id ?? ""),
@@ -35,11 +22,11 @@ const normalizeSalary = (raw: Record<string, unknown>): Salary => {
     baseSalary,
     lumpSumSalary: raw.lumpSumSalary !== undefined ? toNumber(raw.lumpSumSalary) : undefined,
     livingAllowance: raw.livingAllowance !== undefined ? toNumber(raw.livingAllowance) : undefined,
-    responsibilityAllowance,
+    responsibilityAllowance: toNumber(raw.responsibilityAllowance),
     extraEffortAllowance:
       raw.extraEffortAllowance !== undefined ? toNumber(raw.extraEffortAllowance) : undefined,
-    productionIncentive,
-    transportAllowance,
+    productionIncentive: toNumber(raw.productionIncentive),
+    transportAllowance: toNumber(raw.transportAllowance),
     insuranceAmount: raw.insuranceAmount !== undefined ? toNumber(raw.insuranceAmount) : undefined,
     roundingDifference:
       raw.roundingDifference !== undefined ? toNumber(raw.roundingDifference) : undefined,

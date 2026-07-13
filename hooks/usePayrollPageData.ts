@@ -13,7 +13,7 @@ import { useAttendance } from "@/hooks/useAttendance";
 import { useLeaves } from "@/hooks/useLeaves";
 import { toNumber } from "@/lib/number-utils";
 import {
-  calcEarnedSalary,
+  calcEarnedSalaryHourly,
   calcLateMinutes,
   STANDARD_WORK_DAYS,
   HOURS_PER_DAY,
@@ -197,7 +197,12 @@ export function usePayrollPageData(month: string) {
           netPayRounded: toNumber(payrollItem.netPayRounded),
         });
       } else {
-        map.set(emp.employeeId, { earnedSalary: 0, bonusesTotal: 0, discountsTotal: 0, netPayRounded: 0 });
+        map.set(emp.employeeId, {
+          earnedSalary: 0,
+          bonusesTotal: 0,
+          discountsTotal: 0,
+          netPayRounded: 0,
+        });
       }
     }
     return map;
@@ -205,32 +210,25 @@ export function usePayrollPageData(month: string) {
 
   // ── Preview data (when no backend payroll run yet) ─────────────────────────
   const previewData = useMemo<AggregatedPayroll[]>(() => {
-    console.log("usePayrollPageData employees:", employees);
-    console.log("usePayrollPageData salaries:", salaries);
     return employees
       .filter((e) => e.status === "active" && !resignedEmployeeIds.has(e.employeeId))
       .map((emp) => {
         const employeeId = emp.employeeId;
         const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
-        console.log("usePayrollPageData salaryConfig for", employeeId, ":", salaryConfig);
         const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
 
         let calcGross = 0;
         if (salaryConfig) {
           calcGross =
             toNumber(salaryConfig.baseSalary) +
-            (toNumber(salaryConfig.lumpSumSalary) || 0) +
-            (toNumber(salaryConfig.livingAllowance) || 0) +
-            toNumber(salaryConfig.responsibilityAllowance) +
-            (toNumber(salaryConfig.extraEffortAllowance) || 0) +
-            toNumber(salaryConfig.productionIncentive) +
-            toNumber(salaryConfig.transportAllowance);
-          console.log("usePayrollPageData calcGross for", employeeId, ":", calcGross);
+            (toNumber(salaryConfig.livingAllowance) || 0);
         }
         if (calcGross <= 0) {
           calcGross =
             toNumber((emp as { baseSalary?: number }).baseSalary) ||
-            (toNumber((emp as { hourlyRate?: number }).hourlyRate) * HOURS_PER_DAY * STANDARD_WORK_DAYS);
+            toNumber((emp as { hourlyRate?: number }).hourlyRate) *
+              HOURS_PER_DAY *
+              STANDARD_WORK_DAYS;
         }
 
         const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
@@ -246,15 +244,6 @@ export function usePayrollPageData(month: string) {
             ? (manualInput.lateMinutes ?? 0)
             : autoLateMinutes;
 
-        let actualWorkDays: number;
-        if (hasManualInput && manualInput.absenceDays !== undefined) {
-          actualWorkDays = Math.max(0, STANDARD_WORK_DAYS - manualInput.absenceDays);
-        } else {
-          const backendPresent = autoInput?.presentDays ?? 0;
-          const localPresent = localPresentDaysMap.get(employeeId) ?? 0;
-          actualWorkDays = Math.max(backendPresent, localPresent);
-        }
-
         const sickLeaveDays = Math.max(
           hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
           leaveData?.sickLeaveDays ?? 0,
@@ -265,7 +254,6 @@ export function usePayrollPageData(month: string) {
             : 0,
           leaveData?.paidLeaveDays ?? 0,
         );
-        const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
         const earlyLeaveMinutes =
           manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
         const totalOvertimeMinutes =
@@ -278,15 +266,23 @@ export function usePayrollPageData(month: string) {
             : (autoInput?.overtimeWeekendDays ?? 0);
 
         const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
-        const rawEarned = calcEarnedSalary(
-          calcGross,
-          actualWorkDays,
-          effectivePaidLeaveDays,
-          lateMinutes,
-          earlyLeaveMinutes,
-          totalOvertimeMinutes,
-          totalOvertimeDays,
-        );
+        const workDaysInPeriod = (emp as { workDaysInPeriod?: number }).workDaysInPeriod ?? STANDARD_WORK_DAYS;
+        const hoursPerDayEmp = (emp as { hoursPerDay?: number }).hoursPerDay ?? HOURS_PER_DAY;
+        const rawEarned = calcGross > 0
+          ? calcEarnedSalaryHourly(
+              calcGross,
+              workDaysInPeriod,
+              hoursPerDayEmp,
+              autoInput?.workedMinutes ?? 0,
+              autoInput?.sickRemainderMinutes ?? 0,
+              sickLeaveDays,
+              paidLeaveDays,
+              totalOvertimeMinutes,
+              lateMinutes,
+              earlyLeaveMinutes,
+              totalOvertimeDays,
+            )
+          : 0;
         const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
 
         const employeeBonuses = bonuses.filter(
@@ -312,7 +308,8 @@ export function usePayrollPageData(month: string) {
         const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
         const earlyLeaveDeductionAmount = earlyLeaveMinutes * minuteRate;
 
-        const netPay = earnedSalary + variableEarnings - variableDeductions - earlyLeaveDeductionAmount;
+        const netPay =
+          earnedSalary + variableEarnings - variableDeductions - earlyLeaveDeductionAmount;
         const netPayRounded = Math.ceil(netPay / 1000) * 1000;
         const roundingDifference = netPayRounded - netPay;
         const totalDeductionsAmount = variableDeductions + earlyLeaveDeductionAmount;
@@ -422,8 +419,7 @@ export function usePayrollPageData(month: string) {
     discountsLoading ||
     penaltiesLoading;
 
-  const hasNoPayrollRun =
-    !reportLoading && (!reportData?.items || reportData.items.length === 0);
+  const hasNoPayrollRun = !reportLoading && (!reportData?.items || reportData.items.length === 0);
 
   return {
     payrollData,

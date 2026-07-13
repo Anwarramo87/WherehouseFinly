@@ -18,6 +18,7 @@ import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction"
 import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
 import type { Salary } from "@/types/salary";
 import { toNumber } from "@/lib/number-utils";
+import { calcEarnedSalaryHourly } from "@/lib/payroll-calc";
 
 const EditAttendanceTotalsModal = dynamic(
   () => import("@/components/EditAttendanceTotalsModal"),
@@ -51,12 +52,7 @@ const calcGrossSalary = (
   if (salaryRecord) {
     const gross =
       safeToNumber(salaryRecord.baseSalary) +
-      (safeToNumber(salaryRecord.lumpSumSalary) || 0) +
-      (safeToNumber(salaryRecord.livingAllowance) || 0) +
-      safeToNumber(salaryRecord.responsibilityAllowance) +
-      (safeToNumber(salaryRecord.extraEffortAllowance) || 0) +
-      safeToNumber(salaryRecord.productionIncentive) +
-      safeToNumber(salaryRecord.transportAllowance);
+      (safeToNumber(salaryRecord.livingAllowance) || 0);
     if (gross > 0) return gross;
   }
 
@@ -75,36 +71,7 @@ const calcGrossSalary = (
  *   - خصم التأخير (دقائق)
  *   - خصم الخروج المبكر (دقائق)
  */
-const calcEarnedSalary = (
-  grossSalary: number,
-  presentDays: number,
-  paidLeaveDays: number,
-  lateMinutes: number,
-  earlyLeaveMinutes = 0,
-  overtimeMinutes = 0,
-  overtimeWeekendDays = 0,
-): number => {
-  if (grossSalary <= 0) return 0;
-  // الأيام المدفوعة = حضور فعلي + إجازات مدفوعة (لا تتجاوز أيام الشهر المعياري)
-  const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
-  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
-  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-  const salaryFromDays = dailyRate * paidDays;
-  // خصومات الوقت
-  const lateDeduction = lateMinutes * minuteRate * 1.5;
-  const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
-  // مكافآت الإضافي
-  const overtimePay = overtimeMinutes * minuteRate * 1.5;         // إضافي عادي
-  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5; // إضافي جمعة
-  return Math.max(
-    0,
-    salaryFromDays
-    - lateDeduction
-    - earlyLeaveDeduction
-    + overtimePay
-    + weekendOvertimePay,
-  );
-};
+
 
 /**
  * حساب دقائق التأخير لسجل يومي واحد (بالـ local time — نفس منطق صفحة attendance)
@@ -289,19 +256,6 @@ export default function TimeTablePage() {
   // سيتم عرض presentDays/absentDays فقط القادمة من backend عبر useAttendanceDeductions
   // لتوحيد منطق CalendarModal مع جدول الدوام.
 
-  // حساب أيام الحضور الفعلية من dailyRecords — نفس منطق صفحة /attendance
-  // dailyRecords تُبنى من نفس سجلات البصمة الخام (IN/OUT) بنفس الطريقة
-  const localPresentDaysMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
-    for (const dr of dailyRecords) {
-      // نعتبر اليوم حضوراً إذا وُجد checkIn فقط (نفس منطق attendance page)
-      if (!dr.checkIn) continue;
-      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
-    }
-    return map;
-  }, [monthlyAttendanceData?.dailyRecords]);
-
   /**
    * بناء map: employeeId → { leaveTypes, paidLeaveDays, unpaidLeaveDays }
    * نفكك الـ Range ونحسب فقط الأيام التي تقع داخل حدود الشهر المحدد (periodStart..periodEnd)
@@ -359,6 +313,26 @@ export default function TimeTablePage() {
     }
     return map;
   }, [monthlyLeaves, periodStart, periodEnd]);
+
+  // حساب أيام الحضور الفعلية من dailyRecords — نفس منطق صفحة /attendance
+  // dailyRecords تُبنى من نفس سجلات البصمة الخام (IN/OUT) بنفس الطريقة
+  //
+  // FIX: لا نحتسب أي يوم إجازة معتمدة (مرضية/إدارية/وفاة/بدون أجر) كيوم حضور،
+  // حتى لو وُجدت فيه بصمة دخول (IN). هذه الأيام تُعالَج بالفعل عبر
+  // paidLeaveDays / sickLeaveDays، فاحتسابها كحضور يضاعف عدد الأيام خطأً
+  // (مثال: موظف عمل يومين + يوم مرضي ببصمة → يظهر 3 أيام بدل 2).
+  const localPresentDaysMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    for (const dr of dailyRecords) {
+      // نعتبر اليوم حضوراً إذا وُجد checkIn فقط (نفس منطق attendance page)
+      if (!dr.checkIn || !dr.date) continue;
+      const leave = employeeLeavesMap.get(dr.employeeId);
+      if (leave && leave.countedDates.has(dr.date.slice(0, 10))) continue;
+      map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [monthlyAttendanceData?.dailyRecords, employeeLeavesMap]);
 
   // نستخرج المصفوفة بأمان من الـ response
   const autoDeductions: AttendanceDeductionBreakdown[] = useMemo(() => {
@@ -480,18 +454,28 @@ export default function TimeTablePage() {
       // قيمة التأمينات الشهرية (خصم ثابت)
       const insuranceAmount = salaryRec ? safeToNumber(salaryRec.insuranceAmount) : 0;
 
-      // الراتب المستحق بناءً على الدوام الفعلي + الإجازات المدفوعة - التأمينات
-      // sickLeaveDays تُعامَل كـ 50% مدفوعة: نضيف نصف أيامها فقط للأيام المدفوعة
-      const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
-      const rawEarned = actualWorkDays !== null
-        ? calcEarnedSalary(
+      // الراتب المستحق على أساس الساعات الفعلية (نموذج بالساعات).
+      // workedMinutes (أجر كامل) + sickRemainderMinutes (نصف أجر) من الباك إند،
+      // وأيام الإجازة الكاملة (مرضية بنصف/مدفوعة كاملة) كما سابقاً.
+      const workDaysInPeriod = emp.workDaysInPeriod ?? STANDARD_WORK_DAYS;
+      const hoursPerDayEmp = emp.hoursPerDay ?? HOURS_PER_DAY;
+      const workedMinutes = autoInput?.workedMinutes ?? 0;
+      const sickRemainderMinutes = autoInput?.sickRemainderMinutes ?? 0;
+      const rawEarned = grossSalary > 0
+        ? calcEarnedSalaryHourly(
             grossSalary,
-            actualWorkDays,
-            effectivePaidLeaveDays,                   // إجازات مدفوعة (100% + 50% مرضية)
-            lateMinutes,                              // دقائق التأخير فقط
-            manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,      // دقائق الخروج المبكر
-            totalOvertimeMinutes,                     // إضافي عادي (دقائق)
-            totalOvertimeDays,                        // إضافي جمعة (أيام)
+            workDaysInPeriod,
+            hoursPerDayEmp,
+            workedMinutes,
+            sickRemainderMinutes,
+            // أيام مرضية كاملة (بلا حضور) من الباك إند — يوم منتصف له حضور
+            // يُعامَل عبر sickRemainderMinutes فلا نضاعفه هنا.
+            autoInput?.sickLeaveDays ?? sickLeaveDays,
+            paidLeaveDays,        // أيام مدفوعة 100% (إدارية/وفاة/PAID)
+            totalOvertimeMinutes,
+            lateMinutes,
+            manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,
+            totalOvertimeDays,
           )
         : null;
 

@@ -73,17 +73,12 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
   if (salaryRecord) {
     const fixedTotal =
       toNumber(salaryRecord.baseSalary) +
-      (toNumber(salaryRecord.lumpSumSalary) || 0) +
-      (toNumber(salaryRecord.livingAllowance) || 0) +
-      toNumber(salaryRecord.responsibilityAllowance) +
-      (toNumber(salaryRecord.extraEffortAllowance) || 0) +
-      toNumber(salaryRecord.productionIncentive) +
-      toNumber(salaryRecord.transportAllowance);
+      (toNumber(salaryRecord.livingAllowance) || 0);
 
     if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
 
-    // Fallback: compute from g3 = baseSalary + livingAllowance + lumpSumSalary
-    const g3 = (toNumber(salaryRecord.baseSalary) || 0) + (toNumber(salaryRecord.livingAllowance) || 0) + (toNumber(salaryRecord.lumpSumSalary) || 0);
+    // Fallback: compute from g3 = baseSalary + livingAllowance
+    const g3 = (toNumber(salaryRecord.baseSalary) || 0) + (toNumber(salaryRecord.livingAllowance) || 0);
     if (g3 > 0) {
       return g3;
     }
