@@ -191,10 +191,14 @@ export default function VouchersClient() {
   });
   const { data: departedEmployees = [], isLoading: departedEmployeesLoading } = useResignedEmployees();
 
-  const allEmployees = useMemo(
-    () => [...activeEmployees, ...departedEmployees],
-    [activeEmployees, departedEmployees],
-  );
+  const allEmployees = useMemo(() => {
+    const byId = new Map<string, (typeof activeEmployees)[number]>();
+    for (const employee of activeEmployees) byId.set(employee.employeeId, employee);
+    for (const employee of departedEmployees) {
+      if (!byId.has(employee.employeeId)) byId.set(employee.employeeId, employee);
+    }
+    return Array.from(byId.values());
+  }, [activeEmployees, departedEmployees]);
   const employeesLoading = activeEmployeesLoading || departedEmployeesLoading;
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });

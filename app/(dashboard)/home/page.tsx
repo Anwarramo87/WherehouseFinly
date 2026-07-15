@@ -6,7 +6,7 @@ import {
   Users, Clock, Timer, AlertTriangle, UserCheck, UserX,
   Building2, TrendingUp, Scissors, User, CalendarX, ClockAlert,
   Banknote, UserCog, Briefcase, ArrowLeftRight, X, HandCoins,
-  MoreVertical, Pencil, Trash2, CalendarDays,
+  MoreVertical, Pencil, Trash2, CalendarDays, Bus,
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import useDepartments from "@/hooks/useDepartments";
@@ -714,22 +714,35 @@ export default function DashboardPage() {
                       </p>
                       <p className="text-[11px] font-bold text-slate-500">موظف</p>
                       {dept.manager && (
-                        <p className="text-[11px] font-bold text-slate-600 mt-1 flex items-center gap-1.5">
-                          <UserCog size={13} className="text-[#C89355]" />
-                          {(() => {
-                            const supervisor = employeeListMemo.find(
-                              (emp) => emp.employeeId === dept.manager,
-                            );
-                            return supervisor ? (
-                              <>
-                                <span>{supervisor.name}</span>
-                                <span className="text-slate-400">({dept.manager})</span>
-                              </>
-                            ) : (
-                              dept.manager
-                            );
-                          })()}
-                        </p>
+                        <div className="mt-1">
+                          <p className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                            <UserCog size={13} className="text-[#C89355]" />
+                            {(() => {
+                              const activeSupervisor = employeeListMemo.find(
+                                (emp) => emp.employeeId === dept.manager,
+                              );
+                              const resignedSupervisor = resignedEmployees.find(
+                                (emp) => emp.employeeId === dept.manager,
+                              );
+                              const supervisorName =
+                                activeSupervisor?.name || resignedSupervisor?.name;
+                              return supervisorName ? (
+                                <>
+                                  <span>{supervisorName}</span>
+                                  <span className="text-slate-400">({dept.manager})</span>
+                                </>
+                              ) : (
+                                dept.manager
+                              );
+                            })()}
+                          </p>
+                          {resignedIds.has(dept.manager) && (
+                            <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 text-[10px] font-black">
+                              <Bus size={11} />
+                              تمت إزالته من الباص
+                            </span>
+                          )}
+                        </div>
                       )}
                       {(dept.establishedAt || dept.createdAt) && (
                         <p

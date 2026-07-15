@@ -38,7 +38,7 @@ export const useDepartments = () => {
       return await api.post("/departments", {
         name: payload.name,
         ...(payload.manager !== undefined && { manager: payload.manager }),
-        ...(payload.date !== undefined && { establishedAt: payload.date }),
+        ...(payload.date !== undefined && payload.date !== "" && { establishedAt: payload.date }),
       });
     },
     onSuccess: async () => {
@@ -53,7 +53,7 @@ export const useDepartments = () => {
       return await api.put(`/departments/${id}`, {
         name,
         ...(manager !== undefined && { manager }),
-        ...(date !== undefined && { establishedAt: date }),
+        ...(date !== undefined && date !== "" && { establishedAt: date }),
       });
     },
     onSuccess: async () => {

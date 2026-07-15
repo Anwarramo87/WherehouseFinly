@@ -53,11 +53,11 @@ export default function DashboardLayout({
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
 
   return (
-    <div className="flex min-h-screen h-screen overflow-clip" dir="rtl">
+    <div className="flex min-h-screen h-screen overflow-clip print:block print:h-auto print:min-h-0 print:overflow-visible" dir="rtl">
       <SessionRefresh />
       {/* ── Desktop Sidebar ── */}
       <div
-        className={`hidden lg:block shrink-0 h-screen transition-all duration-300 ${
+        className={`hidden lg:block shrink-0 h-screen transition-all duration-300 print:hidden ${
           isCollapsed ? "w-20" : "w-72"
         }`}
       >
@@ -86,11 +86,11 @@ export default function DashboardLayout({
       </div>
 
       {/* ── Main content ── */}
-      <main className="flex-1 min-w-0 overflow-y-auto relative" suppressHydrationWarning>
+      <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning>
         {/* Mobile menu button */}
         <button
           onClick={openMobile}
-          className="lg:hidden fixed top-4 right-4 z-30 p-2.5 bg-[#1a2530] text-[#C89355] rounded-xl border border-[#C89355]/30 shadow-lg transition-colors hover:bg-[#263544]"
+          className="lg:hidden print:hidden fixed top-4 right-4 z-30 p-2.5 bg-[#1a2530] text-[#C89355] rounded-xl border border-[#C89355]/30 shadow-lg transition-colors hover:bg-[#263544]"
           aria-label="فتح القائمة"
         >
           <Menu size={22} />
