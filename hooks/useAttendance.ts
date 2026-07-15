@@ -179,7 +179,7 @@ const toDailyRecords = (
 
 export const useAttendance = (params?: AttendanceQueryParams) => {
   const queryClient = useQueryClient();
-  const fallbackToday = toLocalDateString();
+  const fallbackToday = useMemo(toLocalDateString, []);
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 
   // Calculate date range from period (YYYY-MM) if provided
@@ -193,19 +193,30 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     return { periodStart: start, periodEnd: end };
   }, [params?.period]);
 
-  const singleDayFromRange =
-    !params?.date &&
-    Boolean(params?.startDate && params?.endDate) &&
-    params?.startDate === params?.endDate
+  const singleDayFromRange = useMemo(() => {
+    return !params?.date &&
+      Boolean(params?.startDate && params?.endDate) &&
+      params?.startDate === params?.endDate
       ? params?.startDate
       : undefined;
+  }, [params?.date, params?.startDate, params?.endDate]);
 
-  const requestDate =
-    params?.date ??
-    singleDayFromRange ??
-    (!params?.startDate && !params?.endDate && !params?.period ? fallbackToday : undefined);
-  const resolvedStartDate = params?.startDate ?? periodStart ?? requestDate;
-  const resolvedEndDate = params?.endDate ?? periodEnd ?? requestDate;
+  const requestDate = useMemo(() => {
+    return (
+      params?.date ??
+      singleDayFromRange ??
+      (!params?.startDate && !params?.endDate && !params?.period ? fallbackToday : undefined)
+    );
+  }, [params?.date, singleDayFromRange, params?.startDate, params?.endDate, params?.period, fallbackToday]);
+
+  const resolvedStartDate = useMemo(
+    () => params?.startDate ?? periodStart ?? requestDate,
+    [params?.startDate, periodStart, requestDate],
+  );
+  const resolvedEndDate = useMemo(
+    () => params?.endDate ?? periodEnd ?? requestDate,
+    [params?.endDate, periodEnd, requestDate],
+  );
 
   // Build query key including period for proper caching
   const queryKey = useMemo(
@@ -242,10 +253,6 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       }) => {
         return apiClient.get("/attendance", {
           params: requestParams,
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
         });
       };
 
@@ -274,15 +281,11 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         let records: AttendanceRecord[] = Array.isArray(res.data?.records) ? res.data.records : [];
         const pagination = res.data;
 
-        console.log("📊 Attendance API Response:", {
-          recordsCount: records.length,
-          params: requestParams,
-          sample: records.slice(0, 2),
-        });
-
-        // عند عدم تحديد صفحة: حمّل جميع الصفحات لتجنب نقصان السجلات بسبب pagination.
+        // عند عدم تحديد صفحة: حمّل جميع الصفحات — بحد أقصى 10 صفحات لمنع الـ loop.
+        const MAX_AUTO_PAGES = 10;
         if (!params?.page && pagination?.pages && pagination.pages > 1) {
-          for (let page = 2; page <= pagination.pages; page += 1) {
+          const totalPages = Math.min(pagination.pages, MAX_AUTO_PAGES);
+          for (let page = 2; page <= totalPages; page += 1) {
             const pageRes = await requestList({ ...requestParams, page });
             const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
               ? pageRes.data.records
@@ -315,7 +318,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           const retryPagination = retryRes.data;
 
           if (!params?.page && retryPagination?.pages && retryPagination.pages > 1) {
-            for (let page = 2; page <= retryPagination.pages; page += 1) {
+            const totalRetryPages = Math.min(retryPagination.pages, 10);
+            for (let page = 2; page <= totalRetryPages; page += 1) {
               const pageRes = await requestList({ ...fallbackParams, page });
               const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
                 ? pageRes.data.records
@@ -340,6 +344,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
     },
     staleTime: QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
+    refetchOnWindowFocus: false,
   });
 
   const createAttendance = useMutation({
@@ -350,9 +355,13 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       };
       return await apiClient.post("/attendance", cleanPayload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    onSuccess: (_data, variables) => {
+      // نُلغي فقط اليوم المتأثر بدل كل attendance queries
+      const date = variables.timestamp?.slice(0, 10);
+      if (date) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
     },
   });
 
@@ -370,9 +379,12 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       };
       return await apiClient.put(`/attendance/${recordId}`, cleanPayload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
+    onSuccess: (_data, variables) => {
+      const date = variables.data?.timestamp?.slice(0, 10);
+      if (date) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
     },
   });
 
@@ -512,24 +524,10 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       const attendanceDate = input.date || toLocalDateString();
       const source = input.source || "manual";
 
-      const existingRes = await apiClient.get(
-        `/attendance/employee/${input.employeeId}/date/${attendanceDate}`,
-      );
-
-      const existingRecords: AttendanceRecord[] = Array.isArray(existingRes.data?.records)
-        ? existingRes.data.records
-        : [];
-
-      const inRecords = [...existingRecords]
-        .filter((x) => x.type === "IN")
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-      const outRecords = [...existingRecords]
-        .filter((x) => x.type === "OUT")
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
       let lastResponse: unknown = null;
 
+      // دائماً نضيف بصمات جديدة (POST) لدعم الورديات المتعددة والإجازات الساعية
+      // Backend validation سيمنع التسلسلات الخاطئة (IN→IN, OUT→OUT بدون معاكس بينهما)
       if (normalizedCheckIn) {
         const checkInTimestamp = buildTimestampFromDateAndTime(attendanceDate, normalizedCheckIn);
         const payload: AttendancePayload = {
@@ -541,12 +539,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           location: input.location,
           notes: input.notes,
         };
-
-        if (inRecords[0]?.id) {
-          lastResponse = await apiClient.put(`/attendance/${inRecords[0].id}`, payload);
-        } else {
-          lastResponse = await apiClient.post("/attendance", payload);
-        }
+        lastResponse = await apiClient.post("/attendance", payload);
       }
 
       if (normalizedCheckOut) {
@@ -560,23 +553,13 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           location: input.location,
           notes: input.notes,
         };
-
-        // Biometric-ready upsert: if same employee+date exists, update existing OUT record instead of inserting duplicates.
-        if (outRecords[outRecords.length - 1]?.id) {
-          const outRecordId = outRecords[outRecords.length - 1].id;
-          lastResponse = await apiClient.put(`/attendance/${outRecordId}`, payload);
-        } else {
-          // No OUT event exists yet for that date: create first OUT event.
-          lastResponse = await apiClient.post("/attendance", payload);
-        }
+        lastResponse = await apiClient.post("/attendance", payload);
       }
 
       return lastResponse;
     },
     onSuccess: () => {
-      // Invalidate and refetch immediately
       queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
       toast.success("تم تسجيل الحضور بنجاح");
     },
     onError: (error: unknown, _variables, context) => {
@@ -589,10 +572,11 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       const message = getApiErrorMessage(error, "فشل تسجيل الحضور");
       toast.error(message);
     },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, exact: false });
-      await queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+    onSettled: (_data, _error, variables) => {
+      // نُلغي فقط daily-view لليوم المتأثر + قائمة الحضور الأساسية
+      const date = variables?.date || toLocalDateString();
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
     },
   });
 

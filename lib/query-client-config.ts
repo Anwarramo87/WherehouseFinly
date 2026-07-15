@@ -35,13 +35,13 @@ export function createQueryClient() {
           return failureCount < 2;
         },
         retryDelay: (attemptIndex: number) => Math.min(500 * Math.pow(2, attemptIndex), 5000),
-        // staleTime: 30s = البيانات تبقى صالحة لمدة 30 ثانية (يقلل الطلبات المتكررة)
-        // الـ hooks التي تحتاج بيانات لحظية يمكنها override بـ 0
-        staleTime: 30 * 1000,
+        // staleTime: 2min = البيانات تبقى صالحة دقيقتين (يقلل الطلبات المتكررة بشكل كبير)
+        staleTime: 2 * 60 * 1000,
         // gcTime: البيانات تبقى في الذاكرة لمدة 10 دقائق
         gcTime: 10 * 60 * 1000,
-        // إعادة fetch عند focus (لو زميل عدّل من تبويب آخر)
-        refetchOnWindowFocus: true,
+        // تعطيل refetch عند focus — يُسبب loop على صفحات الحضور الثقيلة
+        // الـ socket يتولى التحديث الفوري للبيانات اللحظية
+        refetchOnWindowFocus: false,
         // إعادة fetch عند reconnect
         refetchOnReconnect: true,
         // إعادة fetch عند mount إذا كانت البيانات stale

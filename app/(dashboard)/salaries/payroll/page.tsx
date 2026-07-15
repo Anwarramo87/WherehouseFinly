@@ -25,7 +25,6 @@ import { PayrollVirtualTable } from "@/components/PayrollVirtualTable";
 import { usePayrollPageData } from "@/hooks/usePayrollPageData";
 import type { Employee } from "@/types/employee";
 import type { AggregatedPayroll } from "@/types/payroll-aggregated";
-import { toNumber } from "@/lib/number-utils";
 
 // Lazy load heavy components
 const RunPayrollModal = dynamic(() => import("@/components/RunPayrollModal"), {
@@ -378,8 +377,12 @@ export default function PayrollPage() {
                         <th className="p-4 font-black text-xs uppercase tracking-wider text-center">كود الموظف</th>
                         <th className="p-4 font-black text-xs uppercase tracking-wider text-center">اسم الموظف</th>
                         <th className="p-4 font-black text-xs uppercase tracking-wider text-center">القسم</th>
-                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الراتب الأساسي</th>
-                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الراتب المقوض</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">أيام العمل</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">ساعات العمل</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الراتب المستحق</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">المكافآت</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الخصومات</th>
+                        <th className="p-4 font-black text-xs uppercase tracking-wider text-center">الصافي</th>
                         <th className="p-4 text-center font-black text-xs uppercase tracking-wider">تاريخ الإنهاء</th>
                         <th className="p-4 text-center font-black text-xs uppercase tracking-wider">نوع الإنهاء</th>
                       </tr>
@@ -391,14 +394,18 @@ export default function PayrollPage() {
                         const terminationColor = isFired
                           ? "text-rose-700 bg-rose-100/80 border-rose-300"
                           : "text-amber-700 bg-amber-100/80 border-amber-300";
-                        const baseSalaryVal = toNumber(employee.baseSalary ?? employee.hourlyRate);
                         const resignedCalc = resignedPayrollMap.get(employee.employeeId);
+                        const workedHours = resignedCalc ? (resignedCalc.workedMinutes / 60) : 0;
                         return (
                           <tr key={employee.employeeId} className="transition-all duration-300 group/row bg-white/60 hover:bg-white/90">
                             <td className="p-4 text-center font-mono text-sm font-black text-amber-900/70 group-hover/row:text-amber-700 transition-colors">{employee.employeeId}</td>
                             <td className="p-4 text-center font-black text-slate-800 group-hover/row:text-amber-900 transition-colors">{employee.name}</td>
                             <td className="p-4 text-center font-bold text-slate-700 text-sm">{employee.department || employee.profession || "—"}</td>
-                            <td className="p-4 text-center font-mono font-black text-slate-700 text-sm">{baseSalaryVal > 0 ? `${baseSalaryVal.toLocaleString()} ل.س` : "—"}</td>
+                            <td className="p-4 text-center font-mono font-black text-slate-700 text-sm">{resignedCalc ? resignedCalc.workedDays : "—"}</td>
+                            <td className="p-4 text-center font-mono font-black text-slate-700 text-sm">{resignedCalc ? `${workedHours.toLocaleString(undefined, { maximumFractionDigits: 1 })} س` : "—"}</td>
+                            <td className="p-4 text-center font-mono font-black text-[#263544] text-sm">{resignedCalc ? `${resignedCalc.earnedSalary.toLocaleString()} ل.س` : "—"}</td>
+                            <td className="p-4 text-center font-mono font-black text-emerald-700 text-sm">{resignedCalc ? `+${resignedCalc.bonusesTotal.toLocaleString()}` : "—"}</td>
+                            <td className="p-4 text-center font-mono font-black text-rose-600 text-sm">{resignedCalc ? `-${resignedCalc.discountsTotal.toLocaleString()}` : "—"}</td>
                             <td className="p-4 text-center font-mono font-black text-emerald-700 text-sm">{resignedCalc ? `${resignedCalc.netPayRounded.toLocaleString()} ل.س` : "—"}</td>
                             <td className="p-4 text-center font-mono font-bold text-slate-700 text-sm">{employee.terminationDate ? new Date(employee.terminationDate).toLocaleDateString("ar-SY") : "—"}</td>
                             <td className="p-4 text-center">

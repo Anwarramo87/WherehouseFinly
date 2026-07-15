@@ -37,7 +37,7 @@ export default function RootLayout({
         )}
         {/* Load print styles without blocking initial render */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
-        <link rel="stylesheet" href="/print.css" media="print" />
+        <link rel="stylesheet" href="/print.css" type="text/css" media="print" />
       </head>
       <body className="bg-[#f8fafc] text-slate-800 antialiased">
         <Providers>

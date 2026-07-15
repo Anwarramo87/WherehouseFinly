@@ -115,10 +115,10 @@ export default function FireEmployeeModal({
 
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
         console.log('[FireModal] provisional response:', provPayload);
-        const attendanceBasedSalary = toNum(provPayload.attendanceBasedSalary);
-        const totalBonuses = toNum(provPayload.totalBonuses);
-        const totalDeductions = toNum(provPayload.totalDeductions);
-        const netPayRounded = toNum(provPayload.netPayRounded);
+        const attendanceBasedSalary = toNum(provPayload.earnedSalary ?? provPayload.attendanceBasedSalary);
+        const totalBonuses = toNum(provPayload.bonuses ?? provPayload.totalBonuses);
+        const totalDeductions = toNum(provPayload.deductions ?? provPayload.totalDeductions);
+        const netPayRounded = toNum(provPayload.provisionalTotal ?? provPayload.netPayRounded);
 
         setProvisionalData({
           attendanceBasedSalary,

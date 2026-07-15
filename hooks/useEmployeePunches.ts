@@ -52,7 +52,6 @@ export const useEmployeePunches = (employeeId: string, date: string) => {
     onSuccess: () => {
       toast.success("تم تسجيل البصمة");
       queryClient.invalidateQueries({ queryKey: qk });
-      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
     },
     onError: (e) => toast.error(getApiErrorMessage(e, "فشل تسجيل البصمة")),
@@ -65,7 +64,6 @@ export const useEmployeePunches = (employeeId: string, date: string) => {
     onSuccess: () => {
       toast.success("تم حذف البصمة");
       queryClient.invalidateQueries({ queryKey: qk });
-      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
     },
     onError: (e) => toast.error(getApiErrorMessage(e, "فشل حذف البصمة")),

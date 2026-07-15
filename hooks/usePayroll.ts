@@ -69,7 +69,9 @@ export const usePayroll = (params?: {
         includeAttendanceDeductions: input.includeAttendanceDeductions ?? true,
         includeTransportationDeductions: input.includeTransportationDeductions ?? true,
       };
-      return await apiClient.post("/payroll/calculate", payload);
+      return await apiClient.post("/payroll/calculate", payload, {
+        timeout: 120_000, // allow longer backend payroll processing time
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll"], exact: false });

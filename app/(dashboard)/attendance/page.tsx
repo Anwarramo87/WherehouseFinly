@@ -146,7 +146,8 @@ export default function AttendancePage() {
     isError: dailyViewError,
     error: dailyViewErrorObj,
   } = useAttendanceDailyView(selectedDate);
-  const { markAttendance } = useAttendance({ period, limit: 200 });
+  const attendanceParams = useMemo(() => ({ period, limit: 200 }), [period]);
+  const { markAttendance } = useAttendance(attendanceParams);
 
   const employeeList = useMemo(() => (Array.isArray(employees) ? employees : []), [employees]);
 
@@ -633,25 +634,47 @@ export default function AttendancePage() {
                               <span className="relative z-10">البصمات</span>
                             </button>
                             <button
-                              onClick={() => handleOpenTimeModal(row, "checkIn")}
+                              onClick={() => {
+                                // إذا في بصمات موجودة، افتح PunchesModal لإضافة بصمة جديدة
+                                // إذا ما في بصمات، افتح time modal للإدخال السريع
+                                if (row.checkIn) {
+                                  setPunchesModal({
+                                    employeeId: row.employeeId,
+                                    employeeName: row.employeeName,
+                                  });
+                                } else {
+                                  handleOpenTimeModal(row, "checkIn");
+                                }
+                              }}
                               disabled={markAttendance.isPending}
                               className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[#C89355] bg-[#1a2530] hover:bg-[#263544] border border-[#C89355]/40 text-xs font-black disabled:opacity-50 active:scale-95 transition-all"
                             >
                               <div className="absolute inset-0.5 rounded-lg border border-dashed border-[#C89355]/30 pointer-events-none" />
                               <LogIn size={15} className="relative z-10" />
                               <span className="relative z-10">
-                                {row.checkIn ? "تعديل دخول" : "تسجيل دخول"}
+                                {row.checkIn ? "إضافة دخول" : "تسجيل دخول"}
                               </span>
                             </button>
                             <button
-                              onClick={() => handleOpenTimeModal(row, "checkOut")}
+                              onClick={() => {
+                                // إذا في بصمة دخول ثانية أو أكثر، افتح PunchesModal
+                                // إذا وردية واحدة عادية، افتح time modal للتصحيح السريع
+                                if (row.checkIn) {
+                                  setPunchesModal({
+                                    employeeId: row.employeeId,
+                                    employeeName: row.employeeName,
+                                  });
+                                } else {
+                                  handleOpenTimeModal(row, "checkOut");
+                                }
+                              }}
                               disabled={markAttendance.isPending}
                               className="group/btn relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[#263544] bg-white/80 border border-white hover:bg-white hover:border-[#C89355]/30 text-xs font-black disabled:opacity-50 active:scale-95 transition-all"
                             >
                               <div className="absolute inset-0.5 rounded-lg border border-dashed border-[#263544]/10 pointer-events-none" />
                               <LogOut size={15} className="text-[#C89355] relative z-10" />
                               <span className="relative z-10">
-                                {row.checkOut ? "تعديل خروج" : "تسجيل خروج"}
+                                {row.checkOut ? "إضافة خروج" : "تسجيل خروج"}
                               </span>
                             </button>
                             {/* زر إضافة يوم كامل — يظهر إذا ما في IN أو OUT */}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, LogIn, LogOut, Plus, Trash2, Loader2, Fingerprint } from "lucide-react";
+import { X, LogIn, LogOut, Plus, Trash2, Loader2, Fingerprint, Clock } from "lucide-react";
 import { useEmployeePunches } from "@/hooks/useEmployeePunches";
 
 interface Props {
@@ -16,6 +16,11 @@ const toLocalHHmm = (iso: string) => {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso.slice(11, 16);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+
+const getNowHHmm = () => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 };
 
 const formatDate = (date: string) => {
@@ -34,6 +39,14 @@ export default function PunchesModal({ employeeId, employeeName, date, onClose }
       onSuccess: () => { setShowAdd(false); setNewTime("08:00"); },
     });
   };
+
+  const handleQuickPunch = (type: "IN" | "OUT", hhmm: string) => {
+    addPunch.mutate({ type, hhmm });
+  };
+
+  // آخر بصمة مسجلة لتحديد النوع المتوقع التالي
+  const lastPunchType = punches.length > 0 ? punches[punches.length - 1].type : null;
+  const nextExpectedType: "IN" | "OUT" = lastPunchType === "IN" ? "OUT" : "IN";
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="rtl">
@@ -55,14 +68,40 @@ export default function PunchesModal({ employeeId, employeeName, date, onClose }
           </button>
         </div>
 
+        {/* Quick punch buttons */}
+        <div className="px-5 pt-4 pb-2 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => handleQuickPunch("IN", getNowHHmm())}
+            disabled={addPunch.isPending || nextExpectedType !== "IN"}
+            className={`flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all border
+              ${nextExpectedType === "IN"
+                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
+                : "bg-white/5 text-slate-600 border-white/5 opacity-40 cursor-not-allowed"}`}
+          >
+            {addPunch.isPending ? <Loader2 size={14} className="animate-spin" /> : <LogIn size={14} />}
+            دخول الآن
+          </button>
+          <button
+            onClick={() => handleQuickPunch("OUT", getNowHHmm())}
+            disabled={addPunch.isPending || nextExpectedType !== "OUT"}
+            className={`flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all border
+              ${nextExpectedType === "OUT"
+                ? "bg-rose-500/20 text-rose-400 border-rose-500/40 hover:bg-rose-500/30"
+                : "bg-white/5 text-slate-600 border-white/5 opacity-40 cursor-not-allowed"}`}
+          >
+            {addPunch.isPending ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+            خروج الآن
+          </button>
+        </div>
+
         {/* Punches list */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-2 max-h-72 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-2 max-h-64 custom-scrollbar">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 size={24} className="animate-spin text-[#C89355]" />
             </div>
           ) : punches.length === 0 ? (
-            <p className="text-center text-slate-500 font-bold text-sm py-8">لا توجد بصمات مسجلة</p>
+            <p className="text-center text-slate-500 font-bold text-sm py-6">لا توجد بصمات مسجلة</p>
           ) : (
             punches.map((p, i) => (
               <div key={p.id} className="flex items-center justify-between bg-[#1a2530] rounded-xl px-4 py-3 border border-white/5">
@@ -97,14 +136,18 @@ export default function PunchesModal({ employeeId, employeeName, date, onClose }
           )}
         </div>
 
-        {/* Add punch */}
+        {/* Add punch with custom time */}
         <div className="p-5 border-t border-white/5 bg-[#1a2530]/50">
           {!showAdd ? (
             <button
-              onClick={() => setShowAdd(true)}
+              onClick={() => {
+                setNewType(nextExpectedType);
+                setNewTime(getNowHHmm());
+                setShowAdd(true);
+              }}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#C89355]/10 hover:bg-[#C89355]/20 border border-[#C89355]/30 text-[#C89355] font-black text-sm transition-all"
             >
-              <Plus size={16} /> إضافة بصمة جديدة
+              <Clock size={16} /> إضافة بصمة بوقت محدد
             </button>
           ) : (
             <div className="space-y-3">

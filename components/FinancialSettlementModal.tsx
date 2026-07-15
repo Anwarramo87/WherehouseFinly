@@ -333,10 +333,10 @@ const isMounted = typeof document !== "undefined";
         ]);
 
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
-        const attendanceBasedSalaryFromAPI = toNum(provPayload.attendanceBasedSalary ?? 0);
-        const totalBonusesFromAPI = toNum(provPayload.totalBonuses ?? 0);
-        const totalDeductionsFromAPI = toNum(provPayload.totalDeductions ?? 0);
-        const netPayRoundedFromAPI = toNum(provPayload.netPayRounded ?? 0);
+        const attendanceBasedSalaryFromAPI = toNum(provPayload.earnedSalary ?? provPayload.attendanceBasedSalary ?? 0);
+        const totalBonusesFromAPI = toNum(provPayload.bonuses ?? provPayload.totalBonuses ?? 0);
+        const totalDeductionsFromAPI = toNum(provPayload.deductions ?? provPayload.totalDeductions ?? 0);
+        const netPayRoundedFromAPI = toNum(provPayload.provisionalTotal ?? provPayload.netPayRounded ?? 0);
 
         const inputsRaw = payrollInputsRes.status === 'fulfilled'
           ? (Array.isArray(payrollInputsRes.value.data) ? payrollInputsRes.value.data : (payrollInputsRes.value.data?.data || []))

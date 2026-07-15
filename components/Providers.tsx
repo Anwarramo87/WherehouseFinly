@@ -6,6 +6,7 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { useState, useEffect, useRef } from "react";
 import { Toaster } from "react-hot-toast";
 import { createQueryClient } from "@/lib/query-client-config";
+import RealtimeInvalidator from "@/components/RealtimeInvalidator";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
@@ -27,8 +28,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         shouldDehydrateQuery: (query) => {
           if (query.state.status !== "success" || query.state.data === undefined) return false;
           const key = query.queryKey[0] as string;
-          // لا نحفظ بيانات الحضور اليومي والبصمات — دائماً تحتاج fresh data
+          // لا نحفظ البيانات الحسّاسة للوقت — دائماً تحتاج fresh data:
+          // - الحضور اليومي والبصمات
+          // - خصومات الحضور (الأساس لحساب الراتب المستحق)
+          // - المسير/الرواتب المحسوبة
           if (key === "attendance") return false;
+          if (key === "attendance-deductions") return false;
+          if (key === "payroll") return false;
           return true;
         },
       },
@@ -55,6 +61,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <RealtimeInvalidator />
       {children}
       <Toaster
         position="top-center"

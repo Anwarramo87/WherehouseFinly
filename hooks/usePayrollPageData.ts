@@ -178,10 +178,184 @@ export function usePayrollPageData(month: string) {
     [allResignedEmployees],
   );
 
+  // ── Shared per-employee computation (active + resigned) ────────────────────
+  type ComputedRow = {
+    row: AggregatedPayroll;
+    workedMinutes: number;
+    workedDays: number;
+  };
+
+  const payrollByEmployee = useMemo(() => {
+    const map = new Map<string, ComputedRow>();
+
+    const build = (emp: Employee): ComputedRow => {
+      const employeeId = emp.employeeId;
+      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+      const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
+
+      let calcGross = 0;
+      if (salaryConfig) {
+        calcGross =
+          toNumber(salaryConfig.baseSalary) +
+          (toNumber(salaryConfig.livingAllowance) || 0);
+      }
+      if (calcGross <= 0) {
+        calcGross =
+          toNumber((emp as { baseSalary?: number }).baseSalary) ||
+          toNumber((emp as { hourlyRate?: number }).hourlyRate) *
+            HOURS_PER_DAY *
+            STANDARD_WORK_DAYS;
+      }
+
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+      const autoInput = autoDeductions.find(
+        (d: AttendanceDeductionBreakdown) => d.employeeId === employeeId,
+      );
+      const hasManualInput = !!manualInput;
+      const leaveData = employeeLeavesMap.get(employeeId);
+
+      const autoLateMinutes = autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
+      const lateMinutes =
+        hasManualInput && (manualInput.lateMinutes ?? 0) > 0
+          ? (manualInput.lateMinutes ?? 0)
+          : autoLateMinutes;
+
+      const sickLeaveDays = Math.max(
+        hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
+        leaveData?.sickLeaveDays ?? 0,
+      );
+      const paidLeaveDays = Math.max(
+        hasManualInput
+          ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)
+          : 0,
+        leaveData?.paidLeaveDays ?? 0,
+      );
+      const earlyLeaveMinutes =
+        manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const totalOvertimeMinutes =
+        hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
+          ? (manualInput.overtimeRegularMinutes ?? 0)
+          : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeDays =
+        hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
+          ? (manualInput.overtimeWeekendDays ?? 0)
+          : (autoInput?.overtimeWeekendDays ?? 0);
+
+      const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
+      const workDaysInPeriod = (emp as { workDaysInPeriod?: number }).workDaysInPeriod ?? STANDARD_WORK_DAYS;
+      const hoursPerDayEmp = (emp as { hoursPerDay?: number }).hoursPerDay ?? HOURS_PER_DAY;
+
+      const workedDays = localPresentDaysMap.get(employeeId) ?? 0;
+      const workedMinutes =
+        autoInput?.workedMinutes ?? workedDays * hoursPerDayEmp * 60;
+
+      const rawEarned = calcGross > 0
+        ? calcEarnedSalaryHourly(
+            calcGross,
+            workDaysInPeriod,
+            hoursPerDayEmp,
+            workedMinutes,
+            autoInput?.sickRemainderMinutes ?? 0,
+            sickLeaveDays,
+            paidLeaveDays,
+            totalOvertimeMinutes,
+            lateMinutes,
+            earlyLeaveMinutes,
+            totalOvertimeDays,
+          )
+        : 0;
+      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+
+      const employeeBonuses = bonuses.filter(
+        (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب",
+      );
+      const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
+        const bonusAmt = toNumber(bonus.bonusAmount);
+        const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
+        return sum + bonusAmt + assistAmt;
+      }, 0);
+
+      const employeeAdvances = discounts.filter(
+        (d) => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month),
+      );
+      const employeePenalties = penalties.filter(
+        (p) => p.employeeId === employeeId && p.issueDate.startsWith(month),
+      );
+      const variableDeductions =
+        employeeAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) +
+        employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
+
+      const netPay =
+        earnedSalary + variableEarnings - variableDeductions;
+      const netPayRounded = Math.ceil(netPay / 1000) * 1000;
+      const roundingDifference = netPayRounded - netPay;
+      const totalDeductionsAmount = variableDeductions;
+
+      const row: AggregatedPayroll = {
+        employeeId,
+        employeeName: emp.name,
+        department,
+        grossPay: calcGross,
+        totalDeductions: totalDeductionsAmount,
+        netPay,
+        netPayRounded,
+        roundingDifference,
+        anomalies: [],
+        attendanceBasedSalary: earnedSalary,
+        earnedSalary,
+        bonusesTotal: variableEarnings,
+        discountsTotal: variableDeductions,
+        fixedEarnings: calcGross,
+        variableEarnings,
+        fixedDeductions: insuranceAmount,
+        variableDeductions,
+        totalEarlyLeaveMinutes: earlyLeaveMinutes,
+        earlyLeaveDeduction: 0,
+        details: {
+          salaryConfig,
+          bonuses: employeeBonuses,
+          deductions: [...employeeAdvances, ...employeePenalties],
+          attendance: null,
+        },
+      };
+
+      return { row, workedMinutes, workedDays };
+    };
+
+    const activeEmployees = employees.filter(
+      (e) => e.status === "active" && !resignedEmployeeIds.has(e.employeeId),
+    );
+    for (const emp of activeEmployees) map.set(emp.employeeId, build(emp));
+    for (const emp of allResignedList) map.set(emp.employeeId, build(emp));
+
+    return map;
+  }, [
+    employees,
+    allResignedList,
+    salaries,
+    bonuses,
+    discounts,
+    penalties,
+    month,
+    payrollInputs,
+    autoDeductions,
+    localLateMinutesMap,
+    localPresentDaysMap,
+    employeeLeavesMap,
+    resignedEmployeeIds,
+  ]);
+
   const resignedPayrollMap = useMemo(() => {
     const map = new Map<
       string,
-      { earnedSalary: number; bonusesTotal: number; discountsTotal: number; netPayRounded: number }
+      {
+        earnedSalary: number;
+        bonusesTotal: number;
+        discountsTotal: number;
+        netPayRounded: number;
+        workedMinutes: number;
+        workedDays: number;
+      }
     >();
     const backendPayrollItems = reportData?.items || [];
 
@@ -195,167 +369,31 @@ export function usePayrollPageData(month: string) {
           bonusesTotal: toNumber(payrollItem.totalBonuses),
           discountsTotal: toNumber(payrollItem.totalDeductions),
           netPayRounded: toNumber(payrollItem.netPayRounded),
+          workedMinutes: 0,
+          workedDays: 0,
         });
       } else {
+        const computed = payrollByEmployee.get(emp.employeeId);
         map.set(emp.employeeId, {
-          earnedSalary: 0,
-          bonusesTotal: 0,
-          discountsTotal: 0,
-          netPayRounded: 0,
+          earnedSalary: computed?.row.earnedSalary ?? 0,
+          bonusesTotal: computed?.row.bonusesTotal ?? 0,
+          discountsTotal: computed?.row.discountsTotal ?? 0,
+          netPayRounded: computed?.row.netPayRounded ?? 0,
+          workedMinutes: computed?.workedMinutes ?? 0,
+          workedDays: computed?.workedDays ?? 0,
         });
       }
     }
     return map;
-  }, [allResignedList, reportData?.items]);
+  }, [allResignedList, reportData?.items, payrollByEmployee]);
 
   // ── Preview data (when no backend payroll run yet) ─────────────────────────
   const previewData = useMemo<AggregatedPayroll[]>(() => {
     return employees
       .filter((e) => e.status === "active" && !resignedEmployeeIds.has(e.employeeId))
-      .map((emp) => {
-        const employeeId = emp.employeeId;
-        const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
-        const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
-
-        let calcGross = 0;
-        if (salaryConfig) {
-          calcGross =
-            toNumber(salaryConfig.baseSalary) +
-            (toNumber(salaryConfig.livingAllowance) || 0);
-        }
-        if (calcGross <= 0) {
-          calcGross =
-            toNumber((emp as { baseSalary?: number }).baseSalary) ||
-            toNumber((emp as { hourlyRate?: number }).hourlyRate) *
-              HOURS_PER_DAY *
-              STANDARD_WORK_DAYS;
-        }
-
-        const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-        const autoInput = autoDeductions.find(
-          (d: AttendanceDeductionBreakdown) => d.employeeId === employeeId,
-        );
-        const hasManualInput = !!manualInput;
-        const leaveData = employeeLeavesMap.get(employeeId);
-
-        const autoLateMinutes = autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
-        const lateMinutes =
-          hasManualInput && (manualInput.lateMinutes ?? 0) > 0
-            ? (manualInput.lateMinutes ?? 0)
-            : autoLateMinutes;
-
-        const sickLeaveDays = Math.max(
-          hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
-          leaveData?.sickLeaveDays ?? 0,
-        );
-        const paidLeaveDays = Math.max(
-          hasManualInput
-            ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)
-            : 0,
-          leaveData?.paidLeaveDays ?? 0,
-        );
-        const earlyLeaveMinutes =
-          manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
-        const totalOvertimeMinutes =
-          hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
-            ? (manualInput.overtimeRegularMinutes ?? 0)
-            : (autoInput?.overtimeMinutes ?? 0);
-        const totalOvertimeDays =
-          hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
-            ? (manualInput.overtimeWeekendDays ?? 0)
-            : (autoInput?.overtimeWeekendDays ?? 0);
-
-        const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
-        const workDaysInPeriod = (emp as { workDaysInPeriod?: number }).workDaysInPeriod ?? STANDARD_WORK_DAYS;
-        const hoursPerDayEmp = (emp as { hoursPerDay?: number }).hoursPerDay ?? HOURS_PER_DAY;
-        const rawEarned = calcGross > 0
-          ? calcEarnedSalaryHourly(
-              calcGross,
-              workDaysInPeriod,
-              hoursPerDayEmp,
-              autoInput?.workedMinutes ?? 0,
-              autoInput?.sickRemainderMinutes ?? 0,
-              sickLeaveDays,
-              paidLeaveDays,
-              totalOvertimeMinutes,
-              lateMinutes,
-              earlyLeaveMinutes,
-              totalOvertimeDays,
-            )
-          : 0;
-        const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
-
-        const employeeBonuses = bonuses.filter(
-          (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب",
-        );
-        const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
-          const bonusAmt = toNumber(bonus.bonusAmount);
-          const assistAmt = toNumber((bonus as { assistanceAmount?: number }).assistanceAmount);
-          return sum + bonusAmt + assistAmt;
-        }, 0);
-
-        const employeeAdvances = discounts.filter(
-          (d) => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month),
-        );
-        const employeePenalties = penalties.filter(
-          (p) => p.employeeId === employeeId && p.issueDate.startsWith(month),
-        );
-        const variableDeductions =
-          employeeAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) +
-          employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
-
-        const dailyRate = calcGross / STANDARD_WORK_DAYS;
-        const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-        const earlyLeaveDeductionAmount = earlyLeaveMinutes * minuteRate;
-
-        const netPay =
-          earnedSalary + variableEarnings - variableDeductions - earlyLeaveDeductionAmount;
-        const netPayRounded = Math.ceil(netPay / 1000) * 1000;
-        const roundingDifference = netPayRounded - netPay;
-        const totalDeductionsAmount = variableDeductions + earlyLeaveDeductionAmount;
-
-        return {
-          employeeId,
-          employeeName: emp.name,
-          department,
-          grossPay: calcGross,
-          totalDeductions: totalDeductionsAmount,
-          netPay,
-          netPayRounded,
-          roundingDifference,
-          anomalies: [],
-          attendanceBasedSalary: earnedSalary,
-          earnedSalary,
-          bonusesTotal: variableEarnings,
-          discountsTotal: variableDeductions,
-          fixedEarnings: calcGross,
-          variableEarnings,
-          fixedDeductions: insuranceAmount,
-          variableDeductions,
-          totalEarlyLeaveMinutes: earlyLeaveMinutes,
-          earlyLeaveDeduction: earlyLeaveDeductionAmount,
-          details: {
-            salaryConfig,
-            bonuses: employeeBonuses,
-            deductions: [...employeeAdvances, ...employeePenalties],
-            attendance: null,
-          },
-        } satisfies AggregatedPayroll;
-      });
-  }, [
-    employees,
-    salaries,
-    bonuses,
-    discounts,
-    penalties,
-    month,
-    payrollInputs,
-    autoDeductions,
-    localLateMinutesMap,
-    localPresentDaysMap,
-    employeeLeavesMap,
-    resignedEmployeeIds,
-  ]);
+      .map((emp) => payrollByEmployee.get(emp.employeeId)?.row)
+      .filter((r): r is AggregatedPayroll => !!r);
+  }, [employees, payrollByEmployee, resignedEmployeeIds]);
 
   // ── Final payroll rows (backend run if available, else preview) ────────────
   const payrollData = useMemo<AggregatedPayroll[]>(() => {
