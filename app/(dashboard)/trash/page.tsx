@@ -26,6 +26,7 @@ const ENTITY_LABELS: Record<string, string> = {
   bonus: "مكافأة",
   leave_request: "طلب إجازة",
   employee: "موظف",
+  salary: "راتب",
 };
 
 const ENTITY_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ const ENTITY_COLORS: Record<string, string> = {
   bonus: "bg-emerald-100 text-emerald-700 border-emerald-200",
   leave_request: "bg-blue-100 text-blue-700 border-blue-200",
   employee: "bg-purple-100 text-purple-700 border-purple-200",
+  salary: "bg-[#C89355]/15 text-[#C89355] border-[#C89355]/30",
 };
 
 export default function TrashPage() {
@@ -154,6 +156,16 @@ export default function TrashPage() {
             <p className="font-bold text-[#263544]">{data.name || data.employeeId}</p>
             {data.department && <p className="text-sm text-slate-600">القسم: {data.department}</p>}
             {data.position && <p className="text-sm text-slate-500">المنصب: {data.position}</p>}
+          </div>
+        );
+      case "salary":
+        return (
+          <div className="space-y-1">
+            <p className="font-bold text-[#263544]">الموظف: {data.employeeId}</p>
+            {data.profession && <p className="text-sm text-slate-600">المهنة: {data.profession}</p>}
+            <p className="text-sm text-slate-500">
+              الراتب الأساسي: {Number(data.baseSalary || 0).toLocaleString()} ل.س
+            </p>
           </div>
         );
       default:

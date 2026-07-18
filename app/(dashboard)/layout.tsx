@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import SessionRefresh from "@/components/SessionRefresh";
+import NotificationBell from "@/components/NotificationBell";
 import apiClient from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import axios from "axios";
@@ -87,14 +88,18 @@ export default function DashboardLayout({
 
       {/* ── Main content ── */}
       <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning>
-        {/* Mobile menu button */}
-        <button
-          onClick={openMobile}
-          className="lg:hidden print:hidden fixed top-4 right-4 z-30 p-2.5 bg-[#1a2530] text-[#C89355] rounded-xl border border-[#C89355]/30 shadow-lg transition-colors hover:bg-[#263544]"
-          aria-label="فتح القائمة"
-        >
-          <Menu size={22} />
-        </button>
+        {/* Floating notifications bell (top-left in RTL) */}
+        <div className="fixed top-3 left-3 z-40 flex items-center gap-2 print:hidden">
+          <NotificationBell />
+          {/* Mobile menu button */}
+          <button
+            onClick={openMobile}
+            className="lg:hidden p-2.5 bg-[#263544] text-[#C89355] rounded-xl border border-[#C89355]/30 shadow-lg"
+            aria-label="فتح القائمة"
+          >
+            <Menu size={22} />
+          </button>
+        </div>
 
         {children}
       </main>

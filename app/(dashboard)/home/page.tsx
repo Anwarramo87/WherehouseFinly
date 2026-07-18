@@ -9,6 +9,7 @@ import {
   MoreVertical, Pencil, Trash2, CalendarDays, Bus,
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
+import { usePayrollPageData } from "@/hooks/usePayrollPageData";
 import useDepartments from "@/hooks/useDepartments";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -233,6 +234,12 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
+  // إجمالي المقبوض = نفس رقم "حساب المسير" (صافي الرواتب المستحقة للشهر الحالي)
+  const { payrollData: monthlyPayroll } = usePayrollPageData(monthKey);
+  const totalReceivedThisMonth = useMemo(() => {
+    return monthlyPayroll.reduce((sum, p) => sum + (p.netPayRounded ?? 0), 0);
+  }, [monthlyPayroll]);
+
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(
     () => new Set(resignedEmployees.map((e) => e.employeeId)),
@@ -398,7 +405,7 @@ export default function DashboardPage() {
       },
       {
         title: "اجمالي المقبوض",
-        value: Math.round(kpis.totalReceivedSalaries).toLocaleString("en-US", {
+        value: Math.round(totalReceivedThisMonth).toLocaleString("en-US", {
           maximumFractionDigits: 0,
         }),
         subValue: "ليرة سورية",
@@ -422,7 +429,7 @@ export default function DashboardPage() {
         onClick: () => handleCardClick("overtime"),
       },
     ],
-    [kpis, router, handleCardClick],
+    [kpis, router, handleCardClick, totalReceivedThisMonth],
   );
 
   // const departmentSummary = Object.entries(employeesStats?.byDepartment || {}).map(([name, count]) => ({ name, count: Number(count) }));
@@ -608,21 +615,21 @@ export default function DashboardPage() {
                             {item.name[0]}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-black text-[#263544] truncate">
+                            <p className="text-sm font-black text-[#263544] truncate">
                               {item.name}
                             </p>
                             <span
-                              className={`text-[9px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
+                              className={`text-[11px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
                             >
                               {item._type}
                             </span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-0.5 shrink-0">
-                          <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                          <span className="text-sm font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
                             -{item.amount.toLocaleString()} ل.س
                           </span>
-                          <span className="text-[9px] text-slate-500 font-bold">
+                          <span className="text-[10px] text-slate-500 font-bold">
                             {item._sortDate}
                           </span>
                         </div>

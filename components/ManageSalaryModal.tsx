@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,8 +62,6 @@ export default function ManageSalaryModal({
   isOpen, onClose, onSave, isPending,
   initialData, employees = [], preselectedEmployeeId, allSalariesMap
 }: Props) {
-  const queryClient = useQueryClient();
-  const prevSalariesRef = useRef<Salary[] | undefined>(undefined);
   const savedRef = useRef(false);
 
   // ─── Initialize State ─────────────────────────────────────────────────────────
@@ -131,18 +128,13 @@ export default function ManageSalaryModal({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Restore cache on unmount without save
+  // Reset the saved flag on unmount (no cache restoration — the salaries
+  // query is always refetched after a successful save)
   useEffect(() => {
     return () => {
-      if (!savedRef.current && prevSalariesRef.current !== undefined) {
-        try {
-          queryClient.setQueryData(["salaries"], prevSalariesRef.current);
-        } catch { /* noop */ }
-      }
-      prevSalariesRef.current = undefined;
       savedRef.current = false;
     };
-  }, [queryClient]);
+  }, []);
 
   const filteredEmployees = useMemo(() => {
     if (!searchQuery) return employees;

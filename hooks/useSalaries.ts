@@ -93,38 +93,21 @@ export const useSalaries = () => {
 
   const updateSalary = useMutation({
     mutationFn: async ({ employeeId, data }: { employeeId: string; data: SalaryInput }) => {
-      // Build a clean payload that strictly matches UpsertSalaryDto.
-      // Use canonical field names; coerce all numeric values safely.
+      // Always send every canonical field (including 0) so edits that set a
+      // value to 0 are persisted and the DB mirror stays consistent.
       const payload: Record<string, unknown> = {
         baseSalary: Number(data.baseSalary ?? 0),
+        lumpSumSalary: Number(data.lumpSumSalary ?? 0),
+        livingAllowance: Number(data.livingAllowance ?? 0),
+        transportAllowance: Number(data.transportAllowance ?? 0),
+        insuranceAmount: Number(data.insuranceAmount ?? 0),
+        responsibilityAllowance: Number(data.responsibilityAllowance ?? 0),
+        extraEffortAllowance: Number(data.extraEffortAllowance ?? 0),
+        productionIncentive: Number(data.productionIncentive ?? 0),
       };
 
-      // Optional fields — only include when provided to avoid sending 0 noise
       if (data.profession !== undefined && data.profession !== "") {
         payload.profession = data.profession;
-      }
-      if ((data.lumpSumSalary ?? 0) > 0) {
-        payload.lumpSumSalary = Number(data.lumpSumSalary);
-      }
-      if ((data.livingAllowance ?? 0) > 0) {
-        payload.livingAllowance = Number(data.livingAllowance);
-      }
-      if ((data.responsibilityAllowance ?? 0) > 0) {
-        payload.responsibilityAllowance = Number(data.responsibilityAllowance);
-      }
-      // Canonical: extraEffortAllowance (NOT extraEffort)
-      if ((data.extraEffortAllowance ?? 0) > 0) {
-        payload.extraEffortAllowance = Number(data.extraEffortAllowance);
-      }
-      if ((data.productionIncentive ?? 0) > 0) {
-        payload.productionIncentive = Number(data.productionIncentive);
-      }
-      // Canonical: insuranceAmount (NOT insurances)
-      if ((data.insuranceAmount ?? 0) > 0) {
-        payload.insuranceAmount = Number(data.insuranceAmount);
-      }
-      if ((data.transportAllowance ?? 0) > 0) {
-        payload.transportAllowance = Number(data.transportAllowance);
       }
 
       return await apiClient.put(`/salary/${employeeId}`, payload);
@@ -132,6 +115,7 @@ export const useSalaries = () => {
     onSuccess: async (_data, variables) => {
       // Only runs on HTTP 2xx — TanStack Query guarantees this
       await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
+      await queryClient.refetchQueries({ queryKey: queryKeys.salaries.all });
       if (variables?.employeeId) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.salaries.detail(variables.employeeId),
