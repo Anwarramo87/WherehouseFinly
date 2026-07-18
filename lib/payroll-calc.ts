@@ -5,15 +5,19 @@
 
 export const STANDARD_WORK_DAYS = 26;
 export const HOURS_PER_DAY = 8;
+/** معامل أجر يوم الجمعة: كل دقيقة فعلية × 2 */
+export const WEEKEND_MULTIPLIER = 2.0;
 
 /**
  * حساب الراتب المستحق — نفس الصيغة المستخدمة في صفحة TimeTable بالضبط
  * الصيغة:
  *   (grossSalary / STANDARD_WORK_DAYS) * paidDays
  *   + إضافي عادي (دقائق × 1.5×)
- *   + إضافي جمعة (أيام × dailyRate × 1.5×)
+ *   + دقائق الجمعة (دقائق فعلية × 2×)
  *   - خصم التأخير (دقائق × 1.5×)
  *   - خصم الخروج المبكر (دقائق × 1.0×)
+ *
+ * overtimeWeekendDays الآن = دقائق الجمعة الفعلية (ليس عدد الأيام)
  */
 export const calcEarnedSalary = (
   grossSalary: number,
@@ -32,7 +36,8 @@ export const calcEarnedSalary = (
   const lateDeduction = lateMinutes * minuteRate * 1.5;
   const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
   const overtimePay = overtimeMinutes * minuteRate * 1.5;
-  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5;
+  // overtimeWeekendDays = دقائق الجمعة الفعلية × 2
+  const weekendOvertimePay = overtimeWeekendDays * minuteRate * WEEKEND_MULTIPLIER;
   return Math.max(
     0,
     salaryFromDays - lateDeduction - earlyLeaveDeduction + overtimePay + weekendOvertimePay,
@@ -45,7 +50,7 @@ export const calcEarnedSalary = (
  * - workedMinutes  → أجر كامل (معدل الساعة).
  * - sickRemainderMinutes → أجر بنصف المعدل (باقي يوم إجازة مرضية جزئية).
  * - أيام الإجازة الكاملة (sickLeaveDays/paidLeaveDays) تُضاف كأيام كاملة.
- * - الإضافي/التأخير/الخروج المبكر كما في النموذج اليومي.
+ * - overtimeWeekendDays = دقائق الجمعة الفعلية (من الباك إند) × 2×
  */
 export const calcEarnedSalaryHourly = (
   grossSalary: number,
@@ -73,7 +78,8 @@ export const calcEarnedSalaryHourly = (
   const fullSickPay = dailyRate * sickLeaveDays * 0.5;
   const paidLeavePay = dailyRate * paidLeaveDays;
   const overtimePay = minuteRate * overtimeMinutes * 1.5;
-  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5;
+  // overtimeWeekendDays = دقائق الجمعة الفعلية × 2
+  const weekendOvertimePay = minuteRate * overtimeWeekendDays * WEEKEND_MULTIPLIER;
   const lateDeduction = minuteRate * lateMinutes * 1.5;
   const earlyLeaveDeduction = minuteRate * earlyLeaveMinutes;
 

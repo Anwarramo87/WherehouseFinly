@@ -180,7 +180,9 @@ const toDailyRecords = (
 export const useAttendance = (params?: AttendanceQueryParams) => {
   const queryClient = useQueryClient();
   const fallbackToday = useMemo(toLocalDateString, []);
-  const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
+  // نسمح بـ limit أكبر عند جلب بيانات شهرية لعدة موظفين
+  // الـ pagination الآلي في queryFn يكفل جلب كل الصفحات تلقائياً
+  const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 500);
 
   // Calculate date range from period (YYYY-MM) if provided
   const { periodStart, periodEnd } = useMemo(() => {

@@ -131,11 +131,16 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (driverSource === "external" && !validatePhone(formData.driverPhone)) return;
+    const capacity = Number(formData.capacity);
+    if (!capacity || capacity < 1) {
+      alert("يجب أن تكون سعة الركاب أكبر من صفر");
+      return;
+    }
     onSave({
       ...formData,
-      capacity: Number(formData.capacity),
+      capacity,
       totalCost: Number(formData.totalCost),
-      companyDeductionPct: Number(formData.discountPercent),
+      companyDeductionPct: Number(formData.discountPercent) || 0,
       employeeDeductionPct: initialData?.employeeDeductionPct ?? 0,
     });
   };
@@ -230,19 +235,27 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                   <div className="relative group"><input type="text" required className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-bold pr-12" value={formData.driverName} onChange={(e) => setFormData({ ...formData, driverName: e.target.value })} /><User className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} /></div>
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم السائق</label>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">رقم السائق (سوري)</label>
                   <div className="relative group">
                     <input
                       type="tel"
                       required
-                      className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-12 dir-ltr text-right transition-all ${phoneError ? 'border-rose-400' : 'border-[#263544]/15'}`}
+                      maxLength={10}
+                      inputMode="numeric"
+                      className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-12 dir-ltr text-left transition-all ${phoneError ? 'border-rose-400' : 'border-[#263544]/15'}`}
                       value={formData.driverPhone}
-                      onChange={(e) => { setFormData({ ...formData, driverPhone: e.target.value.replace(/\D/g, '') }); setPhoneError(""); }}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setFormData({ ...formData, driverPhone: digits });
+                        setPhoneError("");
+                      }}
+                      onBlur={() => validatePhone(formData.driverPhone)}
                       placeholder="09XXXXXXXX"
                     />
                     <Phone className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
                   </div>
                   {phoneError && <p className="text-rose-500 text-xs font-bold mt-1.5">{phoneError}</p>}
+                  <p className="text-slate-400 text-[10px] font-bold mt-1">يجب أن يبدأ بـ 09 ويتكون من 10 أرقام</p>
                 </div>
               </>
             )}
@@ -269,11 +282,25 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">حسم الشركة %</label>
-                <div className="relative group"><input type="number" required min={0} max={100} className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-10 text-left dir-ltr" value={formData.discountPercent} onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })} /><Percent className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={18} /></div>
+                <div className="relative group"><input type="number" required min={0} max={100} placeholder="0" className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-10 text-left dir-ltr" value={formData.discountPercent} onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })} /><Percent className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={18} /></div>
               </div>
               <div>
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">سعة الركاب</label>
-                <input type="number" required min={1} className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold text-center dir-ltr" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: e.target.value })} />
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={100}
+                  className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold text-center dir-ltr"
+                  value={formData.capacity}
+                  onChange={(e) => {
+                    const val = Math.max(1, Math.min(100, Number(e.target.value)));
+                    setFormData({ ...formData, capacity: String(val) });
+                  }}
+                />
+                {formData.capacity && Number(formData.capacity) < 1 && (
+                  <p className="text-rose-500 text-xs font-bold mt-1.5">يجب أن تكون السعة أكبر من صفر</p>
+                )}
               </div>
             </div>
           </form>

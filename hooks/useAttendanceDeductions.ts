@@ -11,8 +11,12 @@ import { queryKeys } from "@/lib/query-keys";
 /**
  * Hook لحساب خصومات الدوام (غياب + تأخير)
  * يحسب الخصومات بناءً على سجلات الحضور في فترة زمنية محددة
+ * @param fresh إذا true يُعيد الجلب فوراً عند mount (للصفحات التي تحتاج بيانات حديثة)
  */
-export const useAttendanceDeductions = (input: AttendanceDeductionInput) => {
+export const useAttendanceDeductions = (
+  input: AttendanceDeductionInput,
+  options?: { fresh?: boolean },
+) => {
   return useQuery<AttendanceDeductionResponse>({
     queryKey: queryKeys["attendance-deductions"].list(
       input.periodStart,
@@ -29,9 +33,11 @@ export const useAttendanceDeductions = (input: AttendanceDeductionInput) => {
       });
       return res.data;
     },
-    staleTime: QUERY_STALE_TIME.RELAXED,
+    // fresh=true → staleTime=0 يضمن إعادة الجلب فور تغيير الشهر
+    staleTime: options?.fresh ? 0 : QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
     enabled: !!input.periodStart && !!input.periodEnd,
+    refetchOnMount: options?.fresh ? "always" : true,
   });
 };
 

@@ -236,10 +236,11 @@ export default function TimeTablePage() {
   const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
     periodStart: periodStart ?? "",
     periodEnd: periodEnd ?? "",
-  });
+  }, { fresh: true });
 
-  // جلب سجلات الحضور الشهرية — نفس مصدر بيانات صفحة الحضور
-  // limit=500 + auto-pagination يضمن جلب كل السجلات
+  // جلب سجلات الحضور الشهرية — limit=500 مع auto-pagination
+  // نستخدمه فقط لعرض الحضور في الجدول (actualWorkDays) وبناء localPresentDaysMap
+  // الحسابات المالية تعتمد على deductionsResponse (workedMinutes, presentDays من الباك إند)
   const { data: monthlyAttendanceData, markAttendance: _markAttendance } = useAttendance({
     startDate: periodStart,
     endDate: periodEnd,
@@ -425,14 +426,15 @@ export default function TimeTablePage() {
       const totalDelayMinutes = lateMinutes;
       const totalEarlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
 
-      // أيام الحضور الفعلية — نعتمد على dailyRecords (نفس مصدر صفحة /attendance)
-      // إذا لم تتوفر بيانات محلية نرجع للـ backend كـ fallback
-      const localPresentDays = localPresentDaysMap.get(emp.employeeId) ?? 0;
+      // أيام الحضور الفعلية:
+      // أولوية 1: presentDays من الباك إند (calculate-deductions) — الأدق
+      // أولوية 2: localPresentDaysMap من useAttendance كـ fallback
       const backendPresentDays = autoInput?.presentDays ?? 0;
-      const actualWorkDays: number | null = localPresentDays > 0
-        ? localPresentDays
-        : backendPresentDays > 0
-          ? backendPresentDays
+      const localPresentDays = localPresentDaysMap.get(emp.employeeId) ?? 0;
+      const actualWorkDays: number | null = backendPresentDays > 0
+        ? backendPresentDays
+        : localPresentDays > 0
+          ? localPresentDays
           : null;
 
       // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
@@ -779,7 +781,7 @@ export default function TimeTablePage() {
                           )}
                           {record.totalOvertimeDays > 0 && (
                             <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-700 border border-violet-200">
-                              {record.totalOvertimeDays * HOURS_PER_DAY * 60} د. جمعة
+                              {record.totalOvertimeDays} د. جمعة
                             </span>
                           )}
                           {record.totalOvertimeDays === 0 && record.totalOvertimeMinutes === 0 && (

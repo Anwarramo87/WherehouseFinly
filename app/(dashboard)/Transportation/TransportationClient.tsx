@@ -142,6 +142,7 @@ export default function TransportationClient() {
   const [selectedBus, setSelectedBus] = useState<BusData | null>(null);
   const [editingBus, setEditingBus] = useState<BusData | null>(null);
   const [lastAddedPassengerId, setLastAddedPassengerId] = useState<string | null>(null);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
 
   // Load from sessionStorage after component mounts (client-side only)
   useEffect(() => {
@@ -228,6 +229,16 @@ export default function TransportationClient() {
 
   const handleSavePassenger = async (passengerData: Passenger) => {
     if (!selectedBus) return;
+
+    // تحقق من السعة قبل الإرسال
+    const currentDetails = busDetailsMap[selectedBus.id];
+    const currentCount = currentDetails?.passengers?.length ?? selectedBus.passengers?.length ?? 0;
+    if (currentCount >= selectedBus.capacity) {
+      setCapacityError(`الباص ممتلئ (${currentCount}/${selectedBus.capacity}). لا يمكن إضافة ركاب جدد.`);
+      setIsAddPassengerOpen(false);
+      return;
+    }
+
     try {
       await addPassenger.mutateAsync({
         busId: selectedBus.id,
@@ -238,6 +249,7 @@ export default function TransportationClient() {
         },
       });
 
+      setCapacityError(null);
       const newId = passengerData.employeeId;
       try {
         sessionStorage.setItem("lastAddedPassengerId", String(newId));
@@ -245,8 +257,13 @@ export default function TransportationClient() {
         // ignore
       }
       setLastAddedPassengerId(String(newId));
-    } catch {
-      // handled by hook
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "";
+      if (msg.toLowerCase().includes("capacity") || msg.includes("full") || msg.includes("سعة")) {
+        setCapacityError(`الباص ممتلئ — لا يمكن إضافة ركاب إضافيين.`);
+      }
+      // hook already shows toast for other errors
     } finally {
       setIsAddPassengerOpen(false);
     }
@@ -352,6 +369,15 @@ export default function TransportationClient() {
                 <span className="text-sm text-[#C89355]/60 font-bold">ل.س</span>
               </p>
             </div>
+          </div>
+        )}
+
+        {/* ─── Capacity Error Banner ─── */}
+        {capacityError && (
+          <div className="mb-4 flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 px-5 py-3 rounded-2xl font-bold text-sm">
+            <span className="text-rose-500 text-lg">⚠️</span>
+            {capacityError}
+            <button onClick={() => setCapacityError(null)} className="mr-auto text-rose-400 hover:text-rose-600 text-xs">✕</button>
           </div>
         )}
 
@@ -513,8 +539,11 @@ export default function TransportationClient() {
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-right pr-3 tracking-wider">
                                   الاسم
                                 </th>
-                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-24 tracking-wider">
+                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-28 tracking-wider">
                                   تاريخ الاشتراك
+                                </th>
+                                <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-28 tracking-wider">
+                                  قيمة الاشتراك
                                 </th>
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">
                                   إجراء
@@ -549,6 +578,12 @@ export default function TransportationClient() {
                                     </td>
                                     <td className="p-3 text-center text-xs font-mono text-slate-500">
                                       {p.subscriptionDate ? new Date(p.subscriptionDate).toLocaleDateString("en-GB") : "—"}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <span className="inline-block bg-[#C89355]/10 text-[#C89355] font-black font-mono text-xs px-2.5 py-1 rounded-lg border border-[#C89355]/20">
+                                        {baseShare > 0 ? baseShare.toLocaleString() : "—"}
+                                        {baseShare > 0 && <span className="text-[9px] mr-1 opacity-70">ل.س</span>}
+                                      </span>
                                     </td>
                                     <td className="p-3 text-center">
                                       <button

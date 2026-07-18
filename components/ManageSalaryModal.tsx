@@ -214,7 +214,7 @@ export default function ManageSalaryModal({
     }
   };
 
-  const handleFormSubmit = useCallback(() => handleSubmit(onSubmit), [handleSubmit, onSubmit]);
+  const handleFormSubmit = handleSubmit(onSubmit);
 
   if (!isOpen || typeof document === "undefined") return null;
 

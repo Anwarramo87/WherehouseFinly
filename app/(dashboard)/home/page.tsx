@@ -597,36 +597,79 @@ export default function DashboardPage() {
                     .sort((a, b) => b._sortDate.localeCompare(a._sortDate))
                     .slice(0, 8)
                     .map((item) => (
+                      // <div
+                      //   key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
+                      //   className="group flex items-center justify-between p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-2"
+                      // >
+                      //   <div className="flex items-center gap-2 min-w-0">
+                      //     <div
+                      //       className={`w-8 h-8 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-[10px] font-black ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}
+                      //     >
+                      //       {item.name[0]}
+                      //     </div>
+                      //     <div className="min-w-0">
+                      //       <p className="text-sm font-black text-[#263544] truncate">
+                      //         {item.name}
+                      //       </p>
+                      //       <span
+                      //         className={`text-[10px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
+                      //       >
+                      //         {item._type}
+                      //       </span>
+                      //     </div>
+                      //   </div>
+                      //   <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      //     <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                      //       -{item.amount.toLocaleString()} ل.س
+                      //     </span>
+                      //     <span className="text-[9px] text-slate-500 font-bold">
+                      //       {item._sortDate}
+                      //     </span>
+                      //   </div>
+                      // </div>
+
                       <div
-                        key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
-                        className="group flex items-center justify-between p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className={`w-8 h-8 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-[10px] font-black ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}
-                          >
-                            {item.name[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-black text-[#263544] truncate">
-                              {item.name}
-                            </p>
-                            <span
-                              className={`text-[9px] font-bold ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
-                            >
-                              {item._type}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5 shrink-0">
-                          <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-                            -{item.amount.toLocaleString()} ل.س
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-bold">
-                            {item._sortDate}
-                          </span>
-                        </div>
-                      </div>
+  key={`${item._type}-${"advanceId" in item ? item.advanceId : "penaltyId" in item ? item.penaltyId : ""}`}
+  // 1. تعديل الحاوي الرئيسي: تحويل p-3 إلى p-4، و gap-2 إلى gap-3، وإضافة flex-col sm:flex-row
+  className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-rose-300 shadow-sm hover:shadow-[0_8px_20px_rgba(225,29,72,0.15)] transition-all duration-300 gap-3"
+>
+  {/* 2. تعديل مسافة الـ Avatar والاسم: gap-2 إلى gap-3 */}
+  <div className="flex items-center gap-3 min-w-0">
+    <div
+      // 3. تعديل حجم الـ Avatar: من w-8 h-8 إلى w-10 h-10، والخط إلى text-xs، وإضافة shadow-md
+      className={`w-10 h-10 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-xs font-black shadow-md ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}
+    >
+      {item.name[0]}
+    </div>
+    <div className="min-w-0">
+      <p className="text-sm font-black text-[#263544] truncate">
+        {item.name}
+      </p>
+      <span
+        // تم إضافة mt-1 block لعمل مسافة متناسقة تعادل المساحة في تصميم المكافآت
+        className={`text-[10px] font-bold mt-1 block ${item._type === "سلفة" ? "text-indigo-500" : "text-rose-500"}`}
+      >
+        {item._type}
+      </span>
+    </div>
+  </div>
+  
+  {/* 4. تعديل المسافة بين القيمة والتاريخ: gap-0.5 إلى gap-1 */}
+  <div className="flex flex-col items-end gap-1 shrink-0">
+    <span 
+      // 5. تعديل شارة القيمة: text-xs إلى text-sm، و px-2 py-0.5 إلى px-3 py-1.5، و rounded-lg إلى rounded-xl + shadow-md
+      className="text-sm font-extrabold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 shadow-md"
+    >
+      -{item.amount.toLocaleString()} ل.س
+    </span>
+    <span 
+      // 6. تعديل حجم التاريخ: text-[9px] إلى text-[10px]
+      className="text-[10px] text-slate-500 font-bold"
+    >
+      {item._sortDate}
+    </span>
+  </div>
+</div>
                     ))}
                 {(!mounted || (monthlyAdvances.length === 0 && recentPenalties.length === 0)) && (
                   <p className="text-slate-400 text-sm font-bold text-center py-8">

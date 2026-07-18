@@ -201,19 +201,23 @@ export default function SalariesSettingClient() {
 
   const handleSave = (employeeId: string, payload: SalaryPayload) => {
     if (!employeeId) return toast.error("يرجى إدخال كود الموظف");
-    updateSalary.mutate({
-      employeeId,
-      data: {
+    updateSalary.mutate(
+      {
         employeeId,
-        profession: payload.profession ?? "",
-        baseSalary: payload.baseSalary,
-        lumpSumSalary: payload.lumpSumSalary,
-        livingAllowance: payload.livingAllowance,
-        transportAllowance: payload.transportAllowance,
-        insuranceAmount: payload.insuranceAmount,
+        data: {
+          employeeId,
+          profession: payload.profession ?? "",
+          baseSalary: payload.baseSalary,
+          lumpSumSalary: payload.lumpSumSalary,
+          livingAllowance: payload.livingAllowance,
+          transportAllowance: payload.transportAllowance,
+          insuranceAmount: payload.insuranceAmount,
+        },
       },
-    });
-    setIsModalOpen(false);
+      {
+        onSuccess: () => setIsModalOpen(false),
+      },
+    );
   };
 
   const handleDelete = (employeeId: string) => {
