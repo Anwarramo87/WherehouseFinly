@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage } from "@/hooks/useEmployees";
 import { useSalaries } from "@/hooks/useSalaries";
+import useDepartments from "@/hooks/useDepartments";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
@@ -147,16 +148,16 @@ export default function EmployeesPage() {
     };
   }, [selectedEmployee, salaryMap]);
 
-  // الفلترة والأقسام
+  // الفلترة والأقسام — نستخدم الأقسام الحقيقية المسجلة في النظام
+  // (وليس النصوص الحرة لكل موظف) لتجنب ظهور أقسام وهمية/مكررة
+  const { data: departmentsData } = useDepartments();
+  const realDepartments = useMemo(
+    () => (departmentsData?.departments ?? []).map((d) => d.name).filter(Boolean),
+    [departmentsData],
+  );
   const departments = useMemo(() => {
-    if (!visibleEmployees.length) return ["الكل"];
-    const depts = new Set(
-      visibleEmployees
-        .map((emp) => emp.department)
-        .filter((department): department is string => Boolean(department && department.trim())),
-    );
-    return ["الكل", ...Array.from(depts)];
-  }, [visibleEmployees]);
+    return ["الكل", ...realDepartments];
+  }, [realDepartments]);
 
   const filteredEmployees = useMemo(() => {
     return visibleEmployees.filter(emp => {

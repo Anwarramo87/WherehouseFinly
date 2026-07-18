@@ -82,4 +82,9 @@ export const queryKeys = {
         employeeId ?? null,
       ] as const,
   },
+  notifications: {
+    all: ["notifications"] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.notifications.all, params] as const,
+    unreadCount: () => [...queryKeys.notifications.all, "unread-count"] as const,
+  },
 } as const;

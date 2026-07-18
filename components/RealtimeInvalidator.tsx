@@ -6,6 +6,21 @@ import {
   getAttendanceSocket,
   type AttendanceRealtimeEventPayload,
 } from "@/lib/realtime/attendance-socket";
+import { useNotificationStore, type NotificationItem } from "@/stores/notification-store";
+import { queryKeys } from "@/lib/query-keys";
+
+type NotificationRealtimePayload = {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  message: string;
+  employeeId?: string | null;
+  employeeName?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  createdAt: string;
+};
 
 /**
  * مستمع سوكيت عام (mounted مرة واحدة على مستوى التطبيق).
@@ -15,8 +30,7 @@ import {
  * صفحات timeTable / payroll / salaries فوراً دون الحاجة لإعادة تشغيل
  * الباك اند (الذي كان يعمل refetch عرَضياً عبر refetchOnReconnect).
  *
- * ملاحظة: لا يعرض هذا المستمع أي toast لتفادي التكرار مع مستمع صفحة
- * الحضور الذي يتكفل بالإشعار وتحديث الـ daily-view.
+ * كما يستمع لحدث `notification` ويضخه فوراً إلى الستور الحي للإشعارات.
  */
 export default function RealtimeInvalidator() {
   const queryClient = useQueryClient();
@@ -39,9 +53,31 @@ export default function RealtimeInvalidator() {
       }
     };
 
+    const onNotification = (payload: NotificationRealtimePayload) => {
+      if (!payload?.id) return;
+      const item: NotificationItem = {
+        id: payload.id,
+        type: payload.type as NotificationItem["type"],
+        severity: payload.severity as NotificationItem["severity"],
+        title: payload.title,
+        message: payload.message,
+        employeeId: payload.employeeId ?? null,
+        employeeName: payload.employeeName ?? null,
+        entityType: payload.entityType ?? null,
+        entityId: payload.entityId ?? null,
+        createdAt: payload.createdAt,
+        isRead: false,
+        isDismissed: false,
+      };
+      useNotificationStore.getState().upsert(item);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.unreadCount() });
+    };
+
     socket.on("attendanceUpdate", onAttendanceUpdate);
+    socket.on("notification", onNotification);
     return () => {
       socket.off("attendanceUpdate", onAttendanceUpdate);
+      socket.off("notification", onNotification);
     };
   }, [queryClient]);
 
