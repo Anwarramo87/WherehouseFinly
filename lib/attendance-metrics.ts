@@ -28,14 +28,33 @@ export const toMinutes = (time?: string) => {
   return (h * 60) + m;
 };
 
-export const getStatus = (checkIn?: string, scheduledStart?: string): TableStatus => {
+export const getStatus = (
+  checkIn?: string,
+  scheduledStart?: string,
+  scheduledEnd?: string,
+): TableStatus => {
   if (!checkIn) return "absent";
 
   const checkInMinutes = toMinutes(checkIn);
   const scheduledMinutes = toMinutes(scheduledStart || "08:00");
 
   if (checkInMinutes === null || scheduledMinutes === null) return "present";
-  if (checkInMinutes > (scheduledMinutes + 5)) return "late";
+
+  // Find the scheduled-start instance (same day or next day) closest to the
+  // check-in. Handles night shifts and the edge where an employee clocks in
+  // just before the scheduled start (e.g. 23:50 for a 00:00 start → early).
+  const candidates = [scheduledMinutes, scheduledMinutes + 1440];
+  let startInstance = scheduledMinutes;
+  let best = Infinity;
+  for (const c of candidates) {
+    const d = Math.abs((checkInMinutes ?? 0) - c);
+    if (d < best) {
+      best = d;
+      startInstance = c;
+    }
+  }
+
+  if (checkInMinutes > startInstance + 5) return "late";
 
   return "present";
 };
@@ -83,7 +102,7 @@ export const calculateAttendanceMetrics = (
     const scheduledStart = employee?.scheduledStart || "08:00";
     const scheduledEnd = employee?.scheduledEnd || "16:00";
 
-    const status = getStatus(daily?.checkIn, scheduledStart);
+    const status = getStatus(daily?.checkIn, scheduledStart, scheduledEnd);
     counts[status] += 1;
 
     const checkInMinutes = toMinutes(daily?.checkIn);
@@ -91,19 +110,23 @@ export const calculateAttendanceMetrics = (
     if (
       checkInMinutes !== null &&
       scheduledStartMinutes !== null &&
-      checkInMinutes > (scheduledStartMinutes + 5)
+      checkInMinutes > scheduledStartMinutes + 5 &&
+      checkInMinutes <= scheduledStartMinutes + 1440
     ) {
       totalLateMinutes += Math.max(0, checkInMinutes - scheduledStartMinutes);
     }
 
     const checkOutMinutes = toMinutes(daily?.checkOut);
     const scheduledEndMinutes = toMinutes(scheduledEnd);
+    const isNightShift = scheduledEndMinutes !== null && scheduledEndMinutes <= scheduledStartMinutes!;
     if (
       checkOutMinutes !== null &&
-      scheduledEndMinutes !== null &&
-      checkOutMinutes > scheduledEndMinutes
+      scheduledEndMinutes !== null
     ) {
-      totalOvertimeMinutes += Math.max(0, checkOutMinutes - scheduledEndMinutes);
+      const endEff = isNightShift ? scheduledEndMinutes + 1440 : scheduledEndMinutes;
+      if (checkOutMinutes > endEff) {
+        totalOvertimeMinutes += Math.max(0, checkOutMinutes - endEff);
+      }
     }
   }
 

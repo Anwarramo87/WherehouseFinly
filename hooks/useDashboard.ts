@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 
 import type { DashboardKpis } from "@/types/dashboard";
@@ -65,7 +65,10 @@ export const useDashboard = () => {
       const response = await apiClient.get("/dashboard/home");
       return response.data ?? null;
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
     retry: 1,
   });
 

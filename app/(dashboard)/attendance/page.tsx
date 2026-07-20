@@ -122,6 +122,9 @@ export default function AttendancePage() {
   }>({ isOpen: false, row: null, field: null, value: "" });
 
   useEffect(() => {
+    // Intentional one-time client mount flag for SSR/hydration-safe rendering.
+    // This is the canonical pattern (runs once); not a cascading setState.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

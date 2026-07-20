@@ -23,7 +23,7 @@ export const queryKeys = {
   salaries: {
     all: ["salaries"] as const,
     list: () => [...queryKeys.salaries.all, "list"] as const,
-    detail: (employeeId: string) => ["salary", employeeId] as const,
+    detail: (employeeId: string) => [...queryKeys.salaries.all, "detail", employeeId] as const,
   },
   advances: {
     all: ["advances"] as const,
@@ -41,7 +41,7 @@ export const queryKeys = {
   },
   buses: {
     all: ["buses"] as const,
-    detail: (busId: string) => ["bus", busId] as const,
+    detail: (busId: string) => [...queryKeys.buses.all, "detail", busId] as const,
   },
   discounts: {
     all: ["discounts"] as const,

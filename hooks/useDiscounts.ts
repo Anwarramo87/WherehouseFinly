@@ -153,6 +153,9 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       toast.success("تم تحديث الخصم بنجاح");
     },
     onError: (error: unknown) => {
@@ -167,6 +170,9 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       toast.success("تم نقل الخصم إلى سلة المهملات");
     },
     onError: (error: unknown) => {

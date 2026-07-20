@@ -179,7 +179,7 @@ const toDailyRecords = (
 
 export const useAttendance = (params?: AttendanceQueryParams) => {
   const queryClient = useQueryClient();
-  const fallbackToday = useMemo(toLocalDateString, []);
+  const fallbackToday = useMemo(() => toLocalDateString(), []);
   // نسمح بـ limit أكبر عند جلب بيانات شهرية لعدة موظفين
   // الـ pagination الآلي في queryFn يكفل جلب كل الصفحات تلقائياً
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 500);
@@ -358,12 +358,15 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       return await apiClient.post("/attendance", cleanPayload);
     },
     onSuccess: (_data, variables) => {
-      // نُلغي فقط اليوم المتأثر بدل كل attendance queries
       const date = variables.timestamp?.slice(0, 10);
       if (date) {
         queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
+      // exact:false so the real attendance list key (["attendance", empId, ...]) is matched
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
     },
   });
 
@@ -386,7 +389,10 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       if (date) {
         queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
     },
   });
 
@@ -575,10 +581,12 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
       toast.error(message);
     },
     onSettled: (_data, _error, variables) => {
-      // نُلغي فقط daily-view لليوم المتأثر + قائمة الحضور الأساسية
       const date = variables?.date || toLocalDateString();
       queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dailyView(date) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: true });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
     },
   });
 
