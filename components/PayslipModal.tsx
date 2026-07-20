@@ -34,6 +34,7 @@ interface AggregatedPayroll {
   variableDeductions: number;
   totalEarlyLeaveMinutes?: number;
   earlyLeaveDeduction?: number;
+  busDeduction?: number;
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];
@@ -303,6 +304,21 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
                     </span>
                     <span className="text-xl font-black text-rose-600 font-mono print:text-black">
                       -{payslip.variableDeductions.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Bus deduction — shown in blue whenever it applies,
+                  independent of ordinary (advance/penalty) deductions */}
+              {(payslip.busDeduction ?? 0) > 0 && (
+                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200 shadow-sm print:shadow-none print:border-slate-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-blue-700 print:text-black">
+                      🚌 خصم اشتراك الباص
+                    </span>
+                    <span className="text-lg font-black text-blue-600 font-mono print:text-black">
+                      -{(payslip.busDeduction ?? 0).toLocaleString()} ل.س
                     </span>
                   </div>
                 </div>

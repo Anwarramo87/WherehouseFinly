@@ -198,6 +198,28 @@ export default function TransportationClient() {
     };
   }, [safeBuses]);
 
+  // Prorated current-month bus deduction for a passenger, matching the payroll
+  // calculation (baseShare / 26 working days × actual remaining working days).
+  const proratedBusShare = (subscriptionDate?: string): number => {
+    if (!subscriptionDate || baseShare <= 0) return baseShare;
+    const sub = new Date(subscriptionDate);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const subYear = sub.getFullYear();
+    const subMonth = sub.getMonth();
+    // subscription in a future month → 0; past month → full share
+    if (subYear > y || (subYear === y && subMonth > m)) return 0;
+    if (subYear < y || (subYear === y && subMonth < m)) return baseShare;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    let workingDays = 0;
+    for (let d = sub.getDate(); d <= lastDay; d++) {
+      const dow = new Date(y, m, d).getDay();
+      if (dow !== 5 && dow !== 6) workingDays++;
+    }
+    return Math.round((baseShare / 26) * Math.min(26, workingDays) * 100) / 100;
+  };
+
   const handleDeleteBus = async (busId: string, route: string) => {
     if (
       !confirm(
@@ -543,7 +565,7 @@ export default function TransportationClient() {
                                   تاريخ الاشتراك
                                 </th>
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-28 tracking-wider">
-                                  قيمة الاشتراك
+                                  قيمة الاشتراك (الشهر الحالي)
                                 </th>
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">
                                   إجراء
@@ -581,7 +603,7 @@ export default function TransportationClient() {
                                     </td>
                                     <td className="p-3 text-center">
                                       <span className="inline-block bg-[#C89355]/10 text-[#C89355] font-black font-mono text-xs px-2.5 py-1 rounded-lg border border-[#C89355]/20">
-                                        {baseShare > 0 ? baseShare.toLocaleString() : "—"}
+                                        {baseShare > 0 ? proratedBusShare(p.subscriptionDate).toLocaleString() : "—"}
                                         {baseShare > 0 && <span className="text-[9px] mr-1 opacity-70">ل.س</span>}
                                       </span>
                                     </td>

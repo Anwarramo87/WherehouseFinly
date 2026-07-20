@@ -89,6 +89,8 @@ const buildDefaultForm = () => ({
   isPaid: true,
   startTime: "08:00",
   endTime: "10:00",
+  /** معامل الراتب لإجازة "أخرى": "1" = عادي، "2" = ضرب 2 */
+  otherMultiplier: "1" as "1" | "2",
 });
 
 function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
@@ -200,6 +202,10 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
       isPaid: currentConfig.isPaidLocked ? currentConfig.isPaidDefault : form.isPaid,
       reason,
       status: "APPROVED",
+      // معامل الراتب لإجازة "أخرى" — يُخزَّن في notes بصيغة __multiplier:N
+      ...(form.leaveTypeLabel === "أخرى"
+        ? { notes: `__multiplier:${form.otherMultiplier}` }
+        : {}),
       ...(isHourlyLeave
         ? {
             isHourly: true,
@@ -613,17 +619,64 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
 
             {/* ── سبب الإجازة (عند اختيار "أخرى") ── */}
             {form.leaveTypeLabel === "أخرى" && (
-              <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
-                  السبب بالتفصيل
-                </label>
-                <textarea
-                  required
-                  placeholder="يرجى كتابة سبب الإجازة هنا..."
-                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-24 resize-none text-sm"
-                  value={form.customReason}
-                  onChange={(e) => setForm({ ...form, customReason: e.target.value })}
-                />
+              <div className="animate-in fade-in slide-in-from-top-4 duration-300 space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                    السبب بالتفصيل
+                  </label>
+                  <textarea
+                    required
+                    placeholder="يرجى كتابة سبب الإجازة هنا..."
+                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:border-[#C89355] outline-none text-white font-bold shadow-inner min-h-24 resize-none text-sm"
+                    value={form.customReason}
+                    onChange={(e) => setForm({ ...form, customReason: e.target.value })}
+                  />
+                </div>
+
+                {/* ── طريقة احتساب الراتب ── */}
+                <div>
+                  <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
+                    طريقة احتساب الراتب
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, otherMultiplier: "1" })}
+                      className={`p-3 rounded-2xl border-2 font-black text-sm transition-all text-right ${
+                        form.otherMultiplier === "1"
+                          ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/60 shadow-md"
+                          : "bg-[#0f1720] text-slate-500 border-[#263544] hover:border-[#C89355]/30"
+                      }`}
+                    >
+                      <span className="block text-base mb-1">حساب عادي</span>
+                      <span className="block text-[10px] font-bold text-slate-400 leading-relaxed">
+                        الراتب بالساعات الفعلية × 1 (بدون تأخير أو خروج مبكر)
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, otherMultiplier: "2" })}
+                      className={`p-3 rounded-2xl border-2 font-black text-sm transition-all text-right ${
+                        form.otherMultiplier === "2"
+                          ? "bg-[#1a2530] text-[#C89355] border-[#C89355]/60 shadow-md"
+                          : "bg-[#0f1720] text-slate-500 border-[#263544] hover:border-[#C89355]/30"
+                      }`}
+                    >
+                      <span className="block text-base mb-1">ضرب 2</span>
+                      <span className="block text-[10px] font-bold text-slate-400 leading-relaxed">
+                        الراتب بالساعات الفعلية × 2 (مثل أجر يوم الجمعة)
+                      </span>
+                    </button>
+                  </div>
+                  {/* ملاحظة توضيحية */}
+                  <div className="mt-3 flex items-start gap-2 bg-[#1a2530]/60 border border-[#263544] rounded-xl px-3 py-2.5">
+                    <Info size={14} className="text-[#C89355] mt-0.5 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed">
+                      إجازة &quot;أخرى&quot; لا تُحاسب على التأخير أو الخروج المبكر بغض النظر عن الخيار.
+                      {form.otherMultiplier === "2" && " الخيار × 2 يضاعف الراتب كأيام العطل الرسمية."}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
