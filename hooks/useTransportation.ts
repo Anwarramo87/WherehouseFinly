@@ -32,6 +32,8 @@ export interface PassengerResponse {
   paidAmount?: number;
   isManual?: boolean;
   joinDate?: string;
+  subscriptionDate?: string;
+  terminationDate?: string;
   status?: string;
   employeeStatus?: string;
 }

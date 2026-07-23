@@ -32,6 +32,9 @@ type EmployeeWithExtendedFields = Employee & {
   baseSalary?: number | string | { $numberDecimal: string } | null;
   lumpSumSalary?: number | string | { $numberDecimal: string } | null;
   livingAllowance?: number | string | { $numberDecimal: string } | null;
+  transportAllowance?: number | string | { $numberDecimal: string } | null;
+  transportAllowanceOverride?: number | string | { $numberDecimal: string } | null;
+  insuranceAmount?: number | string | { $numberDecimal: string } | null;
 };
 
 const asText = (value: unknown) => {
@@ -72,6 +75,8 @@ export type AddEmployeeFormData = {
   baseSalary: string;
   lumpSumSalary: string;
   livingAllowance: string;
+  transportAllowance: string;
+  insuranceAmount: string;
   scheduledStart: string;
   scheduledEnd: string;
   roleId: string;
@@ -100,6 +105,8 @@ const defaultFormState = {
   baseSalary: "",
   lumpSumSalary: "",
   livingAllowance: "",
+  transportAllowance: "",
+  insuranceAmount: "",
   scheduledStart: "08:00",
   scheduledEnd: "16:00",
   roleId: "",
@@ -146,6 +153,8 @@ export default function AddEmployeeModal({
           baseSalary: formatNumberWithCommas(asText(employee.baseSalary || "")),
           lumpSumSalary: asText(employee.lumpSumSalary || ""),
           livingAllowance: formatNumberWithCommas(asText(employee.livingAllowance || "")),
+          transportAllowance: formatNumberWithCommas(asText((employee.transportAllowanceOverride ?? employee.transportAllowance) || "")),
+          insuranceAmount: formatNumberWithCommas(asText(employee.insuranceAmount || "")),
           scheduledStart: employee.scheduledStart || "08:00",
           scheduledEnd: employee.scheduledEnd || "16:00",
           roleId: employee.roleId || "",
@@ -213,6 +222,14 @@ export default function AddEmployeeModal({
 
   const resolvedRoleId = formData.roleId || roleOptions[0]?.id || "";
 
+  const liveTotalSalary = useCallback(() => {
+    const base = Number(removeCommas(formData.baseSalary) || 0);
+    const living = Number(removeCommas(formData.livingAllowance) || 0);
+    const transport = Number(removeCommas(formData.transportAllowance) || 0);
+    const insurance = Number(removeCommas(formData.insuranceAmount) || 0);
+    return base + living + transport - insurance;
+  }, [formData.baseSalary, formData.livingAllowance, formData.transportAllowance, formData.insuranceAmount]);
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (idError) {
@@ -264,6 +281,8 @@ export default function AddEmployeeModal({
         roleId: resolvedRoleId,
         baseSalary: removeCommas(formData.baseSalary),
         livingAllowance: removeCommas(formData.livingAllowance),
+        transportAllowance: removeCommas(formData.transportAllowance),
+        insuranceAmount: removeCommas(formData.insuranceAmount),
         lumpSumSalary: "0",
       };
 
@@ -604,11 +623,72 @@ export default function AddEmployeeModal({
                       }
                     />
                   </div>
+
+                  <div>
+                    <label
+                      htmlFor="transportAllowance"
+                      className="block text-xs font-bold text-[#C89355] mb-2"
+                    >
+                      بدل المواصلات (ل.س)
+                    </label>
+                    <input
+                      id="transportAllowance"
+                      type="text"
+                      placeholder="0"
+                      className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      dir="ltr"
+                      value={formData.transportAllowance}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          transportAllowance: formatNumberWithCommas(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div>
+                    <label
+                      htmlFor="insuranceAmount"
+                      className="block text-xs font-bold text-rose-400 mb-2"
+                    >
+                      التأمينات — خصم شهري (ل.س)
+                    </label>
+                    <input
+                      id="insuranceAmount"
+                      type="text"
+                      placeholder="0"
+                      className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 outline-none transition-all text-rose-400 font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      dir="ltr"
+                      value={formData.insuranceAmount}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          insuranceAmount: formatNumberWithCommas(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-500 mt-4 font-semibold">
                   💡 يمكنك ترك الحقول فارغة إذا لم تكن مطلوبة (سيتم حفظها كقيمة 0)
                 </p>
+              </div>
+
+              <div className="bg-[#1a2530] border border-[#263544] p-5 rounded-2xl flex justify-between items-center shadow-inner md:col-span-2">
+                <div>
+                  <span className="text-xs font-black text-slate-400">الراتب الإجمالي</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + غلاء المعيشة + المواصلات − التأمينات</p>
+                </div>
+                <span className="text-2xl font-mono font-black text-[#C89355]">
+                  {(() => {
+                    const t = liveTotalSalary();
+                    return t > 0 ? t.toLocaleString() : "—";
+                  })()} <span className="text-xs text-slate-500">ل.س</span>
+                </span>
               </div>
 
               <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-6 shadow-inner">

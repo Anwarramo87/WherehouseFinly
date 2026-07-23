@@ -234,6 +234,18 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
           "$numberDecimal" in newEmployee.livingAllowance
             ? Number((newEmployee.livingAllowance as { $numberDecimal: string }).$numberDecimal)
             : newEmployee.livingAllowance,
+        transportAllowance:
+          typeof newEmployee.transportAllowance === "object" &&
+          newEmployee.transportAllowance &&
+          "$numberDecimal" in newEmployee.transportAllowance
+            ? Number((newEmployee.transportAllowance as { $numberDecimal: string }).$numberDecimal)
+            : newEmployee.transportAllowance,
+        insuranceAmount:
+          typeof newEmployee.insuranceAmount === "object" &&
+          newEmployee.insuranceAmount &&
+          "$numberDecimal" in newEmployee.insuranceAmount
+            ? Number((newEmployee.insuranceAmount as { $numberDecimal: string }).$numberDecimal)
+            : newEmployee.insuranceAmount,
         roleId: newEmployee.roleId,
         scheduledStart: newEmployee.scheduledStart,
         scheduledEnd: newEmployee.scheduledEnd,

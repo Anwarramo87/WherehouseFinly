@@ -34,17 +34,21 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "localhost", port: "3000", pathname: "/**" },
     ],
     formats: ["image/webp", "image/avif"],
+    minimumCacheTTL: 31536000,
   },
 
   // تحسينات المترجم
   compiler: {
-    removeConsole: isProduction,
+    removeConsole: isProduction ? { exclude: ["error", "warn"] } : false,
   },
 
   // silence workspace-root detection warning caused by multiple lockfiles
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   outputFileTracingRoot: require("path").join(__dirname),
 
+  // Modern JavaScript target - removes legacy polyfills
+  transpilePackages: [],
+  
   // تحسين أداء بيئة التطوير وتقليل استهلاك الـ RAM
   experimental: {
     optimizePackageImports: [
@@ -60,6 +64,8 @@ const nextConfig: NextConfig = {
     optimizeServerReact: true,
     // Reduce dev overlay overhead
     webVitalsAttribution: ["CLS", "LCP"],
+    // Enable CSS optimization
+    optimizeCss: isProduction,
   },
 
   // تحسينات Webpack لبيئة الإنتاج

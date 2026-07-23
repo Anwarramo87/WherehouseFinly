@@ -37,8 +37,8 @@ export const useDepartments = () => {
     mutationFn: async (payload: { name: string; manager?: string; date?: string }) => {
       return await api.post("/departments", {
         name: payload.name,
-        ...(payload.manager !== undefined && { manager: payload.manager }),
-        ...(payload.date !== undefined && payload.date !== "" && { establishedAt: payload.date }),
+        ...(payload.manager != null && payload.manager !== "" && { manager: payload.manager }),
+        ...(payload.date != null && payload.date !== "" && { establishedAt: payload.date }),
       });
     },
     onSuccess: async () => {
@@ -52,8 +52,8 @@ export const useDepartments = () => {
     mutationFn: async ({ id, name, manager, date }: { id: string; name: string; manager?: string; date?: string }) => {
       return await api.put(`/departments/${id}`, {
         name,
-        ...(manager !== undefined && { manager }),
-        ...(date !== undefined && date !== "" && { establishedAt: date }),
+        ...(manager !== undefined && { manager: manager || null }),
+        ...(date != null && date !== "" && { establishedAt: date }),
       });
     },
     onSuccess: async () => {
@@ -72,11 +72,22 @@ export const useDepartments = () => {
     },
   });
 
+  const clearSupervisorMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await api.patch(`/departments/${id}/supervisor`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
+      router.refresh();
+    },
+  });
+
   return {
     ...listQuery,
     createDepartment: createMutation,
     updateDepartment: updateMutation,
     deleteDepartment: deleteMutation,
+    clearSupervisor: clearSupervisorMutation,
   } as const;
 };
 

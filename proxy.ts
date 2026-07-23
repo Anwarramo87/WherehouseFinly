@@ -38,9 +38,9 @@ function buildCspHeader(nonce: string): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    isProduction
-      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
-      : `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`,
+    // Note: Next.js requires 'unsafe-inline' for inline scripts in production
+    // 'unsafe-eval' is needed for some Next.js features
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
@@ -319,7 +319,7 @@ export async function proxy(request: NextRequest) {
 
   const pathname = normalizePathname(request.nextUrl.pathname);
 
-  // Skip auth checks for login page and API routes
+  // Skip auth checks for login page, API routes, and static assets
   if (pathname === "/login" || pathname.startsWith("/api/")) {
     return makeNextResponse(request, nonce, requestHeaders);
   }

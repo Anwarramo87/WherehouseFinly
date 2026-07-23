@@ -67,6 +67,9 @@ type ModalInitialEmployee = Employee & {
   baseSalary?: number | string | null;
   lumpSumSalary?: number | string | null;
   livingAllowance?: number | string | null;
+  transportAllowance?: number | string | null;
+  transportAllowanceOverride?: number | string | null;
+  insuranceAmount?: number | string | null;
 };
 
 const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<string, Salary>) => {
@@ -74,12 +77,13 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
   if (salaryRecord) {
     const fixedTotal =
       toNumber(salaryRecord.baseSalary) +
-      (toNumber(salaryRecord.livingAllowance) || 0);
+      (toNumber(salaryRecord.livingAllowance) || 0) +
+      (toNumber(salaryRecord.transportAllowance) || 0) -
+      (toNumber(salaryRecord.insuranceAmount) || 0);
 
     if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
 
-    // Fallback: compute from g3 = baseSalary + livingAllowance
-    const g3 = (toNumber(salaryRecord.baseSalary) || 0) + (toNumber(salaryRecord.livingAllowance) || 0);
+    const g3 = (toNumber(salaryRecord.baseSalary) || 0) + (toNumber(salaryRecord.livingAllowance) || 0) + (toNumber(salaryRecord.transportAllowance) || 0) - (toNumber(salaryRecord.insuranceAmount) || 0);
     if (g3 > 0) {
       return g3;
     }
@@ -228,6 +232,14 @@ export default function EmployeesPage() {
 
     if (formData.lumpSumSalary !== "") {
       payload.lumpSumSalary = toNumber(formData.lumpSumSalary);
+    }
+
+    if (formData.transportAllowance !== "") {
+      payload.transportAllowance = toNumber(formData.transportAllowance);
+    }
+
+    if (formData.insuranceAmount !== "") {
+      payload.insuranceAmount = toNumber(formData.insuranceAmount);
     }
 
     if (!selectedEmployee) {

@@ -42,24 +42,39 @@ const safeToNumber = (v: unknown): number => {
 };
 
 /**
- * حساب الراتب الشهري الكامل للموظف من مكونات الراتب
+ * حساب الراتب الإجمالي الفعلي (effectiveGrossSalary):
+ *   baseSalary + livingAllowance + transportAllowance(Override) − insuranceAmount
  * يستخدم سجل salary إن وُجد، وإلا يرجع للـ baseSalary/hourlyRate على الموظف
  */
-const calcGrossSalary = (
+const calcEffectiveGross = (
   emp: { baseSalary?: unknown; hourlyRate?: unknown },
-  salaryRecord: Salary | undefined
-): number => {
+  salaryRecord: Salary | undefined,
+  manualInput: { transportAllowanceOverride?: number; insuranceAmount?: number } | null,
+): { effectiveGross: number; baseSalary: number; livingAllowance: number; transportAllowance: number; insuranceAmount: number } => {
   if (salaryRecord) {
-    const gross =
-      safeToNumber(salaryRecord.baseSalary) +
-      (safeToNumber(salaryRecord.livingAllowance) || 0);
-    if (gross > 0) return gross;
+    const baseSalary        = Number(salaryRecord.baseSalary)        || 0;
+    const livingAllowance   = Number(salaryRecord.livingAllowance)   || 0;
+    const transportAllowance = Number(salaryRecord.transportAllowance) || 0;
+    const insuranceAmount   = Number(salaryRecord.insuranceAmount)   || 0;
+
+    const transportOverride = manualInput?.transportAllowanceOverride != null
+      ? Number(manualInput.transportAllowanceOverride) || 0
+      : undefined;
+    const insuranceOverride = manualInput?.insuranceAmount != null
+      ? Number(manualInput.insuranceAmount) || 0
+      : undefined;
+
+    const transport = transportOverride ?? transportAllowance;
+    const insurance = insuranceOverride ?? insuranceAmount;
+
+    const effectiveGross = Math.max(0, baseSalary + livingAllowance + transport - insurance);
+    return { effectiveGross, baseSalary, livingAllowance, transportAllowance: transport, insuranceAmount: insurance };
   }
 
   const hourlyLike = safeToNumber(emp.hourlyRate);
   const baseLike = safeToNumber(emp.baseSalary);
   const base = baseLike || hourlyLike * HOURS_PER_DAY * STANDARD_WORK_DAYS;
-  return base;
+  return { effectiveGross: base, baseSalary: base, livingAllowance: 0, transportAllowance: 0, insuranceAmount: 0 };
 };
 
 /**
@@ -449,42 +464,47 @@ export default function TimeTablePage() {
         ? (manualInput.overtimeWeekendDays ?? 0)
         : autoWeekendDays;
 
-      // الراتب الكامل
+      // الراتب الإجمالي الفعلي (base + معيشة + مواصلات − تأمينات)
       const salaryRec = salaryMap.get(emp.employeeId);
-      const grossSalary = calcGrossSalary(emp, salaryRec);
+      const { effectiveGross, baseSalary, livingAllowance, transportAllowance, insuranceAmount } =
+        calcEffectiveGross(emp, salaryRec, manualInput ?? null);
 
-      // قيمة التأمينات الشهرية (خصم ثابت)
-      const insuranceAmount = salaryRec ? safeToNumber(salaryRec.insuranceAmount) : 0;
-
-      // الراتب المستحق على أساس الساعات الفعلية (نموذج بالساعات).
-      // workedMinutes (أجر كامل) + sickRemainderMinutes (نصف أجر) من الباك إند،
-      // وأيام الإجازة الكاملة (مرضية بنصف/مدفوعة كاملة) كما سابقاً.
+      // أسعار اليوم والدقيقة مبنية على effectiveGrossSalary
       const workDaysInPeriod = emp.workDaysInPeriod ?? STANDARD_WORK_DAYS;
       const hoursPerDayEmp = emp.hoursPerDay ?? HOURS_PER_DAY;
+      const dailyRate  = workDaysInPeriod > 0 ? effectiveGross / workDaysInPeriod : 0;
+      const minuteRate = hoursPerDayEmp > 0 ? dailyRate / (hoursPerDayEmp * 60) : 0;
+
+      // الراتب المستحق على أساس الساعات الفعلية
       const workedMinutes = autoInput?.workedMinutes ?? 0;
       const sickRemainderMinutes = autoInput?.sickRemainderMinutes ?? 0;
-      const rawEarned = grossSalary > 0
-        ? calcEarnedSalaryHourly(
-            grossSalary,
+      const earnedSalary = effectiveGross > 0
+        ? Math.max(0, calcEarnedSalaryHourly(
+            effectiveGross,
             workDaysInPeriod,
             hoursPerDayEmp,
             workedMinutes,
             sickRemainderMinutes,
-            // أيام مرضية كاملة (بلا حضور) من الباك إند — يوم منتصف له حضور
-            // يُعامَل عبر sickRemainderMinutes فلا نضاعفه هنا.
             autoInput?.sickLeaveDays ?? sickLeaveDays,
-            paidLeaveDays,        // أيام مدفوعة 100% (إدارية/وفاة/PAID)
+            paidLeaveDays,
             totalOvertimeMinutes,
             lateMinutes,
             manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,
             totalOvertimeDays,
-          )
+          ))
         : null;
 
-      // طرح التأمينات من الراتب المستحق
-      const earnedSalary = rawEarned !== null
-        ? Math.max(0, rawEarned - insuranceAmount)
-        : null;
+      // eslint-disable-next-line no-console
+      console.log(`[Salary Debug - ${emp.name || emp.employeeId}]:`, {
+        baseSalary,
+        livingAllowance,
+        transportAllowance,
+        insuranceAmount,
+        effectiveGross,
+        dailyRate,
+        minuteRate,
+        earnedSalary,
+      });
 
       return {
         ...emp,
@@ -495,9 +515,12 @@ export default function TimeTablePage() {
         totalEarlyLeaveMinutes,
         totalOvertimeMinutes,
         totalOvertimeDays,
-        grossSalary,
+        grossSalary: effectiveGross,
         earnedSalary,
         insuranceAmount,
+        baseSalary,
+        livingAllowance,
+        transportAllowance,
         // بيانات الإجازات للعرض في الجدول — من leaves API
         leaveTypes: leaveData?.leaveTypes ?? [],
         paidLeaveDays,
@@ -801,7 +824,10 @@ export default function TimeTablePage() {
                               {Math.round(record.earnedSalary).toLocaleString()} ل.س
                             </span>
                             {record.earnedSalary < record.grossSalary && (
-                              <span className="text-[10px] text-slate-400 font-bold">
+                              <span
+                                className="text-[10px] text-slate-400 font-bold cursor-help"
+                                title={`تفاصيل الإجمالي: أساسي (${Number(record.baseSalary || 0).toLocaleString()}) + معيشة (${Number(record.livingAllowance || 0).toLocaleString()}) + مواصلات (${Number(record.transportAllowance || 0).toLocaleString()}) - تأمينات (${Number(record.insuranceAmount || 0).toLocaleString()}) = ${Math.round(record.grossSalary).toLocaleString()}`}
+                              >
                                 من {Math.round(record.grossSalary).toLocaleString()}
                               </span>
                             )}

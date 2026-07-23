@@ -150,6 +150,9 @@ export default function DashboardPage() {
   const userPermissions = useAuthStore((state) => state.user?.permissions);
   const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
+  
+  // Call useDepartments early so updateDepartment is available
+  const { data: deptsData, updateDepartment, clearSupervisor } = useDepartments();
 
   // Show skeleton only while dashboard KPIs are loading — not waiting for employees list
   const isSkeleton = isDashboardLoading;
@@ -229,6 +232,25 @@ export default function DashboardPage() {
     setDeptMenuOpen(null);
     setIsDeptModalOpen(true);
   }, []);
+
+  const handleRemoveSupervisor = useCallback(
+    async (dept: DepartmentData) => {
+      if (!dept.id || !dept.manager) return;
+      if (!window.confirm(`هل أنت متأكد من إزالة المشرف من قسم "${dept.name}"؟`)) return;
+      
+      setIsDeletingDept(dept.id); // Reuse loading state
+      try {
+        await clearSupervisor.mutateAsync(dept.id);
+      } catch (err) {
+        console.error("Error removing supervisor:", err);
+        alert("حدث خطأ أثناء إزالة المشرف");
+      } finally {
+        setIsDeletingDept(null);
+        setDeptMenuOpen(null);
+      }
+    },
+    [clearSupervisor],
+  );
 
   const monthKey = useMemo(() => {
     const now = new Date();
@@ -366,8 +388,6 @@ export default function DashboardPage() {
       )
       .filter((item): item is BonusDisplay => Boolean(item));
   }, [bonusesData, employeeListMemo, resignedIds]);
-
-  const { data: deptsData } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
@@ -739,6 +759,16 @@ export default function DashboardPage() {
                               <Pencil size={14} className="text-[#C89355]" />
                               تعديل
                             </button>
+                            {dept.manager && (
+                              <button
+                                onClick={() => handleRemoveSupervisor(dept)}
+                                disabled={isDeletingDept === dept.id}
+                                className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                              >
+                                <UserCog size={14} className="text-orange-500" />
+                                {isDeletingDept === dept.id ? "جارٍ الإزالة..." : "إزالة المشرف"}
+                              </button>
+                            )}
                             {dept.count === 0 && (
                               <button
                                 onClick={() => {
