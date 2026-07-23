@@ -800,11 +800,32 @@ export default function ImportPage() {
                       className="rounded-2xl border border-white/80 bg-white/70 backdrop-blur-sm p-4 shadow-sm hover:shadow-md hover:border-[#C89355]/40 transition-all group/file"
                     >
                       <p className="text-xs font-black text-[#263544] break-all mb-1 group-hover/file:text-[#C89355] transition-colors">{item.originalName || item.storedName || "-"}</p>
-                      <p className="text-[10px] font-mono text-slate-500 bg-white/80 px-2 py-1 rounded truncate border border-slate-100 shadow-inner">{item.path || "-"}</p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-black text-[#263544] bg-[#263544]/10 px-2 py-1 rounded-md">{formatBytes(item.size)}</span>
                         <span className="text-[10px] font-black text-[#C89355] bg-[#C89355]/10 px-2 py-1 rounded-md uppercase border border-[#C89355]/20">{item.extension || "-"}</span>
                         <span className="text-[10px] font-bold text-slate-400 mr-auto">{formatDateTime(item.uploadedAt)}</span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        {item.id && (
+                          <>
+                            <a
+                              href={`/api/files/${item.id}/preview`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#1a2530] bg-[#C89355]/10 hover:bg-[#C89355]/20 px-3 py-1.5 rounded-xl border border-[#C89355]/20 transition-all"
+                            >
+                              <Eye size={12} />
+                              معاينة
+                            </a>
+                            <a
+                              href={`/api/files/${item.id}/download`}
+                              className="inline-flex items-center gap-1.5 text-[10px] font-black text-white bg-[#1a2530] hover:bg-[#263544] px-3 py-1.5 rounded-xl border border-[#C89355]/30 transition-all"
+                            >
+                              <Download size={12} />
+                              تحميل
+                            </a>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
