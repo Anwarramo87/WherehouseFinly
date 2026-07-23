@@ -237,12 +237,12 @@ export default function DashboardPage() {
       
       setIsDeletingDept(dept.id); // Reuse loading state
       try {
-        await apiClient.put(`/departments/${dept.id}`, {
+        await updateDepartment.mutateAsync({
+          id: dept.id,
           name: dept.name,
           manager: "", // Clear the manager
-          ...(dept.establishedAt && { establishedAt: dept.establishedAt }),
+          date: dept.establishedAt,
         });
-        queryClient.invalidateQueries({ queryKey: ["departments"] });
       } catch (err) {
         console.error("Error removing supervisor:", err);
         alert("حدث خطأ أثناء إزالة المشرف");
@@ -251,7 +251,7 @@ export default function DashboardPage() {
         setDeptMenuOpen(null);
       }
     },
-    [queryClient],
+    [updateDepartment],
   );
 
   const monthKey = useMemo(() => {
@@ -391,7 +391,7 @@ export default function DashboardPage() {
       .filter((item): item is BonusDisplay => Boolean(item));
   }, [bonusesData, employeeListMemo, resignedIds]);
 
-  const { data: deptsData } = useDepartments();
+  const { data: deptsData, updateDepartment } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
