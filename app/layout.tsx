@@ -16,6 +16,13 @@ try {
 export const metadata: Metadata = {
   title: "نظام إدارة المصنع",
   description: "نظام متكامل لإدارة الموظفين والرواتب والمخزون",
+  manifest: "/manifest.json",
+  themeColor: "#0070f3",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "نظام إدارة المصنع",
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,6 +38,8 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
+        {/* Theme color for address bar */}
+        <meta name="theme-color" content="#0070f3" />
         {/* Preconnect to backend to reduce TTFB on first API call */}
         {backendOrigin && (
           <link rel="preconnect" href={backendOrigin} crossOrigin="anonymous" />

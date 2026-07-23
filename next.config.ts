@@ -45,6 +45,9 @@ const nextConfig: NextConfig = {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   outputFileTracingRoot: require("path").join(__dirname),
 
+  // Modern JavaScript target - removes legacy polyfills
+  transpilePackages: [],
+  
   // تحسين أداء بيئة التطوير وتقليل استهلاك الـ RAM
   experimental: {
     optimizePackageImports: [
