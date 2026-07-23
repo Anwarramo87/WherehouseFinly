@@ -39,8 +39,8 @@ function buildCspHeader(nonce: string): string {
     "frame-ancestors 'none'",
     "object-src 'none'",
     isProduction
-      ? `script-src 'self' 'unsafe-inline'`
-      : `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`,
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
+      : `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
