@@ -78,5 +78,24 @@ export const useEmployeePunches = (employeeId: string, date: string) => {
     onError: (e) => toast.error(getApiErrorMessage(e, "فشل حذف البصمة")),
   });
 
-  return { ...query, addPunch, deletePunch };
+  const updatePunch = useMutation({
+    mutationFn: async ({ recordId, type, hhmm }: { recordId: string; type: "IN" | "OUT"; hhmm: string }) => {
+      await apiClient.put(`/attendance/${recordId}`, {
+        type,
+        timestamp: buildTimestamp(date, hhmm),
+      });
+    },
+    onSuccess: () => {
+      toast.success("تم تعديل البصمة");
+      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
+    },
+    onError: (e) => toast.error(getApiErrorMessage(e, "فشل تعديل البصمة")),
+  });
+
+  return { ...query, addPunch, deletePunch, updatePunch };
 };

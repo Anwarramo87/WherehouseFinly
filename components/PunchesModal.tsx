@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, LogIn, LogOut, Plus, Trash2, Loader2, Fingerprint, Clock } from "lucide-react";
+import { X, LogIn, LogOut, Plus, Trash2, Loader2, Fingerprint, Clock, Pencil, Check } from "lucide-react";
 import { useEmployeePunches } from "@/hooks/useEmployeePunches";
 
 interface Props {
@@ -29,10 +29,13 @@ const formatDate = (date: string) => {
 };
 
 export default function PunchesModal({ employeeId, employeeName, date, onClose }: Props) {
-  const { data: punches = [], isLoading, addPunch, deletePunch } = useEmployeePunches(employeeId, date);
+  const { data: punches = [], isLoading, addPunch, deletePunch, updatePunch } = useEmployeePunches(employeeId, date);
   const [newType, setNewType] = useState<"IN" | "OUT">("IN");
   const [newTime, setNewTime] = useState("08:00");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<"IN" | "OUT">("IN");
+  const [editTime, setEditTime] = useState("08:00");
 
   const handleAdd = () => {
     addPunch.mutate({ type: newType, hhmm: newTime }, {
@@ -42,6 +45,20 @@ export default function PunchesModal({ employeeId, employeeName, date, onClose }
 
   const handleQuickPunch = (type: "IN" | "OUT", hhmm: string) => {
     addPunch.mutate({ type, hhmm });
+  };
+
+  const startEdit = (id: string, type: "IN" | "OUT", timestamp: string) => {
+    setEditingId(id);
+    setEditType(type);
+    setEditTime(toLocalHHmm(timestamp));
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingId) return;
+    updatePunch.mutate(
+      { recordId: editingId, type: editType, hhmm: editTime },
+      { onSuccess: () => setEditingId(null) }
+    );
   };
 
   // آخر بصمة مسجلة لتحديد النوع المتوقع التالي
@@ -103,36 +120,92 @@ export default function PunchesModal({ employeeId, employeeName, date, onClose }
           ) : punches.length === 0 ? (
             <p className="text-center text-slate-500 font-bold text-sm py-6">لا توجد بصمات مسجلة</p>
           ) : (
-            punches.map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between bg-[#1a2530] rounded-xl px-4 py-3 border border-white/5">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500 font-mono text-xs w-5">{i + 1}</span>
-                  <div className={`p-1.5 rounded-lg ${p.type === "IN" ? "bg-emerald-500/10" : "bg-rose-500/10"}`}>
-                    {p.type === "IN"
-                      ? <LogIn size={14} className="text-emerald-400" />
-                      : <LogOut size={14} className="text-rose-400" />}
-                  </div>
-                  <div>
-                    <span className={`text-xs font-black ${p.type === "IN" ? "text-emerald-400" : "text-rose-400"}`}>
-                      {p.type === "IN" ? "دخول" : "خروج"}
-                    </span>
-                    <p className="text-white font-mono font-black text-base">{toLocalHHmm(p.timestamp)}</p>
-                  </div>
+            punches.map((p, i) => {
+              const isEditing = editingId === p.id;
+              return (
+                <div key={p.id} className={`rounded-xl px-4 py-3 border transition-all ${isEditing ? "bg-[#C89355]/10 border-[#C89355]/30" : "bg-[#1a2530] border-white/5"}`}>
+                  {isEditing ? (
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setEditType("IN")}
+                          className={`py-2 rounded-lg text-xs font-black border transition-all flex items-center justify-center gap-1.5
+                            ${editType === "IN" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-white/5 text-slate-400 border-white/10"}`}
+                        >
+                          <LogIn size={12} /> دخول
+                        </button>
+                        <button
+                          onClick={() => setEditType("OUT")}
+                          className={`py-2 rounded-lg text-xs font-black border transition-all flex items-center justify-center gap-1.5
+                            ${editType === "OUT" ? "bg-rose-500/20 text-rose-400 border-rose-500/40" : "bg-white/5 text-slate-400 border-white/10"}`}
+                        >
+                          <LogOut size={12} /> خروج
+                        </button>
+                      </div>
+                      <input
+                        type="time"
+                        value={editTime}
+                        onChange={(e) => setEditTime(e.target.value)}
+                        className="w-full p-2 bg-[#101720] border border-white/10 rounded-lg text-white font-mono font-black text-base text-center outline-none focus:border-[#C89355]/50"
+                        dir="ltr"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={updatePunch.isPending}
+                          className="py-2 rounded-lg bg-[#C89355] text-[#101720] font-black text-xs flex items-center justify-center gap-1.5 hover:bg-[#d0b468] transition-all disabled:opacity-50"
+                        >
+                          {updatePunch.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                          حفظ
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="py-2 rounded-lg bg-white/5 text-slate-400 font-black text-xs hover:bg-white/10 transition-all border border-white/10"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-500 font-mono text-xs w-5">{i + 1}</span>
+                        <div className={`p-1.5 rounded-lg ${p.type === "IN" ? "bg-emerald-500/10" : "bg-rose-500/10"}`}>
+                          {p.type === "IN"
+                            ? <LogIn size={14} className="text-emerald-400" />
+                            : <LogOut size={14} className="text-rose-400" />}
+                        </div>
+                        <div>
+                          <span className={`text-xs font-black ${p.type === "IN" ? "text-emerald-400" : "text-rose-400"}`}>
+                            {p.type === "IN" ? "دخول" : "خروج"}
+                          </span>
+                          <p className="text-white font-mono font-black text-base">{toLocalHHmm(p.timestamp)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 bg-white/5 rounded-lg">
+                          {p.source === "device" ? "جهاز" : "يدوي"}
+                        </span>
+                        <button
+                          onClick={() => startEdit(p.id, p.type, p.timestamp)}
+                          className="p-1.5 text-slate-600 hover:text-[#C89355] hover:bg-[#C89355]/10 rounded-lg transition-all"
+                          title="تعديل البصمة"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => deletePunch.mutate(p.id)}
+                          disabled={deletePunch.isPending}
+                          className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 bg-white/5 rounded-lg">
-                    {p.source === "device" ? "جهاز" : "يدوي"}
-                  </span>
-                  <button
-                    onClick={() => deletePunch.mutate(p.id)}
-                    disabled={deletePunch.isPending}
-                    className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
