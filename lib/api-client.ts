@@ -66,6 +66,15 @@ const apiClient = axios.create({
   },
 });
 
+// Remove undefined / null / "undefined" values from query params and body so
+// axios never serializes them as the literal string "undefined" (which makes
+// the backend reject the request with a 400 validation error).
+const isEmptyParam = (value: unknown): boolean =>
+  value === undefined ||
+  value === null ||
+  (typeof value === "string" && value.trim() === "" && value !== "0") ||
+  (typeof value === "string" && value.trim().toLowerCase() === "undefined");
+
 apiClient.interceptors.request.use((config) => {
   const token = getAuthAccessToken();
   if (token) {
@@ -74,6 +83,28 @@ apiClient.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+
+  if (config.params && typeof config.params === "object") {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config.params)) {
+      if (!isEmptyParam(value)) cleaned[key] = value;
+    }
+    config.params = cleaned;
+  }
+
+  if (
+    config.data &&
+    typeof config.data === "object" &&
+    !(config.data instanceof FormData) &&
+    !Array.isArray(config.data)
+  ) {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config.data)) {
+      if (!isEmptyParam(value)) cleaned[key] = value;
+    }
+    config.data = cleaned;
+  }
+
   return config;
 });
 

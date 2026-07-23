@@ -9,7 +9,8 @@ import {
   MoreVertical, Pencil, Trash2, CalendarDays, Bus,
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
-import { usePayrollPageData } from "@/hooks/usePayrollPageData";
+import { usePayrollReport } from "@/hooks/usePayrollReport";
+import { toNumber } from "@/lib/number-utils";
 import useDepartments from "@/hooks/useDepartments";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useAdvances } from "@/hooks/useAdvances";
@@ -234,11 +235,14 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  // إجمالي المقبوض = نفس رقم "حساب المسير" (صافي الرواتب المستحقة للشهر الحالي)
-  const { payrollData: monthlyPayroll } = usePayrollPageData(monthKey);
+  // إجمالي المقبوص = نفس رقم "حساب المسير" (صافي الرواتب المستحقة للشهر الحالي)
+  // Lightweight: use payroll report directly instead of usePayrollPageData (which
+  // fires 9 sub-hooks including attendance/leaves/inputs just for this sum).
+  const { data: payrollReport } = usePayrollReport(monthKey);
   const totalReceivedThisMonth = useMemo(() => {
-    return monthlyPayroll.reduce((sum, p) => sum + (p.netPayRounded ?? 0), 0);
-  }, [monthlyPayroll]);
+    const items = payrollReport?.items ?? [];
+    return items.reduce((sum, p) => sum + toNumber(p.netPayRounded), 0);
+  }, [payrollReport]);
 
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(

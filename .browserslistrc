@@ -1,0 +1,12 @@
+# Modern browsers only - NO legacy polyfills
+# Lighthouse-optimized for 100 performance score
+
+> 0.3%
+last 2 versions
+not dead
+not IE 11
+not op_mini all
+Chrome >= 91
+Edge >= 91
+Safari >= 14
+Firefox >= 90

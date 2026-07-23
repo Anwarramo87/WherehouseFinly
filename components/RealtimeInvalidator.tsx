@@ -47,6 +47,9 @@ export default function RealtimeInvalidator() {
         ["salaries"],
         ["payroll"],
         ["dashboard"],
+        // punch modals / monthly leave calendars keyed by employeeId+date
+        ["punches"],
+        ["employeeMonthlyLeaves"],
       ];
       for (const queryKey of keys) {
         void queryClient.invalidateQueries({ queryKey, exact: false });

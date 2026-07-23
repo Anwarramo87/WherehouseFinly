@@ -44,6 +44,7 @@ type ProvisionalSettlementData = {
   attendanceBasedSalary: number;
   totalBonuses: number;
   totalDeductions: number;
+  busDeduction: number;
   netPayRounded: number;
   hasData: boolean;
 };
@@ -118,14 +119,16 @@ export default function FireEmployeeModal({
         const attendanceBasedSalary = toNum(provPayload.earnedSalary ?? provPayload.attendanceBasedSalary);
         const totalBonuses = toNum(provPayload.bonuses ?? provPayload.totalBonuses);
         const totalDeductions = toNum(provPayload.deductions ?? provPayload.totalDeductions);
+        const busDeduction = toNum(provPayload.busDeduction ?? 0);
         const netPayRounded = toNum(provPayload.provisionalTotal ?? provPayload.netPayRounded);
 
         setProvisionalData({
           attendanceBasedSalary,
           totalBonuses,
           totalDeductions,
+          busDeduction,
           netPayRounded,
-          hasData: netPayRounded > 0, // Use netPayRounded for data validity check
+          hasData: netPayRounded > 0,
         });
       } catch (err: unknown) {
         if (
@@ -365,11 +368,37 @@ export default function FireEmployeeModal({
             </div>
 
             {provisionalData && apiDeductions > 0 && (
+              <div className="mt-3 sm:mt-4 space-y-2">
+                {/* الخصومات العادية (سلف + عقوبات + تأمينات) */}
+                {(provisionalData.totalDeductions - provisionalData.busDeduction) > 0 && (
+                  <div className="bg-[#1a2530] p-3 rounded-xl border border-rose-500/20">
+                    <p className="text-[11px] font-bold text-rose-400 mb-1">خصومات</p>
+                    <p className="text-base font-mono font-black text-rose-400">
+                      -{(provisionalData.totalDeductions - provisionalData.busDeduction).toLocaleString()}{" "}
+                      <span className="text-[10px] text-slate-500">ل.س</span>
+                    </p>
+                  </div>
+                )}
+                {/* إذا كان الخصم الكلي يشمل فقط الباص */}
+                {provisionalData.busDeduction === 0 && (
+                  <div className="bg-[#1a2530] p-3 rounded-xl border border-rose-500/20">
+                    <p className="text-[11px] font-bold text-rose-400 mb-1">خصومات</p>
+                    <p className="text-base font-mono font-black text-rose-400">
+                      -{apiDeductions.toLocaleString()}{" "}
+                      <span className="text-[10px] text-slate-500">ل.س</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* خصم اشتراك الباص — معروض لحال (مستقل) باللون الأزرق */}
+            {provisionalData && provisionalData.busDeduction > 0 && (
               <div className="mt-3 sm:mt-4">
-                <div className="bg-[#1a2530] p-3 rounded-xl border border-rose-500/20">
-                  <p className="text-[11px] font-bold text-rose-400 mb-1">خصومات</p>
-                  <p className="text-base font-mono font-black text-rose-400">
-                    -{apiDeductions.toLocaleString()}{" "}
+                <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/30">
+                  <p className="text-[11px] font-bold text-blue-400 mb-1">خصم اشتراك الباص</p>
+                  <p className="text-base font-mono font-black text-blue-400">
+                    -{provisionalData.busDeduction.toLocaleString()}{" "}
                     <span className="text-[10px] text-slate-500">ل.س</span>
                   </p>
                 </div>

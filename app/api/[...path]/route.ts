@@ -107,6 +107,21 @@ const buildResponseHeaders = (response: Response, request: NextRequest, apiPath:
 // If it isn't available in the current codebase, keep compilation working.
 const reportDebug: undefined | ((...args: unknown[]) => void) = undefined;
 
+// Remove undefined/null/empty query params so the backend never receives the
+// literal string "undefined" (which would trigger a 400 validation error).
+function cleanSearchParams(searchParams: URLSearchParams): string {
+  const cleaned = new URLSearchParams();
+  for (const [key, value] of searchParams.entries()) {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null") {
+      continue;
+    }
+    cleaned.append(key, value);
+  }
+  const qs = cleaned.toString();
+  return qs ? `?${qs}` : "";
+}
+
 async function handler(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
@@ -114,7 +129,8 @@ async function handler(request: NextRequest) {
   // Strip /api prefix, and also /v1 since backend URL already includes /api/v1
   const rest = pathParts.slice(1);
   const apiPath = "/" + (rest[0] === "v1" ? rest.slice(1) : rest).join("/");
-  const fullUrl = `${getBackendUrl()}${apiPath}${url.search}`;
+  const cleanedSearch = cleanSearchParams(url.searchParams);
+  const fullUrl = `${getBackendUrl()}${apiPath}${cleanedSearch}`;
 
   if (request.method === "OPTIONS") {
     return new NextResponse(null, {

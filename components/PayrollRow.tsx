@@ -17,7 +17,6 @@ const areEqual = (prevProps: PayrollRowProps, nextProps: PayrollRowProps) => {
 };
 
 const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style }) => {
-  console.log('PayrollRow item:', item);
   return (
     <div
       style={style}
@@ -59,13 +58,25 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
         )}
       </div>
 
-      {/* الخصومات - Deductions */}
-      <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        {item.discountsTotal > 0 ? (
+      {/* الخصومات - Deductions (العادية + الباص منفصلاً) */}
+      <div className="w-[14%] flex flex-col items-center justify-center p-4 gap-1 border-l border-slate-200">
+        {/* الخصم العادي */}
+        {(item.discountsTotal - (item.busDeduction ?? 0)) > 0 ? (
+          <span className="text-sm font-semibold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
+            -{(item.discountsTotal - (item.busDeduction ?? 0)).toLocaleString()}
+          </span>
+        ) : item.discountsTotal > 0 && (item.busDeduction ?? 0) === 0 ? (
           <span className="text-sm font-semibold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
             -{Number(item.discountsTotal).toLocaleString()}
           </span>
-        ) : (
+        ) : null}
+        {/* خصم الباص بالأزرق */}
+        {(item.busDeduction ?? 0) > 0 && (
+          <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-0.5">
+            🚌 -{(item.busDeduction ?? 0).toLocaleString()}
+          </span>
+        )}
+        {item.discountsTotal === 0 && (
           <span className="text-sm text-slate-400">—</span>
         )}
       </div>

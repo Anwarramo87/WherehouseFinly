@@ -20,6 +20,8 @@ export interface Passenger {
   employeeId: string;
   name?: string;
   subscriptionDate?: string;
+  terminationDate?: string;
+  status?: string;
   employeeStatus?: string;
 }
 
@@ -65,9 +67,11 @@ function normalizeBusDetails(details: BusDetailsResponse): BusData {
       id: passenger.id,
       employeeId: passenger.employeeId,
       name: passenger.name || passenger.employeeId,
+      status: passenger.status,
       employeeStatus: passenger.employeeStatus ?? 'active',
       subscriptionDate:
         (passenger as { subscriptionDate?: string }).subscriptionDate ?? passenger.joinDate,
+      terminationDate: (passenger as { terminationDate?: string }).terminationDate,
     })),
   };
 }
@@ -174,7 +178,7 @@ export default function TransportationClient() {
   };
 
   const isResignedPassenger = (passenger: Passenger) => {
-    return passenger.employeeStatus === 'resigned' || passenger.employeeStatus === 'terminated';
+    return passenger.status === 'inactive' || passenger.employeeStatus === 'resigned' || passenger.employeeStatus === 'terminated';
   };
 
   // Global Pooling Logic — compute from buses directly (available immediately)
@@ -197,6 +201,58 @@ export default function TransportationClient() {
       baseShare: share,
     };
   }, [safeBuses]);
+
+  // Prorated current-month bus deduction for a passenger, matching the payroll
+  // calculation (baseShare / 26 working days × actual remaining working days).
+  // If the passenger left this month, prorate from subscriptionDate to terminationDate.
+  const proratedBusShare = (subscriptionDate?: string, terminationDate?: string, status?: string): number => {
+    if (!subscriptionDate || baseShare <= 0) return baseShare;
+    const sub = new Date(subscriptionDate);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const subYear = sub.getFullYear();
+    const subMonth = sub.getMonth();
+    // subscription in a future month → 0; past month → full share
+    if (subYear > y || (subYear === y && subMonth > m)) return 0;
+
+    // Determine end point: terminationDate if departed this month, otherwise end of month
+    let endDay: number;
+    if (terminationDate && status === 'inactive') {
+      const term = new Date(terminationDate);
+      const termYear = term.getFullYear();
+      const termMonth = term.getMonth();
+      if (termYear === y && termMonth === m) {
+        // Left this month — prorate up to termination day
+        endDay = term.getDate();
+      } else if (termYear < y || (termYear === y && termMonth < m)) {
+        // Left in a past month — no deduction
+        return 0;
+      } else {
+        endDay = new Date(y, m + 1, 0).getDate();
+      }
+    } else {
+      endDay = new Date(y, m + 1, 0).getDate();
+    }
+
+    if (subYear < y || (subYear === y && subMonth < m)) {
+      // Subscription in past month — full month from day 1
+      let workingDays = 0;
+      for (let d = 1; d <= endDay; d++) {
+        const dow = new Date(y, m, d).getDay();
+        if (dow !== 5 && dow !== 6) workingDays++;
+      }
+      return Math.round((baseShare / 26) * Math.min(26, workingDays) * 100) / 100;
+    }
+
+    // subscription in current month — count from sub day to endDay
+    let workingDays = 0;
+    for (let d = sub.getDate(); d <= endDay; d++) {
+      const dow = new Date(y, m, d).getDay();
+      if (dow !== 5 && dow !== 6) workingDays++;
+    }
+    return Math.round((baseShare / 26) * Math.min(26, workingDays) * 100) / 100;
+  };
 
   const handleDeleteBus = async (busId: string, route: string) => {
     if (
@@ -543,7 +599,7 @@ export default function TransportationClient() {
                                   تاريخ الاشتراك
                                 </th>
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-28 tracking-wider">
-                                  قيمة الاشتراك
+                                  قيمة الاشتراك (الشهر الحالي)
                                 </th>
                                 <th className="p-3 text-slate-400 font-black text-[10px] uppercase text-center w-20 tracking-wider">
                                   إجراء
@@ -561,7 +617,7 @@ export default function TransportationClient() {
                                   <tr
                                     key={p.id ?? p.employeeId}
                                     onClick={() => setModalContext({ busId: bus.id, passenger: p })}
-                                    className={`cursor-pointer transition-colors ${isNew ? "bg-emerald-50 ring-1 ring-emerald-200" : orphaned ? "bg-amber-50/60 hover:bg-amber-100/60" : "hover:bg-slate-50"}`}
+                                    className={`cursor-pointer transition-colors ${isNew ? "bg-emerald-50 ring-1 ring-emerald-200" : isResignedPassenger(p) ? "bg-rose-50/40 hover:bg-rose-100/40" : orphaned ? "bg-amber-50/60 hover:bg-amber-100/60" : "hover:bg-slate-50"}`}
                                   >
                                     <td className="p-3 text-center font-mono text-xs text-[#1a2530] font-bold">
                                       {p.employeeId}
@@ -575,26 +631,36 @@ export default function TransportationClient() {
                                           </span>
                                         </span>
                                       )}
+                                      {isResignedPassenger(p) && (
+                                        <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full mr-1.5">
+                                          منقطع
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="p-3 text-center text-xs font-mono text-slate-500">
                                       {p.subscriptionDate ? new Date(p.subscriptionDate).toLocaleDateString("en-GB") : "—"}
                                     </td>
                                     <td className="p-3 text-center">
                                       <span className="inline-block bg-[#C89355]/10 text-[#C89355] font-black font-mono text-xs px-2.5 py-1 rounded-lg border border-[#C89355]/20">
-                                        {baseShare > 0 ? baseShare.toLocaleString() : "—"}
+                                        {baseShare > 0 ? proratedBusShare(p.subscriptionDate, p.terminationDate, p.status).toLocaleString() : "—"}
                                         {baseShare > 0 && <span className="text-[9px] mr-1 opacity-70">ل.س</span>}
                                       </span>
                                     </td>
                                     <td className="p-3 text-center">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemovePassenger(bus.id, p.employeeId);
-                                        }}
-                                        className="text-rose-500 hover:text-rose-600 font-black text-[11px] bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg transition-all"
-                                      >
-                                        إزالة
-                                      </button>
+                                      {p.status !== 'inactive' && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemovePassenger(bus.id, p.employeeId);
+                                          }}
+                                          className="text-rose-500 hover:text-rose-600 font-black text-[11px] bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg transition-all"
+                                        >
+                                          إزالة
+                                        </button>
+                                      )}
+                                      {p.status === 'inactive' && (
+                                        <span className="text-slate-400 text-[11px] font-bold">منقطع</span>
+                                      )}
                                     </td>
                                   </tr>
                                 );

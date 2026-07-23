@@ -45,6 +45,9 @@ export interface AggregatedPayroll {
   totalEarlyLeaveMinutes: number;
   earlyLeaveDeduction: number;
 
+  /** خصم اشتراك الباص (منفصل عن باقي الخصومات) — للعرض بالأزرق */
+  busDeduction?: number;
+
   details: {
     salaryConfig: Salary | null;
     bonuses: Bonus[];

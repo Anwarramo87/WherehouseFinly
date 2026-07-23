@@ -13,7 +13,8 @@ const formatWithCommas = (value: string | number) => {
   return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
 };
 
-const SYRIAN_PHONE_REGEX = /^(09[0-9]{8}|[0-9]{9})$/;
+const SYRIAN_PHONE_REGEX = /^09[0-9]{8}$/;
+const MAX_BUS_CAPACITY = 20;
 
 type DriverSource = "external" | "employee";
 
@@ -121,7 +122,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
       return false;
     }
     if (!SYRIAN_PHONE_REGEX.test(phone)) {
-      setPhoneError("يجب أن يكون رقم سوري صحيح (09XXXXXXXX)");
+      setPhoneError("يجب أن يبدأ الرقم بـ 09 ويتكون من 10 أرقام");
       return false;
     }
     setPhoneError("");
@@ -134,6 +135,10 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
     const capacity = Number(formData.capacity);
     if (!capacity || capacity < 1) {
       alert("يجب أن تكون سعة الركاب أكبر من صفر");
+      return;
+    }
+    if (capacity > MAX_BUS_CAPACITY) {
+      alert(`الحد الأقصى لسعة الركاب هو ${MAX_BUS_CAPACITY}`);
       return;
     }
     onSave({
@@ -290,16 +295,19 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                   type="number"
                   required
                   min={1}
-                  max={100}
+                  max={MAX_BUS_CAPACITY}
                   className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold text-center dir-ltr"
                   value={formData.capacity}
                   onChange={(e) => {
-                    const val = Math.max(1, Math.min(100, Number(e.target.value)));
+                    const val = Math.max(1, Math.min(MAX_BUS_CAPACITY, Number(e.target.value)));
                     setFormData({ ...formData, capacity: String(val) });
                   }}
                 />
                 {formData.capacity && Number(formData.capacity) < 1 && (
                   <p className="text-rose-500 text-xs font-bold mt-1.5">يجب أن تكون السعة أكبر من صفر</p>
+                )}
+                {formData.capacity && Number(formData.capacity) > MAX_BUS_CAPACITY && (
+                  <p className="text-rose-500 text-xs font-bold mt-1.5">الحد الأقصى لسعة الركاب هو {MAX_BUS_CAPACITY}</p>
                 )}
               </div>
             </div>

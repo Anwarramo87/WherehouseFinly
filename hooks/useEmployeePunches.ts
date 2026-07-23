@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import { getApiErrorMessage } from "@/lib/http/error";
+import { queryKeys } from "@/lib/query-keys";
 
 export interface RawPunch {
   id: string;
@@ -53,6 +54,10 @@ export const useEmployeePunches = (employeeId: string, date: string) => {
       toast.success("تم تسجيل البصمة");
       queryClient.invalidateQueries({ queryKey: qk });
       queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
     },
     onError: (e) => toast.error(getApiErrorMessage(e, "فشل تسجيل البصمة")),
   });
@@ -65,6 +70,10 @@ export const useEmployeePunches = (employeeId: string, date: string) => {
       toast.success("تم حذف البصمة");
       queryClient.invalidateQueries({ queryKey: qk });
       queryClient.invalidateQueries({ queryKey: ["attendance", "daily-view", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.home() });
+      queryClient.invalidateQueries({ queryKey: queryKeys["attendance-deductions"].all, exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all, exact: false });
     },
     onError: (e) => toast.error(getApiErrorMessage(e, "فشل حذف البصمة")),
   });

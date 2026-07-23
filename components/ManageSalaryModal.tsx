@@ -206,7 +206,10 @@ export default function ManageSalaryModal({
     }
   };
 
-  const handleFormSubmit = handleSubmit(onSubmit);
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => handleSubmit(onSubmit)(e),
+    [handleSubmit, onSubmit],
+  );
 
   if (!isOpen || typeof document === "undefined") return null;
 

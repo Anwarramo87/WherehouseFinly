@@ -311,6 +311,7 @@ export function usePayrollPageData(month: string) {
         variableDeductions,
         totalEarlyLeaveMinutes: earlyLeaveMinutes,
         earlyLeaveDeduction: 0,
+        busDeduction: 0, // Preview mode — bus deduction unavailable before payroll run
         details: {
           salaryConfig,
           bonuses: employeeBonuses,
@@ -420,6 +421,8 @@ export function usePayrollPageData(month: string) {
       const earlyLeaveDeduction = toNumber(backendItem.earlyLeaveDeduction);
       const anomalies: string[] = Array.isArray(backendItem.anomalies) ? backendItem.anomalies : [];
       const fixedDeductions = toNumber(salaryConfig?.insuranceAmount);
+      // خصم الباص منفصلاً — الباك إند يحسبه ويُرسله ضمن PayrollItem
+      const busDeduction = toNumber((backendItem as { busDeduction?: unknown }).busDeduction ?? 0);
 
       return {
         employeeId,
@@ -441,6 +444,7 @@ export function usePayrollPageData(month: string) {
         variableDeductions: totalDeductions - fixedDeductions,
         totalEarlyLeaveMinutes: earlyLeaveMinutes,
         earlyLeaveDeduction,
+        busDeduction,
         details: { salaryConfig, bonuses: [], deductions: [], attendance: null },
       } satisfies AggregatedPayroll;
     });
