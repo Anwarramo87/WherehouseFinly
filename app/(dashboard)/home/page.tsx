@@ -230,6 +230,30 @@ export default function DashboardPage() {
     setIsDeptModalOpen(true);
   }, []);
 
+  const handleRemoveSupervisor = useCallback(
+    async (dept: DepartmentData) => {
+      if (!dept.id || !dept.manager) return;
+      if (!window.confirm(`هل أنت متأكد من إزالة المشرف من قسم "${dept.name}"؟`)) return;
+      
+      setIsDeletingDept(dept.id); // Reuse loading state
+      try {
+        await apiClient.put(`/departments/${dept.id}`, {
+          name: dept.name,
+          manager: "", // Clear the manager
+          ...(dept.establishedAt && { establishedAt: dept.establishedAt }),
+        });
+        queryClient.invalidateQueries({ queryKey: ["departments"] });
+      } catch (err) {
+        console.error("Error removing supervisor:", err);
+        alert("حدث خطأ أثناء إزالة المشرف");
+      } finally {
+        setIsDeletingDept(null);
+        setDeptMenuOpen(null);
+      }
+    },
+    [queryClient],
+  );
+
   const monthKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -739,6 +763,16 @@ export default function DashboardPage() {
                               <Pencil size={14} className="text-[#C89355]" />
                               تعديل
                             </button>
+                            {dept.manager && (
+                              <button
+                                onClick={() => handleRemoveSupervisor(dept)}
+                                disabled={isDeletingDept === dept.id}
+                                className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                              >
+                                <UserCog size={14} className="text-orange-500" />
+                                {isDeletingDept === dept.id ? "جارٍ الإزالة..." : "إزالة المشرف"}
+                              </button>
+                            )}
                             {dept.count === 0 && (
                               <button
                                 onClick={() => {
