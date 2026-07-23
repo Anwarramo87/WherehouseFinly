@@ -9,48 +9,52 @@ export type DiscountRecord = {
   id: string;
   employeeId: string;
   type: string;
-  kind: "advance" | "penalty" | "assistance";
+  kind: "advance" | "penalty" | "assistance" | "reward";
   amount: number;
   date: string;
   notes?: string;
   advanceType?: string;
   category?: string;
-  backendModel?: "advance" | "penalty";
+  backendModel?: "advance" | "penalty" | "bonus";
   createdAt?: string;
 };
 
 export type DiscountPayload = {
   employeeId: string;
-  kind: "advance" | "penalty" | "assistance";
+  kind: "advance" | "penalty" | "assistance" | "reward";
   type: string;
   amount: number;
   date: string;
   notes?: string;
 };
 
-
-const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: "advance" | "penalty" | "assistance" } => {
-  // استقبال البيانات من الـ discounts endpoint الموحد
-  // السجلات تأتي بخاصية kind من الـ backend
+const mapBackendKindToType = (record: Record<string, unknown>): { type: string; kind: DiscountRecord["kind"] } => {
   if (record.kind === 'advance') {
     const advanceType = record.advanceType as string;
     if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
-    return { type: "سلفة", kind: "advance" as const };
+    return { type: "سلفة مالية", kind: "advance" as const };
+  }
+  
+  if (record.kind === 'reward') {
+    return { type: record.type as string || 'مكافأة', kind: "reward" as const };
+  }
+
+  if (record.kind === 'penalty') {
+    return { type: record.type as string || 'عقوبة إدارية', kind: "penalty" as const };
   }
   
   if (record.kind === 'assistance') {
     return { type: record.type as string || 'خصم متنوع', kind: "assistance" as const };
   }
   
-  // السجلات القديمة من جدول EmployeeAdvance فقط (fallback)
+  // Fallback for old records
   if (record.advanceType || record.totalAmount !== undefined) {
     const advanceType = record.advanceType as string;
     if (advanceType === "clothing") return { type: "شراء ملابس", kind: "advance" as const };
-    return { type: "سلفة", kind: "advance" as const };
+    return { type: "سلفة مالية", kind: "advance" as const };
   }
-  // السجلات من جدول EmployeePenalty
   if (record.category) {
-    return { type: "عقوبة", kind: "penalty" as const };
+    return { type: "عقوبة إدارية", kind: "penalty" as const };
   }
   return { type: "أخرى", kind: "advance" as const };
 };
@@ -83,7 +87,7 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
           employeeId: record.employeeId as string,
           type,
           kind,
-          backendModel: kind === "advance" ? "advance" : "penalty",
+          backendModel: kind === "advance" ? "advance" : kind === "penalty" ? "penalty" : "bonus",
           amount: Number(record.amount || record.totalAmount || 0),
           date: (record.issueDate as string || record.date as string || "").split("T")[0],
           notes: (record.notes as string) || (record.reason as string) || "",
@@ -103,31 +107,28 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       const body: Record<string, unknown> = {
         employeeId: payload.employeeId,
         type: payload.type,
-        kind: payload.kind === "advance" ? "advance" : "assistance",
+        kind: payload.kind,
         amount: payload.amount,
         date: payload.date,
         notes: payload.notes,
       };
 
       if (payload.kind === "advance") {
-        body.advanceType = payload.type === "شراء ملابس" ? "clothing" : payload.type === "مساعدة" ? "assistance" : "salary";
+        body.advanceType = payload.type === "شراء ملابس" ? "clothing" : "salary";
       }
 
-      console.log('Creating discount with payload:', body);
       return await apiClient.post("/discounts", body);
     },
-    onSuccess: (response) => {
-      console.log('Discount created successfully:', response.data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
       router.refresh();
-      toast.success("تم إضافة الخصم بنجاح");
+      toast.success("تم إضافة السجل بنجاح");
     },
     onError: (error: unknown) => {
-      console.error('Failed to create discount:', error);
-      toast.error(normalizeError(error, "فشل إضافة الخصم"));
+      toast.error(normalizeError(error, "فشل إضافة السجل"));
     },
   });
 
@@ -139,15 +140,28 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
           installmentAmount: 0,
           notes: payload.notes,
         };
-
         return await apiClient.put(`/advances/${id}`, body);
       }
 
+      if (payload.kind === "penalty") {
+        return await apiClient.put(`/penalties/${id}`, {
+          amount: Number(payload.amount),
+          category: payload.type,
+          reason: payload.notes,
+        });
+      }
+
       const body: Record<string, unknown> = {
-        assistanceAmount: Number(payload.amount),
         bonusReason: payload.type,
         period: payload.date?.slice(0, 7),
       };
+
+      if (payload.kind === "reward") {
+        body.bonusAmount = Number(payload.amount);
+        body.assistanceAmount = 0;
+      } else {
+        body.assistanceAmount = Number(payload.amount);
+      }
 
       return await apiClient.put(`/bonuses/${id}`, body);
     },
@@ -156,27 +170,26 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
-      toast.success("تم تحديث الخصم بنجاح");
+      toast.success("تم تحديث السجل بنجاح");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error, "فشل تحديث الخصم"));
+      toast.error(normalizeError(error, "فشل تحديث السجل"));
     },
   });
 
   const deleteDiscount = useMutation({
-    mutationFn: async ({ id, kind }: { id: string; kind: "advance" | "penalty" | "assistance" }) => {
-      const backendKind = kind === "advance" ? "advance" : "assistance";
-      return await apiClient.delete(`/discounts/${id}?kind=${backendKind}`);
+    mutationFn: async ({ id, kind }: { id: string; kind: DiscountRecord["kind"] }) => {
+      return await apiClient.delete(`/discounts/${id}?kind=${kind}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bonuses"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["advances"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["dashboard"], exact: false });
-      toast.success("تم نقل الخصم إلى سلة المهملات");
+      toast.success("تم نقل السجل إلى سلة المهملات");
     },
     onError: (error: unknown) => {
-      toast.error(normalizeError(error, "فشل حذف الخصم"));
+      toast.error(normalizeError(error, "فشل حذف السجل"));
     },
   });
 
