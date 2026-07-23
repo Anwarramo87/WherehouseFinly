@@ -53,18 +53,6 @@ export default function RootLayout({
         {/* Load print styles without blocking initial render */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/print.css" type="text/css" media="print" />
-        {/* Service Worker Registration */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `,
-          }}
-        />
       </head>
       <body className="bg-[#f8fafc] text-slate-800 antialiased">
         <Providers>

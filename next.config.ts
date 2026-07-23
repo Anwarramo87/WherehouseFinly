@@ -123,16 +123,6 @@ const nextConfig: NextConfig = {
             : []),
         ],
       },
-      // Manifest file with correct Content-Type
-      {
-        source: "/manifest.json",
-        headers: [
-          {
-            key: "Content-Type",
-            value: "application/manifest+json",
-          },
-        ],
-      },
       // Static asset caching — production only to avoid breaking Next.js dev HMR
       ...(isProduction
         ? [
