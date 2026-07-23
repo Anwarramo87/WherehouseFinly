@@ -16,7 +16,6 @@ try {
 export const metadata: Metadata = {
   title: "نظام إدارة المصنع",
   description: "نظام متكامل لإدارة الموظفين والرواتب والمخزون",
-  themeColor: "#0070f3",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -31,6 +30,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#0070f3",
 };
 
 export default function RootLayout({
@@ -50,9 +50,6 @@ export default function RootLayout({
             <link rel="dns-prefetch" href={backendOrigin} />
           </>
         )}
-        {/* Load print styles without blocking initial render */}
-        {/* eslint-disable-next-line @next/next/no-css-tags */}
-        <link rel="stylesheet" href="/print.css" type="text/css" media="print" />
       </head>
       <body className="bg-[#f8fafc] text-slate-800 antialiased">
         <Providers>
