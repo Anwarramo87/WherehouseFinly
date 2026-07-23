@@ -233,14 +233,7 @@ export default function DiscountsPage() {
                 <Plus size={18} className="group-hover:animate-spin relative z-10" />
                 <span className="relative z-10 tracking-wide">إضافة إجراء مالي</span>
               </button>
-              <button
-                onClick={handleOpenAddAdvance}
-                title="إضافة سلفة مفصلة"
-                className="relative overflow-hidden bg-white/80 hover:bg-white text-[#263544] px-4 py-2 rounded-2xl flex items-center gap-2 transition-all shadow-sm border border-slate-200 text-sm font-bold"
-              >
-                <Wallet size={16} />
-                <span>إضافة سلفة</span>
-              </button>
+
             </div>
           </div>
         </header>

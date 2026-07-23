@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
-import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp, Coins } from "lucide-react";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
@@ -164,6 +164,10 @@ export default function RewardsClient() {
     );
   }, [groupedRewards, searchTerm]);
 
+  const totalSum = useMemo(() => {
+    return filteredGroups.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+  }, [filteredGroups]);
+
   const toggleRow = (empId: string) => {
     setExpandedRows(prev => ({ ...prev, [empId]: !prev[empId] }));
   };
@@ -285,6 +289,20 @@ export default function RewardsClient() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-5 w-full md:w-auto">
+            {/* بطاقة المجموع النهائي - Denim Stitch Theme */}
+            <div className="relative overflow-hidden bg-linear-to-br from-[#1a2530] to-[#263544] px-6 py-3.5 rounded-2xl border border-emerald-500/40 shadow-[0_15px_30px_rgba(38,53,68,0.3)] flex items-center gap-4 w-full md:w-auto group">
+              <div className="absolute inset-1 rounded-xl border border-dashed border-emerald-500/30 pointer-events-none group-hover:border-emerald-500/50 transition-colors" />
+              <div className="p-2 bg-emerald-500/10 rounded-xl relative z-10">
+                <Coins size={24} className="text-emerald-500" />
+              </div>
+              <div className="relative z-10 flex flex-col">
+                <span className="text-xs font-black text-emerald-500 uppercase tracking-wider mb-0.5">مجموع المكافآت (المعروض)</span>
+                <span className="text-2xl font-mono font-black text-white drop-shadow-md">
+                  {mounted ? totalSum.toLocaleString() : "0"} <span className="text-xs text-white/70">ل.س</span>
+                </span>
+              </div>
+            </div>
+
             <MonthPeriodSelector
               value={period}
               onChange={(p) => router.replace(`/salaries/rewards?period=${p}`)}
