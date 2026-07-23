@@ -150,6 +150,9 @@ export default function DashboardPage() {
   const userPermissions = useAuthStore((state) => state.user?.permissions);
   const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
+  
+  // Call useDepartments early so updateDepartment is available
+  const { data: deptsData, updateDepartment } = useDepartments();
 
   // Show skeleton only while dashboard KPIs are loading — not waiting for employees list
   const isSkeleton = isDashboardLoading;
@@ -390,8 +393,6 @@ export default function DashboardPage() {
       )
       .filter((item): item is BonusDisplay => Boolean(item));
   }, [bonusesData, employeeListMemo, resignedIds]);
-
-  const { data: deptsData, updateDepartment } = useDepartments();
 
   const departmentSummary = useMemo<DepartmentData[]>(() => {
     const apiList = Array.isArray(deptsData?.departments) ? deptsData.departments : [];
