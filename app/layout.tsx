@@ -16,12 +16,15 @@ try {
 export const metadata: Metadata = {
   title: "نظام إدارة المصنع",
   description: "نظام متكامل لإدارة الموظفين والرواتب والمخزون",
-  manifest: "/manifest.json",
   themeColor: "#0070f3",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "نظام إدارة المصنع",
+  },
+  icons: {
+    icon: '/icon-512.svg',
+    apple: '/icon-192.png',
   },
 };
 
@@ -40,9 +43,6 @@ export default function RootLayout({
       <head>
         {/* Theme color for address bar */}
         <meta name="theme-color" content="#0070f3" />
-        {/* PWA */}
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
         {/* Preconnect to backend to reduce TTFB on first API call */}
         {backendOrigin && (
           <>
