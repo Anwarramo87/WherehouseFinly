@@ -19,7 +19,9 @@ import {
   Calculator,
 } from "lucide-react";
 import { usePayroll } from "@/hooks/usePayroll";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import { getApiErrorMessage } from "@/lib/http/error";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import { PayrollVirtualTable } from "@/components/PayrollVirtualTable";
 import { usePayrollPageData } from "@/hooks/usePayrollPageData";
@@ -54,6 +56,7 @@ export default function PayrollPage() {
   React.useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true); }, []);
 
+  const queryClient = useQueryClient();
   const { calculatePayroll } = usePayroll();
 
   const {
@@ -432,6 +435,8 @@ export default function PayrollPage() {
         onRun={async (payload) => {
           calculatePayroll.mutate(payload, {
             onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ["payroll"], exact: false });
+              queryClient.invalidateQueries({ queryKey: ["payrollInputs"], exact: false });
               const calculatedMonth = payload.periodStart.slice(0, 7);
               setMonth(calculatedMonth);
               router.push(`/salaries/payroll?period=${calculatedMonth}`);
@@ -440,6 +445,7 @@ export default function PayrollPage() {
             },
             onError: (error) => {
               console.error("[Payroll] Calculation failed:", error);
+              toast.error(getApiErrorMessage(error, "فشل احتساب مسير الرواتب"));
             },
           });
         }}

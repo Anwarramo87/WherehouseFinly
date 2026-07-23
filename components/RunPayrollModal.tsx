@@ -192,35 +192,37 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
 
         {/* Footer */}
         <div className="px-4 sm:px-6 py-4 bg-[#1e293b]/60 border-t border-slate-700/30 shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isPending}
-              className="flex-1 sm:flex-none py-2.5 rounded-xl font-bold text-sm text-slate-300 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all disabled:opacity-50"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              form="payrollForm"
-              disabled={isPending}
-              className="flex-2 sm:flex-none sm:px-8 py-2.5 rounded-xl font-black text-sm bg-[#C89355] text-[#101720] flex items-center justify-center gap-2 hover:bg-[#b07f45] active:scale-[0.98] transition-all disabled:opacity-60 shadow-[0_0_20px_rgba(200,147,85,0.3)]"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="animate-spin" size={18} />
-                  جاري المعالجة...
-                </>
-              ) : (
-                <>
-                  <Play size={18} />
-                  تشغيل المسير
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+
+  <div className="flex flex-col-reverse sm:flex-row sm:justify-start items-stretch sm:items-center gap-3">
+    <button
+      type="button"
+      onClick={handleClose}
+      disabled={isPending}
+      className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-sm text-slate-300 bg-white/5 hover:bg-white/10 active:scale-[0.98] transition-all disabled:opacity-50"
+    >
+      إلغاء
+    </button>
+    <button
+      type="submit"
+      form="payrollForm"
+      disabled={isPending}
+      className="w-full sm:w-auto px-4 sm:px-8 py-2.5 rounded-xl font-black text-sm bg-[#C89355] text-[#101720] flex items-center justify-center gap-2 hover:bg-[#b07f45] active:scale-[0.98] transition-all disabled:opacity-60 shadow-[0_0_20px_rgba(200,147,85,0.3)]"
+    >
+      {isPending ? (
+        <>
+          <Loader2 className="animate-spin" size={18} />
+          جاري المعالجة...
+        </>
+      ) : (
+        <>
+          <Play size={18} />
+          تشغيل المسير
+        </>
+      )}
+    </button>
+  </div>
+</div>
+
       </div>
     </div>,
     document.body
