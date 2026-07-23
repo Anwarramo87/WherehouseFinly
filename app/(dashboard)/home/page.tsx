@@ -152,7 +152,7 @@ export default function DashboardPage() {
   const router = useRouter();
   
   // Call useDepartments early so updateDepartment is available
-  const { data: deptsData, updateDepartment } = useDepartments();
+  const { data: deptsData, updateDepartment, clearSupervisor } = useDepartments();
 
   // Show skeleton only while dashboard KPIs are loading — not waiting for employees list
   const isSkeleton = isDashboardLoading;
@@ -240,12 +240,7 @@ export default function DashboardPage() {
       
       setIsDeletingDept(dept.id); // Reuse loading state
       try {
-        await updateDepartment.mutateAsync({
-          id: dept.id,
-          name: dept.name,
-          manager: "", // Clear the manager
-          date: dept.establishedAt,
-        });
+        await clearSupervisor.mutateAsync(dept.id);
       } catch (err) {
         console.error("Error removing supervisor:", err);
         alert("حدث خطأ أثناء إزالة المشرف");
@@ -254,7 +249,7 @@ export default function DashboardPage() {
         setDeptMenuOpen(null);
       }
     },
-    [updateDepartment],
+    [clearSupervisor],
   );
 
   const monthKey = useMemo(() => {
