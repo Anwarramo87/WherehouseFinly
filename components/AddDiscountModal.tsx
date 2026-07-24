@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { 
   X, Save, Search, Wallet, FileText, AlertOctagon, 
-  Coins, Calendar, Edit3, Shirt, Banknote , Loader2 , ChevronDown
+  Coins, Calendar, Edit3, Shirt, Banknote , Loader2 , ChevronDown, Gift
 } from "lucide-react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -58,7 +58,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
     mode: "onChange",
     defaultValues: {
       employeeId: "",
-      type: "سلفة",
+      type: "سلفة مالية",
       amount: undefined,
       date: new Date().toISOString().split('T')[0],
       notes: "",
@@ -86,7 +86,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
       Promise.resolve().then(() => {
         reset({
           employeeId: "",
-          type: "سلفة",
+          type: "سلفة مالية",
           amount: undefined,
           date: new Date().toISOString().split('T')[0],
           notes: "",
@@ -131,10 +131,10 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
   };
 
   const onSubmit = (data: DiscountFormValues) => {
-    // احتسب kind بناءً على type
     let kind: DiscountPayload["kind"] = "penalty";
-    if (data.type === "سلفة" || data.type === "شراء ملابس") kind = "advance";
-    else if (data.type === "مكافأة" || data.type === "مساعدة") kind = "assistance";
+    if (data.type === "سلفة مالية" || data.type === "شراء ملابس") kind = "advance";
+    else if (data.type === "مكافأة" || data.type === "مساعدة") kind = "reward";
+    else if (data.type === "عقوبة") kind = "penalty";
     onSave({ ...data, kind });
   };
 
@@ -142,9 +142,12 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
 
   const renderTypeIcon = () => {
     if (currentType === "شراء ملابس") return <Shirt className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />;
-    if (currentType === "عقوبة") return <AlertOctagon className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />;
+    if (currentType === "عقوبة") return <AlertOctagon className="absolute right-4 top-4 text-slate-500 group-focus-within:text-rose-400 transition-colors" size={22} />;
+    if (currentType === "مكافأة") return <Gift className="absolute right-4 top-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" size={22} />;
     return <Banknote className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />;
   };
+
+  const isReward = currentType === "مكافأة";
 
   return createPortal(
     <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md transition-all duration-300" dir="rtl">
@@ -157,9 +160,9 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
-                {isEditMode ? "تعديل الإجراء المالي" : "إضافة خصم أو سلفة"}
+                {isEditMode ? "تعديل الإجراء المالي" : isReward ? "إضافة مكافأة" : "إضافة خصم أو سلفة"}
               </h2>
-              <p className="text-xs text-slate-400 font-bold mt-1">سيتم اقتطاع هذا المبلغ من المسير النهائي</p>
+              <p className="text-xs text-slate-400 font-bold mt-1">{isReward ? "سيتم إضافة هذا المبلغ إلى الراتب" : "سيتم اقتطاع هذا المبلغ من المسير النهائي"}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-rose-400 bg-[#263544] p-2.5 rounded-2xl border border-transparent hover:border-rose-400/30 transition-all hover:rotate-90 active:scale-90">
@@ -227,9 +230,10 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
                   {...register("type")}
                   className={`w-full p-4 bg-[#1a2530] border rounded-2xl focus:ring-2 focus:ring-[#C89355]/20 focus:border-[#C89355] outline-none text-white font-bold cursor-pointer pr-12 pl-10 appearance-none transition-all ${errors.type ? 'border-rose-500' : 'border-[#263544]'}`}
                 >
-                  <option value="سلفة">سلفة مالية</option>
+                  <option value="سلفة مالية">سلفة مالية</option>
                   <option value="شراء ملابس">شراء ملابس</option>
                   <option value="عقوبة">عقوبة إدارية</option>
+                  <option value="مكافأة">مكافأة / بدل</option>
                 </select>
                 {renderTypeIcon()}
                 <ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-focus-within:text-[#C89355] transition-all duration-300" size={18} />
@@ -251,8 +255,8 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
             </div>
 
             {/* حقل القيمة مع التنسيق الذكي */}
-            <div className="md:col-span-2 bg-rose-500/5 p-5 rounded-2xl border border-rose-500/10">
-              <label className="block text-xs font-black text-rose-400 mb-3 uppercase tracking-widest">القيمة / المبلغ المستقطع (ل.س)</label>
+            <div className={`md:col-span-2 p-5 rounded-2xl border ${isReward ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-rose-500/5 border-rose-500/10'}`}>
+              <label className={`block text-xs font-black mb-3 uppercase tracking-widest ${isReward ? 'text-emerald-400' : 'text-rose-400'}`}>القيمة / المبلغ (ل.س)</label>
               <div className="relative group">
                 <Controller
                   name="amount"
@@ -269,11 +273,11 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
                         }
                       }}
                       placeholder="مثال: 50,000"
-                      className={`w-full p-4 bg-[#101720] border rounded-2xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-rose-400 text-2xl font-mono font-black pr-14 shadow-inner transition-all placeholder:text-rose-900/50 ${errors.amount ? 'border-rose-500' : 'border-rose-500/30'}`}
+                      className={`w-full p-4 bg-[#101720] border rounded-2xl focus:ring-2 outline-none text-2xl font-mono font-black pr-14 shadow-inner transition-all placeholder:text-slate-700 ${isReward ? `focus:ring-emerald-500/20 focus:border-emerald-500 text-emerald-400 ${errors.amount ? 'border-emerald-500' : 'border-emerald-500/30'}` : `focus:ring-rose-500/20 focus:border-rose-500 text-rose-400 ${errors.amount ? 'border-rose-500' : 'border-rose-500/30'}`}`}
                     />
                   )}
                 />
-                <Coins className="absolute right-5 top-5 text-rose-500/50 group-focus-within:text-rose-500 transition-colors" size={24} />
+                <Coins className={`absolute right-5 top-5 transition-colors ${isReward ? 'text-emerald-500/50 group-focus-within:text-emerald-500' : 'text-rose-500/50 group-focus-within:text-rose-500'}`} size={24} />
               </div>
               {errors.amount && <p className="text-rose-400 text-xs font-bold mt-2">{errors.amount.message}</p>}
             </div>
