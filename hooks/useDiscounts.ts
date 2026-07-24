@@ -318,8 +318,11 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
 
       return data.map((record: Record<string, unknown>) => {
         const { type, kind } = mapBackendKindToType(record);
+        const rawId = record.id as string;
+        const id = kind === "reward" || kind === "assistance" ? `${rawId}_${kind}` : rawId;
+
         return {
-          id: record.id as string,
+          id,
           employeeId: record.employeeId as string,
           type,
           kind,
