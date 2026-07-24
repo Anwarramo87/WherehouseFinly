@@ -115,19 +115,17 @@ export default function RewardsClient() {
         : employeesLookup.get(employeeId) || "موظف غير معروف";
       const bonusAmount = resolveAmount(bonus.bonusAmount);
       const assistanceAmount = resolveAssistance(bonus.assistanceAmount);
-      // المكافآت الإجمالية = bonusAmount + assistanceAmount
-      const totalAmount = bonusAmount + assistanceAmount;
       const periodDate = bonus.period ? `${bonus.period}-01` : new Date().toISOString();
 
-      // فقط عرض السجلات التي فيها مكافآت (استبعد سجلات الزيادة لأنها تظهر في الرواتب)
-      if (totalAmount <= 0 || bonus.bonusReason === 'زيادة راتب') return null;
+      // فقط عرض السجلات التي فيها مكافآت (bonusAmount فقط) واستبعد سجلات الزيادة والاعانات
+      if (bonusAmount <= 0 || bonus.bonusReason === 'زيادة راتب') return null;
 
       return {
         id: String(rewardId),
         employeeId,
         name,
         type: bonus.bonusReason || "مكافأة",
-        amount: totalAmount,
+        amount: bonusAmount,
         date: periodDate,
         notes: bonus.bonusReason || "",
         allEmployees: isAll,
