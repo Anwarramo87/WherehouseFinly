@@ -1,17 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import SessionRefresh from "@/components/SessionRefresh";
-import NotificationBell from "@/components/NotificationBell";
 import apiClient from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import axios from "axios";
 
 const Sidebar = dynamic(() => import("@/components/Sidebar"), {
   loading: () => <aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />,
+  ssr: false,
+});
+
+const NotificationBell = dynamic(() => import("@/components/NotificationBell"), {
+  ssr: false,
 });
 
 export default function DashboardLayout({
@@ -24,13 +28,16 @@ export default function DashboardLayout({
   const clear = useAuthStore((state) => state.clear);
   const user = useAuthStore((state) => state.user);
   const router = useRouter();
+  const authChecked = useRef(false);
 
   useEffect(() => {
+    if (authChecked.current) return;
     if (user?.permissions) {
-      // permissions already loaded — mark as authenticated immediately
       setStatus("authenticated");
+      authChecked.current = true;
       return;
     }
+    authChecked.current = true;
     apiClient.get('/auth/me').then((res) => {
       const data = res.data as Record<string, unknown>;
       if (data && data.permissions) {
@@ -46,7 +53,8 @@ export default function DashboardLayout({
         router.replace('/login');
       }
     });
-  }, [user, setUser, setStatus, clear, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleCollapse = useCallback(() => setIsCollapsed((v: boolean) => !v), []);
 
@@ -62,10 +70,12 @@ export default function DashboardLayout({
           isCollapsed ? "w-20" : "w-72"
         }`}
       >
-        <Sidebar
-          isCollapsed={isCollapsed}
-          toggleCollapse={toggleCollapse}
-        />
+        <Suspense fallback={<aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />}>
+          <Sidebar
+            isCollapsed={isCollapsed}
+            toggleCollapse={toggleCollapse}
+          />
+        </Suspense>
       </div>
 
       {/* ── Mobile overlay ── */}
@@ -83,14 +93,18 @@ export default function DashboardLayout({
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <Sidebar onClose={closeMobile} />
+        <Suspense fallback={null}>
+          <Sidebar onClose={closeMobile} />
+        </Suspense>
       </div>
 
       {/* ── Main content ── */}
       <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning>
         {/* Floating notifications bell (top-left in RTL) */}
         <div className="fixed top-3 left-3 z-40 flex items-center gap-2 print:hidden">
-          <NotificationBell />
+          <Suspense fallback={null}>
+            <NotificationBell />
+          </Suspense>
           {/* Mobile menu button */}
           <button
             onClick={openMobile}

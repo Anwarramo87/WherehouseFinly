@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -70,7 +70,7 @@ function useIsHydrated() {
 export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }: SidebarProps) {
   const queryClient = useQueryClient();
 
-  const prefetchMap: Record<string, () => void> = {
+  const prefetchMap: Record<string, () => void> = useMemo(() => ({
     '/employees': () => queryClient.prefetchQuery({
       queryKey: ['employees', 'all-statuses', 'exclude-terminated', 'all-departments', 'no-search', 1, 500, 'fetch-all'],
       queryFn: () => apiClient.get('/employees', { params: { limit: 500 } }).then((r) => r.data),
@@ -102,7 +102,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       queryFn: () => apiClient.get('/attendance').then((r) => r.data),
       staleTime: QUERY_STALE_TIME.STANDARD,
     }),
-  };
+  }), [queryClient]);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();

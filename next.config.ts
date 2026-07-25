@@ -60,6 +60,7 @@ const nextConfig: NextConfig = {
       "react-hot-toast",
       "sonner",
       "exceljs",
+      "socket.io-client",
     ],
     optimizeServerReact: true,
     // Reduce dev overlay overhead
