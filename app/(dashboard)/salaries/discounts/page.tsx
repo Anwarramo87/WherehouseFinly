@@ -47,11 +47,11 @@ export default function DiscountsPage() {
     
     return discounts
       .filter(d => {
-        // Must be in active employees AND not in resigned list AND not a reward
+        // Must be in active employees AND not in resigned list AND not a reward or assistance
         const isActive = activeEmployeeIds.has(d.employeeId);
         const isNotResigned = !resignedIds.has(d.employeeId);
-        const isNotReward = d.kind !== "reward";
-        return isActive && isNotResigned && isNotReward;
+        const isOnlyDeduction = d.kind === "advance" || d.kind === "penalty";
+        return isActive && isNotResigned && isOnlyDeduction;
       })
       .map(d => {
         const emp = employees.find(e => e.employeeId === d.employeeId);

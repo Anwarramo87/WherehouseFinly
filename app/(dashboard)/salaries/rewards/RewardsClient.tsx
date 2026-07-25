@@ -442,7 +442,6 @@ export default function RewardsClient() {
             onSave={handleSaveReward}
             isPending={createBonus.isPending || isRaisePending}
             employees={Array.isArray(employees) ? employees : []}
-            salaries={Array.isArray(salaries) ? salaries : []}
             initialData={undefined}
           />
         )}

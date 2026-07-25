@@ -440,7 +440,8 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
 
   const deleteDiscount = useMutation({
     mutationFn: async ({ id, kind }: { id: string; kind: DiscountRecord["kind"] }) => {
-      return await apiClient.delete(`/discounts/${id}?kind=${kind}`);
+      const rawId = id.replace(/_(reward|assistance)$/i, "");
+      return await apiClient.delete(`/discounts/${rawId}?kind=${kind}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"], exact: false });
