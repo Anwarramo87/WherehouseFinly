@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
       "@tanstack/react-virtual",
       "react-hot-toast",
       "sonner",
-      "xlsx",
+      "exceljs",
     ],
     optimizeServerReact: true,
     // Reduce dev overlay overhead

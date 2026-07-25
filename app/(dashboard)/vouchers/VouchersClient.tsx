@@ -30,6 +30,7 @@ import type { Bonus } from "@/types/bonus";
 import type { Advance } from "@/types/advance";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { Employee } from "@/types/employee";
+import { calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "@/lib/payroll-calc";
 
 interface AggregatedPayroll {
   employeeId: string;
@@ -53,33 +54,6 @@ interface AggregatedPayroll {
     attendance: null;
   };
 }
-
-const STANDARD_WORK_DAYS = 26;
-const HOURS_PER_DAY = 8;
-
-const calcEarnedSalary = (
-  grossSalary: number,
-  presentDays: number,
-  paidLeaveDays: number,
-  lateMinutes: number,
-  earlyLeaveMinutes = 0,
-  overtimeMinutes = 0,
-  overtimeWeekendDays = 0,
-): number => {
-  if (grossSalary <= 0) return 0;
-  const paidDays = Math.min(presentDays + paidLeaveDays, STANDARD_WORK_DAYS);
-  const dailyRate = grossSalary / STANDARD_WORK_DAYS;
-  const minuteRate = dailyRate / (HOURS_PER_DAY * 60);
-  const salaryFromDays = dailyRate * paidDays;
-  const lateDeduction = lateMinutes * minuteRate * 1.5;
-  const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
-  const overtimePay = overtimeMinutes * minuteRate * 1.5;
-  const weekendOvertimePay = dailyRate * overtimeWeekendDays * 1.5;
-  return Math.max(
-    0,
-    salaryFromDays - lateDeduction - earlyLeaveDeduction + overtimePay + weekendOvertimePay,
-  );
-};
 
 const toNumber = (value: unknown): number => {
   if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
@@ -370,13 +344,17 @@ export default function VouchersClient() {
           ? (manualInput?.overtimeWeekendDays ?? 0)
           : (autoInput?.overtimeWeekendDays ?? 0);
 
-      const rawEarned = calcEarnedSalary(
+      const rawEarned = calcEarnedSalaryHourly(
         calcGross,
-        actualWorkDays,
+        employee.workDaysInPeriod ?? STANDARD_WORK_DAYS,
+        employee.hoursPerDay ?? HOURS_PER_DAY,
+        autoInput?.workedMinutes ?? 0,
+        autoInput?.sickRemainderMinutes ?? 0,
+        sickLeaveDays,
         effectivePaidLeaveDays,
+        totalOvertimeMinutes,
         lateMinutes,
         earlyLeaveMinutes,
-        totalOvertimeMinutes,
         totalOvertimeDays,
       );
       const earnedSalary = Math.max(0, rawEarned - insuranceAmount);

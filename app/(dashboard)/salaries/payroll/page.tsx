@@ -117,8 +117,21 @@ export default function PayrollPage() {
       return;
     }
     try {
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.utils.book_new();
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("مسير الرواتب");
+      worksheet.columns = [
+        { header: "#", key: "#", width: 6 },
+        { header: "كود الموظف", key: "كود الموظف", width: 15 },
+        { header: "اسم الموظف", key: "اسم الموظف", width: 25 },
+        { header: "القسم", key: "القسم", width: 20 },
+        { header: "الراتب المستحق", key: "الراتب المستحق", width: 18 },
+        { header: "المكافآت", key: "المكافآت", width: 15 },
+        { header: "الخصومات", key: "الخصومات", width: 15 },
+        { header: "المجموع", key: "المجموع", width: 18 },
+        { header: "الفرق", key: "الفرق", width: 12 },
+        { header: "الراتب المقبوض (النهائي)", key: "الراتب المقبوض (النهائي)", width: 22 },
+      ];
       const rows = filteredPayrollData.map((item, index) => ({
         "#": String(index + 1),
         "كود الموظف": item.employeeId,
@@ -143,14 +156,19 @@ export default function PayrollPage() {
         "الفرق": Number(globalTotals.totalRoundingDifference.toFixed(2)),
         "الراتب المقبوض (النهائي)": Number(globalTotals.totalNetPayRounded.toFixed(2)),
       });
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-      worksheet["!cols"] = [
-        { wch: 6 }, { wch: 15 }, { wch: 25 }, { wch: 20 },
-        { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 18 },
-        { wch: 12 }, { wch: 22 },
-      ];
-      XLSX.utils.book_append_sheet(workbook, worksheet, "مسير الرواتب");
-      XLSX.writeFile(workbook, `تقرير-الرواتب-${month}.xlsx`);
+      worksheet.addRows(rows);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `تقرير-الرواتب-${month}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       toast.success("تم تنزيل ملف Excel بنجاح");
     } catch (error) {
       console.error(error);

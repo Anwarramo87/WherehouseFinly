@@ -10,9 +10,6 @@ import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction"
 import type { Salary } from "@/types/salary";
 import type { Leave } from "../types/leave";
 
-const STANDARD_WORK_DAYS = 26; // eslint-disable-line @typescript-eslint/no-unused-vars
-const HOURS_PER_DAY = 8; // eslint-disable-line @typescript-eslint/no-unused-vars
-
 type AttendanceEventRecord = {
   employeeId?: string;
   timestamp?: string;

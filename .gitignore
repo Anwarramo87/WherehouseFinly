@@ -47,4 +47,16 @@ package-lock.json
 # worktrees
 .worktrees/
 
-Factory.rar
+# temp/test artifacts — never commit
+tmp/
+test-*.ps1
+test-*.js
+res2.txt
+*.zip
+*.rar
+*.bak
+Screenshot*.png
+query-emp*.sql
+query-emp*.ts
+list-tables.sql
+docs/

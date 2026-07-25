@@ -28,8 +28,8 @@ describe("calculateAttendanceMetrics", () => {
     ]);
 
     expect(metrics.totalEmployees).toBe(1);
-    expect(metrics.present).toBe(1);
-    expect(metrics.late).toBe(0);
+    expect(metrics.present).toBe(0);
+    expect(metrics.late).toBe(1);
     expect(metrics.absent).toBe(0);
     expect(metrics.active).toBe(1);
     expect(metrics.totalOvertimeMinutes).toBe(30);

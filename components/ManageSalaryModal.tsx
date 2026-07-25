@@ -6,7 +6,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  X, Loader2, Save, Coins, Zap, Shield, Search,
+  X, Loader2, Save, Coins, Shield, Search,
   Wallet, Truck, Lock
 } from "lucide-react";
 import type { Employee } from "@/types/employee";
@@ -147,18 +147,17 @@ export default function ManageSalaryModal({
   // Live total display
   const watchedValues = useWatch({
     control,
-    name: ["baseSalary", "lumpSumSalary", "livingAllowance", "transportAllowance", "insuranceAmount"],
-  }) as [number | undefined, number | undefined, number | undefined, number | undefined, number | undefined];
-  const [baseSalary, lumpSumSalary, livingAllowance, transportAllowance, insuranceAmount] = watchedValues;
+    name: ["baseSalary", "livingAllowance", "transportAllowance", "insuranceAmount"],
+  }) as [number | undefined, number | undefined, number | undefined, number | undefined];
+  const [baseSalary, livingAllowance, transportAllowance, insuranceAmount] = watchedValues;
   
   const netTotal = useMemo(
     () =>
       Number(baseSalary || 0) +
-      Number(lumpSumSalary || 0) +
       Number(livingAllowance || 0) +
       Number(transportAllowance || 0) -
       Number(insuranceAmount || 0),
-    [baseSalary, lumpSumSalary, livingAllowance, transportAllowance, insuranceAmount]
+    [baseSalary, livingAllowance, transportAllowance, insuranceAmount]
   );
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -166,7 +165,7 @@ export default function ManageSalaryModal({
     const payload: SalaryPayload = {
       profession:             initialData?.profession ?? "",
       baseSalary:             Math.round(Number(values.baseSalary ?? 0)),
-      lumpSumSalary:          Math.round(Number(values.lumpSumSalary ?? 0)),
+      lumpSumSalary:          0,
       livingAllowance:        Math.round(Number(values.livingAllowance ?? 0)),
       transportAllowance:     Math.round(Number(values.transportAllowance ?? 0)),
       insuranceAmount:        Math.round(Number(values.insuranceAmount ?? 0)),
@@ -189,7 +188,7 @@ export default function ManageSalaryModal({
 
     if (existingSalary) {
       setValue("baseSalary", toNum(existingSalary.baseSalary));
-      setValue("lumpSumSalary", toNum(existingSalary.lumpSumSalary));
+      setValue("lumpSumSalary", 0);
       setValue("livingAllowance", toNum(existingSalary.livingAllowance));
       setValue("transportAllowance", toNum(existingSalary.transportAllowance));
       setValue("insuranceAmount", toNum(existingSalary.insuranceAmount));
@@ -199,7 +198,7 @@ export default function ManageSalaryModal({
       const calculatedBase = Math.round(hr * 208) || 0;
 
       setValue("baseSalary", calculatedBase);
-      setValue("lumpSumSalary", toNum(emp.lumpSumSalary) || 0);
+      setValue("lumpSumSalary", 0);
       setValue("livingAllowance", toNum(emp.livingAllowance) || 0);
       setValue("transportAllowance", toNum(emp.transportAllowance) || 0);
       setValue("insuranceAmount", toNum(emp.insuranceAmount) || 0);
@@ -340,40 +339,6 @@ export default function ManageSalaryModal({
                 {errors.baseSalary && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.baseSalary.message}</p>}
               </div>
 
-              {/* lumpSumSalary */}
-              <div>
-                <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
-                  الراتب المقطوع (ل.س)
-                </label>
-                <div className="relative group">
-                  <Controller
-                    name="lumpSumSalary"
-                    control={control}
-                    render={({ field }) => (
-                      <input
-                         type="text"
-                         inputMode="numeric"
-                         className={inputCls(!!errors.lumpSumSalary)}
-                         placeholder="الراتب المقطوع"
-                         value={field.value === 0 ? "" : field.value?.toLocaleString('en-US')}
-                         onChange={(e) => {
-                           const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                           const value = rawValue === "" ? 0 : Number(rawValue);
-                           field.onChange(value);
-                         }}
-                         onBlur={() => {
-                           if (field.value !== 0 && field.value !== null && field.value !== undefined) {
-                             field.onChange(Number(field.value));
-                           }
-                         }}
-                       />
-                    )}
-                  />
-                  <Zap className="absolute right-4 top-4.5 text-slate-500 group-focus-within:text-[#C89355] pointer-events-none" size={22} />
-                </div>
-                {errors.lumpSumSalary && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.lumpSumSalary.message}</p>}
-              </div>
-
               {/* livingAllowance */}
               <div>
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">
@@ -481,7 +446,7 @@ export default function ManageSalaryModal({
             <div className="bg-[#1a2530] border border-[#263544] p-5 rounded-2xl flex justify-between items-center shadow-inner">
               <div>
                 <span className="text-xs font-black text-slate-400">الإجمالي الثابت</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + المقطوع + المعيشة + نقل − تأمينات</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">الأساسي + المعيشة + نقل − تأمينات</p>
               </div>
               <span className="text-2xl font-mono font-black text-[#C89355]">
                 {netTotal > 0 ? netTotal.toLocaleString() : "—"} <span className="text-xs text-slate-500">ل.س</span>

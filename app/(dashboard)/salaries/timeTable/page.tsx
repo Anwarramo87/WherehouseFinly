@@ -18,7 +18,7 @@ import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction"
 import type { EditTotalsPayload } from "@/components/EditAttendanceTotalsModal";
 import type { Salary } from "@/types/salary";
 import { toNumber } from "@/lib/number-utils";
-import { calcEarnedSalaryHourly } from "@/lib/payroll-calc";
+import { calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "@/lib/payroll-calc";
 
 const EditAttendanceTotalsModal = dynamic(
   () => import("@/components/EditAttendanceTotalsModal"),
@@ -28,10 +28,6 @@ const EmployeeMonthlyCalendarModal = dynamic(
   () => import("@/components/EmployeeMonthlyCalendarModal"),
   { loading: () => null }
 );
-
-// عدد أيام العمل المعياري في الشهر
-const STANDARD_WORK_DAYS = 26;
-const HOURS_PER_DAY = 8;
 
 // NOTE: we intentionally use the canonical converter from lib/number-utils.ts
 // to avoid format/locale/Decimal128 mismatches.

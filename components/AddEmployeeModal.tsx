@@ -81,6 +81,7 @@ export type AddEmployeeFormData = {
   scheduledEnd: string;
   roleId: string;
   residence?: string;
+  hoursPerDay: string;
 };
 
 interface Props {
@@ -111,6 +112,7 @@ const defaultFormState = {
   scheduledEnd: "16:00",
   roleId: "",
   residence: "",
+  hoursPerDay: "8",
 };
 
 export default function AddEmployeeModal({
@@ -159,6 +161,7 @@ export default function AddEmployeeModal({
           scheduledEnd: employee.scheduledEnd || "16:00",
           roleId: employee.roleId || "",
           residence: employee.residence || "",
+          hoursPerDay: String(employee.hoursPerDay ?? 8),
         };
       }
 
@@ -551,7 +554,7 @@ export default function AddEmployeeModal({
                 {roleError && <p className="text-xs text-rose-400 font-bold mt-1.5">{roleError}</p>}
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
                   المسمى الوظيفي
                 </label>
@@ -624,7 +627,7 @@ export default function AddEmployeeModal({
                     />
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label
                       htmlFor="transportAllowance"
                       className="block text-xs font-bold text-[#C89355] mb-2"
@@ -659,16 +662,40 @@ export default function AddEmployeeModal({
                     <input
                       id="insuranceAmount"
                       type="text"
-                      placeholder="0"
-                      className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 outline-none transition-all text-rose-400 font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      readOnly
+                      className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl text-rose-400/60 font-mono text-lg font-bold shadow-sm text-left cursor-not-allowed"
                       dir="ltr"
-                      value={formData.insuranceAmount}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          insuranceAmount: formatNumberWithCommas(e.target.value),
-                        })
-                      }
+                      value={formData.insuranceAmount || ""}
+                    />
+                    <p className="text-xs text-slate-500 mt-1.5 font-semibold" dir="rtl">
+                      لتعديل مبلغ التأمين، استخدم صفحة إعدادات الرواتب
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div>
+                    <label
+                      htmlFor="hoursPerDay"
+                      className="block text-xs font-bold text-[#C89355] mb-2"
+                    >
+                      ساعات العمل اليومية
+                    </label>
+                    <input
+                      id="hoursPerDay"
+                      type="number"
+                      min={1}
+                      max={24}
+                      placeholder="8"
+                      className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
+                      dir="ltr"
+                      value={formData.hoursPerDay}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || (Number(val) >= 1 && Number(val) <= 24)) {
+                          setFormData({ ...formData, hoursPerDay: val });
+                        }
+                      }}
                     />
                   </div>
                 </div>

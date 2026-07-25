@@ -186,7 +186,7 @@ describe("ResignedEmployeesList", () => {
       />
     );
 
-    const settleButtons = screen.getAllByText(/اعتماد التصفية/i);
+    const settleButtons = screen.getAllByText(/تصفية مالية/i);
     
     // Should have 2 settle buttons (for the 2 unsettled employees)
     expect(settleButtons).toHaveLength(2);
@@ -203,7 +203,7 @@ describe("ResignedEmployeesList", () => {
       />
     );
 
-    const settleButtons = screen.getAllByText(/اعتماد التصفية/i);
+    const settleButtons = screen.getAllByText(/تصفية مالية/i);
     fireEvent.click(settleButtons[0]);
 
     await waitFor(() => {
@@ -225,7 +225,7 @@ describe("ResignedEmployeesList", () => {
       />
     );
 
-    const settleButtons = screen.getAllByText(/اعتماد التصفية/i);
+    const settleButtons = screen.getAllByText(/تصفية مالية/i);
     // There is no confirm prompt directly on click in the new flow, it opens a modal instead
     // We update the test to reflect we're interacting with onFinancialSettlement
     fireEvent.click(settleButtons[0]);

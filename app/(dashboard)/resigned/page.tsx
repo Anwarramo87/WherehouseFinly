@@ -267,7 +267,7 @@ export default function ResignedEmployeesPage() {
     }
   }, [selectedEmployeeForSettlement, queryClient]);
 
-  // Export to Excel — xlsx loaded lazily so it doesn't block the page compile
+  // Export to Excel — exceljs loaded lazily so it doesn't block the page compile
   const handleExportToExcel = useCallback(async () => {
     try {
       const { excelExportService } = await import("@/lib/excel-export");

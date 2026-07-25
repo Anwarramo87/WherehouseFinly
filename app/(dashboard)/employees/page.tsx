@@ -242,6 +242,10 @@ export default function EmployeesPage() {
       payload.insuranceAmount = toNumber(formData.insuranceAmount);
     }
 
+    if (formData.hoursPerDay !== undefined && formData.hoursPerDay !== "") {
+      payload.hoursPerDay = Number(formData.hoursPerDay) || 8;
+    }
+
     if (!selectedEmployee) {
       // Generate a safe username: use trimmed input OR fall back to employeeId (guaranteed unique)
       const rawUsername = formData.username.trim();

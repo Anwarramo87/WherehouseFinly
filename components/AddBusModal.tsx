@@ -109,8 +109,8 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
 
-  const handleSelectEmployee = (emp: { employeeId: string; name: string }) => {
-    setFormData((p) => ({ ...p, driverName: emp.name, driverPhone: emp.employeeId }));
+  const handleSelectEmployee = (emp: { employeeId: string; name: string; mobile?: string | null }) => {
+    setFormData((p) => ({ ...p, driverName: emp.name, driverPhone: emp.mobile || "" }));
     setEmployeeSearch(`${emp.employeeId} - ${emp.name}`);
     setIsEmpDropdownOpen(false);
     setPhoneError("");
@@ -131,7 +131,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (driverSource === "external" && !validatePhone(formData.driverPhone)) return;
+    if (!validatePhone(formData.driverPhone)) return;
     const capacity = Number(formData.capacity);
     if (!capacity || capacity < 1) {
       alert("يجب أن تكون سعة الركاب أكبر من صفر");
@@ -218,7 +218,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                       {filteredEmployees.length === 0 ? (
                         <div className="p-4 text-center text-slate-500 font-bold text-sm">لا يوجد موظف بهذا الاسم</div>
                       ) : (
-                        filteredEmployees.map((emp: { employeeId: string; name: string }) => (
+                        filteredEmployees.map((emp: { employeeId: string; name: string; mobile?: string | null }) => (
                           <div
                             key={emp.employeeId}
                             onClick={() => handleSelectEmployee(emp)}

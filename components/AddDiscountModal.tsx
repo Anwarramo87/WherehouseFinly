@@ -233,7 +233,6 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
                   <option value="سلفة مالية">سلفة مالية</option>
                   <option value="شراء ملابس">شراء ملابس</option>
                   <option value="عقوبة">عقوبة إدارية</option>
-                  <option value="مكافأة">مكافأة / بدل</option>
                 </select>
                 {renderTypeIcon()}
                 <ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-focus-within:text-[#C89355] transition-all duration-300" size={18} />

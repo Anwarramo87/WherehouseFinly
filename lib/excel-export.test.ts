@@ -7,11 +7,11 @@
  * - exportResignedEmployees: error on empty array, correct result shape
  * - ExcelExportError: correct name, code, statusCode
  *
- * Note: XLSX.writeFile is mocked so no actual file I/O occurs in tests.
+ * Note: workbook.xlsx.writeBuffer and browser download are mocked so no actual
+ * file I/O occurs in tests.
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import * as XLSX from 'xlsx';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   ExcelExportService,
   ExcelExportError,
@@ -20,15 +20,80 @@ import {
 import type { Employee } from '@/types/employee';
 
 // ============================================================================
-// Mock XLSX.writeFile so tests don't touch the filesystem
+// Mock exceljs — lightweight mock that tracks worksheets
 // ============================================================================
 
-vi.mock('xlsx', async () => {
-  const actual = await vi.importActual<typeof XLSX>('xlsx');
+interface MockWorksheet {
+  name: string;
+  columns: Array<{ header: string; key: string; width: number }>;
+  views: Array<{ rightToLeft: boolean }>;
+  _rows: unknown[];
+  addRow: ReturnType<typeof vi.fn>;
+}
+
+const { mockWorksheets, MockWorkbook } = vi.hoisted(() => {
+  const mockWorksheets: MockWorksheet[] = [];
+  const MockWorkbook = vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+    this.addWorksheet = vi.fn((name: string, options?: { views?: Array<{ rightToLeft: boolean }> }) => {
+      const ws: MockWorksheet = {
+        name,
+        columns: [],
+        views: options?.views || [],
+        _rows: [],
+        addRow: vi.fn(),
+      };
+      mockWorksheets.push(ws);
+      return ws;
+    });
+    this.xlsx = {
+      writeBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+    };
+    return this;
+  });
+  return { mockWorksheets, MockWorkbook };
+});
+
+vi.mock('exceljs', () => {
   return {
-    ...actual,
-    writeFile: vi.fn(),
+    __esModule: true,
+    default: {
+      Workbook: MockWorkbook,
+    },
   };
+});
+
+// ============================================================================
+// Mock browser download globals
+// ============================================================================
+
+const mockClick = vi.fn();
+let mockLinkHref = '';
+let mockLinkDownload = '';
+
+beforeEach(() => {
+  mockWorksheets.length = 0;
+  mockClick.mockClear();
+  mockLinkHref = '';
+  mockLinkDownload = '';
+
+  vi.spyOn(document, 'createElement').mockReturnValue({
+    set href(v: string) { mockLinkHref = v; },
+    set download(v: string) { mockLinkDownload = v; },
+    click: mockClick,
+  } as unknown as HTMLElement);
+  vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node as ChildNode);
+  vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node as ChildNode);
+
+  if (!URL.createObjectURL) {
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:mock-url'), configurable: true });
+  } else {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
+  }
+  if (!URL.revokeObjectURL) {
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+  } else {
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  }
 });
 
 // ============================================================================
@@ -63,11 +128,7 @@ describe('ExcelExportService', () => {
 
   beforeEach(() => {
     service = new ExcelExportService();
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    mockWorksheets.length = 0;
   });
 
   // --------------------------------------------------------------------------
@@ -111,7 +172,6 @@ describe('ExcelExportService', () => {
     });
 
     it('labels resigned employees as "استقالة" even when status is "terminated"', () => {
-      // terminationType overrides status for the label
       const emp = makeEmployee({ status: 'terminated', terminationType: 'resignation' });
       const rows = service.buildExportRows([emp]);
       expect(rows[0]['نوع الإنهاء']).toBe('استقالة');
@@ -132,7 +192,6 @@ describe('ExcelExportService', () => {
     it('formats the termination date in Arabic locale', () => {
       const emp = makeEmployee({ terminationDate: '2026-05-10' });
       const rows = service.buildExportRows([emp]);
-      // Should be a non-empty string (locale formatting varies by environment)
       expect(rows[0]['تاريخ الإنهاء']).toBeTruthy();
       expect(rows[0]['تاريخ الإنهاء']).not.toBe('—');
     });
@@ -288,11 +347,12 @@ describe('ExcelExportService', () => {
   // --------------------------------------------------------------------------
 
   describe('exportResignedEmployees', () => {
-    it('throws ExcelExportError with NO_DATA code for empty array', () => {
-      expect(() => service.exportResignedEmployees([])).toThrow(ExcelExportError);
+    it('rejects with ExcelExportError and NO_DATA code for empty array', async () => {
+      await expect(service.exportResignedEmployees([]))
+        .rejects.toThrow(ExcelExportError);
 
       try {
-        service.exportResignedEmployees([]);
+        await service.exportResignedEmployees([]);
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(ExcelExportError);
@@ -301,20 +361,20 @@ describe('ExcelExportService', () => {
       }
     });
 
-    it('calls XLSX.writeFile with a .xlsx file name', () => {
+    it('triggers browser download with a .xlsx file name', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp]);
+      await service.exportResignedEmployees([emp]);
 
-      expect(XLSX.writeFile).toHaveBeenCalledOnce();
-      const [, fileName] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(fileName).toMatch(/\.xlsx$/);
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockLinkDownload).toMatch(/\.xlsx$/);
     });
 
-    it('returns a successful ExcelExportResult', () => {
+    it('returns a successful ExcelExportResult', async () => {
       const employees = [makeEmployee({ employeeId: 'E1' }), makeEmployee({ employeeId: 'E2' })];
-      service.exportResignedEmployees(employees);
+      const result = await service.exportResignedEmployees(employees);
 
-      expect(XLSX.writeFile).toHaveBeenCalledOnce();
+      expect(result.success).toBe(true);
+      expect(result.rowCount).toBe(2);
     });
 
     it('uses a custom fileName when provided', async () => {
@@ -322,36 +382,31 @@ describe('ExcelExportService', () => {
       const result = await service.exportResignedEmployees([emp], { fileName: 'تقرير_مخصص' });
 
       expect(result.fileName).toBe('تقرير_مخصص.xlsx');
-      const [, fileName] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(fileName).toBe('تقرير_مخصص.xlsx');
+      expect(mockLinkDownload).toBe('تقرير_مخصص.xlsx');
     });
 
-    it('includes a filters sheet when filters option is provided', () => {
+    it('includes a filters sheet when filters option is provided', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp], {
+      await service.exportResignedEmployees([emp], {
         filters: { department: 'الإنتاج', terminationType: 'resignation' },
       });
 
-      // The workbook passed to writeFile should have 2 sheets
-      const [workbook] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(workbook.SheetNames).toHaveLength(2);
-      expect(workbook.SheetNames[1]).toBe('الفلاتر المطبقة');
+      expect(mockWorksheets).toHaveLength(2);
+      expect(mockWorksheets[1].name).toBe('الفلاتر المطبقة');
     });
 
-    it('does NOT include a filters sheet when filters option is omitted', () => {
+    it('does NOT include a filters sheet when filters option is omitted', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp]);
+      await service.exportResignedEmployees([emp]);
 
-      const [workbook] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(workbook.SheetNames).toHaveLength(1);
+      expect(mockWorksheets).toHaveLength(1);
     });
 
-    it('uses a custom sheetName when provided', () => {
+    it('uses a custom sheetName when provided', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp], { sheetName: 'تقرير مخصص' });
+      await service.exportResignedEmployees([emp], { sheetName: 'تقرير مخصص' });
 
-      const [workbook] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(workbook.SheetNames[0]).toBe('تقرير مخصص');
+      expect(mockWorksheets[0].name).toBe('تقرير مخصص');
     });
 
     it('default file name contains today\'s date', async () => {
@@ -361,25 +416,21 @@ describe('ExcelExportService', () => {
       expect(result.fileName).toContain(today);
     });
 
-    it('the main sheet has RTL view set', () => {
+    it('the main sheet has RTL view set', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp]);
+      await service.exportResignedEmployees([emp]);
 
-      const [workbook] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      expect(sheet['!views']).toBeDefined();
-      expect(sheet['!views'][0].rightToLeft).toBe(true);
+      expect(mockWorksheets[0].views).toBeDefined();
+      expect(mockWorksheets[0].views[0].rightToLeft).toBe(true);
     });
 
-    it('the main sheet has column widths set', () => {
+    it('the main sheet has column widths set', async () => {
       const emp = makeEmployee();
-      service.exportResignedEmployees([emp]);
+      await service.exportResignedEmployees([emp]);
 
-      const [workbook] = (XLSX.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      expect(sheet['!cols']).toBeDefined();
-      expect(Array.isArray(sheet['!cols'])).toBe(true);
-      expect((sheet['!cols'] as XLSX.ColInfo[]).length).toBe(9); // 9 columns
+      expect(mockWorksheets[0].columns).toBeDefined();
+      expect(mockWorksheets[0].columns.length).toBe(9);
+      expect(mockWorksheets[0].columns[0].width).toBe(14);
     });
   });
 
