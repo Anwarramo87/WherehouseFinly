@@ -400,7 +400,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
       />
 
       <div
-        className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden"
+        className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col"
         dir="rtl"
       >
         <div
@@ -496,7 +496,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                   </div>
                 </div>
 
-                <div className="bg-linear-to-br from-[#1a2530] via-[#263544] to-[#1a2530] rounded-3xl p-6 text-center border border-[#C89355]/40 shadow-[0_20px_40px_rgba(38,53,68,0.4)] min-w-60 w-full sm:w-auto relative overflow-hidden group/dues transform hover:-translate-y-1 transition-all duration-500 flex flex-col justify-center">
+                <div className="bg-linear-to-br from-[#1a2530] via-[#263544] to-[#1a2530] rounded-3xl p-5 sm:p-6 text-center border border-[#C89355]/40 shadow-[0_20px_40px_rgba(38,53,68,0.4)] w-full relative group/dues transform hover:-translate-y-1 transition-all duration-500 flex flex-col justify-center">
                   <div className="absolute inset-1.5 rounded-[1.2rem] border border-dashed border-[#C89355]/20 pointer-events-none transition-colors group-hover/dues:border-[#C89355]/50 z-0" />
                   <div className="absolute inset-0 bg-linear-to-r from-transparent via-[#C89355]/10 to-transparent -translate-x-full group-hover/dues:translate-x-full transition-transform duration-1000 ease-in-out" />
 
@@ -504,11 +504,11 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                     <Wallet size={12} />
                     المستحقات الحالية
                   </p>
-                  <div className="flex justify-center items-baseline gap-2 relative z-10">
-                    <h2 className="text-4xl md:text-5xl font-black text-white drop-shadow-[0_2px_10px_rgba(200,147,85,0.3)]">
+                  <div className="flex justify-center items-baseline gap-2 relative z-10 min-w-0">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-[0_2px_10px_rgba(200,147,85,0.3)] break-all leading-tight">
                       {formatMoney(salaryBreakdown.totalDues)}
                     </h2>
-                    <span className="text-[#C89355] font-black text-sm">ل.س</span>
+                    <span className="text-[#C89355] font-black text-xs sm:text-sm shrink-0">ل.س</span>
                   </div>
                 </div>
               </div>

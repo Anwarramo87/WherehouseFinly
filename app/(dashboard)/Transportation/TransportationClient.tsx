@@ -336,7 +336,7 @@ export default function TransportationClient() {
 
   return (
     <div
-      className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex flex-col overflow-hidden"
+      className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto flex flex-col"
       dir="rtl"
     >
       <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
@@ -357,7 +357,7 @@ export default function TransportationClient() {
                 <Bus size={24} className="text-[#C89355]" strokeWidth={2.5} />
               </div>
               <div>
-                <h1 className="text-3xl font-black text-[#1a2530] tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#1a2530] tracking-tight">
                   مواصلات الموظفين
                 </h1>
                 <p className="text-slate-500 text-sm font-bold mt-1 flex items-center gap-1.5">

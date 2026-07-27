@@ -8,6 +8,7 @@ import { resolveApiUrl } from "@/lib/api-url";
 
 // Resolve at request time so env vars are always fresh
 const getBackendUrl = () => resolveApiUrl(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL);
+const DEPLOYED_BACKEND_URL = "https://werehouse-production-4cba.up.railway.app/api/v1";
 const HOP_BY_HOP_HEADERS = new Set([
   "accept-encoding",
   "connection",
@@ -130,7 +131,6 @@ async function handler(request: NextRequest) {
   const rest = pathParts.slice(1);
   const apiPath = "/" + (rest[0] === "v1" ? rest.slice(1) : rest).join("/");
   const cleanedSearch = cleanSearchParams(url.searchParams);
-  const fullUrl = `${getBackendUrl()}${apiPath}${cleanedSearch}`;
 
   if (request.method === "OPTIONS") {
     return new NextResponse(null, {
@@ -140,13 +140,33 @@ async function handler(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(fullUrl, {
-      method: request.method,
-      headers: buildUpstreamHeaders(request),
-      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
-      redirect: "manual",
-      cache: "no-store",
-    });
+    const primaryUrl = getBackendUrl();
+    const isGetOrHead = request.method === "GET" || request.method === "HEAD";
+    const body = isGetOrHead ? undefined : await request.text();
+    let response: Response;
+    
+    try {
+      response = await fetch(primaryUrl + apiPath + cleanedSearch, {
+        method: request.method,
+        headers: buildUpstreamHeaders(request),
+        body,
+        redirect: "manual",
+        cache: "no-store",
+      });
+    } catch {
+      // Primary backend unreachable — try deployed fallback
+      if (primaryUrl !== DEPLOYED_BACKEND_URL) {
+        response = await fetch(DEPLOYED_BACKEND_URL + apiPath + cleanedSearch, {
+          method: request.method,
+          headers: buildUpstreamHeaders(request),
+          body,
+          redirect: "manual",
+          cache: "no-store",
+        });
+      } else {
+        throw new Error("Primary backend unreachable and no fallback configured");
+      }
+    }
 
     return new NextResponse(response.body, {
       status: response.status,
@@ -160,7 +180,6 @@ async function handler(request: NextRequest) {
     reportDebug?.("C", "Next API proxy failed before upstream response", {
       method: request.method,
       path,
-      fullUrl,
       error: errMsg,
     });
     // #endregion

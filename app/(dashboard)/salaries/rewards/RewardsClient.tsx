@@ -239,7 +239,7 @@ export default function RewardsClient() {
 
   if (!mounted) {
     return (
-      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+      <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col" dir="rtl">
         <div className="flex items-center justify-center h-full min-h-[85vh]">
           <div className="flex flex-col items-center gap-4 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
             <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin" />
@@ -251,7 +251,7 @@ export default function RewardsClient() {
   }
 
   return (
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col" dir="rtl">
       
       {/* نقشة الفايبر */}
       <div
@@ -279,7 +279,7 @@ export default function RewardsClient() {
               <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 group">
                 <Gift size={22} className="text-[#C89355] group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
               </div>
-              <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">المكافآت والبدلات</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">المكافآت والبدلات</h1>
             </div>
             <p className="text-slate-600 text-sm font-bold pr-14 mt-1">
               إدارة كافة الإضافات المالية والمكافآت والعمل الإضافي للموظفين.

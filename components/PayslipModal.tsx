@@ -386,14 +386,14 @@ const PayslipModal: React.FC<Props> = ({ payslip, month, onClose }) => {
         </div>
 
         {/* Modal footer */}
-        <div className="p-6 sm:p-8 bg-[#1a2530]/90 backdrop-blur-md border-t border-white/5 flex flex-col md:flex-row items-center justify-between shrink-0 relative z-10 print:hidden">
-          <div className="text-right mb-6 md:mb-0">
-            <p className="text-[#C89355] font-black text-sm uppercase tracking-widest mb-1">
+        <div className="p-4 sm:p-6 md:p-8 bg-[#1a2530]/90 backdrop-blur-md border-t border-white/5 flex flex-col md:flex-row items-center justify-between shrink-0 relative z-10 print:hidden">
+          <div className="text-right mb-4 md:mb-0 min-w-0 w-full md:w-auto">
+            <p className="text-[#C89355] font-black text-xs sm:text-sm uppercase tracking-widest mb-1">
               صافي المبلغ المستحق للدفع
             </p>
-            <p className="text-white text-5xl font-black font-mono drop-shadow-md">
+            <p className="text-white text-3xl sm:text-4xl md:text-5xl font-black font-mono drop-shadow-md break-all leading-tight">
               {payslip.netPayRounded.toLocaleString()}
-              <span className="text-2xl mr-3 opacity-80">ل.س</span>
+              <span className="text-lg sm:text-xl md:text-2xl mr-2 sm:mr-3 opacity-80">ل.س</span>
             </p>
             <p className="text-slate-400 text-xs font-bold mt-2">
               (الصافي الدقيق: {payslip.netPay.toLocaleString()} | فرق تقريب:{" "}

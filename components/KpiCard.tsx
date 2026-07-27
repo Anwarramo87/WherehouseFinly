@@ -32,21 +32,23 @@ const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   return (
     <div
-      className={`relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] ${hoverShadowClass} hover:-translate-y-1 transition-all group`}
+      className={`relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] ${hoverShadowClass} hover:-translate-y-1 transition-all group`}
     >
       <div className={`absolute inset-1.5 rounded-[2.2rem] border border-dashed ${borderColorClass} pointer-events-none transition-colors`} />
-      <div className="flex items-center gap-3 mb-4 relative z-10">
-        <div className={`p-3 ${iconBgClass} rounded-xl border ${borderColorClass} shadow-sm ${iconHoverShadowClass} transition-shadow`}>
-          <Icon className={iconColorClass} size={22} />
+      <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+        <div className={`p-2.5 sm:p-3 ${iconBgClass} rounded-xl border ${borderColorClass} shadow-sm ${iconHoverShadowClass} transition-shadow shrink-0`}>
+          <Icon className={iconColorClass} size={20} />
         </div>
-        <p className="font-black text-[#263544] text-sm">{title}</p>
+        <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">{title}</p>
       </div>
-      <p className={`text-4xl font-black ${valueColorClass} relative z-10 drop-shadow-sm`}>
-        {prefix}
-        {value.toLocaleString()}
-        {suffix}
-      </p>
-      <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">
+      <div className="min-w-0 relative z-10">
+        <p className={`text-2xl sm:text-3xl md:text-4xl font-black ${valueColorClass} drop-shadow-sm leading-tight break-all`}>
+          {prefix}
+          {value.toLocaleString()}
+          {suffix ? <span className="text-sm sm:text-base opacity-70 mr-1">{suffix}</span> : null}
+        </p>
+      </div>
+      <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10 leading-tight">
         {description}
       </p>
     </div>

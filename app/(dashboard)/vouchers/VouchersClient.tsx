@@ -709,21 +709,21 @@ export default function VouchersClient() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-          <div className="bg-white/70 border border-white/90 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-black text-slate-500 mb-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="bg-white/70 border border-white/90 rounded-2xl p-4 shadow-sm min-w-0">
+            <p className="text-[10px] sm:text-xs font-black text-slate-500 mb-1 leading-tight">
               إجمالي القسائم الظاهرة
               {showOnlyUnreceived && <span className="text-amber-600"> (غير المقبوضة فقط)</span>}
             </p>
-            <p className="text-3xl font-black text-[#263544]">{receiptStats.total}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-[#263544] break-all leading-tight">{receiptStats.total}</p>
           </div>
-          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-black text-emerald-700 mb-1">تم القبض</p>
-            <p className="text-3xl font-black text-emerald-700">{receiptStats.received}</p>
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 shadow-sm min-w-0">
+            <p className="text-[10px] sm:text-xs font-black text-emerald-700 mb-1 leading-tight">تم القبض</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-emerald-700 break-all leading-tight">{receiptStats.received}</p>
           </div>
-          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-black text-amber-700 mb-1">لم يتم القبض</p>
-            <p className="text-3xl font-black text-amber-700">{receiptStats.pending}</p>
+          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 shadow-sm min-w-0">
+            <p className="text-[10px] sm:text-xs font-black text-amber-700 mb-1 leading-tight">لم يتم القبض</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-amber-700 break-all leading-tight">{receiptStats.pending}</p>
           </div>
         </div>
 
@@ -1050,18 +1050,18 @@ export default function VouchersClient() {
                   <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع</p>
                   {voucher.isPendingSettlement && voucher.netPay === 0 ? (
                     <>
-                      <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
+                      <p className="text-[#1a2530] text-3xl sm:text-4xl md:text-5xl font-black font-mono drop-shadow-md print:text-2xl break-all leading-tight">
                         0
-                        <span className="text-xl mr-2 print:text-sm">ل.س</span>
+                        <span className="text-lg sm:text-xl md:text-2xl mr-2 print:text-sm">ل.س</span>
                       </p>
                       <p className="text-amber-700 text-sm font-bold mt-2 print:text-xs">
                         {departureLabel} - يتطلب تصفية مالية لإنهاء الملف
                       </p>
                     </>
                   ) : (
-                    <p className="text-[#1a2530] text-5xl font-black font-mono drop-shadow-md print:text-2xl">
+                    <p className="text-[#1a2530] text-3xl sm:text-4xl md:text-5xl font-black font-mono drop-shadow-md print:text-2xl break-all leading-tight">
                       {voucher.netPay.toLocaleString()}
-                      <span className="text-xl mr-2 print:text-sm">ل.س</span>
+                      <span className="text-lg sm:text-xl md:text-2xl mr-2 print:text-sm">ل.س</span>
                     </p>
                   )}
                 </div>

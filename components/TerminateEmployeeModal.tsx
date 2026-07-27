@@ -165,7 +165,7 @@ export default function TerminateEmployeeModal({
               <label className="block text-sm font-bold text-rose-400 mb-3">
                 نوع الإنهاء
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label 
                   className={`relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     formData.terminationType === 'resignation'

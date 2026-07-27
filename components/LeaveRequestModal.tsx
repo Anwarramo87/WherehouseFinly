@@ -638,7 +638,7 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                   <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">
                     طريقة احتساب الراتب
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, otherMultiplier: "1" })}

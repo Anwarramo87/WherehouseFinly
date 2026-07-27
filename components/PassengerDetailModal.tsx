@@ -31,7 +31,7 @@ export default function PassengerDetailModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-[#1a2530] rounded-2xl shadow-xl p-6 w-105 rtl text-right border border-[#C89355]/40">
+      <div className="relative bg-[#1a2530] rounded-2xl shadow-xl p-5 sm:p-6 w-[90vw] max-w-sm rtl text-right border border-[#C89355]/40">
         <h3 className="text-lg font-black mb-2 text-[#C89355]">تفاصيل المشترك</h3>
         <p className="text-sm text-slate-400 mb-4">الكود: <span className="font-mono text-[#C89355] font-bold">{passenger.employeeId}</span></p>
         <p className="text-sm text-white font-bold mb-2">{passenger.name || passenger.employeeId}</p>

@@ -35,6 +35,19 @@ npm run dev
 
 ## Troubleshooting - حل المشاكل
 
+### 500 Error on /api/employees (SOLVED)
+**Problem**: `GET http://localhost:3000/api/employees 500`
+
+**Root Cause**: Missing `.env.local` file prevents the Next.js API proxy from connecting to backend
+
+**Solution**:
+1. Create `.env.local` in the `Factory` folder (frontend):
+   ```
+   NEXT_PUBLIC_API_URL=http://localhost:5003/api/v1
+   ```
+2. Restart the frontend server (close terminal and run `start-both.ps1` again)
+3. The `start-both.ps1` script now auto-creates this file if missing
+
 ### WebSocket Connection Failed
 **Problem**: `WebSocket connection to 'ws://localhost:5003/socket.io/...' failed`
 
@@ -51,6 +64,19 @@ npm run start:dev
 **Fixed**: themeColor moved to viewport export
 
 ## Environment Variables
+
+### Frontend (.env.local)
+
+**IMPORTANT**: The frontend needs `.env.local` file to connect to the local backend:
+
+```bash
+# Create .env.local in Factory folder
+NEXT_PUBLIC_API_URL=http://localhost:5003/api/v1
+```
+
+This file is auto-created when you run `start-both.ps1`. If you see 500 errors, make sure this file exists and restart the frontend.
+
+### Backend (.env)
 
 Make sure `.env` exists in backend folder:
 ```

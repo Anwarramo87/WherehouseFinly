@@ -75,7 +75,11 @@ export const calcEarnedSalaryHourly = (
   const hourlyRate = dailyRate / effectiveHours;
   const minuteRate = hourlyRate / 60;
 
-  const workedPay = minuteRate * workedMinutes;
+  // Cap workedMinutes at effectiveWorkDays × hoursPerDay × 60 to prevent overpayment
+  const maxContractualMinutes = effectiveWorkDays * effectiveHours * 60;
+  const cappedWorkedMinutes = Math.min(workedMinutes, maxContractualMinutes);
+
+  const workedPay = minuteRate * cappedWorkedMinutes;
   const sickRemainderPay = minuteRate * sickRemainderMinutes * 0.5;
   const fullSickPay = dailyRate * sickLeaveDays * 0.5;
   const paidLeavePay = dailyRate * paidLeaveDays;

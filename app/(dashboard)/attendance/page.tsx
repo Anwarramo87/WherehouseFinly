@@ -406,7 +406,7 @@ export default function AttendancePage() {
                   <div className="p-3 bg-[#1a2530] rounded-2xl border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 -outline-offset-4">
                     <ClipboardCheck size={22} className="text-[#C89355]" strokeWidth={2.5} />
                   </div>
-                  <h1 className="text-3xl font-black text-[#263544] tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-black text-[#263544] tracking-tight">
                     سجل الحضور والانصراف
                   </h1>
                 </div>

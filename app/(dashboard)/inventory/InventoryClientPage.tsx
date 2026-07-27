@@ -361,7 +361,7 @@ export default function InventoryPage() {
 
   return (
     /* الحاوية الرئيسية: تأثير زجاجي مع درازة خارجية متطابقة مع باقي النظام */
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col" dir="rtl">
         
         {/* نقشة الفايبر (القماش) الثابتة والشفافة */}
         <div 
@@ -432,37 +432,43 @@ export default function InventoryPage() {
 
           {/* كروت الإحصائيات (زجاجية مع درازة) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm">
-                  <Boxes className="text-[#C89355] group-hover:animate-pulse transition-all duration-300" size={22}/>
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm shrink-0">
+                  <Boxes className="text-[#C89355] group-hover:animate-pulse transition-all duration-300" size={20}/>
                 </div>
-                <p className="font-black text-[#263544] text-sm">إجمالي الأصناف</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">إجمالي الأصناف</p>
               </div>
-              <p className="text-4xl font-black text-[#263544] relative z-10">{items.length}</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight">{items.length}</p>
+              </div>
             </div>
 
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-white/80 backdrop-blur-md rounded-xl border border-white shadow-sm">
-                  <Package2 className="text-[#263544] group-hover:animate-pulse transition-all duration-300" size={22}/>
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-white/80 backdrop-blur-md rounded-xl border border-white shadow-sm shrink-0">
+                  <Package2 className="text-[#263544] group-hover:animate-pulse transition-all duration-300" size={20}/>
                 </div>
-                <p className="font-black text-[#263544] text-sm">إجمالي الكمية المتاحة</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">إجمالي الكمية المتاحة</p>
               </div>
-              <p className="text-4xl font-black text-[#263544] relative z-10">{totalQuantity.toLocaleString()}</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight">{totalQuantity.toLocaleString()}</p>
+              </div>
             </div>
 
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(225,29,72,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(225,29,72,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-rose-300" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm">
-                  <AlertTriangle className="text-rose-600 group-hover:animate-pulse transition-all duration-300" size={22}/>
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm shrink-0">
+                  <AlertTriangle className="text-rose-600 group-hover:animate-pulse transition-all duration-300" size={20}/>
                 </div>
-                <p className="font-black text-rose-600 text-sm">تنبيهات المخزون المنخفض</p>
+                <p className="font-black text-rose-600 text-xs sm:text-sm leading-tight">تنبيهات المخزون المنخفض</p>
               </div>
-              <p className="text-4xl font-black text-rose-600 relative z-10">{lowStockCount}</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-rose-600 relative z-10 break-all leading-tight">{lowStockCount}</p>
+              </div>
             </div>
           </div>
 

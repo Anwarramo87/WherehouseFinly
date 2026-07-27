@@ -62,8 +62,22 @@ export const useDashboard = () => {
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard.home(),
     queryFn: async () => {
-      const response = await apiClient.get("/dashboard/home");
-      return response.data ?? null;
+      try {
+        const response = await apiClient.get("/dashboard/home");
+        const data = response.data;
+        if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
+          console.warn("[useDashboard] Empty response from /dashboard/home", response.status);
+        }
+        return data ?? null;
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
+        console.error(
+          "[useDashboard] API error:",
+          axiosErr?.response?.status,
+          axiosErr?.response?.data ?? axiosErr?.message,
+        );
+        throw err;
+      }
     },
     staleTime: 15_000,
     placeholderData: keepPreviousData,
@@ -120,6 +134,7 @@ export const useDashboard = () => {
     kpis,
     isLoading: dashboardQuery.isLoading && !timedOut,
     isError: dashboardQuery.isError,
+    refetch: dashboardQuery.refetch,
     presentEmployees: dashboard?.attendance?.employees ?? [],
     absentEmployees: dashboard?.absence?.employees ?? [],
     lateEmployees: dashboard?.lateness?.employees ?? [],

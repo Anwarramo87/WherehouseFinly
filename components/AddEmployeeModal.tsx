@@ -718,7 +718,7 @@ export default function AddEmployeeModal({
                 </span>
               </div>
 
-              <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-2 gap-6 shadow-inner">
+              <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 shadow-inner">
                 <div className="col-span-2 flex items-center gap-2 border-b border-white/5 pb-4">
                   <CalendarDays size={22} className="text-[#C89355]" />
                   <span className="text-base font-bold text-white">أوقات الدوام المجدولة</span>

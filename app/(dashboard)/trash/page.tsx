@@ -174,7 +174,7 @@ export default function TrashPage() {
   };
 
   return (
-    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden" dir="rtl">
+    <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col" dir="rtl">
       <div
         className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
         style={{
@@ -195,7 +195,7 @@ export default function TrashPage() {
               <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 group">
                 <Trash2 size={22} className="text-rose-400 group-hover:animate-bounce transition-all duration-300" strokeWidth={2.5} />
               </div>
-              <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">سلة المحذوفات</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">سلة المحذوفات</h1>
             </div>
             <p className="text-slate-600 text-sm font-bold pr-14 mt-1">
               استعادة أو حذف السجلات المحذوفة نهائياً.

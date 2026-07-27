@@ -285,53 +285,61 @@ export default function PayrollPage() {
           )}
 
           {/* KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)] transition-shadow">
-                  <Wallet className="text-[#C89355]" size={22} />
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-[#1a2530] rounded-xl border border-[#C89355]/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(200,147,85,0.4)] transition-shadow shrink-0">
+                  <Wallet className="text-[#C89355]" size={20} />
                 </div>
-                <p className="font-black text-[#263544] text-sm">صافي الإجمالي المقبوض (ل.س) *</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">صافي الإجمالي المقبوض (ل.س) *</p>
               </div>
-              <p className="text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm">{globalTotals.totalNetPayRounded.toLocaleString()} ل.س</p>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">* الراتب المستحق من أيام الدوام الفعلية</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 drop-shadow-sm break-all leading-tight">{globalTotals.totalNetPayRounded.toLocaleString()} <span className="text-sm sm:text-base opacity-70">ل.س</span></p>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10 leading-tight">* الراتب المستحق من أيام الدوام الفعلية</p>
             </div>
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-emerald-500/30 pointer-events-none transition-colors group-hover:border-emerald-500/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-shadow">
-                  <HandCoins className="text-emerald-600" size={22} />
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-sm group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-shadow shrink-0">
+                  <HandCoins className="text-emerald-600" size={20} />
                 </div>
-                <p className="font-black text-[#263544] text-sm">المكافآت (ل.س)</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">المكافآت (ل.س)</p>
               </div>
-              <p className="text-4xl font-black text-emerald-600 relative z-10 drop-shadow-sm">+{globalTotals.totalBonuses.toLocaleString()}</p>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">إجمالي المكافآت والبونصات</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-600 relative z-10 drop-shadow-sm break-all leading-tight">+{globalTotals.totalBonuses.toLocaleString()}</p>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10 leading-tight">إجمالي المكافآت والبونصات</p>
             </div>
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(239,68,68,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(239,68,68,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-rose-500/30 pointer-events-none transition-colors group-hover:border-rose-500/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-shadow">
-                  <Receipt className="text-rose-600" size={22} />
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-shadow shrink-0">
+                  <Receipt className="text-rose-600" size={20} />
                 </div>
-                <p className="font-black text-[#263544] text-sm">الخصومات (ل.س)</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">الخصومات (ل.س)</p>
               </div>
-              <p className="text-4xl font-black text-rose-600 relative z-10 drop-shadow-sm">-{globalTotals.totalDiscounts.toLocaleString()}</p>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">السلف + العقوبات + الخصومات الأخرى</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-rose-600 relative z-10 drop-shadow-sm break-all leading-tight">-{globalTotals.totalDiscounts.toLocaleString()}</p>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10 leading-tight">السلف + العقوبات + الخصومات الأخرى</p>
             </div>
-            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(217,119,6,0.12)] hover:-translate-y-1 transition-all group">
+            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(217,119,6,0.12)] hover:-translate-y-1 transition-all group">
               <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-amber-500/30 pointer-events-none transition-colors group-hover:border-amber-500/50" />
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-shadow">
-                  <Calculator className="text-amber-600" size={22} />
+              <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+                <div className="p-2.5 sm:p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 shadow-sm group-hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-shadow shrink-0">
+                  <Calculator className="text-amber-600" size={20} />
                 </div>
-                <p className="font-black text-[#263544] text-sm">فرق التقريب (ل.س)</p>
+                <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">فرق التقريب (ل.س)</p>
               </div>
-              <p className="text-4xl font-black text-amber-700 relative z-10 drop-shadow-sm">
-                {globalTotals.totalRoundingDifference > 0 ? "+" : ""}
-                {globalTotals.totalRoundingDifference.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10">إجمالي فروقات جبر الكسور للرواتب</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-700 relative z-10 drop-shadow-sm break-all leading-tight">
+                  {globalTotals.totalRoundingDifference > 0 ? "+" : ""}
+                  {globalTotals.totalRoundingDifference.toLocaleString()}
+                </p>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold mt-2 relative z-10 leading-tight">إجمالي فروقات جبر الكسور للرواتب</p>
             </div>
           </div>
 

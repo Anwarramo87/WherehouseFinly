@@ -37,7 +37,7 @@ export function PayrollVirtualTable({
       <div
         ref={parentRef}
         className="w-full overflow-x-auto custom-scrollbar relative z-10"
-        style={{ height: "75vh", minHeight: "500px" }}
+        style={{ height: "70vh", minHeight: "min(500px, 50vh)" }}
       >
         {/* Header */}
         <div className="flex w-full min-w-212.5 bg-slate-100 border-b border-slate-200 sticky top-0 z-20 shadow-sm">

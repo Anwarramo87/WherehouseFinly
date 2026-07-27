@@ -138,6 +138,8 @@ export default function DashboardPage() {
   const {
     kpis,
     isLoading: isDashboardLoading,
+    isError: isDashboardError,
+    refetch: refetchDashboard,
     presentEmployees,
     absentEmployees,
     lateEmployees,
@@ -461,7 +463,7 @@ export default function DashboardPage() {
   return (
     <>
       <div
-        className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col overflow-hidden"
+        className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-2xl rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col"
         dir="rtl"
       >
         <div
@@ -495,12 +497,25 @@ export default function DashboardPage() {
             </div>
           </header>
 
+          {isDashboardError && (
+            <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-bold">
+              <AlertTriangle size={18} className="shrink-0" />
+              <span className="flex-1">تعذر تحميل بيانات لوحة التحكم — تأكد من تسجيل الدخول ثم حاول مرة أخرى</span>
+              <button
+                onClick={() => refetchDashboard()}
+                className="px-4 py-1.5 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 transition-colors"
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          )}
+
           {/* KPI Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-10">
             {stats.map((stat, index) => (
               <div
                 key={index}
-                className={`relative bg-white/60 backdrop-blur-xl p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group overflow-hidden ${stat.clickable ? "cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]" : "hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]"}`}
+                className={`relative bg-white/60 backdrop-blur-xl p-5 sm:p-7 rounded-4xl border-2 border-white/90 shadow-[0_10px_30px_rgba(38,53,68,0.08)] transition-all duration-500 group ${stat.clickable ? "cursor-pointer hover:shadow-[0_25px_50px_rgba(200,147,85,0.2)] hover:-translate-y-2 hover:scale-[1.02]" : "hover:shadow-[0_15px_35px_rgba(38,53,68,0.1)]"}`}
                 onClick={stat.onClick}
                 role={stat.clickable ? "button" : undefined}
                 tabIndex={stat.clickable ? 0 : undefined}
@@ -531,11 +546,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <h3
-                  className={`text-4xl font-black text-[#263544] tracking-tight mb-2 origin-right transition-transform duration-500 drop-shadow-md relative z-10 ${stat.clickable ? "group-hover:scale-105" : ""}`}
+                  className={`text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] tracking-tight mb-2 origin-right transition-transform duration-500 drop-shadow-md relative z-10 break-all leading-tight ${stat.clickable ? "group-hover:scale-105" : ""}`}
                   suppressHydrationWarning
                 >
                   {isSkeleton ? (
                     <span className="inline-block h-9 w-24 bg-[#e7e0d5] animate-pulse rounded-lg" />
+                  ) : isDashboardError ? (
+                    <span className="text-red-500 text-lg font-bold">—</span>
                   ) : (
                     stat.value
                   )}
@@ -793,7 +810,7 @@ export default function DashboardPage() {
                           {dept.name}
                         </h3>
                       </div>
-                      <p className="text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300">
+                      <p className="text-2xl sm:text-3xl font-black text-[#263544] mb-1 group-hover:scale-105 origin-right transition-transform duration-300 break-all leading-tight">
                         {dept.count}
                       </p>
                       <p className="text-[11px] font-bold text-slate-500">موظف</p>

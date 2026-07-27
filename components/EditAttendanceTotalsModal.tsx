@@ -295,7 +295,7 @@ export default function EditAttendanceTotalsModal({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase">أيام الغياب</label>
                     <input
@@ -347,7 +347,7 @@ export default function EditAttendanceTotalsModal({
                   )}
                 </h3>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* تأخير */}
                   <div>
                     <label className={`block text-[11px] font-black mb-2 uppercase ${isFullyAbsent ? "text-slate-600" : "text-slate-400"}`}>

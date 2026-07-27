@@ -284,7 +284,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                 <Coins className="absolute right-4 top-4.5 text-slate-400 group-focus-within:text-[#C89355]" size={22} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-black text-[#C89355] mb-2 uppercase">حسم الشركة %</label>
                 <div className="relative group"><input type="number" required min={0} max={100} placeholder="0" className="w-full p-4 bg-slate-50 border border-[#263544]/15 rounded-2xl focus:border-[#C89355] outline-none text-[#263544] font-mono font-bold pr-10 text-left dir-ltr" value={formData.discountPercent} onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })} /><Percent className="absolute right-4 top-4 text-slate-400 group-focus-within:text-[#C89355]" size={18} /></div>

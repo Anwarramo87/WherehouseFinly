@@ -208,7 +208,7 @@ function LeaveManageModalContent({ onClose, leave, onUpdated }: Omit<Props, "isO
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#C89355] mb-1.5 uppercase">من تاريخ</label>
                   <div className="relative">
