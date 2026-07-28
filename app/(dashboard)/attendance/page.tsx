@@ -170,6 +170,14 @@ export default function AttendancePage() {
     return map;
   }, [employeeList]);
 
+  const employeeScheduleEndMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of employeeList) {
+      if (e?.employeeId) map.set(e.employeeId, e.scheduledEnd || "16:00");
+    }
+    return map;
+  }, [employeeList]);
+
   const rows = useMemo((): AttendanceTableRow[] => {
     const employeeIds = new Set<string>();
     for (const e of employeeList) {
@@ -313,14 +321,14 @@ export default function AttendancePage() {
     );
   };
 
-  // إضافة يوم كامل (IN + OUT) بوقت الدوام المجدول — للاختبار
+  // إضافة يوم كامل (IN + OUT) بوقت الدوام المجدول
   const handleAddFullDay = (row: AttendanceTableRow) => {
     if (!EMPLOYEE_ID_REGEX.test(row.employeeId)) {
       toast.error(`رقم الموظف غير صالح: ${row.employeeId}`);
       return;
     }
     const scheduledStart = employeeScheduleMap.get(row.employeeId) || "08:00";
-    const scheduledEnd = "16:00";
+    const scheduledEnd = employeeScheduleEndMap.get(row.employeeId) || "16:00";
     markAttendance.mutate(
       {
         employeeId: row.employeeId,

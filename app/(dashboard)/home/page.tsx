@@ -6,7 +6,7 @@ import {
   Users, Clock, Timer, AlertTriangle, UserCheck, UserX,
   Building2, TrendingUp, Scissors, User, CalendarX, ClockAlert,
   Banknote, UserCog, Briefcase, ArrowLeftRight, X, HandCoins,
-  MoreVertical, Pencil, Trash2, CalendarDays, Bus,
+  MoreVertical, Pencil, Trash2, CalendarDays, Bus, Calendar,
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePayrollReport } from "@/hooks/usePayrollReport";
@@ -106,6 +106,7 @@ interface AbsentEmployee {
   scheduledStart: string;
   avatar?: string;
   lastCheckIn?: string;
+  lastWorkDay?: string;
 }
 
 interface LateEmployeeDetail {
@@ -950,13 +951,13 @@ export default function DashboardPage() {
         icon={UserX}
         isLoading={false}
         data={absentEmployees.map((emp) => ({
-          // useDashboard types: DashboardAbsentEmployee = {employeeId,name,department,scheduledStart}
           employeeId: emp.employeeId,
           name: emp.name,
-
           department: emp.department || "",
           profession: "",
           scheduledStart: emp.scheduledStart || "08:00",
+          lastCheckIn: emp.lastCheckIn || undefined,
+          lastWorkDay: emp.lastWorkDay || undefined,
         }))}
         emptyMessage="لا يوجد موظفون غائبون اليوم - حضور كامل! 🎉"
         emptyIcon={CalendarX}
@@ -1012,7 +1013,12 @@ export default function DashboardPage() {
                     <span className="font-mono tracking-wider">{employee.lastCheckIn}</span>
                   </span>
                 )}
-                {/* lastCheckIn may be missing depending on backend payload */}
+                {employee.lastWorkDay && (
+                  <span className="text-[10px] text-slate-500 font-bold bg-slate-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-slate-100">
+                    <Calendar size={10} /> آخر يوم دوام:{" "}
+                    <span className="font-mono tracking-wider">{employee.lastWorkDay}</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -662,14 +662,12 @@ export default function AddEmployeeModal({
                     <input
                       id="insuranceAmount"
                       type="text"
-                      readOnly
-                      className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl text-rose-400/60 font-mono text-lg font-bold shadow-sm text-left cursor-not-allowed"
+                      className="w-full p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl text-rose-400 font-mono text-lg font-bold shadow-sm text-left focus:border-rose-400 focus:ring-2 focus:ring-rose-400/20 transition-all"
                       dir="ltr"
+                      placeholder="0"
                       value={formData.insuranceAmount || ""}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, insuranceAmount: e.target.value }))}
                     />
-                    <p className="text-xs text-slate-500 mt-1.5 font-semibold" dir="rtl">
-                      لتعديل مبلغ التأمين، استخدم صفحة إعدادات الرواتب
-                    </p>
                   </div>
                 </div>
 

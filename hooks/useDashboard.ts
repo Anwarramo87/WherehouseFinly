@@ -31,6 +31,7 @@ export interface DashboardPresentEmployee {
   name: string;
   department: string | null;
   checkIn: string;
+  checkOut: string | null;
 }
 
 export interface DashboardAbsentEmployee {
@@ -38,6 +39,8 @@ export interface DashboardAbsentEmployee {
   name: string;
   department: string | null;
   scheduledStart: string | null;
+  lastWorkDay: string | null;
+  lastCheckIn: string | null;
 }
 
 export interface DashboardLateEmployee {
