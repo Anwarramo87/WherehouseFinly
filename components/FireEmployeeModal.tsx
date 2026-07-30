@@ -11,7 +11,6 @@ import {
   Calendar,
   FileText,
   Calculator,
-  Coins,
   AlertOctagon,
   UserX,
   LogOut,
@@ -76,7 +75,6 @@ export default function FireEmployeeModal({
   const [fireDate, setFireDate] = useState(new Date().toISOString().slice(0, 10));
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
-  const [bonus, setBonus] = useState<string>("");
   const [provisionalData, setProvisionalData] = useState<ProvisionalSettlementData | null>(null);
   const [salaryLoading, setSalaryLoading] = useState(false);
   const prevDateRef = useRef<string>("");
@@ -115,7 +113,6 @@ export default function FireEmployeeModal({
         ]);
 
         const provPayload = provisionalRes.status === 'fulfilled' ? (provisionalRes.value.data || {}) : {};
-        console.log('[FireModal] provisional response:', provPayload);
         const attendanceBasedSalary = toNum(provPayload.earnedSalary ?? provPayload.attendanceBasedSalary);
         const totalBonuses = toNum(provPayload.bonuses ?? provPayload.totalBonuses);
         const totalDeductions = toNum(provPayload.deductions ?? provPayload.totalDeductions);
@@ -151,7 +148,7 @@ export default function FireEmployeeModal({
   const dueSalary = provisionalData?.attendanceBasedSalary ?? 0;
   const apiDeductions = provisionalData?.totalDeductions ?? 0;
   const apiBonuses = provisionalData?.totalBonuses ?? 0;
-  const totalDues = provisionalData?.netPayRounded ?? 0; // Directly use netPayRounded as per architectural constraint
+  const totalDues = Math.ceil((provisionalData?.netPayRounded ?? 0) / 1000) * 1000;
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -379,8 +376,8 @@ export default function FireEmployeeModal({
                     </p>
                   </div>
                 )}
-                {/* إذا كان الخصم الكلي يشمل فقط الباص */}
-                {provisionalData.busDeduction === 0 && (
+                {/* إذا كانت الخصومات كلها باص فقط */}
+                {provisionalData.busDeduction > 0 && (provisionalData.totalDeductions - provisionalData.busDeduction) === 0 && (
                   <div className="bg-[#1a2530] p-3 rounded-xl border border-rose-500/20">
                     <p className="text-[11px] font-bold text-rose-400 mb-1">خصومات</p>
                     <p className="text-base font-mono font-black text-rose-400">
@@ -404,22 +401,6 @@ export default function FireEmployeeModal({
                 </div>
               </div>
             )}
-
-            <div>
-              <label className="block text-[11px] sm:text-xs font-black text-[#E7C873] mb-1.5 uppercase">
-                مكافأة أو خصم إضافي
-              </label>
-              <div className="relative group">
-                <input
-                  type="number"
-                  placeholder="0"
-                  className="w-full p-3 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#E7C873]/30 focus:border-[#E7C873] outline-none text-white font-mono text-base font-bold pr-10 placeholder:text-slate-600"
-                  value={bonus}
-                  onChange={(e) => setBonus(e.target.value)}
-                />
-                <Coins className="absolute right-3 top-3 text-slate-500" size={20} />
-              </div>
-            </div>
 
             <div
               className={`bg-${themeColor}-500/10 p-4 sm:p-5 rounded-xl border border-${themeColor}-500/30 text-center shadow-inner`}

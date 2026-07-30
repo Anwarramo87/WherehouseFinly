@@ -43,13 +43,9 @@ export const useEmployeeSalary = (employeeId?: string) =>
       try {
         const res = await apiClient.get(`/salary/${employeeId}`);
         const raw = res.data;
-        console.log("useEmployeeSalary raw data:", raw);
-        const normalized = raw ? normalizeSalary(raw as Record<string, unknown>) : null;
-        console.log("useEmployeeSalary normalized data:", normalized);
-        return normalized;
+        return raw ? normalizeSalary(raw as Record<string, unknown>) : null;
       } catch (error: unknown) {
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-        // 404/400 means no salary record yet — return null silently
         if (status === 404 || status === 400) {
           return null;
         }
@@ -79,13 +75,9 @@ export const useSalaries = () => {
     queryKey: queryKeys.salaries.all,
     queryFn: async () => {
       const res = await apiClient.get("/salary");
-      console.log("useSalaries api response:", res);
       const data = res.data?.salaries ?? res.data;
-      console.log("useSalaries data:", data);
       const rawArray = Array.isArray(data) ? data : [];
-      const normalized = rawArray.map((raw) => normalizeSalary(raw as Record<string, unknown>));
-      console.log("useSalaries normalized:", normalized);
-      return normalized;
+      return rawArray.map((raw) => normalizeSalary(raw as Record<string, unknown>));
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,

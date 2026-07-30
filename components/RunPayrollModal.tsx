@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Play, X, CalendarDays, Timer, Minus, Info } from "lucide-react";
+import { Loader2, Play, X, CalendarDays, Minus, Info } from "lucide-react";
 import { CalculatePayrollInput } from "@/types/payroll";
 
 interface RunPayrollModalProps {
@@ -47,7 +47,6 @@ const createDefaultForm = (monthStr?: string): CalculatePayrollInput => {
   return {
     periodStart: range.periodStart,
     periodEnd: range.periodEnd,
-    gracePeriodMinutes: 5,
     includeAttendanceDeductions: true,
     includeTransportationDeductions: true,
   };
@@ -66,7 +65,6 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('[RunPayrollModal] Form submitted with:', form);
     onRun(form);
   };
 
@@ -121,29 +119,6 @@ export default function RunPayrollModal({ isOpen, onClose, onRun, isPending, ini
             className="space-y-4"
             onSubmit={handleSubmit}
           >
-            {/* Grace Period */}
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-400 mb-2">
-                <Timer size={14} />
-                دقائق السماحية
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min={0}
-                  value={form.gracePeriodMinutes?.toString() || ""}
-                  onChange={(e) => setForm((p) => ({ ...p, gracePeriodMinutes: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2.5 bg-[#1e293b] border border-slate-700/40 rounded-xl focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355]/60 outline-none transition-all text-white font-mono text-sm font-bold pr-10 placeholder:text-slate-500"
-                  placeholder="5"
-                />
-                <Timer className="absolute right-3 top-2.5 text-slate-500 pointer-events-none" size={18} />
-              </div>
-              <p className="text-[10px] text-slate-500 font-semibold mt-1">الوقت المسموح به قبل احتساب التأخير (بالدقائق)</p>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-slate-700/30 my-2" />
-
             {/* Deductions Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">

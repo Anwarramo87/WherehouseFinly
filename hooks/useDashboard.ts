@@ -1,12 +1,30 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import type { DashboardKpis } from "@/types/dashboard";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 
-// Max time to show skeleton — after this show zeros rather than spinning forever
 const SKELETON_TIMEOUT_MS = 4_000;
+const POLL_INTERVAL_ACTIVE_MS = 60_000;
+const POLL_INTERVAL_BACKGROUND_MS = 5 * 60_000;
+
+const isBrowser = typeof window !== "undefined";
+
+const useIsTabVisible = (): boolean => {
+  const [visible, setVisible] = useState<boolean>(
+    isBrowser ? document.visibilityState === "visible" : true,
+  );
+
+  useEffect(() => {
+    if (!isBrowser) return;
+    const onChange = () => setVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+
+  return visible;
+};
 
 const fallbackKpis: DashboardKpis = {
   totalEmployees: 0,
@@ -62,30 +80,24 @@ export interface DashboardOvertimeEmployee {
 }
 
 export const useDashboard = () => {
+  const tabVisible = useIsTabVisible();
+
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard.home(),
     queryFn: async () => {
       try {
         const response = await apiClient.get("/dashboard/home");
         const data = response.data;
-        if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
-          console.warn("[useDashboard] Empty response from /dashboard/home", response.status);
-        }
         return data ?? null;
-      } catch (err: unknown) {
-        const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
-        console.error(
-          "[useDashboard] API error:",
-          axiosErr?.response?.status,
-          axiosErr?.response?.data ?? axiosErr?.message,
-        );
-        throw err;
+      } catch {
+        throw new Error("فشل تحميل بيانات لوحة التحكم");
       }
     },
-    staleTime: 15_000,
+    staleTime: 30_000,
     placeholderData: keepPreviousData,
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchOnWindowFocus: tabVisible,
+    refetchInterval: tabVisible ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_BACKGROUND_MS,
+    refetchIntervalInBackground: false,
     retry: 1,
   });
 

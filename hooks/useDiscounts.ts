@@ -312,7 +312,6 @@ export const useDiscounts = (employeeId?: string, period?: string, enabled = tru
       const data = res.data;
 
       if (!Array.isArray(data)) {
-        console.warn('Discounts API returned non-array data:', data);
         return [];
       }
 

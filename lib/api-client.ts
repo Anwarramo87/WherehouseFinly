@@ -1,26 +1,26 @@
-import axios from 'axios';
-import { clearAuthAccessToken, clearAuthSession, getAuthAccessToken } from '@/lib/auth-session';
-import { resetAuthVerificationCache } from '@/lib/auth-verify';
-import { useAuthStore } from '@/stores/auth-store';
-import { resolveApiUrl } from '@/lib/api-url';
+import axios from "axios";
+import { clearAuthAccessToken, clearAuthSession, getAuthAccessToken } from "@/lib/auth-session";
+import { resetAuthVerificationCache } from "@/lib/auth-verify";
+import { useAuthStore } from "@/stores/auth-store";
+import { resolveApiUrl } from "@/lib/api-url";
 
-const isBrowser = typeof window !== 'undefined';
+const isBrowser = typeof window !== "undefined";
 const serverApiUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
-const BASE_URL = isBrowser ? '/api' : serverApiUrl;
+const BASE_URL = isBrowser ? "/api" : serverApiUrl;
 const LOGIN_REDIRECT_COOLDOWN_MS = 1500;
 let lastLoginRedirectAt = 0;
 
 const getRequestPathname = (url?: string) => {
-  if (!url) return '';
+  if (!url) return "";
 
   try {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
       return new URL(url).pathname;
     }
 
     const base = isBrowser
       ? window.location.origin
-      : serverApiUrl.startsWith('http')
+      : serverApiUrl.startsWith("http")
         ? serverApiUrl
         : resolveApiUrl();
 
@@ -31,12 +31,12 @@ const getRequestPathname = (url?: string) => {
 };
 
 const AUTH_ENDPOINT_PREFIXES = [
-  '/auth/login',
-  '/auth/logout',
-  '/auth/me',
-  '/auth/register',
-  '/auth/refresh',
-  '/auth/biometric/',
+  "/auth/login",
+  "/auth/logout",
+  "/auth/me",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/biometric/",
 ] as const;
 
 const isAuthEndpoint = (pathname: string) => {
@@ -57,12 +57,9 @@ const waitForRefresh = (): Promise<boolean> =>
 const apiClient = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
-  timeout: 30000, // 30 ثواني timeout
+  timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0',
+    "Content-Type": "application/json",
   },
 });
 
@@ -81,6 +78,23 @@ apiClient.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     if (!config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  const method = (config.method || "get").toUpperCase();
+  if (method === "GET") {
+    // Allow browser/proxy caching for GET — React Query handles freshness via staleTime
+    if (config.headers) {
+      delete (config.headers as Record<string, unknown>).Pragma;
+      delete (config.headers as Record<string, unknown>).Expires;
+      delete (config.headers as Record<string, unknown>)["Cache-Control"];
+    }
+  } else {
+    if (config.headers) {
+      (config.headers as Record<string, unknown>)["Cache-Control"] =
+        "no-cache, no-store, must-revalidate";
+      (config.headers as Record<string, unknown>).Pragma = "no-cache";
+      (config.headers as Record<string, unknown>).Expires = "0";
     }
   }
 
@@ -115,9 +129,13 @@ const forceLogout = () => {
   resetAuthVerificationCache();
 
   const now = Date.now();
-  if (typeof window !== 'undefined' && now - lastLoginRedirectAt > LOGIN_REDIRECT_COOLDOWN_MS && window.location.pathname !== '/login') {
+  if (
+    typeof window !== "undefined" &&
+    now - lastLoginRedirectAt > LOGIN_REDIRECT_COOLDOWN_MS &&
+    window.location.pathname !== "/login"
+  ) {
     lastLoginRedirectAt = now;
-    window.location.href = '/login';
+    window.location.href = "/login";
   }
 };
 
@@ -131,7 +149,7 @@ apiClient.interceptors.response.use(
     // فقط عند 401 وخارج نقاط المصادقة وبدون retry سابق
     if (
       status === 401 &&
-      typeof window !== 'undefined' &&
+      typeof window !== "undefined" &&
       !isAuthEndpoint(requestPathname) &&
       !originalConfig?._retry
     ) {
@@ -150,7 +168,7 @@ apiClient.interceptors.response.use(
       originalConfig._retry = true;
 
       try {
-        await apiClient.post('/auth/refresh', {}, { timeout: 8_000 });
+        await apiClient.post("/auth/refresh", {}, { timeout: 8_000 });
         isRefreshing = false;
         onRefreshComplete(true);
         // أعد تنفيذ الطلب الأصلي بعد نجاح الـ refresh
