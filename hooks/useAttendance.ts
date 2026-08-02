@@ -56,6 +56,7 @@ export interface AttendanceQueryParams {
   period?: string; // YYYY-MM format
   page?: number;
   limit?: number;
+  enabled?: boolean;
 }
 
 export interface AttendancePayload {
@@ -244,6 +245,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
 
   const query = useQuery<AttendanceListResponse>({
     queryKey,
+    enabled: params?.enabled ?? true,
     queryFn: async () => {
       const requestList = async (requestParams: {
         employeeId?: string;

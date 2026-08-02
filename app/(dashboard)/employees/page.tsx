@@ -294,6 +294,7 @@ export default function EmployeesPage() {
       roleId: formData.roleId || undefined,
       scheduledStart: formData.scheduledStart || undefined,
       scheduledEnd: formData.scheduledEnd || undefined,
+      gracePeriodMinutes: formData.gracePeriodMinutes,
       baseSalary: monthlySalary || undefined,
     };
 
@@ -309,13 +310,8 @@ export default function EmployeesPage() {
       payload.transportAllowance = toNumber(formData.transportAllowance);
     }
 
-    if (formData.insuranceAmount !== "") {
-      payload.insuranceAmount = toNumber(formData.insuranceAmount);
-    }
-
-    if (formData.hoursPerDay !== undefined && formData.hoursPerDay !== "") {
-      payload.hoursPerDay = Number(formData.hoursPerDay) || 8;
-    }
+    // Clearing insurance means removing the deduction, not preserving its old value.
+    payload.insuranceAmount = toNumber(formData.insuranceAmount);
 
     if (!selectedEmployee) {
       // Generate a safe username: use trimmed input OR fall back to employeeId (guaranteed unique)
@@ -388,7 +384,6 @@ export default function EmployeesPage() {
         await Promise.all([
           refetchSalaries().catch(() => {}),
           refetchAllEmployees().catch(() => {}),
-          refetch().catch(() => {}),
         ]);
       }
 
@@ -420,14 +415,15 @@ export default function EmployeesPage() {
   };
 
   const handleBulkTerminateDepartment = async () => {
-    if (!bulkTerminateDept || bulkTerminateDept === "الكل") {
+    const dept = bulkTerminateDept || selectedDept;
+    if (!dept || dept === "الكل") {
       toast.error("يرجى اختيار قسم محدد");
       return;
     }
 
     try {
       await bulkTerminateDepartment.mutateAsync({
-        department: bulkTerminateDept,
+        department: dept,
         status: "terminated",
         terminationDate: new Date().toISOString(),
         terminationReason: "إقالة جماعية",
@@ -489,17 +485,11 @@ export default function EmployeesPage() {
 
             <div className="w-full md:w-auto flex justify-end">
               <button
-                onClick={async () => {
+                onClick={() => {
                   setSelectedEmployee(null);
-                  try {
-                    const result = await refetchAllEmployees();
-                    const freshList = Array.isArray(result.data) ? result.data : [];
-                    setSuggestedEmployeeId(computeNextId(freshList));
-                  } catch {
-                    setSuggestedEmployeeId(
-                      computeNextId(Array.isArray(allEmployeesForId) ? allEmployeesForId : []),
-                    );
-                  }
+                  setSuggestedEmployeeId(
+                    computeNextId(Array.isArray(allEmployeesForId) ? allEmployeesForId : []),
+                  );
                   setIsModalOpen(true);
                 }}
                 className="relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group"

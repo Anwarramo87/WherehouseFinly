@@ -148,12 +148,12 @@ export default function NotificationBell() {
   const markRead = useMarkNotificationRead();
   const dismiss = useDismissNotification();
 
-  // جلب أحدث الإشعارات + عداد غير المقروء عند تحميل الجرس
-  useNotifications({ limit: 50 });
-  useUnreadNotificationCount();
-
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // The count is enough for the closed bell; fetch the full list only on demand.
+  useNotifications({ limit: 50, enabled: open });
+  useUnreadNotificationCount();
 
   useEffect(() => {
     if (!open) return;

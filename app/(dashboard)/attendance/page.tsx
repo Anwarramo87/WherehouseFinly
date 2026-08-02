@@ -149,7 +149,9 @@ export default function AttendancePage() {
     isError: dailyViewError,
     error: dailyViewErrorObj,
   } = useAttendanceDailyView(selectedDate);
-  const attendanceParams = useMemo(() => ({ period, limit: 200 }), [period]);
+  // This page renders the daily-view endpoint; keep only the mutation from
+  // useAttendance and avoid loading up to ten unused monthly pages.
+  const attendanceParams = useMemo(() => ({ period, limit: 200, enabled: false }), [period]);
   const { markAttendance } = useAttendance(attendanceParams);
 
   const employeeList = useMemo(() => (Array.isArray(employees) ? employees : []), [employees]);

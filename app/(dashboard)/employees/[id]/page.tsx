@@ -191,7 +191,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
       if (
         checkInMinutes !== null &&
         scheduledStartMinutes !== null &&
-        checkInMinutes > scheduledStartMinutes + 5
+        checkInMinutes > scheduledStartMinutes + (employee?.gracePeriodMinutes ?? 5)
       ) {
         lateMinutes += checkInMinutes - scheduledStartMinutes;
       }

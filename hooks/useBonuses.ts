@@ -7,7 +7,7 @@ import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 import { queryKeys } from "@/lib/query-keys";
 
-export const useBonuses = (params?: { employeeId?: string; period?: string }) => {
+export const useBonuses = (params?: { employeeId?: string; period?: string; enabled?: boolean }) => {
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -34,6 +34,7 @@ export const useBonuses = (params?: { employeeId?: string; period?: string }) =>
 
       return [];
     },
+    enabled: params?.enabled ?? true,
     staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
   });

@@ -257,7 +257,6 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         employmentStartDate: newEmployee.employmentStartDate,
         gracePeriodMinutes: newEmployee.gracePeriodMinutes,
         workDaysInPeriod: newEmployee.workDaysInPeriod,
-        hoursPerDay: newEmployee.hoursPerDay,
         residence: newEmployee.residence,
       };
 

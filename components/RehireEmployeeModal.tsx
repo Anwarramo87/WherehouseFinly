@@ -175,6 +175,28 @@ export default function RehireEmployeeModal({
               )}
             </div>
 
+            {/* Restore previous settings */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer select-none p-4 bg-[#1a2530]/60 border border-[#263544] rounded-xl transition-colors hover:border-emerald-500/30">
+                <input
+                  type="checkbox"
+                  checked={formData.restorePreviousSettings}
+                  onChange={(e) =>
+                    setFormData({ ...formData, restorePreviousSettings: e.target.checked })
+                  }
+                  className="mt-0.5 h-5 w-5 rounded accent-emerald-500 bg-[#263544] border border-[#263544] focus:ring-2 focus:ring-emerald-500/30"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-emerald-400">
+                    استعادة الإعدادات السابقة
+                  </span>
+                  <span className="block text-xs text-slate-400 font-semibold mt-1">
+                    عند الإلغاء: يبدأ الموظف من جديد بدون الراتب والمكافآت والسلف والخصومات القديمة
+                  </span>
+                </span>
+              </label>
+            </div>
+
             {/* Additional Notes */}
             <div>
               <label className="block text-sm font-bold text-slate-400 mb-2">

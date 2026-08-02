@@ -278,8 +278,13 @@ export default function DashboardPage() {
   // Deferred queries — only fire when dashboard KPIs have loaded (below-the-fold data)
   const isSecondaryReady = !isDashboardLoading && mounted;
   const { data: advances = [] } = useAdvances(undefined, undefined, isSecondaryReady && canViewFinancialRecords);
-  const { data: penaltiesData = [] } = usePenalties();
-  const { data: bonusesData = [] } = useBonuses({ period: monthKey });
+  const { data: penaltiesData = [] } = usePenalties({
+    enabled: isSecondaryReady && canViewFinancialRecords,
+  });
+  const { data: bonusesData = [] } = useBonuses({
+    period: monthKey,
+    enabled: isSecondaryReady && canViewFinancialRecords,
+  });
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];

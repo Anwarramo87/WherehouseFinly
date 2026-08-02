@@ -74,10 +74,10 @@ export default function SalariesSettingClient() {
   const activeTab = getTabFromQuery(requestedTab);
 
   const { data: salaries = [], isLoading, isError, error, updateSalary, deleteSalary } = useSalaries();
-  const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees({ limit: 200, status: "active", fetchAll: false });
+  const { data: employees = [], isLoading: employeesLoading } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
-  const { data: advances = [] } = useAdvances();
+  const { data: advances = [] } = useAdvances(undefined, undefined, activeTab === "advances");
   const queryClient = useQueryClient();
 
   const [mounted, setMounted] = useState(false);
@@ -85,7 +85,7 @@ export default function SalariesSettingClient() {
     setMounted(true); }, []);
 
   const period = useMemo(() => getLocalMonth(), []);
-  const { data: bonuses = [] } = useBonuses({ period });
+  const { data: bonuses = [] } = useBonuses({ period, enabled: activeTab === "bonuses" });
 
   // ── Bulk Raise Modal state ──
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
@@ -148,17 +148,6 @@ export default function SalariesSettingClient() {
     (employees || []).forEach((e) => { if (e?.employeeId) m.set(e.employeeId, e); });
     return m;
   }, [employees]);
-
-  useEffect(() => {
-    if (!refetchEmployees) return;
-    try {
-      const missing = (salaries || []).some((s) => !!s?.employeeId && !employeeMap.has(s.employeeId));
-      if (missing) {
-        refetchEmployees().catch(() => {});
-      }
-    } catch {
-    }
-  }, [salaries, employeeMap, refetchEmployees]);
 
   const salaryMap = useMemo(() => {
     const m = new Map<string, Salary>();
