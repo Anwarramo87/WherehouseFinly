@@ -12,7 +12,7 @@ export interface DailyViewEmployee {
   scheduledEnd: string;
   checkIn: string | null;
   checkOut: string | null;
-  status: "present" | "late" | "absent";
+  status: "present" | "late" | "absent" | "rest";
   notes: string | null;
   source: string | null;
 }
@@ -25,6 +25,7 @@ interface DailyViewResponse {
     present: number;
     late: number;
     absent: number;
+    rest?: number;
   };
 }
 

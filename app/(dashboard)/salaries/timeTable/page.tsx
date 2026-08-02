@@ -543,9 +543,9 @@ export default function TimeTablePage() {
           ? (manualInput.overtimeRegularMinutes ?? 0)
           : autoOvertimeMinutes;
 
-      // أيام إضافي العطلة (الجمعة): يدوي إن وُجد، وإلا آلي
+      // دقائق الجمعة الفعلية: يدوي إن وُجد، وإلا آلي
       const autoWeekendDays = autoInput?.overtimeWeekendDays ?? 0;
-      const totalOvertimeDays =
+      const totalOvertimeWeekendMinutes =
         hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
           ? (manualInput.overtimeWeekendDays ?? 0)
           : autoWeekendDays;
@@ -579,7 +579,7 @@ export default function TimeTablePage() {
                 totalOvertimeMinutes,
                 lateMinutes,
                 manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,
-                totalOvertimeDays,
+                 totalOvertimeWeekendMinutes,
               ),
             )
           : null;
@@ -592,7 +592,7 @@ export default function TimeTablePage() {
         totalDelayMinutes,
         totalEarlyLeaveMinutes,
         totalOvertimeMinutes,
-        totalOvertimeDays,
+        totalOvertimeDays: totalOvertimeWeekendMinutes,
         grossSalary: effectiveGross,
         earnedSalary,
         insuranceAmount,

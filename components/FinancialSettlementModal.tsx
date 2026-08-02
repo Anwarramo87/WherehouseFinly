@@ -155,15 +155,29 @@ const summarizeAttendance = (
   let lateMinutes = 0;
   let earlyLeaveMinutes = 0;
   let overtimeMinutes = 0;
-  let overtimeWeekendDays = 0;
+  let overtimeWeekendMinutes = 0;
 
   dailyMap.forEach((daily, dateKey) => {
     if (daily.ins.length === 0) return;
 
-    presentDays += 1;
-
     const firstIn = [...daily.ins].sort()[0];
     const lastOut = [...daily.outs].sort().at(-1);
+    const weekDay = new Date(`${dateKey}T00:00:00Z`).getUTCDay();
+
+    // Friday is paid only as actual worked minutes at 1.5x. It is not a normal
+    // workday, so no late, early-leave, or absence calculation applies.
+    if (weekDay === 5) {
+      if (firstIn && lastOut) {
+        const inMinutes = toMinutes(toHHmm(firstIn));
+        const outMinutes = toMinutes(toHHmm(lastOut));
+        if (inMinutes !== null && outMinutes !== null) {
+          overtimeWeekendMinutes += Math.max(0, outMinutes - inMinutes);
+        }
+      }
+      return;
+    }
+
+    presentDays += 1;
 
     if (firstIn) {
       lateMinutes += calcLateMinutes(toHHmm(firstIn), scheduledStart, gracePeriod);
@@ -182,10 +196,6 @@ const summarizeAttendance = (
       }
     }
 
-    const weekDay = new Date(`${dateKey}T00:00:00`).getDay();
-    if (weekDay === 5) {
-      overtimeWeekendDays += 1;
-    }
   });
 
   return {
@@ -193,7 +203,7 @@ const summarizeAttendance = (
     lateMinutes,
     earlyLeaveMinutes,
     overtimeMinutes,
-    overtimeWeekendDays,
+    overtimeWeekendDays: overtimeWeekendMinutes,
   };
 };
 

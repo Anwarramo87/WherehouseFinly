@@ -34,13 +34,16 @@ export interface AttendanceDeductionBreakdown {
   // إجمالي دقائق الخروج المبكر / الدوام الناقص (من DailyAttendanceLog)
   earlyLeaveMinutes: number;
 
-  // الإجمالي = غياب + تأخير
+  // خصم الخروج المبكر / الدوام الناقص
+  earlyLeaveDeduction: number;
+
+  // الإجمالي = غياب + تأخير + خروج مبكر/دوام ناقص
   totalAttendanceDeduction: number;
 
   // دقائق الإضافي المحسوبة من وقت الخروج مقارنةً بـ scheduledEnd
   overtimeMinutes: number;
 
-  // أيام إضافي العطلة (الجمعة) المحسوبة تلقائياً
+  // دقائق العمل الفعلية يوم الجمعة، وتُدفع بمعامل الجمعة
   overtimeWeekendDays: number;
 
   // عدد أيام العمل التي مضت فعلاً في الفترة (يُحسب حتى اليوم الحالي)

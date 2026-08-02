@@ -240,6 +240,7 @@ export default function VouchersClient() {
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
+      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
     return map;
@@ -374,7 +375,7 @@ export default function VouchersClient() {
         hasManualInput && (manualInput?.overtimeRegularMinutes ?? 0) > 0
           ? (manualInput?.overtimeRegularMinutes ?? 0)
           : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeDays =
+      const totalOvertimeWeekendMinutes =
         hasManualInput && (manualInput?.overtimeWeekendDays ?? 0) > 0
           ? (manualInput?.overtimeWeekendDays ?? 0)
           : (autoInput?.overtimeWeekendDays ?? 0);
@@ -390,7 +391,7 @@ export default function VouchersClient() {
         totalOvertimeMinutes,
         lateMinutes,
         earlyLeaveMinutes,
-        totalOvertimeDays,
+        totalOvertimeWeekendMinutes,
       );
       const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
 

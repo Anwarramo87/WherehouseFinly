@@ -43,7 +43,7 @@ const STANDARD_WORK_DAYS = 26;
  * فالموظف غائب طوال الشهر — لا يجوز تسجيل تأخير أو مغادرة مبكرة أو إضافي عادي.
  *
  * الحقول المسموح بها حتى عند الغياب الكامل:
- * - overtimeWeekendDays: إضافي عطلة (يوم راحة منفصل عن أيام العمل)
+ * - overtimeWeekendDays: دقائق الجمعة الفعلية (وحدة الدقائق، رغم اسم API القديم)
  * - unpaidHours: إجازة ساعية (تُحسب بشكل مستقل)
  */
 const totalsSchema = z
@@ -404,10 +404,10 @@ export default function EditAttendanceTotalsModal({
                       )}
                     </div>
 
-                    {/* إضافي عطلة — مسموح دائماً */}
+                    {/* دقائق الجمعة الفعلية — مسموح دائماً */}
                     <div>
                       <label className="block text-[10px] font-black text-[#C89355] mb-2 uppercase">
-                        إضافي عطلة (أيام)
+                        إضافي الجمعة (دقائق فعلية)
                       </label>
                       <input
                         type="number" step="0.5" min="0"
