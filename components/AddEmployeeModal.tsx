@@ -79,9 +79,9 @@ export type AddEmployeeFormData = {
   insuranceAmount: string;
   scheduledStart: string;
   scheduledEnd: string;
+  gracePeriodMinutes: number;
   roleId: string;
   residence?: string;
-  hoursPerDay: string;
 };
 
 interface Props {
@@ -110,9 +110,9 @@ const defaultFormState = {
   insuranceAmount: "",
   scheduledStart: "08:00",
   scheduledEnd: "16:00",
+  gracePeriodMinutes: 5,
   roleId: "",
   residence: "",
-  hoursPerDay: "8",
 };
 
 export default function AddEmployeeModal({
@@ -159,9 +159,9 @@ export default function AddEmployeeModal({
           insuranceAmount: formatNumberWithCommas(asText(employee.insuranceAmount || "")),
           scheduledStart: employee.scheduledStart || "08:00",
           scheduledEnd: employee.scheduledEnd || "16:00",
+          gracePeriodMinutes: employee.gracePeriodMinutes ?? 5,
           roleId: employee.roleId || "",
           residence: employee.residence || "",
-          hoursPerDay: String(employee.hoursPerDay ?? 8),
         };
       }
 
@@ -666,7 +666,7 @@ export default function AddEmployeeModal({
                       dir="ltr"
                       placeholder="0"
                       value={formData.insuranceAmount || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, insuranceAmount: e.target.value }))}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, insuranceAmount: formatNumberWithCommas(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -689,7 +689,7 @@ export default function AddEmployeeModal({
                 </span>
               </div>
 
-              <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 shadow-inner">
+              <div className="bg-[#1a2530] p-6 rounded-2xl border border-[#263544] md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-inner">
                 <div className="col-span-2 flex items-center gap-2 border-b border-white/5 pb-4">
                   <CalendarDays size={22} className="text-[#C89355]" />
                   <span className="text-base font-bold text-white">أوقات الدوام المجدولة</span>
@@ -715,6 +715,26 @@ export default function AddEmployeeModal({
                     className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono text-lg font-bold text-center shadow-sm scheme-dark"
                     value={formData.scheduledEnd}
                     onChange={(e) => setFormData({ ...formData, scheduledEnd: e.target.value })}
+                    dir="ltr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#C89355] mb-2">
+                    فترة السماح (دقائق)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    required={step === 2}
+                    className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-mono text-lg font-bold text-center shadow-sm"
+                    value={formData.gracePeriodMinutes}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        gracePeriodMinutes: Math.max(0, Number(e.target.value) || 0),
+                      })
+                    }
                     dir="ltr"
                   />
                 </div>

@@ -36,7 +36,7 @@ const LeaveRequestModal = dynamic(() => import("@/components/LeaveRequestModal")
   loading: () => null,
 });
 
-type TableStatus = "present" | "late" | "absent";
+type TableStatus = "present" | "late" | "absent" | "rest";
 
 const EMPLOYEE_ID_REGEX = /^EMP[0-9]{3,}$/;
 
@@ -72,6 +72,7 @@ const statusUi: Record<TableStatus, { label: string; classes: string }> = {
   present: { label: "حاضر", classes: "text-[#C89355] bg-[#1a2530] border-[#C89355]/30 shadow-sm" },
   late: { label: "متأخر", classes: "text-rose-600 bg-rose-50/80 border-rose-100 shadow-sm" },
   absent: { label: "غائب", classes: "text-red-700 bg-red-50/80 border-red-200 shadow-sm" },
+  rest: { label: "يوم راحة", classes: "text-sky-700 bg-sky-50/80 border-sky-200 shadow-sm" },
 };
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
@@ -149,7 +150,9 @@ export default function AttendancePage() {
     isError: dailyViewError,
     error: dailyViewErrorObj,
   } = useAttendanceDailyView(selectedDate);
-  const attendanceParams = useMemo(() => ({ period, limit: 200 }), [period]);
+  // This page renders the daily-view endpoint; keep only the mutation from
+  // useAttendance and avoid loading up to ten unused monthly pages.
+  const attendanceParams = useMemo(() => ({ period, limit: 200, enabled: false }), [period]);
   const { markAttendance } = useAttendance(attendanceParams);
 
   const employeeList = useMemo(() => (Array.isArray(employees) ? employees : []), [employees]);
@@ -214,7 +217,13 @@ export default function AttendancePage() {
       const leaveStatus = leavesMap.get(employeeId);
 
       const rawStatus: TableStatus =
-        dv?.status === "late" ? "late" : dv?.status === "present" ? "present" : "absent";
+        dv?.status === "late"
+          ? "late"
+          : dv?.status === "present"
+            ? "present"
+            : dv?.status === "rest"
+              ? "rest"
+              : "absent";
       // فقط الإجازات المدفوعة الفعلية تحوّل الغائب لحاضر
       const PAID_LEAVE_TYPES = ["PAID", "SICK", "ADMIN", "DEATH"];
       const effectiveStatus: TableStatus =
@@ -257,7 +266,7 @@ export default function AttendancePage() {
           acc[row.status] += 1;
           return acc;
         },
-        { present: 0, late: 0, absent: 0 } as Record<TableStatus, number>,
+        { present: 0, late: 0, absent: 0, rest: 0 } as Record<TableStatus, number>,
       ),
     [rows],
   );

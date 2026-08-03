@@ -15,6 +15,7 @@ export const usePenalties = (params?: {
   startDate?: string;
   endDate?: string;
   period?: string;
+  enabled?: boolean;
 }) => {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -41,6 +42,7 @@ export const usePenalties = (params?: {
       });
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled: params?.enabled ?? true,
     staleTime: isPastPeriod ? 10 * 60_000 : QUERY_STALE_TIME.FAST,
     gcTime: QUERY_GC_TIME.RELAXED,
   });

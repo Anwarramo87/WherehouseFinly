@@ -15,11 +15,17 @@ type ListParams = {
   type?: string;
   limit?: number;
   cursor?: string;
+  enabled?: boolean;
 };
 
 export const useNotifications = (params?: ListParams) => {
   const query = useQuery<{ items: NotificationItem[]; nextCursor: string | null; hasMore: boolean }>({
-    queryKey: queryKeys.notifications.list(params),
+    queryKey: queryKeys.notifications.list({
+      unreadOnly: params?.unreadOnly,
+      type: params?.type,
+      limit: params?.limit,
+      cursor: params?.cursor,
+    }),
     queryFn: async () => {
       const res = await apiClient.get("/notifications", {
         params: {
@@ -31,6 +37,7 @@ export const useNotifications = (params?: ListParams) => {
       });
       return res.data;
     },
+    enabled: params?.enabled ?? true,
     staleTime: 30_000,
   });
 

@@ -56,6 +56,7 @@ export interface AttendanceQueryParams {
   period?: string; // YYYY-MM format
   page?: number;
   limit?: number;
+  enabled?: boolean;
 }
 
 export interface AttendancePayload {
@@ -244,6 +245,7 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
 
   const query = useQuery<AttendanceListResponse>({
     queryKey,
+    enabled: params?.enabled ?? true,
     queryFn: async () => {
       const requestList = async (requestParams: {
         employeeId?: string;
@@ -283,15 +285,19 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
         let records: AttendanceRecord[] = Array.isArray(res.data?.records) ? res.data.records : [];
         const pagination = res.data;
 
-        // عند عدم تحديد صفحة: حمّل جميع الصفحات — بحد أقصى 10 صفحات لمنع الـ loop.
         const MAX_AUTO_PAGES = 10;
         if (!params?.page && pagination?.pages && pagination.pages > 1) {
           const totalPages = Math.min(pagination.pages, MAX_AUTO_PAGES);
+          const pagePromises: Promise<AttendanceRecord[]>[] = [];
           for (let page = 2; page <= totalPages; page += 1) {
-            const pageRes = await requestList({ ...requestParams, page });
-            const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
-              ? pageRes.data.records
-              : [];
+            pagePromises.push(
+              requestList({ ...requestParams, page }).then((pageRes) =>
+                Array.isArray(pageRes.data?.records) ? pageRes.data.records : [],
+              ),
+            );
+          }
+          const pageResults = await Promise.all(pagePromises);
+          for (const pageRecords of pageResults) {
             records = records.concat(pageRecords);
           }
         }
@@ -302,10 +308,8 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
           dailyRecords: toDailyRecords(records, resolvedStartDate, resolvedEndDate),
         };
       } catch (error: unknown) {
-        console.error("❌ Attendance API Error:", error);
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
 
-        // Fallback: بعض بيئات الخادم ترفض date في list endpoint
         if (status === 400 && requestDate) {
           const fallbackParams = {
             employeeId: params?.employeeId,
@@ -321,11 +325,16 @@ export const useAttendance = (params?: AttendanceQueryParams) => {
 
           if (!params?.page && retryPagination?.pages && retryPagination.pages > 1) {
             const totalRetryPages = Math.min(retryPagination.pages, 10);
+            const retryPagePromises: Promise<AttendanceRecord[]>[] = [];
             for (let page = 2; page <= totalRetryPages; page += 1) {
-              const pageRes = await requestList({ ...fallbackParams, page });
-              const pageRecords: AttendanceRecord[] = Array.isArray(pageRes.data?.records)
-                ? pageRes.data.records
-                : [];
+              retryPagePromises.push(
+                requestList({ ...fallbackParams, page }).then((pageRes) =>
+                  Array.isArray(pageRes.data?.records) ? pageRes.data.records : [],
+                ),
+              );
+            }
+            const retryPageResults = await Promise.all(retryPagePromises);
+            for (const pageRecords of retryPageResults) {
               retryRecords = retryRecords.concat(pageRecords);
             }
           }

@@ -56,7 +56,11 @@ interface AggregatedPayroll {
 }
 
 const toNumber = (value: unknown): number => {
-  if (value && typeof value === "object" && "$numberDecimal" in (value as Record<string, unknown>)) {
+  if (
+    value &&
+    typeof value === "object" &&
+    "$numberDecimal" in (value as Record<string, unknown>)
+  ) {
     return Number((value as { $numberDecimal: string }).$numberDecimal || 0);
   }
   return Number(value || 0);
@@ -84,13 +88,13 @@ const formatDate = (date: string | null | undefined) => {
 
 const isPendingSettlementEmployee = (employee: Employee): boolean => {
   // Defensive check: Ensure employee object is valid and has a status
-  if (!employee || typeof employee.status === 'undefined' || employee.status === null) {
+  if (!employee || typeof employee.status === "undefined" || employee.status === null) {
     return false;
   }
 
   const normalizedStatus = String(employee.status).toLowerCase();
 
-  // Define statuses that are considered 'departed' for settlement purposes  
+  // Define statuses that are considered 'departed' for settlement purposes
   const departedStatuses = ["resigned", "terminated", "inactive"];
 
   const isDeparted = departedStatuses.includes(normalizedStatus);
@@ -100,21 +104,24 @@ const isPendingSettlementEmployee = (employee: Employee): boolean => {
 
   // A departed employee is considered pending settlement if:
   // 1. They are NOT marked as settled (isSettled !== true)
-  // 2. They are NOT marked as financially settled (isFinanciallySettled !== true) 
+  // 2. They are NOT marked as financially settled (isFinanciallySettled !== true)
   // 3. Their financial settlement status is NOT 'completed'
-  // 
+  //
   // The key change: We treat null/undefined financial settlement status as 'pending'
   // This ensures all departed employees show up unless explicitly marked as completed
   const isSettled = employee.isSettled === true;
   const isFinanciallySettled = employee.isFinanciallySettled === true;
   const hasCompletedSettlement = employee.financialSettlementStatus?.toLowerCase() === "completed";
-  
+
   // Return true if employee needs settlement (any of the settlement flags indicate not completed)
   return !isSettled && !isFinanciallySettled && !hasCompletedSettlement;
 };
 
-const getDepartureLabel = (employee: Pick<AggregatedPayroll, "employeeStatus" | "terminationType">) => {
-  if (employee.terminationType === "termination" || employee.employeeStatus === "terminated") return "إقالة";
+const getDepartureLabel = (
+  employee: Pick<AggregatedPayroll, "employeeStatus" | "terminationType">,
+) => {
+  if (employee.terminationType === "termination" || employee.employeeStatus === "terminated")
+    return "إقالة";
   return "استقالة";
 };
 
@@ -163,7 +170,8 @@ export default function VouchersClient() {
     fetchAll: true,
     limit: 500,
   });
-  const { data: departedEmployees = [], isLoading: departedEmployeesLoading } = useResignedEmployees();
+  const { data: departedEmployees = [], isLoading: departedEmployeesLoading } =
+    useResignedEmployees();
 
   const allEmployees = useMemo(() => {
     const byId = new Map<string, (typeof activeEmployees)[number]>();
@@ -187,7 +195,10 @@ export default function VouchersClient() {
     return { periodStart: startDate, periodEnd: endDate };
   }, [month]);
 
-  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(periodStart, periodEnd);
+  const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(
+    periodStart,
+    periodEnd,
+  );
   const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
     periodStart: periodStart ?? "",
     periodEnd: periodEnd ?? "",
@@ -198,9 +209,18 @@ export default function VouchersClient() {
     return [];
   }, [deductionsResponse]);
 
-  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({ period: month, limit: 500 });
-  const { data: monthlyLeaves = [], isLoading: leavesLoading } = useLeaves({ startDate: periodStart, endDate: periodEnd });
-  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({ startDate: periodStart, endDate: periodEnd });
+  const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({
+    period: month,
+    limit: 500,
+  });
+  const { data: monthlyLeaves = [], isLoading: leavesLoading } = useLeaves({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
+  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
   const {
     receiptMap,
     storageMode,
@@ -210,7 +230,9 @@ export default function VouchersClient() {
   } = usePayrollReceipts(month);
 
   const eligibleEmployees = useMemo(() => {
-    return allEmployees.filter((employee) => employee.status === "active" || isPendingSettlementEmployee(employee));
+    return allEmployees.filter(
+      (employee) => employee.status === "active" || isPendingSettlementEmployee(employee),
+    );
   }, [allEmployees]);
 
   const localPresentDaysMap = useMemo(() => {
@@ -218,13 +240,22 @@ export default function VouchersClient() {
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
+      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
     return map;
   }, [monthlyAttendanceData?.dailyRecords]);
 
   const employeeLeavesMap = useMemo(() => {
-    const map = new Map<string, { paidLeaveDays: number; sickLeaveDays: number; unpaidLeaveDays: number; countedDates: Set<string> }>();
+    const map = new Map<
+      string,
+      {
+        paidLeaveDays: number;
+        sickLeaveDays: number;
+        unpaidLeaveDays: number;
+        countedDates: Set<string>;
+      }
+    >();
     if (!periodStart || !periodEnd) return map;
     for (const leave of monthlyLeaves) {
       if (!leave.employeeId || !leave.leaveType) continue;
@@ -280,7 +311,8 @@ export default function VouchersClient() {
       const employeeName = employee.name;
       const isPendingSettlement = isPendingSettlementEmployee(employee);
       const isDepartedEmployee = employee.status === "resigned" || employee.status === "terminated";
-      const department = employee.department || employee.profession || employee.jobTitle || "أقسام عامة";
+      const department =
+        employee.department || employee.profession || employee.jobTitle || "أقسام عامة";
 
       const salaryConfig = salaries.find((salary) => salary.employeeId === employeeId) || null;
 
@@ -303,7 +335,9 @@ export default function VouchersClient() {
 
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
       const manualInput = payrollInputs.find((input) => input.employeeId === employeeId);
-      const autoInput = autoDeductions.find((deduction: AttendanceDeductionBreakdown) => deduction.employeeId === employeeId);
+      const autoInput = autoDeductions.find(
+        (deduction: AttendanceDeductionBreakdown) => deduction.employeeId === employeeId,
+      );
       const hasManualInput = Boolean(manualInput);
       const leaveData = employeeLeavesMap.get(employeeId);
 
@@ -329,17 +363,19 @@ export default function VouchersClient() {
         leaveData?.sickLeaveDays ?? 0,
       );
       const paidLeaveDays = Math.max(
-        hasManualInput ? ((manualInput?.adminLeaveDays ?? 0) + (manualInput?.deathLeaveDays ?? 0)) : 0,
+        hasManualInput
+          ? (manualInput?.adminLeaveDays ?? 0) + (manualInput?.deathLeaveDays ?? 0)
+          : 0,
         leaveData?.paidLeaveDays ?? 0,
       );
-      const effectivePaidLeaveDays = paidLeaveDays + (sickLeaveDays * 0.5);
+      const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
 
       const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
       const totalOvertimeMinutes =
         hasManualInput && (manualInput?.overtimeRegularMinutes ?? 0) > 0
           ? (manualInput?.overtimeRegularMinutes ?? 0)
           : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeDays =
+      const totalOvertimeWeekendMinutes =
         hasManualInput && (manualInput?.overtimeWeekendDays ?? 0) > 0
           ? (manualInput?.overtimeWeekendDays ?? 0)
           : (autoInput?.overtimeWeekendDays ?? 0);
@@ -355,7 +391,7 @@ export default function VouchersClient() {
         totalOvertimeMinutes,
         lateMinutes,
         earlyLeaveMinutes,
-        totalOvertimeDays,
+        totalOvertimeWeekendMinutes,
       );
       const earnedSalary = Math.max(0, rawEarned);
 
@@ -376,7 +412,10 @@ export default function VouchersClient() {
       const employeePenalties = penalties.filter((penalty) => {
         return penalty.employeeId === employeeId && penalty.issueDate.startsWith(month);
       });
-      const penaltiesDeduction = employeePenalties.reduce((sum, penalty) => sum + toNumber(penalty.amount), 0);
+      const penaltiesDeduction = employeePenalties.reduce(
+        (sum, penalty) => sum + toNumber(penalty.amount),
+        0,
+      );
 
       const fixedDeductions = insuranceAmount;
       const variableDeductions = advancesDeduction + penaltiesDeduction;
@@ -423,10 +462,11 @@ export default function VouchersClient() {
     let filtered = payrollData.filter((voucher) => {
       // Always include employees pending financial settlement, regardless of their pay amounts
       if (voucher.isPendingSettlement) return true;
-      
+
       // For active employees, only include if they have meaningful financial activity
-      if (voucher.netPay <= 0 && voucher.fixedEarnings === 0 && voucher.variableEarnings === 0) return false;
-      
+      if (voucher.netPay <= 0 && voucher.fixedEarnings === 0 && voucher.variableEarnings === 0)
+        return false;
+
       return true;
     });
 
@@ -440,10 +480,11 @@ export default function VouchersClient() {
 
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      filtered = filtered.filter((voucher) =>
-        voucher.employeeName.toLowerCase().includes(query) ||
-        voucher.employeeId.toLowerCase().includes(query) ||
-        voucher.department.toLowerCase().includes(query),
+      filtered = filtered.filter(
+        (voucher) =>
+          voucher.employeeName.toLowerCase().includes(query) ||
+          voucher.employeeId.toLowerCase().includes(query) ||
+          voucher.department.toLowerCase().includes(query),
       );
     }
     return filtered;
@@ -475,62 +516,6 @@ export default function VouchersClient() {
     });
   }, [payrollData, receiptMap]);
 
-  // Debugging block to check useEmployees / useResignedEmployees hooks
-  useEffect(() => {
-    console.group("Employee Data Debugging - useEmployees Hook");
-    console.log(
-      "Active source (useEmployees):", activeEmployees.length,
-      "| Departed source (useResignedEmployees):", departedEmployees.length,
-    );
-    console.log("Total employees (merged):", allEmployees.length);
-
-    const activeEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "active");
-    const resignedEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "resigned");
-    const terminatedEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "terminated");
-    const inactiveEmployeesCount = allEmployees.filter(emp => emp.status?.toLowerCase() === "inactive");
-    const otherStatusEmployees = allEmployees.filter(emp =>
-      emp.status?.toLowerCase() !== "active" &&
-      emp.status?.toLowerCase() !== "resigned" &&
-      emp.status?.toLowerCase() !== "terminated" &&
-      emp.status?.toLowerCase() !== "inactive" &&
-      emp.status !== undefined && emp.status !== null
-    );
-
-    console.log("Active Employees:", activeEmployeesCount.length, activeEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
-    console.log("Resigned Employees:", resignedEmployeesCount.length, resignedEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
-    console.log("Terminated Employees:", terminatedEmployeesCount.length, terminatedEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
-    console.log("Inactive Employees (if any):", inactiveEmployeesCount.length, inactiveEmployeesCount.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
-    console.log("Employees with other statuses:", otherStatusEmployees.length, otherStatusEmployees.map(e => ({ id: e.employeeId, status: e.status, isSettled: e.isSettled, isFinanciallySettled: e.isFinanciallySettled, financialSettlementStatus: e.financialSettlementStatus })));
-
-    // Detailed check for pending settlement status among departed employees
-    const potentiallyPendingSettlement = allEmployees.filter(employee => {
-      const normalizedStatus = String(employee.status).toLowerCase();
-      const departedStatuses = ["resigned", "terminated", "inactive"];
-      const isDeparted = departedStatuses.includes(normalizedStatus);
-
-      return isDeparted;
-    });
-
-    console.log("All Potentially Pending Settlement Employees (all departed, before filtering):", potentiallyPendingSettlement.length, potentiallyPendingSettlement.map(e => ({ 
-      id: e.employeeId, 
-      status: e.status, 
-      isSettled: e.isSettled, 
-      isFinanciallySettled: e.isFinanciallySettled, 
-      financialSettlementStatus: e.financialSettlementStatus,
-      passesFilter: isPendingSettlementEmployee(e)
-    })));
-
-    // Show eligible employees after filtering
-    console.log("Eligible employees for payroll:", eligibleEmployees.length, eligibleEmployees.map(e => ({ 
-      id: e.employeeId, 
-      status: e.status, 
-      isPendingSettlement: isPendingSettlementEmployee(e)
-    })));
-
-    console.groupEnd();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allEmployees, eligibleEmployees]); // Dependency array includes allEmployees to re-run when data changes
-
   const getReceiptEntry = (employeeId: string) => receiptMap[employeeId];
 
   const handleReceiptDateChange = (employeeId: string, receivedAt: string) => {
@@ -541,7 +526,8 @@ export default function VouchersClient() {
   };
 
   const markEmployeeAsReceived = async (employeeId: string, receivedAt?: string) => {
-    const effectiveDate = receivedAt || draftReceiptDates[employeeId] || bulkReceiptDate || getTodayDate();
+    const effectiveDate =
+      receivedAt || draftReceiptDates[employeeId] || bulkReceiptDate || getTodayDate();
     await upsertReceipt.mutateAsync({
       employeeId,
       month,
@@ -569,44 +555,36 @@ export default function VouchersClient() {
   };
 
   const handlePrint = () => {
-    console.log('🖨️ Print initiated');
-    console.log('📋 Total vouchers to print:', filteredVouchers.length);
-    console.log('📄 Vouchers data:', filteredVouchers.map(v => ({ id: v.employeeId, name: v.employeeName })));
-    
     // Add print-ready class to body
-    document.body.classList.add('print-mode');
-    
+    document.body.classList.add("print-mode");
+
     // Force layout recalculation
-    const vouchersGrid = document.querySelector('.vouchers-grid') as HTMLElement;
-    const voucherCards = document.querySelectorAll('.voucher-card');
-    
-    console.log('🎯 Found voucher cards in DOM:', voucherCards.length);
-    
+    const vouchersGrid = document.querySelector(".vouchers-grid") as HTMLElement;
+    const voucherCards = document.querySelectorAll(".voucher-card");
+
     if (vouchersGrid) {
-      vouchersGrid.style.display = 'block';
-      vouchersGrid.style.pageBreakInside = 'auto';
+      vouchersGrid.style.display = "block";
+      vouchersGrid.style.pageBreakInside = "auto";
     }
-    
+
     // Apply print styles to all voucher cards
     voucherCards.forEach((card, index) => {
-      (card as HTMLElement).style.pageBreakInside = 'avoid';
-      (card as HTMLElement).style.breakInside = 'avoid';
-      (card as HTMLElement).style.marginBottom = '5mm';
+      (card as HTMLElement).style.pageBreakInside = "avoid";
+      (card as HTMLElement).style.breakInside = "avoid";
+      (card as HTMLElement).style.marginBottom = "5mm";
       if (index === voucherCards.length - 1) {
-        (card as HTMLElement).style.marginBottom = '0';
+        (card as HTMLElement).style.marginBottom = "0";
       }
     });
-    
+
     // Small delay to ensure styles are applied
     setTimeout(() => {
-      console.log('🚀 Calling window.print()');
       window.print();
     }, 200);
-    
+
     // Clean up after printing
     setTimeout(() => {
-      document.body.classList.remove('print-mode');
-      console.log('✅ Print cleanup completed');
+      document.body.classList.remove("print-mode");
     }, 1000);
   };
 
@@ -620,7 +598,9 @@ export default function VouchersClient() {
 
   const receiptStats = useMemo(() => {
     const total = filteredVouchers.length;
-    const received = filteredVouchers.filter((voucher) => receiptMap[voucher.employeeId]?.isReceived).length;
+    const received = filteredVouchers.filter(
+      (voucher) => receiptMap[voucher.employeeId]?.isReceived,
+    ).length;
     return {
       total,
       received,
@@ -633,7 +613,9 @@ export default function VouchersClient() {
       <div className="relative min-h-[85vh] w-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 relative z-10 bg-white/40 p-8 rounded-3xl backdrop-blur-2xl border border-white/60 shadow-[0_20px_40px_rgba(38,53,68,0.1)]">
           <div className="w-14 h-14 border-4 border-[#C89355]/30 border-t-[#263544] rounded-full animate-spin shadow-lg" />
-          <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">جاري تجهيز القسائم...</p>
+          <p className="text-[#263544] font-black animate-pulse text-sm tracking-wide">
+            جاري تجهيز القسائم...
+          </p>
         </div>
       </div>
     );
@@ -668,10 +650,13 @@ export default function VouchersClient() {
               <div className="p-3 bg-[#1a2530] rounded-2xl shadow-[0_15px_25px_rgba(38,53,68,0.4)] border border-[#C89355]/40 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4">
                 <Receipt size={22} className="text-[#C89355] animate-bounce" strokeWidth={2.5} />
               </div>
-              <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">قسائم القبض المجمعة</h1>
+              <h1 className="text-3xl font-black text-[#263544] tracking-tight drop-shadow-sm">
+                قسائم القبض المجمعة
+              </h1>
             </div>
             <p className="text-slate-600 text-sm font-bold pr-14 mt-1">
-              يشمل جميع الموظفين الفعالين وكل مستقيل أو مقال لم تتم تصفيته المالية بعد. يظهر المستقيلون حتى لو لم يكن لهم راتب في هذا الشهر لإنهاء تصفيتهم المالية.
+              يشمل جميع الموظفين الفعالين وكل مستقيل أو مقال لم تتم تصفيته المالية بعد. يظهر
+              المستقيلون حتى لو لم يكن لهم راتب في هذا الشهر لإنهاء تصفيتهم المالية.
             </p>
           </div>
 
@@ -693,7 +678,10 @@ export default function VouchersClient() {
               className="relative overflow-hidden inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-emerald-600/90 backdrop-blur-md text-white font-black text-lg hover:bg-emerald-700 transition-all shadow-[0_15px_30px_rgba(5,150,105,0.4)] active:scale-95 border border-emerald-500 group"
             >
               <div className="absolute inset-1 rounded-xl border border-dashed border-white/30 pointer-events-none" />
-              <Printer size={22} className="group-hover:-translate-y-1 transition-transform relative z-10" />
+              <Printer
+                size={22}
+                className="group-hover:-translate-y-1 transition-transform relative z-10"
+              />
               <span className="relative z-10">طباعة القسائم</span>
               {filteredVouchers.length > 0 && (
                 <span className="relative z-10 bg-white/20 px-3 py-1 rounded-full text-sm font-black">
@@ -706,7 +694,8 @@ export default function VouchersClient() {
 
         {storageMode === "local" && (
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-            الحفظ المركزي غير متاح حالياً، لذلك تعمل حالة القبض مؤقتاً بوضع توافق محلي على هذا المتصفح فقط.
+            الحفظ المركزي غير متاح حالياً، لذلك تعمل حالة القبض مؤقتاً بوضع توافق محلي على هذا
+            المتصفح فقط.
           </div>
         )}
 
@@ -716,15 +705,25 @@ export default function VouchersClient() {
               إجمالي القسائم الظاهرة
               {showOnlyUnreceived && <span className="text-amber-600"> (غير المقبوضة فقط)</span>}
             </p>
-            <p className="text-xl sm:text-2xl md:text-3xl font-black text-[#263544] break-all leading-tight">{receiptStats.total}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-[#263544] break-all leading-tight">
+              {receiptStats.total}
+            </p>
           </div>
           <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 shadow-sm min-w-0">
-            <p className="text-[10px] sm:text-xs font-black text-emerald-700 mb-1 leading-tight">تم القبض</p>
-            <p className="text-xl sm:text-2xl md:text-3xl font-black text-emerald-700 break-all leading-tight">{receiptStats.received}</p>
+            <p className="text-[10px] sm:text-xs font-black text-emerald-700 mb-1 leading-tight">
+              تم القبض
+            </p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-emerald-700 break-all leading-tight">
+              {receiptStats.received}
+            </p>
           </div>
           <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 shadow-sm min-w-0">
-            <p className="text-[10px] sm:text-xs font-black text-amber-700 mb-1 leading-tight">لم يتم القبض</p>
-            <p className="text-xl sm:text-2xl md:text-3xl font-black text-amber-700 break-all leading-tight">{receiptStats.pending}</p>
+            <p className="text-[10px] sm:text-xs font-black text-amber-700 mb-1 leading-tight">
+              لم يتم القبض
+            </p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-black text-amber-700 break-all leading-tight">
+              {receiptStats.pending}
+            </p>
           </div>
         </div>
 
@@ -754,7 +753,7 @@ export default function VouchersClient() {
                 عرض غير المقبوضة فقط
               </span>
             </label>
-            
+
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-black text-slate-500">تاريخ القبض الجماعي</span>
               <input
@@ -802,7 +801,8 @@ export default function VouchersClient() {
         {filteredVouchers.map((voucher, index) => {
           const receiptEntry = getReceiptEntry(voucher.employeeId);
           const receiptDate = receiptEntry?.receivedAt || "";
-          const draftReceiptDate = draftReceiptDates[voucher.employeeId] || receiptDate || getTodayDate();
+          const draftReceiptDate =
+            draftReceiptDates[voucher.employeeId] || receiptDate || getTodayDate();
           const isReceived = receiptEntry?.isReceived ?? false;
           const departureLabel = voucher.isDepartedEmployee ? getDepartureLabel(voucher) : null;
 
@@ -811,34 +811,52 @@ export default function VouchersClient() {
               key={voucher.employeeId}
               className={`voucher-card relative bg-white rounded-3xl border-4 border-[#1a2530] shadow-[0_10px_30px_rgba(38,53,68,0.15)] overflow-hidden flex flex-col
                 print:rounded-none print:shadow-none print:border print:border-gray-400 print:mb-2 print:break-inside-avoid
-                ${index > 0 ? 'print:mt-2' : ''}
+                ${index > 0 ? "print:mt-2" : ""}
               `}
             >
               <div className="bg-linear-to-br from-[#1a2530] to-[#263544] p-6 border-b-4 border-[#C89355] print:p-4 print:border-b-2">
                 <div className="flex justify-between items-start gap-4">
                   <div>
-                    <h2 className="text-2xl font-black text-[#C89355] mb-1 tracking-tight print:text-lg">قسيمة قبض راتب</h2>
-                    <p className="text-white/80 font-bold text-xs print:text-[10px]">KU&M JEANS — نظام الرواتب المتكامل</p>
+                    <h2 className="text-2xl font-black text-[#C89355] mb-1 tracking-tight print:text-lg">
+                      قسيمة قبض راتب
+                    </h2>
+                    <p className="text-white/80 font-bold text-xs print:text-[10px]">
+                      KU&M JEANS — نظام الرواتب المتكامل
+                    </p>
                   </div>
                   <div className="text-left bg-black/20 p-2 rounded-lg border border-white/10 print:border-none print:bg-transparent">
                     <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">الفترة</p>
-                    <p className="text-[#C89355] text-xl font-black font-mono print:text-base">{month}</p>
+                    <p className="text-[#C89355] text-xl font-black font-mono print:text-base">
+                      {month}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 print:p-2 print:mt-2">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">اسم الموظف</p>
-                      <p className="text-white text-lg font-black print:text-sm">{voucher.employeeName}</p>
+                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">
+                        اسم الموظف
+                      </p>
+                      <p className="text-white text-lg font-black print:text-sm">
+                        {voucher.employeeName}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">القسم</p>
-                      <p className="text-white text-sm font-black print:text-xs">{voucher.department}</p>
+                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">
+                        القسم
+                      </p>
+                      <p className="text-white text-sm font-black print:text-xs">
+                        {voucher.department}
+                      </p>
                     </div>
                     <div className="text-left">
-                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">كود الموظف</p>
-                      <p className="text-[#C89355] text-lg font-black font-mono print:text-sm">{voucher.employeeId}</p>
+                      <p className="text-white/60 text-xs font-bold mb-1 print:text-[10px]">
+                        كود الموظف
+                      </p>
+                      <p className="text-[#C89355] text-lg font-black font-mono print:text-sm">
+                        {voucher.employeeId}
+                      </p>
                     </div>
                   </div>
 
@@ -875,14 +893,18 @@ export default function VouchersClient() {
                       type="date"
                       value={draftReceiptDate}
                       max={getTodayDate()}
-                      onChange={(event) => handleReceiptDateChange(voucher.employeeId, event.target.value)}
+                      onChange={(event) =>
+                        handleReceiptDateChange(voucher.employeeId, event.target.value)
+                      }
                       className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-[#263544] outline-none focus:border-[#C89355]"
                     />
                   </label>
 
                   <button
                     type="button"
-                    onClick={() => void markEmployeeAsReceived(voucher.employeeId, draftReceiptDate)}
+                    onClick={() =>
+                      void markEmployeeAsReceived(voucher.employeeId, draftReceiptDate)
+                    }
                     disabled={upsertReceipt.isPending}
                     className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-sm hover:bg-emerald-700 transition-all"
                   >
@@ -902,7 +924,9 @@ export default function VouchersClient() {
 
                   <div className="lg:mr-auto bg-white rounded-2xl px-4 py-2.5 border border-slate-200">
                     <p className="text-[11px] text-slate-500 font-black mb-1">آخر حالة</p>
-                    <p className={`text-sm font-black ${isReceived ? "text-emerald-700" : "text-rose-700"}`}>
+                    <p
+                      className={`text-sm font-black ${isReceived ? "text-emerald-700" : "text-rose-700"}`}
+                    >
                       {isReceived ? `تم القبض بتاريخ ${formatDate(receiptDate)}` : "بانتظار القبض"}
                     </p>
                   </div>
@@ -918,7 +942,9 @@ export default function VouchersClient() {
 
                   {voucher.fixedEarnings > 0 && (
                     <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-200/50 print:p-1.5 print:bg-emerald-50">
-                      <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1">الاستحقاقات الثابتة</p>
+                      <p className="text-xs font-black text-emerald-800 mb-2 uppercase print:text-[9px] print:mb-1">
+                        الاستحقاقات الثابتة
+                      </p>
                       {voucher.details.salaryConfig && (
                         <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                           {toNumber(voucher.details.salaryConfig.baseSalary) > 0 && (
@@ -933,7 +959,9 @@ export default function VouchersClient() {
                             <div className="flex justify-between">
                               <span className="font-bold text-slate-700">الراتب المقطوع</span>
                               <span className="font-black text-emerald-700 font-mono">
-                                {toNumber(voucher.details.salaryConfig.lumpSumSalary).toLocaleString()}
+                                {toNumber(
+                                  voucher.details.salaryConfig.lumpSumSalary,
+                                ).toLocaleString()}
                               </span>
                             </div>
                           )}
@@ -941,7 +969,9 @@ export default function VouchersClient() {
                             <div className="flex justify-between">
                               <span className="font-bold text-slate-700">بدل المعيشة</span>
                               <span className="font-black text-emerald-700 font-mono">
-                                {toNumber(voucher.details.salaryConfig.livingAllowance).toLocaleString()}
+                                {toNumber(
+                                  voucher.details.salaryConfig.livingAllowance,
+                                ).toLocaleString()}
                               </span>
                             </div>
                           )}
@@ -949,7 +979,9 @@ export default function VouchersClient() {
                             <div className="flex justify-between">
                               <span className="font-bold text-slate-700">بدل النقل</span>
                               <span className="font-black text-emerald-700 font-mono">
-                                {toNumber(voucher.details.salaryConfig.transportAllowance).toLocaleString()}
+                                {toNumber(
+                                  voucher.details.salaryConfig.transportAllowance,
+                                ).toLocaleString()}
                               </span>
                             </div>
                           )}
@@ -957,20 +989,29 @@ export default function VouchersClient() {
                       )}
                       <div className="mt-2 pt-2 border-t border-emerald-300 flex justify-between items-center text-xs print:text-[10px] print:mt-1 print:pt-1">
                         <span className="font-black text-emerald-900 uppercase">المجموع</span>
-                        <span className="font-black text-emerald-700 font-mono">{voucher.fixedEarnings.toLocaleString()}</span>
+                        <span className="font-black text-emerald-700 font-mono">
+                          {voucher.fixedEarnings.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   )}
 
                   {voucher.variableEarnings > 0 && (
                     <div className="bg-[#C89355]/10 rounded-xl p-3 border border-[#C89355]/30 print:p-1.5 print:bg-transparent">
-                      <p className="text-xs font-black text-[#C89355] mb-2 uppercase print:text-[9px] print:mb-1">الاستحقاقات المتغيرة</p>
+                      <p className="text-xs font-black text-[#C89355] mb-2 uppercase print:text-[9px] print:mb-1">
+                        الاستحقاقات المتغيرة
+                      </p>
                       <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                         {voucher.details.bonuses.map((bonus, idx) => (
                           <div key={idx} className="flex justify-between">
-                            <span className="font-bold text-slate-700">{bonus.bonusReason || "مكافأة"}</span>
+                            <span className="font-bold text-slate-700">
+                              {bonus.bonusReason || "مكافأة"}
+                            </span>
                             <span className="font-black text-[#C89355] font-mono">
-                              +{(toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount)).toLocaleString()}
+                              +
+                              {(
+                                toNumber(bonus.bonusAmount) + toNumber(bonus.assistanceAmount)
+                              ).toLocaleString()}
                             </span>
                           </div>
                         ))}
@@ -987,21 +1028,28 @@ export default function VouchersClient() {
 
                   {voucher.fixedDeductions > 0 && (
                     <div className="bg-rose-50/50 rounded-xl p-3 border border-rose-200/50 print:p-1.5 print:bg-rose-50">
-                      <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">الخصومات الثابتة</p>
+                      <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">
+                        الخصومات الثابتة
+                      </p>
                       <div className="flex justify-between text-xs print:text-[10px]">
                         <span className="font-bold text-slate-700">التأمينات</span>
-                        <span className="font-black text-rose-700 font-mono">-{voucher.fixedDeductions.toLocaleString()}</span>
+                        <span className="font-black text-rose-700 font-mono">
+                          -{voucher.fixedDeductions.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   )}
 
                   {voucher.variableDeductions > 0 && (
                     <div className="bg-rose-100/50 rounded-xl p-3 border border-rose-300/50 print:p-1.5 print:bg-rose-50">
-                      <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">الخصومات المتغيرة</p>
+                      <p className="text-xs font-black text-rose-800 mb-2 uppercase print:text-[9px] print:mb-1">
+                        الخصومات المتغيرة
+                      </p>
                       <div className="space-y-1.5 print:space-y-0.5 text-xs print:text-[10px]">
                         {voucher.details.advances.map((advance, idx) => {
                           const deductionAmount =
-                            toNumber(advance.installmentAmount) || toNumber(advance.remainingAmount);
+                            toNumber(advance.installmentAmount) ||
+                            toNumber(advance.remainingAmount);
                           return (
                             <div key={idx} className="flex justify-between">
                               <span className="font-bold text-slate-700">
@@ -1016,14 +1064,18 @@ export default function VouchersClient() {
                       </div>
                       <div className="mt-2 pt-2 border-t border-rose-400 flex justify-between items-center text-xs print:text-[10px] print:mt-1 print:pt-1">
                         <span className="font-black text-rose-900 uppercase">المجموع</span>
-                        <span className="font-black text-rose-700 font-mono">-{voucher.variableDeductions.toLocaleString()}</span>
+                        <span className="font-black text-rose-700 font-mono">
+                          -{voucher.variableDeductions.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   )}
 
                   {voucher.fixedDeductions === 0 && voucher.variableDeductions === 0 && (
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-center print:p-2">
-                      <p className="text-slate-500 font-bold text-xs print:text-[10px]">لا توجد اقتطاعات</p>
+                      <p className="text-slate-500 font-bold text-xs print:text-[10px]">
+                        لا توجد اقتطاعات
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1033,11 +1085,15 @@ export default function VouchersClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 print:mb-2">
                   <div
                     className={`rounded-2xl p-3 border ${
-                      isReceived ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+                      isReceived
+                        ? "bg-emerald-50 border-emerald-200"
+                        : "bg-amber-50 border-amber-200"
                     }`}
                   >
                     <p className="text-[11px] font-black text-slate-500 mb-1">حالة القبض</p>
-                    <p className={`text-sm font-black ${isReceived ? "text-emerald-700" : "text-amber-700"}`}>
+                    <p
+                      className={`text-sm font-black ${isReceived ? "text-emerald-700" : "text-amber-700"}`}
+                    >
                       {isReceived ? "تم القبض" : "لم يتم القبض بعد"}
                     </p>
                   </div>
@@ -1048,12 +1104,16 @@ export default function VouchersClient() {
                 </div>
 
                 <div className="text-center mb-6 print:mb-3">
-                  <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">صافي المستحق للدفع</p>
+                  <p className="text-[#1a2530]/60 font-black text-xs uppercase tracking-widest mb-1 print:text-[9px]">
+                    صافي المستحق للدفع
+                  </p>
                   {voucher.isPendingSettlement && voucher.netPay === 0 ? (
                     <>
                       <p className="text-[#1a2530] text-3xl sm:text-4xl md:text-5xl font-black font-mono drop-shadow-md print:text-2xl break-all leading-tight">
                         0
-                        <span className="text-lg sm:text-xl md:text-2xl mr-2 print:text-sm">ل.س</span>
+                        <span className="text-lg sm:text-xl md:text-2xl mr-2 print:text-sm">
+                          ل.س
+                        </span>
                       </p>
                       <p className="text-amber-700 text-sm font-bold mt-2 print:text-xs">
                         {departureLabel} - يتطلب تصفية مالية لإنهاء الملف
@@ -1069,11 +1129,15 @@ export default function VouchersClient() {
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t-2 border-[#1a2530]/20 print:gap-2 print:pt-2">
                   <div>
-                    <p className="text-[#1a2530]/60 text-xs font-bold mb-4 print:text-[9px] print:mb-3">توقيع المحاسب:</p>
+                    <p className="text-[#1a2530]/60 text-xs font-bold mb-4 print:text-[9px] print:mb-3">
+                      توقيع المحاسب:
+                    </p>
                     <div className="border-b-2 border-dashed border-[#1a2530]/30 w-3/4 print:w-full"></div>
                   </div>
                   <div>
-                    <p className="text-[#1a2530]/60 text-xs font-bold mb-4 print:text-[9px] print:mb-3">توقيع الموظف المستلم:</p>
+                    <p className="text-[#1a2530]/60 text-xs font-bold mb-4 print:text-[9px] print:mb-3">
+                      توقيع الموظف المستلم:
+                    </p>
                     <div className="border-b-2 border-dashed border-[#1a2530]/30 w-3/4 print:w-full"></div>
                   </div>
                 </div>

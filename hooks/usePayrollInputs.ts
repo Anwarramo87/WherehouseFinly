@@ -79,8 +79,15 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
           clothingDeduction: Number(record.clothingDeduction || 0),
           bonusAdjustment: Number(record.bonusAdjustment || 0),
           advanceAmount: Number(record.advanceAmount || 0),
-          insuranceAmount: record.insuranceAmount ? Number(record.insuranceAmount) : undefined,
-          transportAllowanceOverride: record.transportAllowanceOverride ? Number(record.transportAllowanceOverride) : undefined,
+          insuranceAmount:
+            record.insuranceAmount !== undefined && record.insuranceAmount !== null
+              ? Number(record.insuranceAmount)
+              : undefined,
+          transportAllowanceOverride:
+            record.transportAllowanceOverride !== undefined &&
+            record.transportAllowanceOverride !== null
+              ? Number(record.transportAllowanceOverride)
+              : undefined,
           notes: (record.notes as string | undefined) || "",
         };
       });

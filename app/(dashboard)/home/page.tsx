@@ -211,8 +211,8 @@ export default function DashboardPage() {
       try {
         await apiClient.delete(`/departments/${deptId}`);
         queryClient.invalidateQueries({ queryKey: ["departments"] });
-      } catch (err) {
-        console.error("Error deleting department:", err);
+      } catch {
+        // Error silently handled
       } finally {
         setIsDeletingDept(null);
       }
@@ -244,8 +244,7 @@ export default function DashboardPage() {
       setIsDeletingDept(dept.id); // Reuse loading state
       try {
         await clearSupervisor.mutateAsync(dept.id);
-      } catch (err) {
-        console.error("Error removing supervisor:", err);
+      } catch {
         alert("حدث خطأ أثناء إزالة المشرف");
       } finally {
         setIsDeletingDept(null);
@@ -260,14 +259,8 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  // إجمالي المقبوص = نفس رقم "حساب المسير" (صافي الرواتب المستحقة للشهر الحالي)
-  // Lightweight: use payroll report directly instead of usePayrollPageData (which
-  // fires 9 sub-hooks including attendance/leaves/inputs just for this sum).
+  // إجمالي المقبوص = صافي الرواتب المستحقة للشهر الحالي (active فقط — يطابق صفحة الرواتب)
   const { data: payrollReport } = usePayrollReport(monthKey);
-  const totalReceivedThisMonth = useMemo(() => {
-    const items = payrollReport?.items ?? [];
-    return items.reduce((sum, p) => sum + toNumber(p.netPayRounded), 0);
-  }, [payrollReport]);
 
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(
@@ -275,9 +268,23 @@ export default function DashboardPage() {
     [resignedEmployees],
   );
 
-  const { data: advances = [] } = useAdvances(undefined, undefined, canViewFinancialRecords);
-  const { data: penaltiesData = [] } = usePenalties();
-  const { data: bonusesData = [] } = useBonuses({ period: monthKey });
+  const totalReceivedThisMonth = useMemo(() => {
+    const items = payrollReport?.items ?? [];
+    return items
+      .filter((p) => !resignedIds.has(p.employeeId))
+      .reduce((sum, p) => sum + toNumber(p.netPayRounded), 0);
+  }, [payrollReport, resignedIds]);
+
+  // Deferred queries — only fire when dashboard KPIs have loaded (below-the-fold data)
+  const isSecondaryReady = !isDashboardLoading && mounted;
+  const { data: advances = [] } = useAdvances(undefined, undefined, isSecondaryReady && canViewFinancialRecords);
+  const { data: penaltiesData = [] } = usePenalties({
+    enabled: isSecondaryReady && canViewFinancialRecords,
+  });
+  const { data: bonusesData = [] } = useBonuses({
+    period: monthKey,
+    enabled: isSecondaryReady && canViewFinancialRecords,
+  });
 
   const employeeListMemo = useMemo<Employee[]>(() => {
     return Array.isArray(employees) ? employees : [];

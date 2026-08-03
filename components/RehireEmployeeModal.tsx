@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, UserCheck, Calendar, MessageSquare, CheckSquare } from "lucide-react";
+import { X, Loader2, UserCheck, Calendar, MessageSquare } from "lucide-react";
 import type { Employee } from "@/types/employee";
 
 export interface RehireData {
@@ -175,36 +175,25 @@ export default function RehireEmployeeModal({
               )}
             </div>
 
-            {/* Restore Previous Settings Checkbox */}
-            <div className="bg-[#1a2530] p-5 rounded-2xl border border-[#263544] shadow-inner">
-              <label className="flex items-start gap-4 cursor-pointer group">
-                <div className="relative flex items-center justify-center shrink-0 mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={formData.restorePreviousSettings}
-                    onChange={(e) => setFormData({ ...formData, restorePreviousSettings: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center ${
-                    formData.restorePreviousSettings
-                      ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                      : 'bg-[#101720] border-[#263544] group-hover:border-emerald-500/30'
-                  }`}>
-                    {formData.restorePreviousSettings && (
-                      <CheckSquare className="text-white" size={16} />
-                    )}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className={`text-base font-bold transition-colors ${
-                    formData.restorePreviousSettings ? 'text-emerald-400' : 'text-slate-400'
-                  }`}>
+            {/* Restore previous settings */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer select-none p-4 bg-[#1a2530]/60 border border-[#263544] rounded-xl transition-colors hover:border-emerald-500/30">
+                <input
+                  type="checkbox"
+                  checked={formData.restorePreviousSettings}
+                  onChange={(e) =>
+                    setFormData({ ...formData, restorePreviousSettings: e.target.checked })
+                  }
+                  className="mt-0.5 h-5 w-5 rounded accent-emerald-500 bg-[#263544] border border-[#263544] focus:ring-2 focus:ring-emerald-500/30"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-emerald-400">
                     استعادة الإعدادات السابقة
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1.5 font-semibold leading-relaxed">
-                    سيتم استعادة جميع البيانات السابقة للموظف (الراتب، القسم، الوظيفة، أوقات الدوام، والثوابت المالية)
-                  </p>
-                </div>
+                  </span>
+                  <span className="block text-xs text-slate-400 font-semibold mt-1">
+                    عند الإلغاء: يبدأ الموظف من جديد بدون الراتب والمكافآت والسلف والخصومات القديمة
+                  </span>
+                </span>
               </label>
             </div>
 

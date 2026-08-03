@@ -9,6 +9,8 @@ import { resolveApiUrl } from "@/lib/api-url";
 // Resolve at request time so env vars are always fresh
 const getBackendUrl = () => resolveApiUrl(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL);
 const DEPLOYED_BACKEND_URL = "https://werehouse-production-4cba.up.railway.app/api/v1";
+const LOCAL_BACKEND_TIMEOUT_MS = 6000; // 6s timeout for local backend TCP connect
+const DEPLOYED_BACKEND_TIMEOUT_MS = 15000; // 15s for deployed backend
 const HOP_BY_HOP_HEADERS = new Set([
   "accept-encoding",
   "connection",
@@ -23,6 +25,11 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
+
+// Track if local backend was recently reachable (avoid repeated timeouts)
+let localBackendLastCheck = 0;
+let localBackendReachable = true;
+const LOCAL_CHECK_INTERVAL_MS = 30_000; // re-probe local every 30s if it was down
 
 const ALLOWED_ORIGINS: Set<string> = new Set(
   (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_APP_URL ?? "")
@@ -144,27 +151,67 @@ async function handler(request: NextRequest) {
     const isGetOrHead = request.method === "GET" || request.method === "HEAD";
     const body = isGetOrHead ? undefined : await request.text();
     let response: Response;
-    
-    try {
-      response = await fetch(primaryUrl + apiPath + cleanedSearch, {
-        method: request.method,
-        headers: buildUpstreamHeaders(request),
-        body,
-        redirect: "manual",
-        cache: "no-store",
-      });
-    } catch {
-      // Primary backend unreachable — try deployed fallback
-      if (primaryUrl !== DEPLOYED_BACKEND_URL) {
-        response = await fetch(DEPLOYED_BACKEND_URL + apiPath + cleanedSearch, {
+    const headers = buildUpstreamHeaders(request);
+
+    const now = Date.now();
+    // Skip local entirely if: primary IS deployed, or local was recently unreachable
+    const useDeployed =
+      primaryUrl === DEPLOYED_BACKEND_URL || !localBackendReachable;
+
+    const fetchWithTimeout = async (
+      url: string,
+      timeoutMs: number,
+    ): Promise<Response> => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, {
           method: request.method,
-          headers: buildUpstreamHeaders(request),
+          headers,
           body,
           redirect: "manual",
           cache: "no-store",
+          signal: controller.signal,
         });
-      } else {
-        throw new Error("Primary backend unreachable and no fallback configured");
+      } finally {
+        clearTimeout(id);
+      }
+    };
+
+    if (useDeployed) {
+      // Skip local entirely — known unreachable or already pointing to deployed
+      response = await fetchWithTimeout(
+        DEPLOYED_BACKEND_URL + apiPath + cleanedSearch,
+        DEPLOYED_BACKEND_TIMEOUT_MS,
+      );
+      // Re-probe local backend periodically (only if primary is local, not deployed)
+      if (primaryUrl !== DEPLOYED_BACKEND_URL && now - localBackendLastCheck > LOCAL_CHECK_INTERVAL_MS) {
+        localBackendLastCheck = now;
+        fetchWithTimeout(primaryUrl, LOCAL_BACKEND_TIMEOUT_MS)
+          .then(() => {
+            localBackendReachable = true;
+          })
+          .catch(() => {
+            localBackendReachable = false;
+          });
+      }
+    } else {
+      // Try local first with short timeout
+      try {
+        response = await fetchWithTimeout(
+          primaryUrl + apiPath + cleanedSearch,
+          LOCAL_BACKEND_TIMEOUT_MS,
+        );
+        localBackendReachable = true;
+        localBackendLastCheck = now;
+      } catch {
+        // Local failed — try deployed fallback
+        localBackendReachable = false;
+        localBackendLastCheck = now;
+        response = await fetchWithTimeout(
+          DEPLOYED_BACKEND_URL + apiPath + cleanedSearch,
+          DEPLOYED_BACKEND_TIMEOUT_MS,
+        );
       }
     }
 

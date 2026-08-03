@@ -34,49 +34,45 @@ export function usePayrollPageData(month: string) {
     return { periodStart: startDate, periodEnd: endDate };
   }, [month]);
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  // ── Data fetching (prioritized — critical queries fire immediately, others deferred) ──
   const { data: salaries = [], isLoading: salariesLoading } = useSalaries();
-  const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
-  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts(undefined, month);
-  const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
-  const { data: allResignedEmployees = [] } = useResignedEmployees();
-
   const { data: rawEmployees, isLoading: employeesLoading } = useEmployees({ limit: 500 });
   const employees = useMemo(
     () => (Array.isArray(rawEmployees) ? rawEmployees : []),
     [rawEmployees],
   );
-
-  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({
-    startDate: periodStart,
-    endDate: periodEnd,
-  });
-
+  const { data: reportData, isLoading: reportLoading } = usePayrollReport(month);
   const { data: payrollInputs = [], isLoading: inputsLoading } = usePayrollInputs(
     periodStart,
     periodEnd,
   );
-
   const { data: deductionsResponse, isLoading: deductionsLoading } = useAttendanceDeductions({
     periodStart: periodStart ?? "",
     periodEnd: periodEnd ?? "",
   });
-
   const autoDeductions = useMemo<AttendanceDeductionBreakdown[]>(() => {
     if (!deductionsResponse) return [];
     if (Array.isArray(deductionsResponse.data)) return deductionsResponse.data;
     return [];
   }, [deductionsResponse]);
-
   const { data: monthlyLeaves = [] } = useLeaves({
     startDate: periodStart,
     endDate: periodEnd,
   });
-
   const { data: monthlyAttendanceData, isLoading: attendanceLoading } = useAttendance({
     period: month,
     limit: 500,
   });
+
+  // Secondary queries — fire after critical data loads to reduce initial waterfall
+  const isSecondaryEnabled = !salariesLoading && !employeesLoading;
+  const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
+  const { data: discounts = [], isLoading: discountsLoading } = useDiscounts(undefined, month);
+  const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({
+    startDate: periodStart,
+    endDate: periodEnd,
+  });
+  const { data: allResignedEmployees = [] } = useResignedEmployees();
 
   // ── Derived maps ───────────────────────────────────────────────────────────
   const employeeLeavesMap = useMemo(() => {
@@ -139,9 +135,11 @@ export function usePayrollPageData(month: string) {
   const localLateMinutesMap = useMemo(() => {
     const map = new Map<string, number>();
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
+    const empById = new Map(employees.map((e) => [e.employeeId, e]));
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
-      const emp = employees.find((e) => e.employeeId === dr.employeeId);
+      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
+      const emp = empById.get(dr.employeeId);
       const scheduledStart = emp?.scheduledStart || "08:00";
       const gracePeriod =
         emp && typeof (emp as { gracePeriodMinutes?: number }).gracePeriodMinutes === "number"
@@ -158,6 +156,7 @@ export function usePayrollPageData(month: string) {
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
+      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
     return map;
@@ -188,14 +187,38 @@ export function usePayrollPageData(month: string) {
   const payrollByEmployee = useMemo(() => {
     const map = new Map<string, ComputedRow>();
 
+    const salariesById = new Map(salaries.map((s) => [s.employeeId, s]));
+    const payrollInputsById = new Map(payrollInputs.map((pi) => [pi.employeeId, pi]));
+    const autoDeductionsById = new Map(
+      autoDeductions.map((d: AttendanceDeductionBreakdown) => [d.employeeId, d]),
+    );
+    const bonusesByEmp = new Map<string, typeof bonuses>();
+    for (const b of bonuses) {
+      if (!bonusesByEmp.has(b.employeeId)) bonusesByEmp.set(b.employeeId, []);
+      bonusesByEmp.get(b.employeeId)!.push(b);
+    }
+    const advancesByEmp = new Map<string, typeof discounts>();
+    const penaltiesByEmp = new Map<string, typeof penalties>();
+    for (const d of discounts) {
+      if (d.kind === "advance" && d.date.startsWith(month)) {
+        if (!advancesByEmp.has(d.employeeId)) advancesByEmp.set(d.employeeId, []);
+        advancesByEmp.get(d.employeeId)!.push(d);
+      }
+    }
+    for (const p of penalties) {
+      if (p.issueDate.startsWith(month)) {
+        if (!penaltiesByEmp.has(p.employeeId)) penaltiesByEmp.set(p.employeeId, []);
+        penaltiesByEmp.get(p.employeeId)!.push(p);
+      }
+    }
+
     const build = (emp: Employee): ComputedRow => {
       const employeeId = emp.employeeId;
-      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+      const salaryConfig = salariesById.get(employeeId) ?? null;
       const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
 
-      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
-
-      // نفس قاعدة حساب سجل الدوام: أساسي + معيشة + مواصلات (مع احترام override)
+      const manualInput = payrollInputsById.get(employeeId);
+      const autoInput = autoDeductionsById.get(employeeId);
       let calcGross = 0;
       if (salaryConfig) {
         const manualTransport = manualInput?.transportAllowanceOverride;
@@ -215,9 +238,6 @@ export function usePayrollPageData(month: string) {
             HOURS_PER_DAY *
             STANDARD_WORK_DAYS;
       }
-      const autoInput = autoDeductions.find(
-        (d: AttendanceDeductionBreakdown) => d.employeeId === employeeId,
-      );
       const hasManualInput = !!manualInput;
       const leaveData = employeeLeavesMap.get(employeeId);
 
@@ -232,50 +252,49 @@ export function usePayrollPageData(month: string) {
         leaveData?.sickLeaveDays ?? 0,
       );
       const paidLeaveDays = Math.max(
-        hasManualInput
-          ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)
-          : 0,
+        hasManualInput ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0) : 0,
         leaveData?.paidLeaveDays ?? 0,
       );
-      const earlyLeaveMinutes =
-        manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
       const totalOvertimeMinutes =
         hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
           ? (manualInput.overtimeRegularMinutes ?? 0)
           : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeDays =
+      const totalOvertimeWeekendMinutes =
         hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
           ? (manualInput.overtimeWeekendDays ?? 0)
           : (autoInput?.overtimeWeekendDays ?? 0);
 
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
-      const workDaysInPeriod = (emp as { workDaysInPeriod?: number }).workDaysInPeriod ?? STANDARD_WORK_DAYS;
+      const workDaysInPeriod =
+        (emp as { workDaysInPeriod?: number }).workDaysInPeriod ?? STANDARD_WORK_DAYS;
       const hoursPerDayEmp = (emp as { hoursPerDay?: number }).hoursPerDay ?? HOURS_PER_DAY;
 
       const workedDays = localPresentDaysMap.get(employeeId) ?? 0;
       // مطابقة سجل الدوام تماماً: نستخدم دقائق العمل من الباك إند فقط (بدون fallback للأيام)
       const workedMinutes = autoInput?.workedMinutes ?? 0;
 
-      const rawEarned = calcGross > 0
-        ? calcEarnedSalaryHourly(
-            calcGross,
-            workDaysInPeriod,
-            hoursPerDayEmp,
-            workedMinutes,
-            autoInput?.sickRemainderMinutes ?? 0,
-            // مطابقة سجل الدوام: نفضّل أيام المرض من الباك إند إن وُجدت
-            autoInput?.sickLeaveDays ?? sickLeaveDays,
-            paidLeaveDays,
-            totalOvertimeMinutes,
-            lateMinutes,
-            earlyLeaveMinutes,
-            totalOvertimeDays,
-          )
-        : 0;
+      const rawEarned =
+        calcGross > 0
+          ? calcEarnedSalaryHourly(
+              calcGross,
+              workDaysInPeriod,
+              hoursPerDayEmp,
+              workedMinutes,
+              autoInput?.sickRemainderMinutes ?? 0,
+              // مطابقة سجل الدوام: نفضّل أيام المرض من الباك إند إن وُجدت
+              autoInput?.sickLeaveDays ?? sickLeaveDays,
+              paidLeaveDays,
+              totalOvertimeMinutes,
+              lateMinutes,
+              earlyLeaveMinutes,
+              totalOvertimeWeekendMinutes,
+            )
+          : 0;
       const earnedSalary = Math.max(0, rawEarned);
 
-      const employeeBonuses = bonuses.filter(
-        (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب",
+      const employeeBonuses = (bonusesByEmp.get(employeeId) ?? []).filter(
+        (b) => b.bonusReason !== "زيادة في الراتب",
       );
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
         const bonusAmt = toNumber(bonus.bonusAmount);
@@ -283,19 +302,14 @@ export function usePayrollPageData(month: string) {
         return sum + bonusAmt + assistAmt;
       }, 0);
 
-      const employeeAdvances = discounts.filter(
-        (d) => d.employeeId === employeeId && d.kind === "advance" && d.date.startsWith(month),
-      );
-      const employeePenalties = penalties.filter(
-        (p) => p.employeeId === employeeId && p.issueDate.startsWith(month),
-      );
+      const employeeAdvances = advancesByEmp.get(employeeId) ?? [];
+      const employeePenalties = penaltiesByEmp.get(employeeId) ?? [];
       const variableDeductions =
         employeeAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) +
         employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
 
       const totalDeductionsAmount = variableDeductions + insuranceAmount;
-      const netPay =
-        earnedSalary + variableEarnings - totalDeductionsAmount;
+      const netPay = earnedSalary + variableEarnings - totalDeductionsAmount;
       const netPayRounded = Math.ceil(netPay / 1000) * 1000;
       const roundingDifference = netPayRounded - netPay;
 
@@ -319,7 +333,7 @@ export function usePayrollPageData(month: string) {
         variableDeductions,
         totalEarlyLeaveMinutes: earlyLeaveMinutes,
         earlyLeaveDeduction: 0,
-        busDeduction: 0, // Preview mode — bus deduction unavailable before payroll run
+        busDeduction: 0,
         details: {
           salaryConfig,
           bonuses: employeeBonuses,
@@ -367,11 +381,12 @@ export function usePayrollPageData(month: string) {
       }
     >();
     const backendPayrollItems = reportData?.items || [];
+    const backendPayrollById = new Map(
+      backendPayrollItems.map((item: PayrollItem) => [item.employeeId, item]),
+    );
 
     for (const emp of allResignedList) {
-      const payrollItem = backendPayrollItems.find(
-        (item: PayrollItem) => item.employeeId === emp.employeeId,
-      );
+      const payrollItem = backendPayrollById.get(emp.employeeId);
       if (payrollItem) {
         map.set(emp.employeeId, {
           earnedSalary: toNumber(payrollItem.attendanceBasedSalary),
@@ -412,9 +427,11 @@ export function usePayrollPageData(month: string) {
 
     if (!backendPayrollItems.length) return previewData;
 
+    const salariesById = new Map(salaries.map((s) => [s.employeeId, s]));
+
     return backendPayrollItems.map((backendItem: PayrollItem) => {
       const { employeeId, employeeName } = backendItem;
-      const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
+      const salaryConfig = salariesById.get(employeeId) ?? null;
       const department =
         backendItem.department?.trim() || salaryConfig?.profession?.trim() || "أقسام عامة";
 
@@ -429,7 +446,6 @@ export function usePayrollPageData(month: string) {
       const earlyLeaveDeduction = toNumber(backendItem.earlyLeaveDeduction);
       const anomalies: string[] = Array.isArray(backendItem.anomalies) ? backendItem.anomalies : [];
       const fixedDeductions = toNumber(salaryConfig?.insuranceAmount);
-      // خصم الباص منفصلاً — الباك إند يحسبه ويُرسله ضمن PayrollItem
       const busDeduction = toNumber((backendItem as { busDeduction?: unknown }).busDeduction ?? 0);
 
       // نقرأ fixedDeductions من الإعدادات المحلية (الراتب) لعرض التأمينات كبند منفصل

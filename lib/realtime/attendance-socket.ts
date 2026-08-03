@@ -1,7 +1,8 @@
 "use client";
 
 import { io, type Socket } from "socket.io-client";
-import { DEFAULT_API_URL } from "@/lib/api-url";
+
+const DEPLOYED_BACKEND = "https://werehouse-production-4cba.up.railway.app";
 
 export type AttendanceRealtimeEventPayload = {
   employeeId: string;
@@ -22,49 +23,12 @@ declare global {
   }
 }
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
-
-const stripApiSuffix = (pathname: string) => {
-  const cleanPath = trimTrailingSlash(pathname || "");
-  if (!cleanPath) return "";
-  if (cleanPath.toLowerCase().endsWith("/api")) {
-    return cleanPath.slice(0, -4);
-  }
-  return cleanPath;
-};
-
-const resolveSocketBaseUrl = () => {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const rawApiUrl = String(process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).trim();
-
-  if (!rawApiUrl) {
-    return window.location.origin;
-  }
-
-  if (rawApiUrl.startsWith("/")) {
-    return window.location.origin;
-  }
-
-  try {
-    const parsed = new URL(rawApiUrl);
-    const maybeBasePath = stripApiSuffix(parsed.pathname || "");
-    const basePath = maybeBasePath === "/" ? "" : maybeBasePath;
-    return `${parsed.origin}${basePath}`;
-  } catch {
-    return window.location.origin;
-  }
-};
-
 const getAuthToken = (): string | null => {
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    // Try to get auth token from localStorage (auth store may have persisted it)
     const authJson = localStorage.getItem("auth-store");
     if (!authJson) {
       return null;
@@ -86,15 +50,18 @@ export const getAttendanceSocket = () => {
     return window.__factoryAttendanceSocket;
   }
 
-  const socketBase = trimTrailingSlash(resolveSocketBaseUrl());
   const authToken = getAuthToken();
 
-  const socket = io(`${socketBase}/realtime`, {
+  const socket = io(`${DEPLOYED_BACKEND}/realtime`, {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     withCredentials: true,
     autoConnect: true,
-    // Include auth token in handshake for token-based auth systems
+    reconnection: true,
+    reconnectionAttempts: 3,
+    reconnectionDelay: 5000,
+    reconnectionDelayMax: 30000,
+    timeout: 10000,
     auth: authToken
       ? {
           token: authToken,
@@ -102,20 +69,10 @@ export const getAttendanceSocket = () => {
       : undefined,
   });
 
-  // Re-authenticate on disconnect/reconnect if token available
-  if (authToken) {
-    socket.on("disconnect", () => {
-      // Optional: log disconnect for debugging
-      console.debug("Attendance socket disconnected; will re-auth on reconnect");
-    });
-
-    socket.on("connect_error", (error) => {
-      // Log auth errors if they occur
-      if (error.message && error.message.includes("auth")) {
-        console.warn("Attendance socket auth error:", error.message);
-      }
-    });
-  }
+  // Suppress connection errors — socket is optional (realtime biometric updates)
+  socket.on("connect_error", () => {
+    // Silently ignore — realtime updates are a nice-to-have, not required
+  });
 
   window.__factoryAttendanceSocket = socket;
   return socket;

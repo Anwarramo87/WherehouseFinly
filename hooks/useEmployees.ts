@@ -176,9 +176,14 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       const pagination = response.data?.pagination;
 
       if (fetchAll && !options?.page && pagination?.pages && pagination.pages > firstPage) {
+        const pagePromises: Promise<Employee[]>[] = [];
         for (let page = firstPage + 1; page <= pagination.pages; page += 1) {
-          const pageResponse = await requestEmployees(page);
-          const pageEmployees: Employee[] = resolveEmployees(pageResponse.data);
+          pagePromises.push(
+            requestEmployees(page).then((pageResponse) => resolveEmployees(pageResponse.data)),
+          );
+        }
+        const pageResults = await Promise.all(pagePromises);
+        for (const pageEmployees of pageResults) {
           employeesData = employeesData.concat(pageEmployees);
         }
       }
@@ -252,7 +257,6 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         employmentStartDate: newEmployee.employmentStartDate,
         gracePeriodMinutes: newEmployee.gracePeriodMinutes,
         workDaysInPeriod: newEmployee.workDaysInPeriod,
-        hoursPerDay: newEmployee.hoursPerDay,
         residence: newEmployee.residence,
       };
 
@@ -261,13 +265,10 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         if (payload[key] === undefined) delete payload[key];
       });
 
-      console.log("Creating employee with payload:", payload);
       const response = await apiClient.post("/employees", payload);
-      console.log("Employee created response:", response);
       return response;
     },
     onSuccess: async (_response) => {
-      console.log("onSuccess called, invalidating queries");
       await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.salaries.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
@@ -275,12 +276,11 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       toast.success("تم إضافة الموظف بنجاح!");
     },
     onError: (error: unknown) => {
-      console.error("Create employee error:", error);
       let finalMessage = getErrorMessage(error, "حدث خطأ غير متوقع");
 
       // Log the raw error response for debugging
       if (axios.isAxiosError(error) && error.response) {
-        console.error("Raw backend response:", error.response.data);
+        // Raw backend response logged for debugging
       }
 
       if (finalMessage.includes("employeeId must match")) {

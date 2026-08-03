@@ -5,15 +5,15 @@
 
 export const STANDARD_WORK_DAYS = 26;
 export const HOURS_PER_DAY = 8;
-/** معامل أجر يوم الجمعة: كل دقيقة فعلية × 2 */
-export const WEEKEND_MULTIPLIER = 2.0;
+/** معامل أجر يوم الجمعة: كل دقيقة فعلية × 1.5 */
+export const WEEKEND_MULTIPLIER = 1.5;
 
 /**
  * حساب الراتب المستحق — نفس الصيغة المستخدمة في صفحة TimeTable بالضبط
  * الصيغة:
  *   (grossSalary / STANDARD_WORK_DAYS) * paidDays
  *   + إضافي عادي (دقائق × 1.5×)
- *   + دقائق الجمعة (دقائق فعلية × 2×)
+ *   + دقائق الجمعة (دقائق فعلية × 1.5×)
  *   - خصم التأخير (دقائق × 1.5×)
  *   - خصم الخروج المبكر (دقائق × 1.0×)
  *
@@ -38,7 +38,7 @@ export const calcEarnedSalary = (
   const lateDeduction = lateMinutes * minuteRate * 1.5;
   const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
   const overtimePay = overtimeMinutes * minuteRate * 1.5;
-  // overtimeWeekendDays = دقائق الجمعة الفعلية × 2
+  // overtimeWeekendDays = دقائق الجمعة الفعلية × 1.5
   const weekendOvertimePay = overtimeWeekendDays * minuteRate * WEEKEND_MULTIPLIER;
   return Math.max(
     0,
@@ -52,7 +52,7 @@ export const calcEarnedSalary = (
  * - workedMinutes  → أجر كامل (معدل الساعة).
  * - sickRemainderMinutes → أجر بنصف المعدل (باقي يوم إجازة مرضية جزئية).
  * - أيام الإجازة الكاملة (sickLeaveDays/paidLeaveDays) تُضاف كأيام كاملة.
- * - overtimeWeekendDays = دقائق الجمعة الفعلية (من الباك إند) × 2×
+ * - overtimeWeekendDays = دقائق الجمعة الفعلية (من الباك إند) × 1.5×
  */
 export const calcEarnedSalaryHourly = (
   grossSalary: number,
@@ -84,7 +84,7 @@ export const calcEarnedSalaryHourly = (
   const fullSickPay = dailyRate * sickLeaveDays * 0.5;
   const paidLeavePay = dailyRate * paidLeaveDays;
   const overtimePay = minuteRate * overtimeMinutes * 1.5;
-  // overtimeWeekendDays = دقائق الجمعة الفعلية × 2
+  // overtimeWeekendDays = دقائق الجمعة الفعلية × 1.5
   const weekendOvertimePay = minuteRate * overtimeWeekendDays * WEEKEND_MULTIPLIER;
   const lateDeduction = minuteRate * lateMinutes * 1.5;
   const earlyLeaveDeduction = minuteRate * earlyLeaveMinutes;

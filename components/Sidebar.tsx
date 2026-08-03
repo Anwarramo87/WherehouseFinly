@@ -71,11 +71,6 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const queryClient = useQueryClient();
 
   const prefetchMap: Record<string, () => void> = useMemo(() => ({
-    '/employees': () => queryClient.prefetchQuery({
-      queryKey: ['employees', 'all-statuses', 'exclude-terminated', 'all-departments', 'no-search', 1, 500, 'fetch-all'],
-      queryFn: () => apiClient.get('/employees', { params: { limit: 500 } }).then((r) => r.data),
-      staleTime: QUERY_STALE_TIME.RELAXED,
-    }),
     '/salaries/payroll': () => queryClient.prefetchQuery({
       queryKey: ['payroll', 'runs'],
       queryFn: () => apiClient.get(`/payroll/report/${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`).then((r) => r.data),
@@ -96,12 +91,8 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       queryFn: () => apiClient.get('/salary').then((r) => r.data?.salaries ?? r.data ?? []),
       staleTime: QUERY_STALE_TIME.RELAXED,
     }),
-    // advances moved into discounts page; rely on discounts prefetch
-    '/attendance': () => queryClient.prefetchQuery({
-      queryKey: ['attendance'],
-      queryFn: () => apiClient.get('/attendance').then((r) => r.data),
-      staleTime: QUERY_STALE_TIME.STANDARD,
-    }),
+    // Employees and attendance use parameterized/paginated keys. Let their
+    // page hooks fetch the exact data instead of warming unusable cache entries.
   }), [queryClient]);
   const pathname = usePathname();
   const router = useRouter();
@@ -271,8 +262,10 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
                             <Link
                               key={sub.name}
                               href={sub.href}
-                              prefetch={false}
-                              onMouseEnter={() => sub.href ? prefetchMap[sub.href]?.() : undefined}
+                              onMouseEnter={() => {
+                                router.prefetch(sub.href);
+                                prefetchMap[sub.href]?.();
+                              }}
                               onClick={() => {
                                 if (onClose && window.innerWidth < 1024) onClose();
                               }}
@@ -295,7 +288,11 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
               ) : (
                 <Link
                   href={item.href || '#'}
-                  onMouseEnter={() => item.href ? prefetchMap[item.href]?.() : undefined}
+                  onMouseEnter={() => {
+                    if (!item.href) return;
+                    router.prefetch(item.href);
+                    prefetchMap[item.href]?.();
+                  }}
                   onClick={() => {
                     setOpenMenu(null);
                     if (onClose && window.innerWidth < 1024) onClose();
