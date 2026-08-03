@@ -193,11 +193,20 @@ export function usePayrollPageData(month: string) {
       const salaryConfig = salaries.find((s) => s.employeeId === employeeId) ?? null;
       const department = emp.department || salaryConfig?.profession?.trim() || "أقسام عامة";
 
+      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
+
+      // نفس قاعدة حساب سجل الدوام: أساسي + معيشة + مواصلات (مع احترام override)
       let calcGross = 0;
       if (salaryConfig) {
+        const manualTransport = manualInput?.transportAllowanceOverride;
+        const transport =
+          manualTransport != null
+            ? Number(manualTransport) || 0
+            : toNumber(salaryConfig.transportAllowance);
         calcGross =
           toNumber(salaryConfig.baseSalary) +
-          (toNumber(salaryConfig.livingAllowance) || 0);
+          (toNumber(salaryConfig.livingAllowance) || 0) +
+          transport;
       }
       if (calcGross <= 0) {
         calcGross =
@@ -206,8 +215,6 @@ export function usePayrollPageData(month: string) {
             HOURS_PER_DAY *
             STANDARD_WORK_DAYS;
       }
-
-      const manualInput = payrollInputs.find((pi) => pi.employeeId === employeeId);
       const autoInput = autoDeductions.find(
         (d: AttendanceDeductionBreakdown) => d.employeeId === employeeId,
       );
@@ -246,8 +253,8 @@ export function usePayrollPageData(month: string) {
       const hoursPerDayEmp = (emp as { hoursPerDay?: number }).hoursPerDay ?? HOURS_PER_DAY;
 
       const workedDays = localPresentDaysMap.get(employeeId) ?? 0;
-      const workedMinutes =
-        autoInput?.workedMinutes ?? workedDays * hoursPerDayEmp * 60;
+      // مطابقة سجل الدوام تماماً: نستخدم دقائق العمل من الباك إند فقط (بدون fallback للأيام)
+      const workedMinutes = autoInput?.workedMinutes ?? 0;
 
       const rawEarned = calcGross > 0
         ? calcEarnedSalaryHourly(
@@ -256,7 +263,8 @@ export function usePayrollPageData(month: string) {
             hoursPerDayEmp,
             workedMinutes,
             autoInput?.sickRemainderMinutes ?? 0,
-            sickLeaveDays,
+            // مطابقة سجل الدوام: نفضّل أيام المرض من الباك إند إن وُجدت
+            autoInput?.sickLeaveDays ?? sickLeaveDays,
             paidLeaveDays,
             totalOvertimeMinutes,
             lateMinutes,
@@ -264,7 +272,7 @@ export function usePayrollPageData(month: string) {
             totalOvertimeDays,
           )
         : 0;
-      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+      const earnedSalary = Math.max(0, rawEarned);
 
       const employeeBonuses = bonuses.filter(
         (b) => b.employeeId === employeeId && b.bonusReason !== "زيادة في الراتب",
@@ -285,11 +293,11 @@ export function usePayrollPageData(month: string) {
         employeeAdvances.reduce((sum, d) => sum + toNumber(d.amount), 0) +
         employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
 
+      const totalDeductionsAmount = variableDeductions + insuranceAmount;
       const netPay =
-        earnedSalary + variableEarnings - variableDeductions;
+        earnedSalary + variableEarnings - totalDeductionsAmount;
       const netPayRounded = Math.ceil(netPay / 1000) * 1000;
       const roundingDifference = netPayRounded - netPay;
-      const totalDeductionsAmount = variableDeductions;
 
       const row: AggregatedPayroll = {
         employeeId,
@@ -424,6 +432,11 @@ export function usePayrollPageData(month: string) {
       // خصم الباص منفصلاً — الباك إند يحسبه ويُرسله ضمن PayrollItem
       const busDeduction = toNumber((backendItem as { busDeduction?: unknown }).busDeduction ?? 0);
 
+      // نقرأ fixedDeductions من الإعدادات المحلية (الراتب) لعرض التأمينات كبند منفصل
+      // attendanceBasedSalary من الباك إند — نفترض أنها قبل خصم التأمينات (netPay سليم)
+      const earnedSalary = attendanceBasedSalary;
+      const variableDeductionsVal = Math.max(0, totalDeductions - fixedDeductions);
+
       return {
         employeeId,
         employeeName,
@@ -434,14 +447,14 @@ export function usePayrollPageData(month: string) {
         netPayRounded,
         roundingDifference,
         anomalies,
-        attendanceBasedSalary,
-        earnedSalary: attendanceBasedSalary,
+        attendanceBasedSalary: earnedSalary,
+        earnedSalary,
         bonusesTotal: totalBonuses,
-        discountsTotal: totalDeductions,
+        discountsTotal: variableDeductionsVal,
         fixedEarnings: grossPay,
         variableEarnings: totalBonuses,
         fixedDeductions,
-        variableDeductions: totalDeductions - fixedDeductions,
+        variableDeductions: variableDeductionsVal,
         totalEarlyLeaveMinutes: earlyLeaveMinutes,
         earlyLeaveDeduction,
         busDeduction,

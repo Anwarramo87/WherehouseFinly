@@ -40,27 +40,33 @@ export function PayrollVirtualTable({
         style={{ height: "70vh", minHeight: "min(500px, 50vh)" }}
       >
         {/* Header */}
-        <div className="flex w-full min-w-212.5 bg-slate-100 border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-          <div className="w-[15%] justify-center px-4 py-4 font-bold text-xs text-slate-700 flex items-center">
+        <div className="flex w-full min-w-270 bg-slate-100 border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+          <div className="w-[14%] justify-center px-4 py-4 font-bold text-xs text-slate-700 flex items-center">
             الموظف
           </div>
-          <div className="w-[15%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
+          <div className="w-[12%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
             الراتب المستحق
           </div>
-          <div className="w-[14%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
+          <div className="w-[11%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
             المكافآت
           </div>
-          <div className="w-[14%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
+          <div className="w-[11%] justify-center px-4 py-4 font-bold text-xs text-rose-600 border-r border-slate-200 flex items-center">
+            التأمينات
+          </div>
+          <div className="w-[11%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
             الخصومات
           </div>
-          <div className="w-[15%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
+          <div className="w-[12%] justify-center px-4 py-4 font-bold text-xs text-slate-700 border-r border-slate-200 flex items-center">
             المجموع
           </div>
-          <div className="w-[10%] justify-center px-4 py-4 font-bold text-xs text-slate-700 bg-amber-50/50 border-r border-slate-200 flex items-center">
+          <div className="w-[7%] justify-center px-4 py-4 font-bold text-xs text-slate-700 bg-amber-50/50 border-r border-slate-200 flex items-center">
             الفرق
           </div>
-          <div className="w-[17%] justify-center px-4 py-4 font-bold text-xs text-amber-700 bg-amber-50/50 border-r border-amber-200/50 flex items-center">
+          <div className="w-[14%] justify-center px-4 py-4 font-bold text-xs text-amber-700 bg-amber-50/50 border-r border-amber-200/50 flex items-center">
             الراتب المقبوض
+          </div>
+          <div className="w-[8%] justify-center px-4 py-4 font-bold text-xs text-slate-500 border-r border-slate-200 flex items-center">
+            وصل القبض
           </div>
         </div>
 

@@ -39,8 +39,9 @@ const safeToNumber = (v: unknown): number => {
 
 /**
  * حساب الراتب الإجمالي الفعلي (effectiveGrossSalary):
- *   baseSalary + livingAllowance + transportAllowance(Override) − insuranceAmount
+ *   baseSalary + livingAllowance + transportAllowance(Override)
  * يستخدم سجل salary إن وُجد، وإلا يرجع للـ baseSalary/hourlyRate على الموظف
+ * ملاحظة: التأمينات لا تُخصم من الـ gross هنا بل تُخصم مرّة واحدة في التقرير النهائي
  */
 const calcEffectiveGross = (
   emp: { baseSalary?: unknown; hourlyRate?: unknown },
@@ -63,7 +64,7 @@ const calcEffectiveGross = (
     const transport = transportOverride ?? transportAllowance;
     const insurance = insuranceOverride ?? insuranceAmount;
 
-    const effectiveGross = Math.max(0, baseSalary + livingAllowance + transport - insurance);
+    const effectiveGross = Math.max(0, baseSalary + livingAllowance + transport);
     return { effectiveGross, baseSalary, livingAllowance, transportAllowance: transport, insuranceAmount: insurance };
   }
 
@@ -460,7 +461,7 @@ export default function TimeTablePage() {
         ? (manualInput.overtimeWeekendDays ?? 0)
         : autoWeekendDays;
 
-      // الراتب الإجمالي الفعلي (base + معيشة + مواصلات − تأمينات)
+      // الراتب الإجمالي الفعلي (base + معيشة + مواصلات) — التأمينات تخصم في التقرير النهائي فقط
       const salaryRec = salaryMap.get(emp.employeeId);
       const { effectiveGross, baseSalary, livingAllowance, transportAllowance, insuranceAmount } =
         calcEffectiveGross(emp, salaryRec, manualInput ?? null);
@@ -822,7 +823,7 @@ export default function TimeTablePage() {
                             {record.earnedSalary < record.grossSalary && (
                               <span
                                 className="text-[10px] text-slate-400 font-bold cursor-help"
-                                title={`تفاصيل الإجمالي: أساسي (${Number(record.baseSalary || 0).toLocaleString()}) + معيشة (${Number(record.livingAllowance || 0).toLocaleString()}) + مواصلات (${Number(record.transportAllowance || 0).toLocaleString()}) - تأمينات (${Number(record.insuranceAmount || 0).toLocaleString()}) = ${Math.round(record.grossSalary).toLocaleString()}`}
+                                title={`تفاصيل الإجمالي: أساسي (${Number(record.baseSalary || 0).toLocaleString()}) + معيشة (${Number(record.livingAllowance || 0).toLocaleString()}) + مواصلات (${Number(record.transportAllowance || 0).toLocaleString()}) = ${Math.round(record.grossSalary).toLocaleString()} (التأمينات تُخصم مرّة واحدة في التقرير النهائي)`}
                               >
                                 من {Math.round(record.grossSalary).toLocaleString()}
                               </span>

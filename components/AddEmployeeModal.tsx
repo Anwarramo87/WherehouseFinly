@@ -671,33 +671,6 @@ export default function AddEmployeeModal({
                   </div>
                 </div>
 
-                <div className="mt-6">
-                  <div>
-                    <label
-                      htmlFor="hoursPerDay"
-                      className="block text-xs font-bold text-[#C89355] mb-2"
-                    >
-                      ساعات العمل اليومية
-                    </label>
-                    <input
-                      id="hoursPerDay"
-                      type="number"
-                      min={1}
-                      max={24}
-                      placeholder="8"
-                      className="w-full p-4 bg-[#101720] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-[#C89355] font-mono text-lg font-bold shadow-sm placeholder:text-slate-600 text-left"
-                      dir="ltr"
-                      value={formData.hoursPerDay}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "" || (Number(val) >= 1 && Number(val) <= 24)) {
-                          setFormData({ ...formData, hoursPerDay: val });
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
                 <p className="text-xs text-slate-500 mt-4 font-semibold">
                   💡 يمكنك ترك الحقول فارغة إذا لم تكن مطلوبة (سيتم حفظها كقيمة 0)
                 </p>

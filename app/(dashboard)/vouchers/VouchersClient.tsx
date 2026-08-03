@@ -357,7 +357,7 @@ export default function VouchersClient() {
         earlyLeaveMinutes,
         totalOvertimeDays,
       );
-      const earnedSalary = Math.max(0, rawEarned - insuranceAmount);
+      const earnedSalary = Math.max(0, rawEarned);
 
       const employeeBonuses = bonuses.filter((bonus) => bonus.employeeId === employeeId);
       const variableEarnings = employeeBonuses.reduce((sum, bonus) => {
@@ -380,7 +380,8 @@ export default function VouchersClient() {
 
       const fixedDeductions = insuranceAmount;
       const variableDeductions = advancesDeduction + penaltiesDeduction;
-      const netPay = earnedSalary + variableEarnings - variableDeductions;
+      const totalDeductions = variableDeductions + fixedDeductions;
+      const netPay = earnedSalary + variableEarnings - totalDeductions;
 
       return {
         employeeId,
