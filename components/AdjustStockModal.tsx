@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Loader2, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Loader2, SlidersHorizontal, X } from "lucide-react";
 import { AdjustStockInput, InventoryItem } from "@/types/inventory";
 
 interface AdjustStockModalProps {
@@ -10,6 +10,7 @@ interface AdjustStockModalProps {
   onSave: (data: AdjustStockInput) => void;
   isPending?: boolean;
   item?: InventoryItem | null;
+  locations?: string[];
 }
 
 const defaultForm: Omit<AdjustStockInput, "productId"> = {
@@ -19,10 +20,13 @@ const defaultForm: Omit<AdjustStockInput, "productId"> = {
   location: "MAIN",
 };
 
-export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = false, item }: AdjustStockModalProps) {
+export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = false, item, locations = [] }: AdjustStockModalProps) {
   const [form, setForm] = useState(defaultForm);
 
   if (!isOpen || !item) return null;
+
+  const typeIsIn = form.type === "IN";
+  const typeIsOut = form.type === "OUT";
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
@@ -59,11 +63,12 @@ export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = 
             <label className="block text-sm font-bold text-slate-700 mb-2">نوع العملية</label>
             <select
               value={form.type}
-              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as "IN" | "OUT" }))}
+              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as "IN" | "OUT" | "ADJUSTMENT" }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="IN">إضافة رصيد</option>
               <option value="OUT">صرف مادة</option>
+              <option value="ADJUSTMENT">تسوية جرد</option>
             </select>
           </div>
 
@@ -86,7 +91,13 @@ export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = 
               onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               placeholder="MAIN"
+              list="inventory-locations"
             />
+            <datalist id="inventory-locations">
+              {Array.from(new Set(["MAIN", ...locations])).map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
           </div>
 
           <div>
@@ -95,7 +106,7 @@ export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = 
               value={form.note}
               onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder={form.type === "IN" ? "توريد مواد" : "استهلاك إنتاجي"}
+              placeholder={typeIsIn ? "توريد مواد" : typeIsOut ? "استهلاك إنتاجي" : "جرد فعلي"}
             />
           </div>
 
@@ -107,15 +118,21 @@ export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = 
               type="submit"
               disabled={isPending}
               className={`px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-white disabled:bg-slate-300 active:scale-95 ${
-                form.type === "IN" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-orange-600 hover:bg-orange-700"
+                typeIsIn
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : typeIsOut
+                    ? "bg-orange-600 hover:bg-orange-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
               }`}
             >
               {isPending ? (
                 <Loader2 className="animate-spin" />
-              ) : form.type === "IN" ? (
+              ) : typeIsIn ? (
                 <ArrowUpCircle size={20} />
-              ) : (
+              ) : typeIsOut ? (
                 <ArrowDownCircle size={20} />
+              ) : (
+                <SlidersHorizontal size={20} />
               )}
               تنفيذ العملية
             </button>

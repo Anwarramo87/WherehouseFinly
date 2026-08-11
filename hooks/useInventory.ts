@@ -1,126 +1,28 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
-import { AdjustStockInput, InventoryItem, InventoryItemInput } from "@/types/inventory";
+import {
+  AdjustStockInput,
+  InventoryItem,
+  InventoryItemInput,
+  InventoryStats,
+  MovementType,
+  PaginatedResult,
+  ProductEnriched,
+  StockMovementRecord,
+  Warehouse,
+  WarehouseInput,
+} from "@/types/inventory";
 import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { queryKeys } from "@/lib/query-keys";
 
-type InventoryListResponse = {
-  products: Array<{
-    id: string;
-    sku: string;
-    name: string;
-    category: string;
-    reorderLevel?: number;
-  }>;
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-};
-
-type StockBySkuResponse = {
-  sku: string;
-  stockLevels: Array<{
-    quantity: number;
-    available: number;
-  }>;
-};
-
-const STOCK_CACHE_TTL_MS = 45_000;
-const STOCK_CACHE_MAX_ITEMS = 1_000;
-const STOCK_CACHE_CLEANUP_INTERVAL_MS = 60_000; // clean up every 60s
-
-const stockQuantityCache = new Map<string, { quantity: number; expiresAt: number }>();
-const stockQuantityInFlight = new Map<string, Promise<number>>();
-
-const now = () => Date.now();
-
-const pruneStockCache = () => {
-  const currentTime = now();
-
-  // Remove expired entries
-  for (const [sku, value] of stockQuantityCache.entries()) {
-    if (value.expiresAt <= currentTime) {
-      stockQuantityCache.delete(sku);
-    }
-  }
-
-  // Enforce max size (evict oldest)
-  while (stockQuantityCache.size > STOCK_CACHE_MAX_ITEMS) {
-    const oldestKey = stockQuantityCache.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    stockQuantityCache.delete(oldestKey);
-  }
-};
-
-// Proactive cleanup: run periodically to prevent memory leaks
-if (typeof setInterval !== "undefined") {
-  setInterval(pruneStockCache, STOCK_CACHE_CLEANUP_INTERVAL_MS);
-}
-
-const getCachedStockQuantity = (sku: string): number | null => {
-  const cached = stockQuantityCache.get(sku);
-  if (!cached) return null;
-
-  if (cached.expiresAt <= now()) {
-    stockQuantityCache.delete(sku);
-    return null;
-  }
-
-  return cached.quantity;
-};
-
-const fetchStockQuantityBySku = async (sku: string): Promise<number> => {
-  const cached = getCachedStockQuantity(sku);
-  if (cached !== null) {
-    return cached;
-  }
-
-  const inFlight = stockQuantityInFlight.get(sku);
-  if (inFlight) {
-    return inFlight;
-  }
-
-  const request = (async () => {
-    try {
-      const stockRes = await apiClient.get<StockBySkuResponse>(`/inventory/stock/${sku}`);
-      const levels = Array.isArray(stockRes.data?.stockLevels) ? stockRes.data.stockLevels : [];
-      const quantity = levels.reduce(
-        (sum, level) => sum + Number(level.available ?? level.quantity ?? 0),
-        0,
-      );
-
-      stockQuantityCache.set(sku, {
-        quantity,
-        expiresAt: now() + STOCK_CACHE_TTL_MS,
-      });
-      pruneStockCache();
-
-      return quantity;
-    } catch {
-      return 0;
-    } finally {
-      stockQuantityInFlight.delete(sku);
-    }
-  })();
-
-  stockQuantityInFlight.set(sku, request);
-  return request;
-};
-
-const toInventoryItem = (
-  product: InventoryListResponse["products"][number],
-  quantity: number,
-): InventoryItem => ({
+const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   id: product.id,
   name: product.name,
   sku: product.sku,
   category: product.category,
-  quantity,
-  unit: "قطعة",
+  quantity: Number(product.totalAvailable ?? 0),
+  unit: product.unit || "قطعة",
   minStockLevel: Number(product.reorderLevel || 0),
 });
 
@@ -129,42 +31,26 @@ const extractMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.error?.message || err?.response?.data?.message || fallback;
 };
 
-export const useProducts = (params?: {
+type InventoryProductsParams = {
   page?: number;
   limit?: number;
   search?: string;
   category?: string;
   status?: string;
-}) => {
+};
+
+export const useProducts = (params?: InventoryProductsParams) => {
   return useQuery({
     queryKey: queryKeys.inventory.products(params),
     queryFn: async () => {
-      const res = await apiClient.get<InventoryListResponse>("/inventory/products", { params });
-      const products = Array.isArray(res.data?.products) ? res.data.products : [];
-
-      if (products.length === 0) {
-        return {
-          products,
-          items: [],
-          pagination: res.data?.pagination,
-        };
-      }
-
-      const stockResponses = await Promise.all(
-        products.map(async (product) => {
-          const quantity = await fetchStockQuantityBySku(product.sku);
-          return [product.sku, quantity] as const;
-        }),
-      );
-
-      const quantityBySku = new Map<string, number>(stockResponses);
-
+      const res = await apiClient.get<PaginatedResult<ProductEnriched>>("/inventory/products", {
+        params,
+      });
+      const products = Array.isArray(res.data?.data) ? res.data.data : [];
       return {
         products,
-        items: products.map((product) =>
-          toInventoryItem(product, quantityBySku.get(product.sku) || 0),
-        ),
-        pagination: res.data?.pagination,
+        items: products.map(toInventoryItem),
+        pagination: res.data,
       };
     },
     staleTime: QUERY_STALE_TIME.RELAXED,
@@ -173,32 +59,84 @@ export const useProducts = (params?: {
   });
 };
 
-export const useInventory = (params?: {
+export const useStockMovements = (params?: {
   page?: number;
   limit?: number;
-  search?: string;
-  category?: string;
-  status?: string;
+  sku?: string;
+  type?: MovementType;
+  location?: string;
 }) => {
+  return useQuery({
+    queryKey: queryKeys.inventory.movements(params),
+    queryFn: async () => {
+      const res = await apiClient.get<PaginatedResult<StockMovementRecord>>("/inventory/movements", {
+        params,
+      });
+      return res.data;
+    },
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
+    placeholderData: keepPreviousData,
+  });
+};
+
+export const useWarehouses = () => {
+  return useQuery({
+    queryKey: queryKeys.inventory.warehouses(),
+    queryFn: async () => {
+      const res = await apiClient.get<Warehouse[]>("/inventory/warehouses");
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    staleTime: QUERY_STALE_TIME.STANDARD,
+    gcTime: QUERY_GC_TIME.STANDARD,
+  });
+};
+
+export const useCategories = () => {
+  return useQuery({
+    queryKey: queryKeys.inventory.categories(),
+    queryFn: async () => {
+      const res = await apiClient.get<string[]>("/inventory/categories");
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    staleTime: QUERY_STALE_TIME.RELAXED,
+    gcTime: QUERY_GC_TIME.RELAXED,
+  });
+};
+
+export const useInventoryStats = () => {
+  return useQuery({
+    queryKey: queryKeys.inventory.stats(),
+    queryFn: async () => {
+      const res = await apiClient.get<InventoryStats>("/inventory/stats");
+      return res.data;
+    },
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
+  });
+};
+
+export const useInventory = (params?: InventoryProductsParams) => {
   const queryClient = useQueryClient();
 
-  const productsQuery = useProducts(params);
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
+  };
 
   const createItem = useMutation({
     mutationFn: async (payload: InventoryItemInput) => {
-      const body = {
+      return await apiClient.post("/inventory/products", {
         sku: payload.sku,
         name: payload.name,
         category: payload.category,
         unitPrice: Number(payload.unitPrice),
         costPrice: Number(payload.costPrice),
         reorderLevel: Number(payload.reorderLevel),
-      };
-
-      return await apiClient.post("/inventory/products", body);
+        unit: payload.unit,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
+      invalidateAll();
       toast.success("تمت إضافة الصنف بنجاح");
     },
     onError: (error: unknown) => {
@@ -208,19 +146,18 @@ export const useInventory = (params?: {
 
   const updateItem = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InventoryItemInput> }) => {
-      const body = {
+      return await apiClient.put(`/inventory/products/${id}`, {
         sku: data.sku,
         name: data.name,
         category: data.category,
         unitPrice: data.unitPrice !== undefined ? Number(data.unitPrice) : undefined,
         costPrice: data.costPrice !== undefined ? Number(data.costPrice) : undefined,
         reorderLevel: data.reorderLevel !== undefined ? Number(data.reorderLevel) : undefined,
-      };
-
-      return await apiClient.put(`/inventory/products/${id}`, body);
+        unit: data.unit,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
+      invalidateAll();
       toast.success("تم تحديث الصنف بنجاح");
     },
     onError: (error: unknown) => {
@@ -228,17 +165,16 @@ export const useInventory = (params?: {
     },
   });
 
-  // NOTE: backend currently has no DELETE /inventory/products/:id endpoint.
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
       return await apiClient.delete(`/inventory/products/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
+      invalidateAll();
       toast.success("تم نقل الصنف إلى سلة المهملات");
     },
     onError: (error: unknown) => {
-      toast.error(extractMessage(error, "الحذف غير مدعوم حالياً من الخادم"));
+      toast.error(extractMessage(error, "فشل حذف الصنف"));
     },
   });
 
@@ -247,22 +183,30 @@ export const useInventory = (params?: {
       const quantity = Number(input.quantity || 0);
       const change = input.type === "IN" ? quantity : -quantity;
 
-      // Resolve SKU for the product and call stock adjust endpoint
-      const productRes = await apiClient.get(`/inventory/products/${input.productId}`);
+      const productRes = await apiClient.get<{ product: { sku: string } }>(
+        `/inventory/products/${input.productId}`,
+      );
       const sku = productRes?.data?.product?.sku;
       if (!sku) {
         throw new Error("تعذر تحديد SKU للصنف المحدد");
       }
 
+      const reasonMap: Record<AdjustStockInput["type"], string> = {
+        IN: "إضافة مخزون",
+        OUT: "صرف مخزون",
+        ADJUSTMENT: "تسوية جرد",
+      };
+
       return await apiClient.post("/inventory/stock/adjust", {
         sku,
         location: input.location || "MAIN",
         change,
-        reason: input.note || (input.type === "IN" ? "إضافة مخزون" : "صرف مخزون"),
+        type: input.type,
+        reason: input.note || reasonMap[input.type],
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all, exact: false });
+      invalidateAll();
       toast.success("تم تعديل المخزون بنجاح");
     },
     onError: (error: unknown) => {
@@ -270,11 +214,31 @@ export const useInventory = (params?: {
     },
   });
 
+  const createWarehouse = useMutation({
+    mutationFn: async (payload: WarehouseInput) => {
+      return await apiClient.post("/inventory/warehouses", {
+        name: payload.name,
+        code: payload.code,
+        address: payload.address,
+      });
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success("تمت إضافة المخزن بنجاح");
+    },
+    onError: (error: unknown) => {
+      toast.error(extractMessage(error, "فشل إضافة المخزن"));
+    },
+  });
+
+  const productsQuery = useProducts(params);
+
   return {
     ...productsQuery,
     createItem,
     updateItem,
     deleteItem,
     adjustStock,
+    createWarehouse,
   };
 };

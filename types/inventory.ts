@@ -8,11 +8,65 @@ export interface InventoryItem {
   minStockLevel: number;
 }
 
-export interface StockMovement {
-  type: "IN" | "OUT";
+export interface ProductEnriched {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  unitPrice: number;
+  costPrice: number;
+  reorderLevel: number;
+  unit: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  totalQuantity: number;
+  totalReserved: number;
+  totalAvailable: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type MovementType = "IN" | "OUT" | "ADJUSTMENT" | "RESERVE" | "RELEASE";
+
+export interface StockMovementRecord {
+  id: string;
+  sku: string;
+  type: MovementType;
   quantity: number;
-  date: string;
-  note?: string;
+  location: string;
+  reason?: string;
+  referenceType?: string;
+  referenceId?: string;
+  createdById?: string;
+  createdAt: string;
+  product?: { name: string } | null;
+}
+
+export interface Warehouse {
+  id: string;
+  name: string;
+  code: string;
+  address?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryStats {
+  totalProducts: number;
+  totalStockRecords: number;
+  totalQuantity: number;
+  totalAvailable: number;
+  totalReserved: number;
+  lowStockCount: number;
+  totalWarehouses: number;
 }
 
 export interface InventoryItemInput {
@@ -27,9 +81,14 @@ export interface InventoryItemInput {
 
 export interface AdjustStockInput {
   productId: string;
-  type: "IN" | "OUT";
+  type: "IN" | "OUT" | "ADJUSTMENT";
   quantity: number | string;
   note: string;
   location?: string;
 }
 
+export interface WarehouseInput {
+  name: string;
+  code: string;
+  address?: string;
+}

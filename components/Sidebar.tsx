@@ -49,7 +49,16 @@ const menuItems: MenuItem[] = [
     ]
   },
   { name: 'بصمتي وحضوري', icon: Fingerprint, href: '/biometric', permissions: ['view_attendance'] },
-  { name: 'مخزن الشغل', icon: Box, href: '/inventory', permissions: ['view_inventory'] },
+  {
+    name: 'مخزن الشغل',
+    icon: Box,
+    permissions: ['view_inventory'],
+    subItems: [
+      { name: 'الأصناف', href: '/inventory' },
+      { name: 'حركات المخزون', href: '/inventory/movements' },
+      { name: 'المخازن', href: '/inventory/warehouses' },
+    ]
+  },
   { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
   { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },

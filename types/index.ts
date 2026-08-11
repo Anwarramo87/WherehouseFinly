@@ -12,7 +12,17 @@ export type { Bonus, BonusInput } from './bonus';
 export type { Penalty } from './penalty';
 export type { Reward, RewardInput } from './reward';
 export type { DiscountRecord, DiscountInput, DiscountKind } from './discount';
-export type { InventoryItem, StockMovement, InventoryItemInput, AdjustStockInput } from './inventory';
+export type {
+  InventoryItem,
+  ProductEnriched,
+  PaginatedResult,
+  MovementType,
+  StockMovementRecord,
+  Warehouse,
+  InventoryItemInput,
+  AdjustStockInput,
+  WarehouseInput
+} from './inventory';
 
 // Payroll and attendance types
 export type {

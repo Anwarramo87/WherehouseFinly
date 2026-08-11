@@ -18,6 +18,10 @@ export const queryKeys = {
     all: ["inventory"] as const,
     products: (params?: Record<string, unknown>) =>
       [...queryKeys.inventory.all, "products", params] as const,
+    movements: (params?: Record<string, unknown>) =>
+      [...queryKeys.inventory.all, "movements", params] as const,
+    warehouses: () => [...queryKeys.inventory.all, "warehouses"] as const,
+    categories: () => [...queryKeys.inventory.all, "categories"] as const,
     stats: () => [...queryKeys.inventory.all, "stats"] as const,
   },
   salaries: {
