@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Save, X } from "lucide-react";
 import { InventoryItemInput } from "@/types/inventory";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const defaultForm: InventoryItemInput = {
   costPrice: "",
   reorderLevel: "10",
   unit: "قطعة",
+  photo: null,
 };
 
 export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = false, initialData }: AddEditItemModalProps) {
@@ -33,6 +35,7 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
         costPrice: initialData.costPrice?.toString() || "",
         reorderLevel: initialData.reorderLevel?.toString() || "10",
         unit: initialData.unit || "قطعة",
+        photo: initialData.photo ?? null,
       };
     }
     return defaultForm;
@@ -60,6 +63,14 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
             onSave(form);
           }}
         >
+          <div className="md:col-span-2">
+            <PhotoUploadField
+              value={form.photo}
+              onChange={(photo) => setForm((p) => ({ ...p, photo }))}
+              label="صورة الصنف"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">اسم الصنف</label>
             <input

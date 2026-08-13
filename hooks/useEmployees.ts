@@ -258,6 +258,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         gracePeriodMinutes: newEmployee.gracePeriodMinutes,
         workDaysInPeriod: newEmployee.workDaysInPeriod,
         residence: newEmployee.residence,
+        photo: (newEmployee as unknown as Record<string, unknown>).photo,
       };
 
       // Remove undefined values so they don't get sent

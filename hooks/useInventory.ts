@@ -24,6 +24,9 @@ const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   quantity: Number(product.totalAvailable ?? 0),
   unit: product.unit || "قطعة",
   minStockLevel: Number(product.reorderLevel || 0),
+  unitPrice: product.unitPrice ? Number(product.unitPrice) : undefined,
+  costPrice: product.costPrice ? Number(product.costPrice) : undefined,
+  photo: product.photo || null,
 });
 
 const extractMessage = (error: unknown, fallback: string) => {
@@ -133,6 +136,7 @@ export const useInventory = (params?: InventoryProductsParams) => {
         costPrice: Number(payload.costPrice),
         reorderLevel: Number(payload.reorderLevel),
         unit: payload.unit,
+        photo: payload.photo || undefined,
       });
     },
     onSuccess: () => {
@@ -154,6 +158,7 @@ export const useInventory = (params?: InventoryProductsParams) => {
         costPrice: data.costPrice !== undefined ? Number(data.costPrice) : undefined,
         reorderLevel: data.reorderLevel !== undefined ? Number(data.reorderLevel) : undefined,
         unit: data.unit,
+        photo: data.photo !== undefined ? data.photo : undefined,
       });
     },
     onSuccess: () => {

@@ -22,8 +22,10 @@ import { toast } from "react-hot-toast";
 import { useRoles } from "@/hooks/useRoles";
 import useDepartments from "@/hooks/useDepartments";
 import type { Employee } from "@/types/employee";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 type EmployeeWithExtendedFields = Employee & {
+  photo?: string | null;
   username?: string | null;
   birthDate?: string | null;
   dateOfBirth?: string | null;
@@ -70,6 +72,7 @@ export type AddEmployeeFormData = {
   mobile: string;
   birthDate: string;
   gender: string;
+  photo?: string | null;
   jobTitle: string;
   department: string;
   baseSalary: string;
@@ -113,6 +116,7 @@ const defaultFormState = {
   gracePeriodMinutes: 5,
   roleId: "",
   residence: "",
+  photo: null,
 };
 
 export default function AddEmployeeModal({
@@ -162,6 +166,7 @@ export default function AddEmployeeModal({
           gracePeriodMinutes: employee.gracePeriodMinutes ?? 5,
           roleId: employee.roleId || "",
           residence: employee.residence || "",
+          photo: employee.photo ?? employee.avatar ?? null,
         };
       }
 
@@ -354,6 +359,16 @@ export default function AddEmployeeModal({
             <div
               className={`col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 transition-all duration-500 ${step === 1 ? "block animate-in slide-in-from-right-8" : "hidden"}`}
             >
+              <div className="md:col-span-2">
+                <PhotoUploadField
+                  value={formData.photo}
+                  onChange={(photo) => setFormData((p) => ({ ...p, photo }))}
+                  label="صورة الموظف"
+                  labelClassName="text-[#C89355]"
+                  className="max-w-xs mx-auto"
+                />
+              </div>
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
                   اسم الموظف الثلاثي

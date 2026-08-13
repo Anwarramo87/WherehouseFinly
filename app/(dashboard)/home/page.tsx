@@ -96,6 +96,7 @@ interface PresentEmployee {
   checkIn: string;
   checkOut: string | null;
   avatar?: string;
+  photo?: string | null;
 }
 
 interface AbsentEmployee {
@@ -105,6 +106,7 @@ interface AbsentEmployee {
   profession: string;
   scheduledStart: string;
   avatar?: string;
+  photo?: string | null;
   lastCheckIn?: string;
   lastWorkDay?: string;
 }
@@ -118,6 +120,7 @@ interface LateEmployeeDetail {
   checkIn: string;
   minutesLate: number;
   avatar?: string;
+  photo?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -907,9 +910,9 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
                 <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {employee.avatar ? (
+                  {(employee.avatar || employee.photo) ? (
                     <Image
-                      src={employee.avatar}
+                      src={employee.avatar || employee.photo || ""}
                       alt={employee.name}
                       width={48}
                       height={48}
@@ -977,9 +980,9 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
                 <div className="w-12 h-12 rounded-xl bg-linear-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {employee.avatar ? (
+                  {(employee.avatar || employee.photo) ? (
                     <Image
-                      src={employee.avatar}
+                      src={employee.avatar || employee.photo || ""}
                       alt={employee.name}
                       width={48}
                       height={48}
@@ -1059,9 +1062,9 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
                 <div className="w-12 h-12 rounded-xl bg-linear-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {employee.avatar ? (
+                  {(employee.avatar || employee.photo) ? (
                     <Image
-                      src={employee.avatar}
+                      src={employee.avatar || employee.photo || ""}
                       alt={employee.name}
                       width={48}
                       height={48}

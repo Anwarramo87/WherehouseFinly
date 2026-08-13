@@ -445,9 +445,18 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
             <div className="flex flex-col lg:flex-row justify-between items-center gap-8 relative z-10 w-full">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 w-full lg:w-auto text-center sm:text-right">
                 <div className="flex flex-col items-center gap-3 shrink-0 group/avatar">
-                  <div className="w-24 h-24 bg-linear-to-br from-[#1a2530] to-[#263544] text-[#C89355] rounded-3xl flex items-center justify-center text-4xl font-black shadow-[0_15px_30px_rgba(38,53,68,0.4)] border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 relative transition-transform duration-500 group-hover/avatar:scale-105 group-hover/avatar:-rotate-2">
+                  <div className="w-24 h-24 bg-linear-to-br from-[#1a2530] to-[#263544] text-[#C89355] rounded-3xl flex items-center justify-center text-4xl font-black shadow-[0_15px_30px_rgba(38,53,68,0.4)] border border-[#C89355]/40 outline-dashed outline-1 outline-[#C89355]/50 outline-offset-4 relative transition-transform duration-500 group-hover/avatar:scale-105 group-hover/avatar:-rotate-2 overflow-hidden">
                     <div className="absolute inset-0 bg-[#C89355] opacity-0 group-hover/avatar:opacity-10 transition-opacity duration-300 rounded-3xl" />
-                    {employee.name?.[0] || <User size={40} />}
+                    {employee.photo || employee.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={employee.photo || employee.avatar || ""}
+                        alt={employee.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      employee.name?.[0] || <User size={40} />
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 bg-[#1a2530] text-[#C89355] text-xs font-black px-3 py-1.5 rounded-xl border border-[#C89355]/30 shadow-inner tracking-widest font-mono">
                     <Hash size={12} className="opacity-70" />

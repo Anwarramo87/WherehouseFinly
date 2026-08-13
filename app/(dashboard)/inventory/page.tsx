@@ -16,6 +16,9 @@ const AddEditItemModal = dynamic(() => import("@/components/AddEditItemModal"), 
 const AdjustStockModal = dynamic(() => import("@/components/AdjustStockModal"), {
   loading: () => null,
 });
+const ProductPreviewModal = dynamic(() => import("@/components/inventory/ProductPreviewModal"), {
+  loading: () => null,
+});
 
 const parseCsvLine = (line: string): string[] => {
   const out: string[] = [];
@@ -63,6 +66,7 @@ export default function InventoryPage() {
   const [category, setCategory] = useState("all");
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isBulkPending, setIsBulkPending] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -427,6 +431,7 @@ export default function InventoryPage() {
           <table className="w-full text-right border-collapse min-w-245">
             <thead className="bg-white/40 border-b border-white/80">
               <tr>
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الصورة</th>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">اسم الصنف</th>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">SKU / الباركود</th>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الفئة</th>
@@ -439,7 +444,7 @@ export default function InventoryPage() {
             <tbody className="divide-y divide-white/40">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-16 text-center text-[#263544]/60 font-black text-lg">لا توجد بيانات مطابقة لنتائج البحث الحالية</td>
+                  <td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black text-lg">لا توجد بيانات مطابقة لنتائج البحث الحالية</td>
                 </tr>
               ) : (
                 items.map((item) => (
@@ -450,12 +455,34 @@ export default function InventoryPage() {
                   }`}
                 >
                   <td className="p-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner border ${item.quantity <= item.minStockLevel ? 'bg-rose-100 border-rose-200' : 'bg-[#1a2530] border-[#C89355]/40'}`}>
-                        <Package2 size={18} className={item.quantity <= item.minStockLevel ? 'text-rose-600' : 'text-[#C89355]'} />
-                      </div>
-                      <span className="font-black text-slate-800 text-sm whitespace-nowrap group-hover/row:text-[#263544] transition-colors">{item.name}</span>
+                    <div className="flex justify-center">
+                      {item.photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.photo}
+                          alt={item.name}
+                          onClick={() => setPreviewItem(item)}
+                          className="w-14 h-14 rounded-xl object-cover cursor-pointer border-2 border-white shadow-md hover:scale-110 hover:shadow-lg transition-all"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setPreviewItem(item)}
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-inner border cursor-pointer transition-all hover:scale-110 ${item.quantity <= item.minStockLevel ? 'bg-rose-100 border-rose-200' : 'bg-[#1a2530] border-[#C89355]/40'}`}
+                          title="عرض تفاصيل الصنف"
+                        >
+                          <Package2 size={20} className={item.quantity <= item.minStockLevel ? 'text-rose-600' : 'text-[#C89355]'} />
+                        </button>
+                      )}
                     </div>
+                  </td>
+                  <td className="p-4">
+                    <button
+                      onClick={() => setPreviewItem(item)}
+                      className="font-black text-slate-800 text-sm whitespace-nowrap group-hover/row:text-[#C89355] transition-colors hover:text-[#C89355] cursor-pointer"
+                      title="عرض تفاصيل الصنف"
+                    >
+                      {item.name}
+                    </button>
                   </td>
                   <td className="p-4 text-center text-xs text-slate-500 font-mono font-bold tracking-wider">{item.sku}</td>
                   <td className="p-4 text-xs font-black text-[#263544]/80 text-center">{item.category}</td>
@@ -527,8 +554,9 @@ export default function InventoryPage() {
                   category: selectedItem.category,
                   reorderLevel: selectedItem.minStockLevel,
                   unit: selectedItem.unit,
-                  unitPrice: 0,
-                  costPrice: 0,
+                  unitPrice: selectedItem.unitPrice ?? 0,
+                  costPrice: selectedItem.costPrice ?? 0,
+                  photo: selectedItem.photo ?? null,
                 }
               : null
           }
@@ -548,6 +576,23 @@ export default function InventoryPage() {
           isPending={adjustStock.isPending}
           onSave={handleAdjustStock}
           locations={["MAIN", ...warehouses.map((w) => w.name)]}
+        />
+      ) : null}
+
+      {previewItem ? (
+        <ProductPreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onEdit={() => {
+            setSelectedItem(previewItem);
+            setPreviewItem(null);
+            setIsItemModalOpen(true);
+          }}
+          onAdjust={() => {
+            setSelectedItem(previewItem);
+            setPreviewItem(null);
+            setIsStockModalOpen(true);
+          }}
         />
       ) : null}
 
@@ -561,60 +606,6 @@ export default function InventoryPage() {
         </div>
       )}
       </InventoryPageShell>
-
-      <button
-        onClick={() => {
-          setSelectedItem(null);
-          setIsItemModalOpen(true);
-        }}
-        className="fixed bottom-8 left-8 z-40 rounded-full w-16 h-16 bg-[#1a2530] text-[#C89355] shadow-[0_10px_30px_rgba(38,53,68,0.5)] hover:bg-[#263544] hover:scale-110 active:scale-95 transition-all flex items-center justify-center border-2 border-[#C89355]/40 group"
-        title="إضافة صنف جديد"
-      >
-        <div className="absolute inset-1.5 rounded-full border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
-        <Plus size={28} className="group-hover:animate-spin transition-all duration-300 relative z-10" />
-      </button>
-
-      {isItemModalOpen ? (
-        <AddEditItemModal
-          key={`${isItemModalOpen}-${selectedItem?.id ?? "new"}`}
-          isOpen={isItemModalOpen}
-          onClose={() => {
-            setIsItemModalOpen(false);
-            setSelectedItem(null);
-          }}
-          isPending={createItem.isPending || updateItem.isPending}
-          initialData={
-            selectedItem
-              ? {
-                  id: selectedItem.id,
-                  sku: selectedItem.sku,
-                  name: selectedItem.name,
-                  category: selectedItem.category,
-                  reorderLevel: selectedItem.minStockLevel,
-                  unit: selectedItem.unit,
-                  unitPrice: 0,
-                  costPrice: 0,
-                }
-              : null
-          }
-          onSave={handleSaveItem}
-        />
-      ) : null}
-
-      {isStockModalOpen ? (
-        <AdjustStockModal
-          key={`${isStockModalOpen}-${selectedItem?.id ?? "new"}`}
-          isOpen={isStockModalOpen}
-          onClose={() => {
-            setIsStockModalOpen(false);
-            setSelectedItem(null);
-          }}
-          item={selectedItem}
-          isPending={adjustStock.isPending}
-          onSave={handleAdjustStock}
-          locations={["MAIN", ...warehouses.map((w) => w.name)]}
-        />
-      ) : null}
     </>
   );
 }

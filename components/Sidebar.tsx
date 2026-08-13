@@ -16,6 +16,7 @@ import { resetAuthVerificationCache } from '@/lib/auth-verify';
 import apiClient from '@/lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_STALE_TIME } from '@/lib/query-cache';
+import { queryKeys } from '@/lib/query-keys';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -100,6 +101,68 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       queryFn: () => apiClient.get('/salary').then((r) => r.data?.salaries ?? r.data ?? []),
       staleTime: QUERY_STALE_TIME.RELAXED,
     }),
+    '/inventory': () => {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.products({ page: 1, limit: 100 }),
+        queryFn: () =>
+          apiClient
+            .get('/inventory/products', { params: { page: 1, limit: 100 } })
+            .then((r) => {
+              const products = Array.isArray(r.data?.data) ? r.data.data : [];
+              return {
+                products,
+                items: products.map((p: { id: string; name: string; sku: string; category: string; totalAvailable: number | string | null; unit?: string; reorderLevel?: number | string | null }) => ({
+                  id: p.id,
+                  name: p.name,
+                  sku: p.sku,
+                  category: p.category,
+                  quantity: Number(p.totalAvailable ?? 0),
+                  unit: p.unit || 'قطعة',
+                  minStockLevel: Number(p.reorderLevel || 0),
+                })),
+                pagination: r.data,
+              };
+            }),
+        staleTime: QUERY_STALE_TIME.RELAXED,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.categories(),
+        queryFn: () => apiClient.get('/inventory/categories').then((r) => (Array.isArray(r.data) ? r.data : [])),
+        staleTime: QUERY_STALE_TIME.RELAXED,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.stats(),
+        queryFn: () => apiClient.get('/inventory/stats').then((r) => r.data),
+        staleTime: QUERY_STALE_TIME.FAST,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.warehouses(),
+        queryFn: () => apiClient.get('/inventory/warehouses').then((r) => (Array.isArray(r.data) ? r.data : [])),
+        staleTime: QUERY_STALE_TIME.STANDARD,
+      });
+    },
+    '/inventory/movements': () => {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.movements({ page: 1, limit: 25 }),
+        queryFn: () =>
+          apiClient
+            .get('/inventory/movements', { params: { page: 1, limit: 25 } })
+            .then((r) => r.data),
+        staleTime: QUERY_STALE_TIME.FAST,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.warehouses(),
+        queryFn: () => apiClient.get('/inventory/warehouses').then((r) => (Array.isArray(r.data) ? r.data : [])),
+        staleTime: QUERY_STALE_TIME.STANDARD,
+      });
+    },
+    '/inventory/warehouses': () => {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.inventory.warehouses(),
+        queryFn: () => apiClient.get('/inventory/warehouses').then((r) => (Array.isArray(r.data) ? r.data : [])),
+        staleTime: QUERY_STALE_TIME.STANDARD,
+      });
+    },
     // Employees and attendance use parameterized/paginated keys. Let their
     // page hooks fetch the exact data instead of warming unusable cache entries.
   }), [queryClient]);

@@ -32,9 +32,15 @@ export default function AdjustStockModal({ isOpen, onClose, onSave, isPending = 
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">حركة مخزون</h2>
-            <p className="text-xs text-slate-500 mt-1">{item.name} • {item.sku}</p>
+          <div className="flex items-center gap-3">
+            {item.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.photo} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white shadow-md" />
+            ) : null}
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">حركة مخزون</h2>
+              <p className="text-xs text-slate-500 mt-1">{item.name} • {item.sku}</p>
+            </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors active:scale-95">
             <X size={24} />

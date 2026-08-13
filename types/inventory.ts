@@ -6,6 +6,9 @@ export interface InventoryItem {
   quantity: number;
   unit: string;
   minStockLevel: number;
+  unitPrice?: number;
+  costPrice?: number;
+  photo?: string | null;
 }
 
 export interface ProductEnriched {
@@ -18,6 +21,7 @@ export interface ProductEnriched {
   reorderLevel: number;
   unit: string;
   status: string;
+  photo?: string | null;
   createdAt: string;
   updatedAt: string;
   totalQuantity: number;
@@ -77,6 +81,7 @@ export interface InventoryItemInput {
   costPrice: number | string;
   reorderLevel: number | string;
   unit?: string;
+  photo?: string | null;
 }
 
 export interface AdjustStockInput {

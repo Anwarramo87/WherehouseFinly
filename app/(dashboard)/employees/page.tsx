@@ -280,6 +280,7 @@ export default function EmployeesPage() {
       baseSalary?: number;
       lumpSumSalary?: number;
       livingAllowance?: number;
+      photo?: string | null;
     } = {
       employeeId: normalizedEmployeeId,
       name: formData.name.trim(),
@@ -296,6 +297,7 @@ export default function EmployeesPage() {
       scheduledEnd: formData.scheduledEnd || undefined,
       gracePeriodMinutes: formData.gracePeriodMinutes,
       baseSalary: monthlySalary || undefined,
+      photo: formData.photo || null,
     };
 
     if (formData.livingAllowance !== "") {

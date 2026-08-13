@@ -24,6 +24,7 @@ export interface Employee {
   workDaysInPeriod?: number;
   hoursPerDay?: number;
   avatar?: string;
+  photo?: string | null;
   currency?: string;
   createdAt?: string;
   updatedAt?: string;
