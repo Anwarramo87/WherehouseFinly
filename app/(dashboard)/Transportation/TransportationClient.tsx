@@ -8,6 +8,7 @@ import useTransportation, {
   type BusDetailsResponse,
 } from "@/hooks/useTransportation";
 import { useEmployees } from "@/hooks/useEmployees";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const AddBusModal = dynamic(() => import("@/components/AddBusModal"), { loading: () => null });
 const AddPassengerModal = dynamic(() => import("@/components/AddPassengerModal"), {
@@ -117,6 +118,13 @@ export default function TransportationClient() {
     () => (Array.isArray(rawEmployees) ? rawEmployees : []),
     [rawEmployees],
   );
+  const employeeRecordMap = useMemo(() => {
+    const map = new Map<string, (typeof employees)[number]>();
+    for (const e of employees) {
+      if (e?.employeeId) map.set(e.employeeId, e);
+    }
+    return map;
+  }, [employees]);
 
   // React Query handles fetching, caching, and deduping bus details
   const safeBuses = useMemo(() => Array.isArray(buses) ? buses : [], [buses]);
@@ -623,19 +631,31 @@ export default function TransportationClient() {
                                       {p.employeeId}
                                     </td>
                                     <td className="p-3 text-right font-bold text-[#1a2530] text-sm">
-                                      {displayName || (
-                                        <span className="inline-flex items-center gap-1.5">
-                                          <span className="text-slate-400">—</span>
-                                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                                            غير موجود
-                                          </span>
-                                        </span>
-                                      )}
-                                      {isResignedPassenger(p) && (
-                                        <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full mr-1.5">
-                                          منقطع
-                                        </span>
-                                      )}
+                                      <div className="flex items-center justify-end gap-3">
+                                        <EmployeeAvatar
+                                          src={employeeRecordMap.get(p.employeeId)?.photo}
+                                          name={displayName || p.name}
+                                          gender={employeeRecordMap.get(p.employeeId)?.gender}
+                                          employeeId={p.employeeId}
+                                          size={36}
+                                          href={`/employees/${p.employeeId}`}
+                                        />
+                                        <div className="flex flex-col">
+                                          {displayName || (
+                                            <span className="inline-flex items-center gap-1.5">
+                                              <span className="text-slate-400">—</span>
+                                              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                                غير موجود
+                                              </span>
+                                            </span>
+                                          )}
+                                          {isResignedPassenger(p) && (
+                                            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full mr-1.5 self-start mt-1">
+                                              منقطع
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </td>
                                     <td className="p-3 text-center text-xs font-mono text-slate-500">
                                       {p.subscriptionDate ? new Date(p.subscriptionDate).toLocaleDateString("en-GB") : "—"}

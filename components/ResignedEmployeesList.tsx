@@ -17,6 +17,7 @@ import {
 import type { Employee } from "@/types/employee";
 import type { ResignedEmployeesStatistics, PaginationInfo } from "@/types/resignation";
 import { RehireEmployeeGuard, ProcessSettlementGuard } from "@/components/PermissionGuard";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 interface ResignedEmployeesListProps {
   employees: Employee[];
@@ -182,10 +183,22 @@ export default function ResignedEmployeesList({
                   return (
                     <tr key={employee.employeeId} className="hover:bg-white/80 transition-all duration-300 group/row">
                       <td className="p-4 text-center">
-                        <p className="font-black text-slate-800 group-hover/row:text-[#263544] transition-colors">
-                          {employee.name}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">{employee.employeeId}</p>
+                        <div className="flex items-center justify-center gap-3">
+                          <EmployeeAvatar
+                            src={employee.photo}
+                            name={employee.name}
+                            gender={employee.gender}
+                            employeeId={employee.employeeId}
+                            size={40}
+                            href={`/employees/${employee.employeeId}`}
+                          />
+                          <div className="text-right">
+                            <p className="font-black text-slate-800 group-hover/row:text-[#263544] transition-colors">
+                              {employee.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">{employee.employeeId}</p>
+                          </div>
+                        </div>
                       </td>
                       
                       <td className="p-4 text-center font-bold text-[#263544] text-sm">

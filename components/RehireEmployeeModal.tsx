@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, UserCheck, Calendar, MessageSquare } from "lucide-react";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 export interface RehireData {
   rehireDate: string;
@@ -109,6 +110,14 @@ export default function RehireEmployeeModal({
             <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
               <UserCheck className="text-emerald-500" size={24} />
             </div>
+            <EmployeeAvatar
+              src={employee.photo}
+              name={employee.name}
+              gender={employee.gender}
+              employeeId={employee.employeeId}
+              size={44}
+              href={`/employees/${employee.employeeId}`}
+            />
             <div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
                 إعادة تعيين الموظف

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, AlertTriangle, Calendar, FileText, MessageSquare } from "lucide-react";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 export interface TerminationData {
   terminationDate: string;
@@ -103,10 +104,18 @@ export default function TerminateEmployeeModal({
         
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-white/5 flex justify-between items-center bg-[#1a2530]/80 shrink-0 relative z-10">
-          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4">
             <div className="bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.15)]">
               <AlertTriangle className="text-rose-500" size={24} />
             </div>
+            <EmployeeAvatar
+              src={employee?.photo}
+              name={employee?.name}
+              gender={employee?.gender}
+              employeeId={employee?.employeeId}
+              size={44}
+              href={employee?.employeeId ? `/employees/${employee.employeeId}` : undefined}
+            />
             <div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
                 إنهاء عمل الموظف

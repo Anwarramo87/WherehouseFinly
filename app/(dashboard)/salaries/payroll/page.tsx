@@ -25,6 +25,7 @@ import { getApiErrorMessage } from "@/lib/http/error";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import { PayrollVirtualTable } from "@/components/PayrollVirtualTable";
 import { usePayrollPageData } from "@/hooks/usePayrollPageData";
+import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
 import type { AggregatedPayroll } from "@/types/payroll-aggregated";
 
@@ -81,6 +82,23 @@ export default function PayrollPage() {
   }, [payrollData, searchTerm]);
 
   const allRows = useMemo(() => filteredPayrollData, [filteredPayrollData]);
+
+  const { data: activeEmployees = [] } = useEmployees({ limit: 500, status: "active", fetchAll: false });
+  const employeeRecordMap = useMemo(() => {
+    const map = new Map<string, (typeof activeEmployees)[number]>();
+    for (const e of activeEmployees) {
+      if (e?.employeeId) map.set(e.employeeId, e);
+    }
+    return map;
+  }, [activeEmployees]);
+
+  const rowsWithAvatars = useMemo<AggregatedPayroll[]>(() => {
+    return allRows.map((row) => {
+      const emp = employeeRecordMap.get(row.employeeId);
+      if (!emp) return row;
+      return { ...row, photo: emp.photo ?? null, gender: emp.gender ?? null };
+    });
+  }, [allRows, employeeRecordMap]);
 
   // ── Grand totals ─────────────────────────────────────────────────────────────
   const globalTotals = useMemo(
@@ -358,7 +376,7 @@ export default function PayrollPage() {
 
           {/* Payroll table */}
           <PayrollVirtualTable
-            allRows={allRows}
+            allRows={rowsWithAvatars}
             onSelectPayslip={(item) => setSelectedPayslip(item)}
           />
 

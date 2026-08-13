@@ -1,27 +1,16 @@
-import apiClient from "@/lib/api-client";
+import { performTokenRefresh } from "@/lib/api-client";
 
 const REFRESH_INTERVAL_MS = 14 * 60 * 1000; // 14 دقيقة — قبل انتهاء الـ token بدقيقة
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
-let refreshInFlight: Promise<boolean> | null = null;
 
 export async function refreshAuthSession(): Promise<boolean> {
-  if (refreshInFlight) return refreshInFlight;
-
-  refreshInFlight = (async () => {
-    try {
-      await apiClient.post("/auth/refresh", {}, { timeout: 10_000 });
-      return true;
-    } catch {
-      // فشل الـ refresh — وقف الـ loop واترك الـ interceptor يتعامل مع الـ logout
-      stopSessionRefreshLoop();
-      return false;
-    } finally {
-      refreshInFlight = null;
-    }
-  })();
-
-  return refreshInFlight;
+  // Shared single-flight refresh مع الـ interceptor لمنع سباق الـ refresh token
+  const success = await performTokenRefresh();
+  if (!success) {
+    stopSessionRefreshLoop();
+  }
+  return success;
 }
 
 export function startSessionRefreshLoop() {

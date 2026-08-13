@@ -9,6 +9,7 @@ import type { PayrollInput } from "@/types/payroll";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { Salary } from "@/types/salary";
 import type { Leave } from "../types/leave";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 type AttendanceEventRecord = {
   employeeId?: string;
@@ -552,6 +553,14 @@ const isMounted = typeof document !== "undefined";
             <div className="bg-blue-500/10 p-2 rounded-xl border border-blue-500/20 shrink-0">
               <DollarSign className="text-blue-400" size={20} />
             </div>
+            <EmployeeAvatar
+              src={employee.photo}
+              name={employee.name}
+              gender={employee.gender}
+              employeeId={employee.employeeId}
+              size={40}
+              href={`/employees/${employee.employeeId}`}
+            />
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-black text-white truncate">التصفية المالية</h2>
               <p className="text-xs sm:text-sm text-slate-400 font-semibold truncate">

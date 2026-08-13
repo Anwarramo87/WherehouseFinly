@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import {
   Users, Clock, Timer, AlertTriangle, UserCheck, UserX,
   Building2, TrendingUp, Scissors, User, CalendarX, ClockAlert,
@@ -24,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 
 import { DataDrilldownModalLazy as DataDrilldownModal } from "@/components/DataDrilldownModalLazy";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   ssr: false,
@@ -54,6 +54,8 @@ interface OvertimeEmployee {
   hourlyRate: number;
   overtimePay: number;
   avatar?: string;
+  photo?: string | null;
+  gender?: string | null;
 }
 
 interface SalaryAdvance {
@@ -70,6 +72,8 @@ interface SalaryAdvance {
   repaymentStatus: "pending" | "partial" | "completed";
   remainingBalance: number;
   avatar?: string;
+  photo?: string | null;
+  gender?: string | null;
 }
 
 interface EmployeePenalty {
@@ -86,6 +90,8 @@ interface EmployeePenalty {
   status: "active" | "waived" | "completed";
   notes?: string;
   avatar?: string;
+  photo?: string | null;
+  gender?: string | null;
 }
 
 interface PresentEmployee {
@@ -97,6 +103,7 @@ interface PresentEmployee {
   checkOut: string | null;
   avatar?: string;
   photo?: string | null;
+  gender?: string | null;
 }
 
 interface AbsentEmployee {
@@ -107,6 +114,7 @@ interface AbsentEmployee {
   scheduledStart: string;
   avatar?: string;
   photo?: string | null;
+  gender?: string | null;
   lastCheckIn?: string;
   lastWorkDay?: string;
 }
@@ -121,6 +129,7 @@ interface LateEmployeeDetail {
   minutesLate: number;
   avatar?: string;
   photo?: string | null;
+  gender?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,6 +143,8 @@ interface BonusDisplay {
   amount: number;
   reason: string;
   date: string;
+  photo?: string | null;
+  gender?: string | null;
 }
 
 type ModalType = "present" | "absent" | "late" | "overtime" | null;
@@ -320,7 +331,9 @@ export default function DashboardPage() {
           status: "approved" as const,
           repaymentStatus: "pending" as const,
           remainingBalance: Number(advance.remainingAmount ?? 0),
-          avatar: undefined,
+          avatar: employee?.avatar,
+          photo: employee?.photo ?? null,
+          gender: employee?.gender ?? null,
         };
       })
       .filter((item): item is SalaryAdvance => Boolean(item));
@@ -357,7 +370,9 @@ export default function DashboardPage() {
           date: (penalty.issueDate || "").slice(0, 10),
           issuedBy: "",
           status: "active" as const,
-          avatar: undefined,
+          avatar: employee?.avatar,
+          photo: employee?.photo ?? null,
+          gender: employee?.gender ?? null,
         };
       })
       .filter((item): item is EmployeePenalty => Boolean(item));
@@ -396,6 +411,8 @@ export default function DashboardPage() {
             amount,
             reason: bonus.bonusReason || "مكافأة",
             date: bonus.period ? `${bonus.period}-01` : (bonus.createdAt || "").slice(0, 10),
+            photo: employee?.photo ?? null,
+            gender: employee?.gender ?? null,
           };
         },
       )
@@ -597,9 +614,14 @@ export default function DashboardPage() {
                       className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 hover:border-emerald-300 shadow-sm hover:shadow-[0_8px_20px_rgba(16,185,129,0.15)] transition-all duration-300 gap-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-xs font-black text-emerald-700 shadow-md">
-                          {bonus.name[0]}
-                        </div>
+                        <EmployeeAvatar
+                          src={bonus.photo}
+                          name={bonus.name}
+                          gender={bonus.gender}
+                          employeeId={bonus.employeeId}
+                          size={40}
+                          href={`/employees/${bonus.employeeId}`}
+                        />
                         <div>
                           <p className="text-sm font-black text-[#263544]">{bonus.name}</p>
                           <p className="text-[11px] font-bold text-[#263544]/60 mt-0.5">
@@ -694,12 +716,14 @@ export default function DashboardPage() {
 >
   {/* 2. تعديل مسافة الـ Avatar والاسم: gap-2 إلى gap-3 */}
   <div className="flex items-center gap-3 min-w-0">
-    <div
-      // 3. تعديل حجم الـ Avatar: من w-8 h-8 إلى w-10 h-10، والخط إلى text-xs، وإضافة shadow-md
-      className={`w-10 h-10 rounded-full ${item._type === "سلفة" ? "bg-indigo-500/10 border-indigo-500/30" : "bg-rose-500/10 border-rose-500/30"} border-2 flex items-center justify-center text-xs font-black shadow-md ${item._type === "سلفة" ? "text-indigo-700" : "text-rose-700"} shrink-0`}
-    >
-      {item.name[0]}
-    </div>
+    <EmployeeAvatar
+      src={item.photo}
+      name={item.name}
+      gender={item.gender}
+      employeeId={item.employeeId}
+      size={40}
+      href={`/employees/${item.employeeId}`}
+    />
     <div className="min-w-0">
       <p className="text-sm font-black text-[#263544] truncate">
         {item.name}
@@ -891,14 +915,20 @@ export default function DashboardPage() {
         title="الموظفون الحاضرون اليوم"
         icon={UserCheck}
         isLoading={false}
-        data={presentEmployees.map((emp) => ({
-          employeeId: emp.name,
-          name: emp.name,
-          department: emp.department || "",
-          profession: "",
-          checkIn: emp.checkIn,
-          checkOut: null,
-        }))}
+        data={presentEmployees.map((emp) => {
+          const match = employeeListMemo.find((e) => e.name === emp.name);
+          return {
+            employeeId: match?.employeeId ?? emp.name,
+            name: emp.name,
+            department: emp.department || "",
+            profession: "",
+            checkIn: emp.checkIn,
+            checkOut: null,
+            avatar: match?.avatar ?? match?.photo ?? undefined,
+            photo: match?.photo ?? null,
+            gender: match?.gender ?? null,
+          };
+        })}
         emptyMessage="لا يوجد موظفون حاضرون اليوم"
         emptyIcon={User}
         renderItem={(employee) => (
@@ -909,20 +939,14 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-emerald-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-100 to-white border border-emerald-200 shadow-inner flex items-center justify-center text-emerald-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {(employee.avatar || employee.photo) ? (
-                    <Image
-                      src={employee.avatar || employee.photo || ""}
-                      alt={employee.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full rounded-xl object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    employee.name[0]
-                  )}
-                </div>
+                <EmployeeAvatar
+                  src={employee.photo ?? employee.avatar}
+                  name={employee.name}
+                  gender={employee.gender}
+                  employeeId={employee.employeeId}
+                  size={48}
+                  href={`/employees/${employee.employeeId}`}
+                />
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
               </div>
               <div>
@@ -960,15 +984,21 @@ export default function DashboardPage() {
         title="الموظفون الغائبون اليوم"
         icon={UserX}
         isLoading={false}
-        data={absentEmployees.map((emp) => ({
-          employeeId: emp.employeeId,
-          name: emp.name,
-          department: emp.department || "",
-          profession: "",
-          scheduledStart: emp.scheduledStart || "08:00",
-          lastCheckIn: emp.lastCheckIn || undefined,
-          lastWorkDay: emp.lastWorkDay || undefined,
-        }))}
+        data={absentEmployees.map((emp) => {
+          const match = employeeListMemo.find((e) => e.employeeId === emp.employeeId);
+          return {
+            employeeId: emp.employeeId,
+            name: emp.name,
+            department: emp.department || "",
+            profession: "",
+            scheduledStart: emp.scheduledStart || "08:00",
+            lastCheckIn: emp.lastCheckIn || undefined,
+            lastWorkDay: emp.lastWorkDay || undefined,
+            avatar: match?.avatar ?? match?.photo ?? undefined,
+            photo: match?.photo ?? null,
+            gender: match?.gender ?? null,
+          };
+        })}
         emptyMessage="لا يوجد موظفون غائبون اليوم - حضور كامل! 🎉"
         emptyIcon={CalendarX}
         renderItem={(employee) => (
@@ -979,20 +1009,14 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-rose-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-rose-100 to-white border border-rose-200 border-dashed shadow-inner flex items-center justify-center text-rose-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {(employee.avatar || employee.photo) ? (
-                    <Image
-                      src={employee.avatar || employee.photo || ""}
-                      alt={employee.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full rounded-xl object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    employee.name[0]
-                  )}
-                </div>
+                <EmployeeAvatar
+                  src={employee.photo ?? employee.avatar}
+                  name={employee.name}
+                  gender={employee.gender}
+                  employeeId={employee.employeeId}
+                  size={48}
+                  href={`/employees/${employee.employeeId}`}
+                />
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white shadow-sm flex items-center justify-center">
                   <X size={8} className="text-white" strokeWidth={4} />
                 </div>
@@ -1042,15 +1066,21 @@ export default function DashboardPage() {
         title="الموظفون المتأخرون اليوم"
         icon={ClockAlert}
         isLoading={false}
-        data={lateEmployees.map((emp) => ({
-          employeeId: emp.employeeId,
-          name: emp.name,
-          department: "",
-          profession: "",
-          scheduledStart: emp.scheduledStart,
-          checkIn: emp.checkIn,
-          minutesLate: emp.minutesLate,
-        }))}
+        data={lateEmployees.map((emp) => {
+          const match = employeeListMemo.find((e) => e.employeeId === emp.employeeId);
+          return {
+            employeeId: emp.employeeId,
+            name: emp.name,
+            department: "",
+            profession: "",
+            scheduledStart: emp.scheduledStart,
+            checkIn: emp.checkIn,
+            minutesLate: emp.minutesLate,
+            avatar: match?.avatar ?? match?.photo ?? undefined,
+            photo: match?.photo ?? null,
+            gender: match?.gender ?? null,
+          };
+        })}
         emptyMessage="لا يوجد موظفون متأخرون اليوم - التزام ممتاز! ⭐"
         emptyIcon={ClockAlert}
         renderItem={(employee) => (
@@ -1061,20 +1091,14 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-amber-100 to-white border border-amber-200 shadow-inner flex items-center justify-center text-amber-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {(employee.avatar || employee.photo) ? (
-                    <Image
-                      src={employee.avatar || employee.photo || ""}
-                      alt={employee.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full rounded-xl object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    employee.name[0]
-                  )}
-                </div>
+                <EmployeeAvatar
+                  src={employee.photo ?? employee.avatar}
+                  name={employee.name}
+                  gender={employee.gender}
+                  employeeId={employee.employeeId}
+                  size={48}
+                  href={`/employees/${employee.employeeId}`}
+                />
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm" />
               </div>
               <div>
@@ -1111,18 +1135,24 @@ export default function DashboardPage() {
         title="موظفو العمل الإضافي اليوم"
         icon={Timer}
         isLoading={false}
-        data={overtimeEmployees.map((emp) => ({
-          employeeId: emp.employeeId,
-          name: emp.name,
-          department: emp.department || "",
-          profession: "",
-          scheduledEnd: emp.scheduledEnd,
-          actualCheckOut: emp.actualCheckOut,
-          overtimeMinutes: emp.overtimeMinutes,
-          overtimeHours: emp.overtimeMinutes / 60,
-          hourlyRate: 0,
-          overtimePay: emp.overtimePay,
-        }))}
+        data={overtimeEmployees.map((emp) => {
+          const match = employeeListMemo.find((e) => e.employeeId === emp.employeeId);
+          return {
+            employeeId: emp.employeeId,
+            name: emp.name,
+            department: emp.department || "",
+            profession: "",
+            scheduledEnd: emp.scheduledEnd,
+            actualCheckOut: emp.actualCheckOut,
+            overtimeMinutes: emp.overtimeMinutes,
+            overtimeHours: emp.overtimeMinutes / 60,
+            hourlyRate: 0,
+            overtimePay: emp.overtimePay,
+            avatar: match?.avatar ?? match?.photo ?? undefined,
+            photo: match?.photo ?? null,
+            gender: match?.gender ?? null,
+          };
+        })}
         emptyMessage="لا يوجد عمل إضافي اليوم"
         emptyIcon={Timer}
         renderItem={(employee) => (
@@ -1133,20 +1163,14 @@ export default function DashboardPage() {
             <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-r-[1.25rem] opacity-40 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-4 pr-3 relative z-10">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-100 to-white border border-blue-200 shadow-inner flex items-center justify-center text-blue-700 font-black text-lg group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
-                  {employee.avatar ? (
-                    <Image
-                      src={employee.avatar}
-                      alt={employee.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full rounded-full object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    employee.name[0]
-                  )}
-                </div>
+                <EmployeeAvatar
+                  src={employee.photo ?? employee.avatar}
+                  name={employee.name}
+                  gender={employee.gender}
+                  employeeId={employee.employeeId}
+                  size={48}
+                  href={`/employees/${employee.employeeId}`}
+                />
                 <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-sm" />
               </div>
               <div>

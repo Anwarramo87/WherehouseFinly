@@ -6,6 +6,7 @@ import { X, Save, Search, Calendar, CheckSquare, Square, Users, ChevronLeft, Che
 import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/TransportationClient";
 import type { Employee } from "@/types/employee";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 import apiClient from "@/lib/api-client";
 
 interface Props {
@@ -300,6 +301,15 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                     {selectedEmployeeIds.has(emp.employeeId) && (
                       <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white pointer-events-none" />
                     )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <EmployeeAvatar
+                      src={emp.photo}
+                      name={emp.name}
+                      gender={emp.gender}
+                      employeeId={emp.employeeId}
+                      size={36}
+                    />
                   </div>
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

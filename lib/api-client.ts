@@ -30,10 +30,12 @@ const getRequestPathname = (url?: string) => {
   }
 };
 
+// NOTE: /auth/me is intentionally NOT in this list — a 401 there must go
+// through the refresh flow (otherwise an expired access token with a valid
+// refresh cookie would be treated as logged out).
 const AUTH_ENDPOINT_PREFIXES = [
   "/auth/login",
   "/auth/logout",
-  "/auth/me",
   "/auth/register",
   "/auth/refresh",
   "/auth/biometric/",
@@ -43,16 +45,24 @@ const isAuthEndpoint = (pathname: string) => {
   return AUTH_ENDPOINT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 };
 
-let isRefreshing = false;
-let refreshSubscribers: Array<(success: boolean) => void> = [];
+// Single-flight refresh: the response interceptor AND the SessionRefresh loop
+// share one promise so two concurrent /auth/refresh calls can never race on the
+// single-use rotating refresh token (a race that previously caused logouts).
+let refreshInFlight: Promise<boolean> | null = null;
 
-const onRefreshComplete = (success: boolean) => {
-  refreshSubscribers.forEach((cb) => cb(success));
-  refreshSubscribers = [];
+export const performTokenRefresh = (): Promise<boolean> => {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = apiClient
+    .post("/auth/refresh", {}, { timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
 };
-
-const waitForRefresh = (): Promise<boolean> =>
-  new Promise((resolve) => refreshSubscribers.push(resolve));
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -153,32 +163,15 @@ apiClient.interceptors.response.use(
       !isAuthEndpoint(requestPathname) &&
       !originalConfig?._retry
     ) {
-      if (isRefreshing) {
-        // انتظر حتى ينتهي الـ refresh الجاري
-        const success = await waitForRefresh();
-        if (success) {
-          originalConfig._retry = true;
-          return apiClient(originalConfig);
-        }
-        forceLogout();
-        return Promise.reject(error);
-      }
-
-      isRefreshing = true;
-      originalConfig._retry = true;
-
-      try {
-        await apiClient.post("/auth/refresh", {}, { timeout: 8_000 });
-        isRefreshing = false;
-        onRefreshComplete(true);
+      // Single-flight refresh: كل الـ 401s تنتظر نفس الـ refresh
+      const success = await performTokenRefresh();
+      if (success) {
+        originalConfig._retry = true;
         // أعد تنفيذ الطلب الأصلي بعد نجاح الـ refresh
         return apiClient(originalConfig);
-      } catch {
-        isRefreshing = false;
-        onRefreshComplete(false);
-        forceLogout();
-        return Promise.reject(error);
       }
+      forceLogout();
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

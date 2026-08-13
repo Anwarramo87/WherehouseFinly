@@ -19,6 +19,7 @@ import { toast } from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 interface Props {
   isOpen: boolean;
@@ -416,13 +417,22 @@ function LeaveRequestModalContent({ isOpen, onClose, employees }: Props) {
                                 : "text-slate-300 hover:bg-white/5"
                             }`}
                           >
+                          <div className="flex items-center gap-3">
+                            <EmployeeAvatar
+                              src={emp.photo}
+                              name={emp.name}
+                              gender={emp.gender}
+                              employeeId={emp.employeeId}
+                              size={30}
+                            />
                             <span>
                               {emp.name}{" "}
                               <span className="font-mono text-[10px] text-slate-500">
                                 ({emp.employeeId})
                               </span>
                             </span>
-                            {isSelected && <Check size={14} />}
+                          </div>
+                          {isSelected && <Check size={14} />}
                           </div>
                         );
                       })

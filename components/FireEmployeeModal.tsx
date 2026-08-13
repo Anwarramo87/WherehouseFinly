@@ -18,6 +18,7 @@ import {
 import type { Employee } from "@/types/employee";
 import apiClient from "@/lib/api-client";
 import useDepartments from "@/hooks/useDepartments";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 export type FireEmployeePayload = {
   employeeId: string;
@@ -195,6 +196,14 @@ export default function FireEmployeeModal({
                 <UserX className="text-rose-500" size={24} />
               )}
             </div>
+            <EmployeeAvatar
+              src={employee?.photo}
+              name={employee?.name}
+              gender={employee?.gender}
+              employeeId={employee?.employeeId}
+              size={44}
+              href={employee?.employeeId ? `/employees/${employee.employeeId}` : undefined}
+            />
             <div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
                 {isResigned ? "تسجيل استقالة وتصفية حساب" : "إقالة موظف وتصفية حساب"}

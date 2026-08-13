@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Bonus, BonusInput } from "@/types/bonus";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
 
@@ -85,6 +86,10 @@ export default function RewardsClient() {
 
   const employeesLookup = useMemo(() => {
     return new Map(employees.map((emp) => [emp.employeeId, emp.name]));
+  }, [employees]);
+
+  const employeesRecordMap = useMemo(() => {
+    return new Map(employees.map((emp) => [emp.employeeId, emp]));
   }, [employees]);
 
   // تجهيز السجلات المسطحة أولاً
@@ -367,6 +372,16 @@ export default function RewardsClient() {
                           <td className="p-5 text-center font-black text-[#263544]">
                             <div className="flex items-center justify-center gap-2">
                               {isGlobal && <Users size={16} className="text-[#C89355]" />}
+                              {!isGlobal && (
+                                <EmployeeAvatar
+                                  src={employeesRecordMap.get(group.employeeId)?.photo}
+                                  name={group.name}
+                                  gender={employeesRecordMap.get(group.employeeId)?.gender}
+                                  employeeId={group.employeeId}
+                                  size={36}
+                                  href={`/employees/${group.employeeId}`}
+                                />
+                              )}
                               <span>{group.name}</span>
                             </div>
                           </td>

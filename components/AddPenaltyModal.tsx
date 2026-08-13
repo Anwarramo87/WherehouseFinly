@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Calendar, Coins, FileText, Search, X } from "lucide-react";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 export type PenaltyPayload = {
   employeeId: string;
@@ -130,6 +131,13 @@ export default function AddPenaltyModal({ isOpen, onClose, onSave, isPending, em
                           onClick={() => handleSelectEmployee(emp)}
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-colors"
                         >
+                          <EmployeeAvatar
+                            src={emp.photo}
+                            name={emp.name}
+                            gender={emp.gender}
+                            employeeId={emp.employeeId}
+                            size={32}
+                          />
                           <div className="bg-[#101720] px-2 py-1 rounded text-xs font-mono font-bold text-[#C89355] border border-[#263544]">
                             {emp.employeeId}
                           </div>

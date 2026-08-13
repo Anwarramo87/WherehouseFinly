@@ -7,13 +7,15 @@ import {
   Calendar, Coins, FileText 
 } from "lucide-react";
 import { BonusInput } from "@/types/bonus";
+import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 interface AddBonusModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: BonusInput) => void;
   isPending?: boolean;
-  employees: Array<{ employeeId: string; name: string; hourlyRate?: number | string | { $numberDecimal: string } }>;
+  employees: Array<{ employeeId: string; name: string; hourlyRate?: number | string | { $numberDecimal: string }; photo?: string | null; gender?: string | null }>;
   initialData?: {
     id?: string;
     employeeId?: string;
@@ -199,6 +201,13 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
                           onClick={() => handleSelectEmployee(emp)}
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98]"
                         >
+                          <EmployeeAvatar
+                            src={emp.photo}
+                            name={emp.name}
+                            gender={emp.gender}
+                            employeeId={emp.employeeId}
+                            size={32}
+                          />
                           <div className="bg-[#101720] px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355] border border-[#263544] shadow-sm">{emp.employeeId}</div>
                           <span className="font-bold text-white text-sm">{emp.name}</span>
                         </div>

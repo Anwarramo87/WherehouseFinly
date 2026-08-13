@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Building2, UserCog, CalendarDays, Save, Loader2, Search, ChevronLeft, Check } from "lucide-react";
 import useDepartments from "@/hooks/useDepartments";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 export interface DeptFormData {
   name: string;
@@ -184,9 +185,13 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
               >
                 {selectedEmployee ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#C89355]/20 border border-[#C89355]/30 flex items-center justify-center text-[10px] font-black text-[#C89355] shrink-0">
-                      {selectedEmployee.name[0]}
-                    </div>
+                    <EmployeeAvatar
+                      src={selectedEmployee.photo}
+                      name={selectedEmployee.name}
+                      gender={selectedEmployee.gender}
+                      employeeId={selectedEmployee.employeeId}
+                      size={28}
+                    />
                     <span className="text-sm font-bold">{selectedEmployee.name}</span>
                     <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{selectedEmployee.employeeId}</span>
                   </div>
@@ -229,9 +234,13 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#C89355]/20 border border-[#C89355]/30 flex items-center justify-center text-xs font-black text-[#C89355] shrink-0">
-                              {emp.name[0]}
-                            </div>
+                            <EmployeeAvatar
+                              src={emp.photo}
+                              name={emp.name}
+                              gender={emp.gender}
+                              employeeId={emp.employeeId}
+                              size={32}
+                            />
                             <div>
                               <p className="text-sm font-bold text-white">{emp.name}</p>
                               <p className="text-[10px] font-mono text-slate-500">{emp.employeeId} {emp.residence ? `• ${emp.residence}` : ""}</p>

@@ -26,6 +26,7 @@ import {
 
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), {
   loading: () => null,
@@ -532,6 +533,9 @@ export default function EmployeesPage() {
             <table className="w-full text-right min-w-225">
               <thead className="bg-white/40 border-b border-white/80">
                 <tr>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center w-20">
+                    الصورة
+                  </th>
                   <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center w-24">
                     كود الموظف
                   </th>
@@ -555,7 +559,7 @@ export default function EmployeesPage() {
               <tbody className="divide-y divide-white/40">
                 {!mounted || isLoading ? (
                   <tr>
-                    <td colSpan={6} className="p-16 text-center">
+                    <td colSpan={7} className="p-16 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="animate-spin text-[#C89355]" size={40} />
                         <span className="font-black text-[#263544] animate-pulse">
@@ -567,7 +571,7 @@ export default function EmployeesPage() {
                 ) : filteredEmployees.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="p-16 text-center text-[#263544]/60 font-black text-lg"
                     >
                       لا يوجد بيانات مطابقة للبحث.
@@ -582,6 +586,18 @@ export default function EmployeesPage() {
                         key={emp.employeeId}
                         className={`hover:bg-white/80 transition-all duration-300 group/row ${emp.status !== "active" ? "opacity-75 bg-rose-50/30" : ""}`}
                       >
+                        <td className="p-4 text-center">
+                          <div className="flex justify-center">
+                            <EmployeeAvatar
+                              src={emp.photo ?? emp.avatar}
+                              name={emp.name}
+                              gender={emp.gender}
+                              employeeId={emp.employeeId}
+                              size={42}
+                              href={`/employees/${emp.employeeId}`}
+                            />
+                          </div>
+                        </td>
                         <td className="p-4 text-center font-mono font-bold text-slate-500 text-sm">
                           {emp.employeeId}
                         </td>

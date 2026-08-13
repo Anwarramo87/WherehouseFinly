@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import type { Salary } from "@/types/salary";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
 const salarySchema = z.object({
@@ -285,6 +286,13 @@ export default function ManageSalaryModal({
                             onClick={() => handleSelectEmployee(emp)}
                             className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-colors"
                           >
+                            <EmployeeAvatar
+                              src={emp.photo}
+                              name={emp.name}
+                              gender={emp.gender}
+                              employeeId={emp.employeeId}
+                              size={32}
+                            />
                             <div className="bg-[#101720] px-2 py-1 rounded text-xs font-mono font-bold text-[#C89355] border border-[#263544]">{emp.employeeId}</div>
                             <span className="font-bold text-white text-sm">{emp.name}</span>
                           </div>

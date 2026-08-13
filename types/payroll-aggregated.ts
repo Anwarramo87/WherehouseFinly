@@ -16,6 +16,9 @@ export interface AggregatedPayroll {
   employeeName: string;
   /** From employee.department in the backend — NOT from salaryConfig.profession */
   department: string;
+  /** For the avatar/photo in the table — looked up from the employees list */
+  photo?: string | null;
+  gender?: string | null;
 
   // ✅ Server-authoritative figures — sourced from payrollItem
   grossPay: number;

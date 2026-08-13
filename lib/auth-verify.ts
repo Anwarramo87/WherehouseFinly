@@ -20,25 +20,7 @@ const cache: { result: VerifyResult | null; expiresAt: number; blockedUntil: num
 };
 let inFlight: Promise<VerifyResult> | null = null;
 
-const AUTH_COOKIE_CANDIDATES = [
-  process.env.NEXT_PUBLIC_AUTH_COOKIE_NAME,
-  "warehouse_access_token",
-  "auth_access_token",
-  "access_token",
-  "token",
-].filter((value): value is string => Boolean(value && value.trim()));
-
 const now = () => Date.now();
-
-const hasSessionHints = () => {
-  if (typeof document === "undefined") return false;
-  const cookie = document.cookie || "";
-  if (!cookie.trim()) return false;
-  return AUTH_COOKIE_CANDIDATES.some((cookieName) => {
-    const escaped = cookieName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?:^|;\\s*)${escaped}=`).test(cookie);
-  });
-};
 
 const isFresh = () => Boolean(cache.result) && cache.expiresAt > now();
 
@@ -53,9 +35,9 @@ export const verifyAuthSession = async (options?: { force?: boolean }) => {
   const force = options?.force === true;
   const currentTime = now();
 
-  if (!force && !hasSessionHints()) {
-    return { authorized: false, status: 401, fromCache: true };
-  }
+  // No hasSessionHints() gate here: the auth cookies are HttpOnly and invisible
+  // to document.cookie, so that check was always false in production and caused
+  // the login page to never probe /auth/me. The request is cheap and cached.
 
   if (!force && cache.blockedUntil > currentTime) {
     return { authorized: false, status: 429, rateLimited: true, fromCache: true };

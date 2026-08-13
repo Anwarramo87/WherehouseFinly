@@ -31,6 +31,7 @@ import {
 import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModal";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import PunchesModal from "@/components/PunchesModal";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const LeaveRequestModal = dynamic(() => import("@/components/LeaveRequestModal"), {
   loading: () => null,
@@ -161,6 +162,14 @@ export default function AttendancePage() {
     const map = new Map<string, string>();
     for (const e of employeeList) {
       if (e?.employeeId) map.set(e.employeeId, e.name || e.employeeId);
+    }
+    return map;
+  }, [employeeList]);
+
+  const employeeRecordMap = useMemo(() => {
+    const map = new Map<string, (typeof employeeList)[number]>();
+    for (const e of employeeList) {
+      if (e?.employeeId) map.set(e.employeeId, e);
     }
     return map;
   }, [employeeList]);
@@ -567,10 +576,22 @@ export default function AttendancePage() {
                         className="hover:bg-white/80 transition-all duration-300 group/row"
                       >
                         <td className="p-4 text-center">
-                          <p className="font-black text-slate-800 text-sm">{row.employeeName}</p>
-                          <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                            {row.employeeId}
-                          </p>
+                          <div className="flex items-center justify-center gap-3">
+                            <EmployeeAvatar
+                              src={employeeRecordMap.get(row.employeeId)?.photo}
+                              name={row.employeeName}
+                              gender={employeeRecordMap.get(row.employeeId)?.gender}
+                              employeeId={row.employeeId}
+                              size={40}
+                              href={`/employees/${row.employeeId}`}
+                            />
+                            <div className="text-right">
+                              <p className="font-black text-slate-800 text-sm">{row.employeeName}</p>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                {row.employeeId}
+                              </p>
+                            </div>
+                          </div>
                         </td>
                         {/* التاريخ بالأرقام الإنجليزية باللون البرتقالي */}
                         <td className="p-4 text-sm font-black font-mono text-center text-[#C89355]">

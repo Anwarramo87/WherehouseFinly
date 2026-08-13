@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Advance } from "@/types/advance";
 import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft, TrendingUp, X } from "lucide-react";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 import type { Salary } from "@/types/salary";
 import type { Employee } from "@/types/employee";
 import type { Bonus } from "@/types/bonus";
@@ -347,8 +348,20 @@ allIds.map((id: string) => {
                           return (
                             <tr key={id} className="hover:bg-white/80 transition-all duration-300 group/row">
                               <td className="p-4 text-center ">
-                                <div className="font-black text-slate-800 group-hover/row:text-[#263544] text-base">{employeeName}</div>
-                                <div className="font-mono font-bold text-[10px] text-slate-500 mt-0.5">{id}</div>
+                                <div className="flex items-center justify-center gap-3">
+                                  <EmployeeAvatar
+                                    src={emp?.photo}
+                                    name={employeeName}
+                                    gender={emp?.gender}
+                                    employeeId={id}
+                                    size={40}
+                                    href={`/employees/${id}`}
+                                  />
+                                  <div className="text-right">
+                                    <div className="font-black text-slate-800 group-hover/row:text-[#263544] text-base">{employeeName}</div>
+                                    <div className="font-mono font-bold text-[10px] text-slate-500 mt-0.5">{id}</div>
+                                  </div>
+                                </div>
                               </td>
 
                               <td className="p-4 text-center font-mono font-black text-[#263544]">

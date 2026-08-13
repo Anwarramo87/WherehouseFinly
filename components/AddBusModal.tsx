@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Save, Bus, User, Phone, Hash, MapPin, Coins, Percent, Search, Users } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
+import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const formatWithCommas = (value: string | number) => {
   if (!value) return "";
@@ -77,7 +79,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
 
   const filteredEmployees = useMemo(() => {
     if (!employeeSearch) return safeEmployees;
-    return safeEmployees.filter((emp: { name: string; employeeId: string }) =>
+    return safeEmployees.filter((emp: Employee) =>
       (emp.name || "").toLowerCase().includes(employeeSearch.toLowerCase()) ||
       (emp.employeeId || "").toLowerCase().includes(employeeSearch.toLowerCase())
     );
@@ -109,7 +111,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
 
-  const handleSelectEmployee = (emp: { employeeId: string; name: string; mobile?: string | null }) => {
+  const handleSelectEmployee = (emp: Employee) => {
     setFormData((p) => ({ ...p, driverName: emp.name, driverPhone: emp.mobile || "" }));
     setEmployeeSearch(`${emp.employeeId} - ${emp.name}`);
     setIsEmpDropdownOpen(false);
@@ -218,12 +220,19 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                       {filteredEmployees.length === 0 ? (
                         <div className="p-4 text-center text-slate-500 font-bold text-sm">لا يوجد موظف بهذا الاسم</div>
                       ) : (
-                        filteredEmployees.map((emp: { employeeId: string; name: string; mobile?: string | null }) => (
+                        filteredEmployees.map((emp: Employee) => (
                           <div
                             key={emp.employeeId}
                             onClick={() => handleSelectEmployee(emp)}
                             className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-xl cursor-pointer transition-all"
                           >
+                            <EmployeeAvatar
+                              src={emp.photo}
+                              name={emp.name}
+                              gender={emp.gender}
+                              employeeId={emp.employeeId}
+                              size={32}
+                            />
                             <div className="bg-[#1a2530] px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355]">{emp.employeeId}</div>
                             <span className="font-bold text-[#263544] text-sm">{emp.name}</span>
                           </div>

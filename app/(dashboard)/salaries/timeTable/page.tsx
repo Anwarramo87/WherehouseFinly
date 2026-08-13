@@ -19,6 +19,7 @@ import apiClient from "@/lib/api-client";
 import { SALARY_CONSTANTS } from "@/lib/salary-constants"; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 import { useEmployees } from "@/hooks/useEmployees";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 import {
   usePayrollInputs,
   UpsertPayrollInputPayload,
@@ -830,13 +831,23 @@ export default function TimeTablePage() {
                           setIsCalendarOpen(true);
                         }}
                       >
-                        <div className="flex flex-col">
-                          <span className="font-bold text-[#1a2530] group-hover/row:text-[#C89355] transition-colors">
-                            {record.name}
-                          </span>
-                          <span className="text-xs text-slate-500 font-mono">
-                            {record.employeeId}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <EmployeeAvatar
+                            src={record.photo}
+                            name={record.name}
+                            gender={record.gender}
+                            employeeId={record.employeeId}
+                            size={40}
+                            href={`/employees/${record.employeeId}`}
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-bold text-[#1a2530] group-hover/row:text-[#C89355] transition-colors">
+                              {record.name}
+                            </span>
+                            <span className="text-xs text-slate-500 font-mono">
+                              {record.employeeId}
+                            </span>
+                          </div>
                         </div>
                       </td>
 

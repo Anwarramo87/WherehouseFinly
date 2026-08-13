@@ -1,7 +1,9 @@
 import React from 'react';
 import { Eye } from "lucide-react";
+import Link from "next/link";
 
 import type { AggregatedPayroll } from '@/types/payroll-aggregated';
+import EmployeeAvatar from '@/components/EmployeeAvatar';
 
 interface PayrollRowProps {
   item: AggregatedPayroll;
@@ -26,13 +28,24 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
     >
       {/* الموظف - Employee */}
       <div className="w-[14%] flex items-center justify-center p-4 align-middle border-l border-slate-200">
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <span className="text-sm font-semibold text-slate-800 truncate max-w-40" title={item.employeeName}>
-            {item.employeeName}
-          </span>
-          <span className="text-[11px] text-slate-500 font-mono">
-            {item.employeeId}
-          </span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Link href={`/employees/${item.employeeId}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <EmployeeAvatar
+              src={item.photo}
+              name={item.employeeName}
+              gender={item.gender}
+              employeeId={item.employeeId}
+              size={40}
+            />
+          </Link>
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <span className="text-sm font-semibold text-slate-800 truncate max-w-40" title={item.employeeName}>
+              {item.employeeName}
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono">
+              {item.employeeId}
+            </span>
+          </div>
         </div>
       </div>
 

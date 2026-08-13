@@ -15,7 +15,6 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
-  User,
   X,
   Briefcase,
   Bus,
@@ -30,6 +29,7 @@ import { useBonuses } from "@/hooks/useBonuses";
 import { useEmployeeSalary } from "@/hooks/useSalaries";
 import { toLocalDateString } from "@/lib/date-time";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 import { DataDrilldownModalLazy as DataDrilldownModal } from "@/components/DataDrilldownModalLazy";
 
@@ -455,7 +455,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      employee.name?.[0] || <User size={40} />
+                      <EmployeeAvatar
+                        name={employee.name}
+                        gender={employee.gender}
+                        employeeId={employee.employeeId}
+                        size={80}
+                      />
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 bg-[#1a2530] text-[#C89355] text-xs font-black px-3 py-1.5 rounded-xl border border-[#C89355]/30 shadow-inner tracking-widest font-mono">

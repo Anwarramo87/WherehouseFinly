@@ -10,6 +10,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Employee } from "@/types/employee";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 import type { DiscountPayload, DiscountRecord } from "@/hooks/useDiscounts";
 
 const discountSchema = z.object({
@@ -212,6 +213,13 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
                           onClick={() => handleSelectEmployee(emp)}
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98]"
                         >
+                          <EmployeeAvatar
+                            src={emp.photo}
+                            name={emp.name}
+                            gender={emp.gender}
+                            employeeId={emp.employeeId}
+                            size={32}
+                          />
                           <div className="bg-[#101720] px-2 py-1 rounded-lg text-xs font-mono font-bold text-[#C89355] border border-[#263544] shadow-sm">{emp.employeeId}</div>
                           <span className="font-bold text-white text-sm">{emp.name}</span>
                         </div>

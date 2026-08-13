@@ -9,6 +9,7 @@ import { useDiscounts, DiscountRecord, DiscountPayload } from "@/hooks/useDiscou
 import { useAdvances } from "@/hooks/useAdvances";
 import { Advance, AdvanceInput } from "@/types/advance";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
+import EmployeeAvatar from "@/components/EmployeeAvatar";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
@@ -34,6 +35,10 @@ export default function DiscountsPage() {
   const [editingDiscount, setEditingDiscount] = useState<DiscountRecord | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
+
+  const employeesRecordMap = useMemo(() => {
+    return new Map(employees.map((emp) => [emp.employeeId, emp]));
+  }, [employees]);
 
   // حالة تتبع الصفوف المفتوحة (المنسدلة)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -274,6 +279,16 @@ export default function DiscountsPage() {
                           <td className="p-5 text-center font-black text-[#263544]">
                             <div className="flex items-center justify-center gap-2">
                               {isGlobal && <Users size={16} className="text-[#C89355]" />}
+                              {!isGlobal && (
+                                <EmployeeAvatar
+                                  src={employeesRecordMap.get(group.employeeId)?.photo}
+                                  name={group.name}
+                                  gender={employeesRecordMap.get(group.employeeId)?.gender}
+                                  employeeId={group.employeeId}
+                                  size={36}
+                                  href={`/employees/${group.employeeId}`}
+                                />
+                              )}
                               <span>{group.name}</span>
                             </div>
                           </td>
