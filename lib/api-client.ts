@@ -78,8 +78,6 @@ const apiClient = axios.create({
 // the backend reject the request with a 400 validation error).
 const isEmptyParam = (value: unknown): boolean =>
   value === undefined ||
-  value === null ||
-  (typeof value === "string" && value.trim() === "" && value !== "0") ||
   (typeof value === "string" && value.trim().toLowerCase() === "undefined");
 
 apiClient.interceptors.request.use((config) => {
@@ -149,6 +147,13 @@ const forceLogout = () => {
   }
 };
 
+/** Returns true only when the refresh itself got a definitive 401/403 from the server */
+const isDefinitiveAuthFailure = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -164,13 +169,30 @@ apiClient.interceptors.response.use(
       !originalConfig?._retry
     ) {
       // Single-flight refresh: كل الـ 401s تنتظر نفس الـ refresh
-      const success = await performTokenRefresh();
-      if (success) {
+      let refreshSucceeded = false;
+      try {
+        refreshSucceeded = await performTokenRefresh();
+      } catch (refreshError) {
+        // Only force logout when the refresh endpoint itself returned 401/403.
+        // Network errors, 500s, timeouts, etc. should NOT log the user out.
+        if (isDefinitiveAuthFailure(refreshError)) {
+          forceLogout();
+        }
+        return Promise.reject(error);
+      }
+
+      if (refreshSucceeded) {
         originalConfig._retry = true;
-        // أعد تنفيذ الطلب الأصلي بعد نجاح الـ refresh
         return apiClient(originalConfig);
       }
-      forceLogout();
+
+      // performTokenRefresh returned false (caught internally) — only logout
+      // if the original request was NOT a mutation (GET requests failing after
+      // a failed refresh are safe to logout on; mutations should just show an error).
+      const isReadRequest = (originalConfig?.method ?? "get").toLowerCase() === "get";
+      if (isReadRequest) {
+        forceLogout();
+      }
       return Promise.reject(error);
     }
 

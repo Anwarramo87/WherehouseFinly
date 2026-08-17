@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 
@@ -24,46 +25,6 @@ const isMale = (gender?: string | null) => {
   return g === "male" || g === "m" || g === "ذكر";
 };
 
-function ManIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="10" r="6" />
-      <path d="M14.5 6.5L20 1" />
-      <path d="M16 1h4v4" />
-    </svg>
-  );
-}
-
-function WomanIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="9" r="6" />
-      <path d="M12 15v7" />
-      <path d="M9 19h6" />
-    </svg>
-  );
-}
-
 function AvatarContent({
   src,
   name,
@@ -71,19 +32,7 @@ function AvatarContent({
   size = 40,
   className,
 }: Omit<EmployeeAvatarProps, "href" | "employeeId">) {
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={name || "صورة الموظف"}
-        width={size}
-        height={size}
-        className={`rounded-full object-cover border-2 border-white/70 shadow-sm shrink-0 ${className}`}
-        style={{ width: size, height: size }}
-      />
-    );
-  }
+  const [imgFailed, setImgFailed] = useState(false);
 
   const female = isFemale(gender);
   const male = isMale(gender);
@@ -93,22 +42,33 @@ function AvatarContent({
       ? "bg-slate-200 text-[#263544] border-slate-300"
       : "bg-slate-100 text-[#263544]/60 border-slate-200";
 
-  return (
+  const fallback = (
     <div
       className={`rounded-full flex items-center justify-center border-2 shrink-0 shadow-sm select-none ${bubbleClass} ${className}`}
       style={{ width: size, height: size }}
       title={name || (female ? "أنثى" : male ? "ذكر" : "بدون صورة")}
       aria-label={name || "صورة الموظف"}
     >
-      {female ? (
-        <WomanIcon size={size * 0.5} />
-      ) : male ? (
-        <ManIcon size={size * 0.5} />
-      ) : (
-        <User size={size * 0.5} strokeWidth={2.5} />
-      )}
+      <User size={size * 0.5} strokeWidth={2} />
     </div>
   );
+
+  if (src && !imgFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name || "صورة الموظف"}
+        width={size}
+        height={size}
+        className={`rounded-full object-cover border-2 border-white/70 shadow-sm shrink-0 ${className}`}
+        style={{ width: size, height: size }}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  return fallback;
 }
 
 export default function EmployeeAvatar(props: EmployeeAvatarProps) {

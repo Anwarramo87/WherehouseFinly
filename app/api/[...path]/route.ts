@@ -6,12 +6,16 @@ export const fetchCache = "force-no-store";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
-// Resolve at request time so env vars are always fresh
-const getBackendUrl = () => resolveApiUrl(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL);
 const DEPLOYED_BACKEND_URL = "https://werehouse-production-4cba.up.railway.app/api/v1";
-const LOCAL_BACKEND_TIMEOUT_MS = 6000; // 6s timeout for local backend TCP connect
-const DEPLOYED_BACKEND_TIMEOUT_MS = 15000; // 15s for deployed backend
-const HOP_BY_HOP_HEADERS = new Set([
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// Resolved once at module load — stable for the lifetime of the server process.
+// NEXT_PUBLIC_API_URL is set in .env.local → http://localhost:5003/api/v1
+const PRIMARY_BACKEND_URL = resolveApiUrl(
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL,
+);
+
+const HOP_BY_HOP = new Set([
   "accept-encoding",
   "connection",
   "content-encoding",
@@ -26,11 +30,6 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
-// Track if local backend was recently reachable (avoid repeated timeouts)
-let localBackendLastCheck = 0;
-let localBackendReachable = true;
-const LOCAL_CHECK_INTERVAL_MS = 30_000; // re-probe local every 30s if it was down
-
 const ALLOWED_ORIGINS: Set<string> = new Set(
   (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_APP_URL ?? "")
     .split(",")
@@ -38,204 +37,122 @@ const ALLOWED_ORIGINS: Set<string> = new Set(
     .filter(Boolean),
 );
 
-const isOriginAllowed = (origin: string | null): boolean => {
+const isOriginAllowed = (origin: string | null) => {
   if (!origin) return false;
-  if (ALLOWED_ORIGINS.size === 0) return true; // dev: no restriction configured
+  if (ALLOWED_ORIGINS.size === 0) return true;
   return ALLOWED_ORIGINS.has(origin);
 };
 
-const buildCorsHeaders = (request: NextRequest) => {
+const corsHeaders = (request: NextRequest) => {
   const origin = request.headers.get("origin");
-  const allowedOrigin = isOriginAllowed(origin) ? origin! : "";
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": isOriginAllowed(origin) ? origin! : "",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
     "Access-Control-Allow-Headers":
-      request.headers.get("access-control-request-headers") || "Content-Type, Authorization, Cookie",
+      request.headers.get("access-control-request-headers") ||
+      "Content-Type, Authorization, Cookie",
     Vary: "Origin",
   };
 };
 
-const buildUpstreamHeaders = (request: NextRequest) => {
-  const headers = new Headers();
-
+const upstreamHeaders = (request: NextRequest) => {
+  const h = new Headers();
   request.headers.forEach((value, key) => {
-    if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
-    headers.set(key, value);
+    if (!HOP_BY_HOP.has(key.toLowerCase())) h.set(key, value);
   });
-
-  return headers;
+  return h;
 };
 
-// Low-volatility endpoints that can benefit from short-lived caching
-const CACHEABLE_PATHS = new Set([
-  "/departments",
-  "/roles",
-]);
+const CACHEABLE = new Set(["/departments", "/roles"]);
+const isCacheable = (p: string) =>
+  [...CACHEABLE].some((c) => p === c || p.startsWith(`${c}/`) || p.startsWith(`${c}?`));
 
-const isCacheablePath = (apiPath: string): boolean => {
-  // Check if the path starts with any cacheable prefix
-  for (const path of CACHEABLE_PATHS) {
-    if (apiPath === path || apiPath.startsWith(`${path}?`) || apiPath.startsWith(`${path}/`)) {
-      return true;
-    }
-  }
-  return false;
-};
+const responseHeaders = (upstream: Response, request: NextRequest, apiPath: string) => {
+  const h = new Headers();
 
-const buildResponseHeaders = (response: Response, request: NextRequest, apiPath: string) => {
-  const headers = new Headers();
-
-  response.headers.forEach((value, key) => {
-    if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
-    headers.append(key, value);
+  upstream.headers.forEach((value, key) => {
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || lower === "set-cookie") return;
+    h.append(key, value);
   });
 
-  const corsHeaders = buildCorsHeaders(request);
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    headers.set(key, value);
-  });
+  // Forward every Set-Cookie individually — forEach() collapses duplicates
+  const cookies = upstream.headers.getSetCookie?.() ?? [];
+  for (const c of cookies) h.append("set-cookie", c);
 
-  // ─── Selective caching for low-volatility endpoints ───────────────────────
-  if (isCacheablePath(apiPath)) {
-    // Short-lived cache: private (browser only), stale-while-revalidate for better UX
-    headers.set("Cache-Control", "private, max-age=0, s-maxage=60, stale-while-revalidate=120");
+  Object.entries(corsHeaders(request)).forEach(([k, v]) => h.set(k, v));
+
+  if (isCacheable(apiPath)) {
+    h.set("Cache-Control", "private, max-age=0, s-maxage=60, stale-while-revalidate=120");
   } else {
-    // Default: no caching for volatile data (attendance, payroll, inventory, etc.)
-    headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-    headers.set("Pragma", "no-cache");
+    h.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    h.set("Pragma", "no-cache");
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
-  return headers;
+  return h;
 };
 
-// reportDebug is referenced in older versions of this proxy file.
-// If it isn't available in the current codebase, keep compilation working.
-const reportDebug: undefined | ((...args: unknown[]) => void) = undefined;
-
-// Remove undefined/null/empty query params so the backend never receives the
-// literal string "undefined" (which would trigger a 400 validation error).
-function cleanSearchParams(searchParams: URLSearchParams): string {
-  const cleaned = new URLSearchParams();
-  for (const [key, value] of searchParams.entries()) {
-    const trimmed = value.trim();
-    if (trimmed === "" || trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null") {
-      continue;
-    }
-    cleaned.append(key, value);
+function cleanSearchParams(sp: URLSearchParams): string {
+  const out = new URLSearchParams();
+  for (const [k, v] of sp.entries()) {
+    const t = v.trim().toLowerCase();
+    if (t === "" || t === "undefined" || t === "null") continue;
+    out.append(k, v);
   }
-  const qs = cleaned.toString();
+  const qs = out.toString();
   return qs ? `?${qs}` : "";
 }
 
 async function handler(request: NextRequest) {
   const url = request.nextUrl;
-  const path = url.pathname;
-  const pathParts = path.split("/").filter(Boolean);
-  // Strip /api prefix, and also /v1 since backend URL already includes /api/v1
-  const rest = pathParts.slice(1);
-  const apiPath = "/" + (rest[0] === "v1" ? rest.slice(1) : rest).join("/");
-  const cleanedSearch = cleanSearchParams(url.searchParams);
+  const parts = url.pathname.split("/").filter(Boolean).slice(1); // strip leading /api
+  const apiPath = "/" + (parts[0] === "v1" ? parts.slice(1) : parts).join("/");
+  const qs = cleanSearchParams(url.searchParams);
 
   if (request.method === "OPTIONS") {
-    return new NextResponse(null, {
-      status: 204,
-      headers: buildCorsHeaders(request),
-    });
+    return new NextResponse(null, { status: 204, headers: corsHeaders(request) });
   }
 
-  try {
-    const primaryUrl = getBackendUrl();
-    const isGetOrHead = request.method === "GET" || request.method === "HEAD";
-    const body = isGetOrHead ? undefined : await request.text();
-    let response: Response;
-    const headers = buildUpstreamHeaders(request);
+  const isGetOrHead = request.method === "GET" || request.method === "HEAD";
+  const body = isGetOrHead ? undefined : await request.text();
+  const headers = upstreamHeaders(request);
 
-    const now = Date.now();
-    // Skip local entirely if: primary IS deployed, or local was recently unreachable
-    const useDeployed =
-      primaryUrl === DEPLOYED_BACKEND_URL || !localBackendReachable;
-
-    const fetchWithTimeout = async (
-      url: string,
-      timeoutMs: number,
-    ): Promise<Response> => {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, {
-          method: request.method,
-          headers,
-          body,
-          redirect: "manual",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(id);
-      }
-    };
-
-    if (useDeployed) {
-      // Skip local entirely — known unreachable or already pointing to deployed
-      response = await fetchWithTimeout(
-        DEPLOYED_BACKEND_URL + apiPath + cleanedSearch,
-        DEPLOYED_BACKEND_TIMEOUT_MS,
-      );
-      // Re-probe local backend periodically (only if primary is local, not deployed)
-      if (primaryUrl !== DEPLOYED_BACKEND_URL && now - localBackendLastCheck > LOCAL_CHECK_INTERVAL_MS) {
-        localBackendLastCheck = now;
-        fetchWithTimeout(primaryUrl, LOCAL_BACKEND_TIMEOUT_MS)
-          .then(() => {
-            localBackendReachable = true;
-          })
-          .catch(() => {
-            localBackendReachable = false;
-          });
-      }
-    } else {
-      // Try local first with short timeout
-      try {
-        response = await fetchWithTimeout(
-          primaryUrl + apiPath + cleanedSearch,
-          LOCAL_BACKEND_TIMEOUT_MS,
-        );
-        localBackendReachable = true;
-        localBackendLastCheck = now;
-      } catch {
-        // Local failed — try deployed fallback
-        localBackendReachable = false;
-        localBackendLastCheck = now;
-        response = await fetchWithTimeout(
-          DEPLOYED_BACKEND_URL + apiPath + cleanedSearch,
-          DEPLOYED_BACKEND_TIMEOUT_MS,
-        );
-      }
+  const fetchWithTimeout = async (targetUrl: string): Promise<Response> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(targetUrl, {
+        method: request.method,
+        headers,
+        body,
+        redirect: "manual",
+        cache: "no-store",
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
     }
+  };
 
-    return new NextResponse(response.body, {
-      status: response.status,
-      headers: buildResponseHeaders(response, request, apiPath),
+  // ── Simple strategy: always use PRIMARY_BACKEND_URL (set in .env.local).
+  // No fallback switching — mixing backends causes 401s because each has its
+  // own JWT secret and Redis refresh-token store.
+  // If you want to use the deployed backend, change NEXT_PUBLIC_API_URL in .env.local.
+  const targetUrl = PRIMARY_BACKEND_URL + apiPath + qs;
+
+  try {
+    const upstream = await fetchWithTimeout(targetUrl);
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders(upstream, request, apiPath),
     });
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    const errStack = error instanceof Error ? error.stack : '';
-    console.error("[proxy] fetch failed:", errMsg, "\nStack:", errStack);
-    // #region debug-point C:proxy-network-error
-    reportDebug?.("C", "Next API proxy failed before upstream response", {
-      method: request.method,
-      path,
-      error: errMsg,
-    });
-    // #endregion
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[proxy] ${request.method} ${targetUrl} failed:`, msg);
     return NextResponse.json(
-      { error: "Backend unreachable", message: errMsg },
-      {
-        status: 502,
-        headers: buildCorsHeaders(request),
-      },
+      { error: "Backend unreachable", message: msg, target: targetUrl },
+      { status: 502, headers: corsHeaders(request) },
     );
   }
 }
@@ -246,5 +163,3 @@ export const PUT = handler;
 export const DELETE = handler;
 export const PATCH = handler;
 export const OPTIONS = handler;
-
-

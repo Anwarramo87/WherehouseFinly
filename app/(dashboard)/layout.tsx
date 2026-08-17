@@ -38,21 +38,39 @@ export default function DashboardLayout({
       return;
     }
     authChecked.current = true;
-    apiClient.get('/auth/me').then((res) => {
-      const data = res.data as Record<string, unknown>;
-      if (data && data.permissions) {
-        setUser({
-          ...(user ?? {}),
-          ...(data as { id?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] }),
-        });
-        setStatus("authenticated");
+
+    // Use a small delay so any in-flight token refresh (triggered by a
+    // concurrent mutation) can complete before we probe /auth/me.
+    // This prevents the layout's auth-check from racing with the interceptor
+    // and causing a spurious logout when the user is editing/adding an employee.
+    const checkAuth = async () => {
+      try {
+        const res = await apiClient.get('/auth/me');
+        const data = res.data as Record<string, unknown>;
+        if (data && data.permissions) {
+          setUser({
+            ...(user ?? {}),
+            ...(data as { id?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] }),
+          });
+          setStatus("authenticated");
+        }
+      } catch (err: unknown) {
+        // Only redirect to login on a definitive 401/403 that survived the
+        // interceptor's refresh attempt (i.e. _retry was already set).
+        // Network errors, 500s, or 401s that the interceptor is still
+        // handling must NOT trigger a logout here.
+        if (
+          axios.isAxiosError(err) &&
+          (err.response?.status === 401 || err.response?.status === 403) &&
+          (err.config as unknown as Record<string, unknown>)?._retry === true
+        ) {
+          clear();
+          router.replace('/login');
+        }
       }
-    }).catch((err: unknown) => {
-      if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
-        clear();
-        router.replace('/login');
-      }
-    });
+    };
+
+    void checkAuth();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
