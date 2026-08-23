@@ -6,7 +6,7 @@ export const fetchCache = "force-no-store";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
-const DEPLOYED_BACKEND_URL = "https://werehouse-production-4cba.up.railway.app/api/v1";
+const DEPLOYED_BACKEND_URL = "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 // Resolved once at module load — stable for the lifetime of the server process.

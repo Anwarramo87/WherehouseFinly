@@ -2,7 +2,9 @@
 
 import { io, type Socket } from "socket.io-client";
 
-const DEPLOYED_BACKEND = "https://werehouse-production-4cba.up.railway.app";
+const DEPLOYED_BACKEND =
+  process.env.NEXT_PUBLIC_SOCKET_URL?.trim() ||
+  "https://warehousebackend-depolyemnt-production.up.railway.app";
 
 export type AttendanceRealtimeEventPayload = {
   employeeId: string;
