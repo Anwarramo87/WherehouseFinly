@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard, Users, ClipboardList,
-  Wallet, Box, Bus, FileInput, Settings, Fingerprint,
+  Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2
 } from 'lucide-react';
@@ -49,7 +49,6 @@ const menuItems: MenuItem[] = [
       { name: 'تقارير الرواتب', href: '/salaries/payroll' },
     ]
   },
-  { name: 'بصمتي وحضوري', icon: Fingerprint, href: '/biometric', permissions: ['view_attendance'] },
   {
     name: 'مخزن الشغل',
     icon: Box,

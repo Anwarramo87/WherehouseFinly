@@ -26,7 +26,6 @@ export const PROTECTED_ROUTE_PREFIXES = [
   "/Transportation",
   "/importData",
   "/settings",
-  "/biometric",
   "/payroll",
   "/advances",
   "/bonuses",
@@ -48,7 +47,6 @@ export const ROUTE_PERMISSION_MAP: Record<string, string[]> = {
   "/vouchers": ["view_payroll"],
   "/advances": ["manage_advances"],
   "/bonuses": ["manage_bonuses"],
-  "/biometric": ["view_attendance"],
 };
 
 export const isProtectedRoute = (pathname: string) =>
