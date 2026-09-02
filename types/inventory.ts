@@ -3,12 +3,19 @@ export interface InventoryItem {
   name: string;
   sku: string;
   category: string;
+  /** Available to sell or issue — on hand minus reserved. */
   quantity: number;
   unit: string;
   minStockLevel: number;
   unitPrice?: number;
   costPrice?: number;
   photo?: string | null;
+  /** Physically on hand, including anything reserved. */
+  onHand?: number;
+  /** Committed to a confirmed order and not available to anyone else. */
+  reserved?: number;
+  /** active | inactive */
+  status?: string;
 }
 
 export interface ProductEnriched {

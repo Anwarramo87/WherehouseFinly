@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import type { AxiosError } from "axios";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -62,6 +63,13 @@ export const useUnreadNotificationCount = () => {
     },
     refetchInterval: 60_000,
     staleTime: 30_000,
+    // A 401/403 here is a permission verdict, not a blip -- retrying it just
+    // fills the console every minute. Retry transport/server errors only.
+    retry: (failureCount, error) => {
+      const status = (error as AxiosError)?.response?.status;
+      if (status === 401 || status === 403) return false;
+      return failureCount < 2;
+    },
   });
   return query;
 };

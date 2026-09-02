@@ -27,6 +27,9 @@ const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   unitPrice: product.unitPrice ? Number(product.unitPrice) : undefined,
   costPrice: product.costPrice ? Number(product.costPrice) : undefined,
   photo: product.photo || null,
+  onHand: Number(product.totalQuantity ?? 0),
+  reserved: Number(product.totalReserved ?? 0),
+  status: product.status,
 });
 
 const extractMessage = (error: unknown, fallback: string) => {
@@ -34,12 +37,27 @@ const extractMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.error?.message || err?.response?.data?.message || fallback;
 };
 
+/** Columns the API will sort on. Mirrors the whitelist in the backend DTO. */
+export type ProductSortField =
+  | "name"
+  | "sku"
+  | "category"
+  | "unitPrice"
+  | "costPrice"
+  | "reorderLevel"
+  | "status"
+  | "createdAt";
+
+export type SortDirection = "asc" | "desc";
+
 type InventoryProductsParams = {
   page?: number;
   limit?: number;
   search?: string;
   category?: string;
   status?: string;
+  sortBy?: ProductSortField;
+  sortDir?: SortDirection;
 };
 
 export const useProducts = (params?: InventoryProductsParams) => {

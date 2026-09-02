@@ -18,6 +18,11 @@ const NotificationBell = dynamic(() => import("@/components/NotificationBell"), 
   ssr: false,
 });
 
+const AssistantLauncher = dynamic(
+  () => import("@/components/assistant/AssistantLauncher"),
+  { ssr: false },
+);
+
 export default function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -134,6 +139,13 @@ export default function DashboardLayout({
         </div>
 
         {children}
+
+        {/* Available on every dashboard page; hides itself when unconfigured. */}
+        <div className="print:hidden">
+          <Suspense fallback={null}>
+            <AssistantLauncher />
+          </Suspense>
+        </div>
       </main>
     </div>
   );

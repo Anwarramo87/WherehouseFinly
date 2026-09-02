@@ -72,7 +72,8 @@ export function usePayrollPageData(month: string) {
     startDate: periodStart,
     endDate: periodEnd,
   });
-  const { data: allResignedEmployees = [] } = useResignedEmployees();
+  // Scope departures to the month being viewed, like every other query here.
+  const { data: allResignedEmployees = [] } = useResignedEmployees(month);
 
   // ── Derived maps ───────────────────────────────────────────────────────────
   const employeeLeavesMap = useMemo(() => {

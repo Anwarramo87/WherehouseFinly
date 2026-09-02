@@ -554,7 +554,7 @@ export default function AddEmployeeModal({
                   <input
                     type="text"
                     required={step === 2}
-                    placeholder="أدخل Role ID"
+                    placeholder="أدخل اسم الدور أو معرّفه (مثال: admin)"
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
                     value={formData.roleId}
                     onChange={(e) => {

@@ -311,10 +311,25 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         assertHourlyRate(normalizedHourlyRate);
       }
 
-      const payload = {
-        ...data,
-        ...(normalizedHourlyRate !== undefined ? { hourlyRate: normalizedHourlyRate } : {}),
-      };
+      // Only send fields accepted by UpdateEmployeeDto (PartialType of CreateEmployeeDto).
+      // Spreading the full Employee object sends unknown fields (departmentEntity, role,
+      // id, createdAt, updatedAt, status, avatar...) that cause a 500 on the backend.
+      const d = data as Record<string, unknown>;
+      const payload: Record<string, unknown> = {};
+      const pick = (key: string) => { if (d[key] !== undefined) payload[key] = d[key]; };
+
+      pick("name"); pick("mobile"); pick("nationalId"); pick("residence");
+      pick("dateOfBirth"); pick("birthDate"); pick("gender");
+      pick("jobTitle"); pick("profession"); pick("department");
+      pick("baseSalary"); pick("lumpSumSalary"); pick("livingAllowance");
+      pick("transportAllowance"); pick("insuranceAmount");
+      pick("roleId"); pick("scheduledStart"); pick("scheduledEnd");
+      pick("employmentStartDate"); pick("workDaysInPeriod"); pick("hoursPerDay");
+      pick("gracePeriodMinutes"); pick("biometricNumber"); pick("photo");
+      pick("username"); pick("password");
+
+      if (normalizedHourlyRate !== undefined) payload.hourlyRate = normalizedHourlyRate;
+
       return await apiClient.put(`/employees/${id}`, payload);
     },
     onSuccess: () => {
@@ -424,14 +439,18 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
 // التعديل الرابع: جلب الأرشيف (المقالين والمستقيلين معاً)
 // يستخدم نقطة النهاية المخصصة GET /employees/resigned بدلاً من القائمة العامة
-export const useResignedEmployees = () => {
+// `month` accepts "current" | "previous" | "all" or an explicit "YYYY-MM".
+// Passing the payroll period keeps the departures list on the same month as the
+// rest of the page -- without it every departure ever recorded is returned,
+// regardless of which month is being viewed.
+export const useResignedEmployees = (month?: string) => {
   const queryClient = useQueryClient();
 
   const query = useQuery<Employee[]>({
-    queryKey: ["resigned-employees"],
+    queryKey: ["resigned-employees", month ?? "all"],
     queryFn: async () => {
       const response = await apiClient.get("/employees/resigned", {
-        params: { limit: 500, page: 1 },
+        params: { limit: 500, page: 1, ...(month ? { month } : {}) },
       });
 
       const payload = response.data;

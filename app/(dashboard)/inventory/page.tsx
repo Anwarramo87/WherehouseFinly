@@ -3,7 +3,17 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Plus, Search, Edit, ArrowRightLeft, Package2, AlertTriangle, Boxes, Upload, Download, Loader2 } from "lucide-react";
-import { useInventory, useCategories, useInventoryStats, useWarehouses } from "@/hooks/useInventory";
+import {
+  useInventory,
+  useCategories,
+  useInventoryStats,
+  useWarehouses,
+  type ProductSortField,
+  type SortDirection,
+} from "@/hooks/useInventory";
+import SortableHeader from "@/components/inventory/SortableHeader";
+import TablePagination from "@/components/inventory/TablePagination";
+import StockCell, { StockBadge, stockStateOf, type StockState } from "@/components/inventory/StockCell";
 import { InventoryItem, InventoryItemInput, AdjustStockInput } from "@/types/inventory";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
@@ -64,6 +74,11 @@ export default function InventoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState<ProductSortField | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [stockFilter, setStockFilter] = useState<StockState | "all">("all");
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
@@ -71,12 +86,29 @@ export default function InventoryPage() {
   const [isBulkPending, setIsBulkPending] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data, isLoading, createItem, updateItem, adjustStock, refetch } = useInventory({
-    page: 1,
-    limit: 100,
+  const { data, isLoading, isFetching, createItem, updateItem, adjustStock, refetch } = useInventory({
+    page,
+    limit,
     search: search.trim() || undefined,
     category: category === "all" ? undefined : category,
+    sortBy,
+    sortDir,
   });
+
+  /**
+   * Clicking a header sorts ascending; clicking the same one again flips it.
+   * Sorting resets to page 1 -- staying on page 7 of a newly-ordered list shows
+   * rows the user never asked to see.
+   */
+  const handleSort = (field: ProductSortField) => {
+    setPage(1);
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortBy(field);
+    setSortDir("asc");
+  };
 
   const categoriesQuery = useCategories();
   const statsQuery = useInventoryStats();
@@ -87,6 +119,9 @@ export default function InventoryPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setSearch(searchInput);
+      // A new search makes the current page number meaningless: page 5 of the
+      // old result set is not page 5 of the new one.
+      setPage(1);
     }, 250);
 
     return () => {
@@ -94,7 +129,25 @@ export default function InventoryPage() {
     };
   }, [searchInput]);
 
-  const items: InventoryItem[] = useMemo(() => data?.items || [], [data?.items]);
+  const allItems: InventoryItem[] = useMemo(() => data?.items || [], [data?.items]);
+  const pagination = data?.pagination;
+
+  /**
+   * Stock state is derived from live stock levels rather than stored on the
+   * product, so it cannot be filtered in SQL without a much larger query. This
+   * narrows the page you are looking at; the counts beside each button say how
+   * many are on this page, not in the whole catalogue.
+   */
+  const stockCounts = useMemo(() => {
+    const c = { all: allItems.length, ok: 0, low: 0, out: 0 };
+    allItems.forEach((i) => { c[stockStateOf(i)] += 1; });
+    return c;
+  }, [allItems]);
+
+  const items = useMemo(
+    () => (stockFilter === "all" ? allItems : allItems.filter((i) => stockStateOf(i) === stockFilter)),
+    [allItems, stockFilter],
+  );
 
   const categories = useMemo(() => {
     const serverCategories = categoriesQuery.data || [];
@@ -108,6 +161,8 @@ export default function InventoryPage() {
     stats?.totalAvailable ?? items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const lowStockCount =
     stats?.lowStockCount ?? items.filter((item) => item.quantity <= item.minStockLevel).length;
+  const totalReserved =
+    stats?.totalReserved ?? items.reduce((sum, item) => sum + Number(item.reserved || 0), 0);
 
   const statusBadge = (item: InventoryItem) => {
     if (item.quantity <= item.minStockLevel) {
@@ -354,7 +409,7 @@ export default function InventoryPage() {
         </>
       }
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
           <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
           <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
@@ -364,7 +419,8 @@ export default function InventoryPage() {
             <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">إجمالي الأصناف</p>
           </div>
           <div className="min-w-0">
-            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight">{totalProducts.toLocaleString()}</p>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight tabular-nums">{totalProducts.toLocaleString()}</p>
+            <p className="relative z-10 mt-1 text-[11px] font-bold text-[#263544]/45">صنف مُعرَّف في الكتالوج</p>
           </div>
         </div>
 
@@ -377,7 +433,22 @@ export default function InventoryPage() {
             <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">إجمالي الكمية المتاحة</p>
           </div>
           <div className="min-w-0">
-            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight">{totalAvailable.toLocaleString()}</p>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#263544] relative z-10 break-all leading-tight tabular-nums">{totalAvailable.toLocaleString()}</p>
+            <p className="relative z-10 mt-1 text-[11px] font-bold text-[#263544]/45">قابل للبيع أو الصرف الآن</p>
+          </div>
+        </div>
+
+        <div className="relative bg-white/60 backdrop-blur-xl border-2 border-white/90 rounded-[2.5rem] p-5 sm:p-7 shadow-[0_15px_40px_rgba(38,53,68,0.06)] hover:shadow-[0_20px_50px_rgba(38,53,68,0.12)] hover:-translate-y-1 transition-all group">
+          <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50" />
+          <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10">
+            <div className="p-2.5 sm:p-3 bg-[#C89355]/10 rounded-xl border border-[#C89355]/25 shadow-sm shrink-0">
+              <ArrowRightLeft className="text-[#8a5f26] group-hover:animate-pulse transition-all duration-300" size={20}/>
+            </div>
+            <p className="font-black text-[#263544] text-xs sm:text-sm leading-tight">الكمية المحجوزة</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-[#8a5f26] relative z-10 break-all leading-tight tabular-nums">{totalReserved.toLocaleString()}</p>
+            <p className="relative z-10 mt-1 text-[11px] font-bold text-[#263544]/45">مرتبطة بطلبات مؤكدة</p>
           </div>
         </div>
 
@@ -390,7 +461,8 @@ export default function InventoryPage() {
             <p className="font-black text-rose-600 text-xs sm:text-sm leading-tight">تنبيهات المخزون المنخفض</p>
           </div>
           <div className="min-w-0">
-            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-rose-600 relative z-10 break-all leading-tight">{lowStockCount.toLocaleString()}</p>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-black text-rose-600 relative z-10 break-all leading-tight tabular-nums">{lowStockCount.toLocaleString()}</p>
+            <p className="relative z-10 mt-1 text-[11px] font-bold text-[#263544]/45">بلغت حد إعادة الطلب أو أقل</p>
           </div>
         </div>
       </div>
@@ -411,7 +483,10 @@ export default function InventoryPage() {
 
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setPage(1);
+            }}
             className="w-full py-3.5 px-4 bg-white/80 backdrop-blur-sm border-none rounded-2xl text-sm font-black text-[#263544] outline-none focus:ring-2 focus:ring-[#C89355]/50 transition-all shadow-inner cursor-pointer appearance-none"
           >
             <option value="all">كل الفئات</option>
@@ -419,6 +494,35 @@ export default function InventoryPage() {
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
+        </div>
+
+        <div className="relative z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-white/70 pt-4">
+          <span className="text-[11px] font-black uppercase tracking-wider text-[#263544]/50">حالة المخزون</span>
+          {([
+            ["all", "الكل", stockCounts.all],
+            ["ok", "متوفر", stockCounts.ok],
+            ["low", "أوشك على النفاد", stockCounts.low],
+            ["out", "نفد", stockCounts.out],
+          ] as const).map(([key, label, count]) => {
+            const active = stockFilter === key;
+            const tone =
+              key === "low" ? "text-amber-800" : key === "out" ? "text-rose-700" : key === "ok" ? "text-emerald-800" : "text-[#263544]";
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStockFilter(key)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C89355]/60
+                  ${active ? "bg-[#1a2530] text-[#C89355] shadow-md" : `bg-white/70 ${tone} hover:bg-white`}`}
+              >
+                {label}
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] tabular-nums ${active ? "bg-white/15" : "bg-[#263544]/8"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -432,29 +536,68 @@ export default function InventoryPage() {
             <thead className="bg-white/40 border-b border-white/80">
               <tr>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الصورة</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">اسم الصنف</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">SKU / الباركود</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الفئة</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الكمية المتاحة</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الوحدة</th>
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الحالة</th>
+                <SortableHeader label="اسم الصنف" field="name" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <SortableHeader label="SKU / الباركود" field="sku" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <SortableHeader label="الفئة" field="category" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الرصيد المتاح</th>
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">حالة المخزون</th>
+                <SortableHeader label="سعر البيع" field="unitPrice" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <SortableHeader label="الحالة" field="status" activeField={sortBy} direction={sortDir} onSort={handleSort} />
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/40">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-16 text-center text-[#263544]/60 font-black text-lg">لا توجد بيانات مطابقة لنتائج البحث الحالية</td>
+                  <td colSpan={9} className="p-16">
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#C89355]/30 bg-[#1a2530]">
+                        <Package2 size={26} className="text-[#C89355]" />
+                      </div>
+                      <p className="text-lg font-black text-[#263544]">
+                        {stockFilter !== "all" && allItems.length > 0
+                          ? "لا يوجد صنف بهذه الحالة في هذه الصفحة"
+                          : "لا توجد أصناف مطابقة"}
+                      </p>
+                      <p className="max-w-sm text-xs font-bold text-[#263544]/50">
+                        {stockFilter !== "all" && allItems.length > 0
+                          ? "جرّب زر «الكل» أو انتقل إلى صفحة أخرى."
+                          : "عدّل كلمة البحث أو الفئة، أو أضف صنفًا جديدًا للبدء."}
+                      </p>
+                      {stockFilter !== "all" && allItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setStockFilter("all")}
+                          className="rounded-xl bg-[#1a2530] px-4 py-2 text-xs font-black text-[#C89355] transition-all hover:scale-105"
+                        >
+                          عرض كل الأصناف
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ) : (
                 items.map((item) => (
                 <tr
                   key={item.id}
                   className={`group/row transition-all duration-300 ${
-                    item.quantity <= item.minStockLevel ? "bg-rose-50/60 hover:bg-rose-50/90" : "hover:bg-white/80"
+                    stockStateOf(item) === "out"
+                      ? "bg-rose-50/50 hover:bg-rose-50/80"
+                      : stockStateOf(item) === "low"
+                        ? "bg-amber-50/40 hover:bg-amber-50/70"
+                        : "hover:bg-white/80"
                   }`}
                 >
-                  <td className="p-4">
+                  {/* Severity stripe on the leading (right, in RTL) edge of the row. */}
+                  <td
+                    className={`p-4 shadow-[inset_-4px_0_0_0_var(--row-stripe)] ${
+                      stockStateOf(item) === "out"
+                        ? "[--row-stripe:var(--color-rose-500)]"
+                        : stockStateOf(item) === "low"
+                          ? "[--row-stripe:var(--color-amber-500)]"
+                          : "[--row-stripe:transparent]"
+                    }`}
+                  >
                     <div className="flex justify-center">
                       {item.photo ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -484,10 +627,19 @@ export default function InventoryPage() {
                       {item.name}
                     </button>
                   </td>
-                  <td className="p-4 text-center text-xs text-slate-500 font-mono font-bold tracking-wider">{item.sku}</td>
+                  <td className="p-4 text-center">
+                    <span className="inline-block rounded-md bg-[#263544]/5 px-2 py-1 font-mono text-[11px] font-bold tracking-wider text-slate-500">
+                      {item.sku}
+                    </span>
+                  </td>
                   <td className="p-4 text-xs font-black text-[#263544]/80 text-center">{item.category}</td>
-                  <td className="p-4 text-base font-black text-[#263544] text-center">{Number(item.quantity || 0).toLocaleString()}</td>
-                  <td className="p-4 text-center text-xs font-black text-slate-500">{item.unit}</td>
+                  <td className="p-4"><StockCell item={item} /></td>
+                  <td className="p-4 text-center"><StockBadge item={item} /></td>
+                  <td className="p-4 text-center text-sm font-black text-[#263544] tabular-nums whitespace-nowrap">
+                    {item.unitPrice === undefined || item.unitPrice === null
+                      ? <span className="text-[#263544]/30">—</span>
+                      : Number(item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
                   <td className="p-4 text-center">
                     {statusBadge(item)}
                   </td>
@@ -521,6 +673,28 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {!isLoading && stockFilter !== "all" && (
+          <div className="relative z-10 flex items-center justify-center gap-2 border-t border-white/70 bg-amber-50/50 px-5 py-2.5 text-[11px] font-black text-amber-800">
+            <AlertTriangle size={13} />
+            تصفية حالة المخزون تُطبَّق على الصفحة الحالية فقط ({items.length} من {allItems.length} صنفًا معروضًا).
+          </div>
+        )}
+
+        {!isLoading && (
+          <TablePagination
+            page={pagination?.page ?? page}
+            limit={pagination?.limit ?? limit}
+            total={pagination?.total ?? items.length}
+            totalPages={pagination?.totalPages ?? 1}
+            isFetching={isFetching}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setLimit(next);
+              setPage(1);
+            }}
+          />
         )}
       </div>
 
