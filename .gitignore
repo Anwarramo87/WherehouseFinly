@@ -42,7 +42,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-package-lock.json
+# package-lock.json is committed: CI (setup-node cache + npm ci) and
+# reproducible Vercel builds both require it
 
 # worktrees
 .worktrees/

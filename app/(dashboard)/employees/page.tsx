@@ -151,8 +151,8 @@ export default function EmployeesPage() {
   );
 
   const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);

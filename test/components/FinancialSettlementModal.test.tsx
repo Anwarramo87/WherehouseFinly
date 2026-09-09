@@ -33,7 +33,9 @@ describe("FinancialSettlementModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.get).mockResolvedValue(defaultGetMock);
-    vi.mocked(apiClient.post).mockResolvedValue({ data: { data: [] } } as any);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { data: [] } } as unknown as Awaited<
+      ReturnType<typeof apiClient.post>
+    >);
   });
 
   it("should not render when isOpen is false", () => {
