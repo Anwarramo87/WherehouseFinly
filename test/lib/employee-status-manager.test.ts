@@ -16,19 +16,19 @@ import {
   EmployeeStatusError,
   EMPLOYEE_STATUS_ERROR_CODES,
   employeeStatusManager,
-} from "./employee-status-manager";
+} from "@/lib/employee-status-manager";
 import type { Employee } from "@/types/employee";
 import type { TerminationRecord, RehireRecord } from "@/types/resignation";
 
 // Mock the api-client module
-vi.mock("./api-client", () => ({
+vi.mock("@/lib/api-client", () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
   },
 }));
 
-import apiClient from "./api-client";
+import apiClient from "@/lib/api-client";
 
 // ============================================================================
 // Test Fixtures

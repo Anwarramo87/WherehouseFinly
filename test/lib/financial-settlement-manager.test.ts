@@ -17,19 +17,19 @@ import {
   FinancialSettlementError,
   FINANCIAL_SETTLEMENT_ERROR_CODES,
   financialSettlementManager,
-} from "./financial-settlement-manager";
+} from "@/lib/financial-settlement-manager";
 import type { Employee } from "@/types/employee";
 import type { FinancialSettlement } from "@/types/resignation";
 
 // Mock the api-client module
-vi.mock("./api-client", () => ({
+vi.mock("@/lib/api-client", () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
   },
 }));
 
-import apiClient from "./api-client";
+import apiClient from "@/lib/api-client";
 
 // ============================================================================
 // Test Fixtures

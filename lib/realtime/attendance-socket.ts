@@ -1,10 +1,38 @@
 "use client";
 
 import { io, type Socket } from "socket.io-client";
+import { resolveApiUrl } from "@/lib/api-url";
 
-const DEPLOYED_BACKEND =
-  process.env.NEXT_PUBLIC_SOCKET_URL?.trim() ||
-  "https://warehousebackend-depolyemnt-production.up.railway.app";
+/**
+ * Which host the realtime socket connects to.
+ *
+ * It follows the API host by default. Hard-coding the deployed backend here
+ * meant a developer running against localhost:5003 still opened their socket
+ * against production: REST calls hit the local server, live notifications and
+ * attendance events came from another database, and the bell never moved. The
+ * socket and the API must agree on which backend they are talking to.
+ *
+ * Exported for tests -- the environment is read by the caller, not in here.
+ */
+export const resolveSocketUrl = (env: {
+  socketUrl?: string;
+  apiUrl?: string;
+  origin?: string;
+}): string => {
+  const explicit = env.socketUrl?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const api = resolveApiUrl(env.apiUrl);
+
+  // A relative API base ("/api") means same-origin: the socket belongs there too.
+  if (api.startsWith("/")) return env.origin ?? "";
+
+  try {
+    return new URL(api).origin;
+  } catch {
+    return env.origin ?? "";
+  }
+};
 
 export type AttendanceRealtimeEventPayload = {
   employeeId: string;
@@ -54,7 +82,13 @@ export const getAttendanceSocket = () => {
 
   const authToken = getAuthToken();
 
-  const socket = io(`${DEPLOYED_BACKEND}/realtime`, {
+  const backendUrl = resolveSocketUrl({
+    socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL,
+    apiUrl: process.env.NEXT_PUBLIC_API_URL,
+    origin: window.location.origin,
+  });
+
+  const socket = io(`${backendUrl}/realtime`, {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     withCredentials: true,

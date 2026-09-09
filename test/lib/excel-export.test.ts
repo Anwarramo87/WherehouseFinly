@@ -16,7 +16,7 @@ import {
   ExcelExportService,
   ExcelExportError,
   EXCEL_EXPORT_ERROR_CODES,
-} from './excel-export';
+} from '@/lib/excel-export';
 import type { Employee } from '@/types/employee';
 
 // ============================================================================

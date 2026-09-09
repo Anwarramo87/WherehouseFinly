@@ -12,14 +12,14 @@ import {
   type ResignedEmployeePayrollData,
   type PayrollRemovalResult,
   type EnhancedPayrollReport,
-} from './payroll-integration';
-import apiClient from './api-client';
+} from '@/lib/payroll-integration';
+import apiClient from '@/lib/api-client';
 import type { Employee } from '@/types/employee';
 import type { PayrollData } from '@/types/resignation';
 import type { PayrollReportResponse, PayrollItem } from '@/types/payroll';
 
 // Mock the API client
-vi.mock('./api-client');
+vi.mock('@/lib/api-client');
 
 describe('PayrollIntegration', () => {
   let payrollIntegration: PayrollIntegration;

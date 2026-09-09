@@ -51,6 +51,128 @@ body {
 }
 
 
+/* ---------------------------------------------------------------------------
+ * Form controls
+ * ---------------------------------------------------------------------------
+ * The dashboard is a light-only design, but nothing here said so. With no
+ * `color-scheme` declared, a browser on a dark-mode operating system renders
+ * every control it draws itself using its own dark palette: select drop-downs
+ * opened as dark panels, the date and time pickers came up dark, number
+ * spinners and autofilled fields turned dark-on-dark, and typed text went pale
+ * grey on near-white. That is what made inputs across the app hard to read,
+ * and it could not be fixed field by field because the browser -- not the
+ * page -- was choosing those colours.
+ *
+ * These live in `@layer base`, so they are only a floor. Tailwind utilities sit
+ * in a later layer and still win, which is what keeps the deliberately dark
+ * fields (bg-[#1a2530] text-white) looking exactly as they did.
+ * ------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  input,
+  select,
+  textarea {
+    color: var(--foreground);
+    /* Chrome and Safari ignore `color` on some control internals; this covers
+     * the text those internals draw. */
+    -webkit-text-fill-color: currentColor;
+  }
+
+  /* Firm enough to read against the pale field backgrounds used across the app
+   * (bg-white and bg-slate-50), without competing with the value itself. */
+  ::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+  }
+
+  /* A disabled field must still be legible -- it is usually showing a computed
+   * figure such as a net salary, which people need to read. */
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    color: #64748b;
+    -webkit-text-fill-color: #64748b;
+    opacity: 1;
+  }
+
+  /* Drop-down panels are painted by the browser, so the option rows need their
+   * colours stated or they inherit the OS theme rather than the page. */
+  select option,
+  select optgroup {
+    background-color: #ffffff;
+    color: var(--foreground);
+  }
+
+  /* Autofill repaints both background and text. Parking the transition keeps
+   * the field's own background visible, and `currentColor` means an autofilled
+   * value matches its field whether that field is light or dark. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: currentColor;
+    caret-color: currentColor;
+    transition:
+      background-color 600000s 0s,
+      color 600000s 0s;
+  }
+
+  /* The calendar and clock buttons are UA-drawn glyphs. Left alone they are
+   * near-invisible on a light field, so the date pickers looked empty. */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    opacity: 0.65;
+    cursor: pointer;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
+  /* A field the browser has scored as invalid keeps its own text colour --
+   * without this Firefox tints the value red and it reads as an error the form
+   * has not actually reported. */
+  input:invalid,
+  select:invalid,
+  textarea:invalid {
+    box-shadow: none;
+  }
+
+  /* Number spinners overlap the value in a right-to-left field, clipping the
+   * last digit of salaries and quantities. The forms all provide their own
+   * controls, so the native ones are not needed. */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Keyboard focus must stay visible on controls that clear the default ring
+   * with `outline-none` -- several forms do, which left keyboard users with no
+   * indication of where they were. */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #c89355;
+    outline-offset: 2px;
+  }
+}
+
 /* Print-only styles */
 @media print {
   @page {

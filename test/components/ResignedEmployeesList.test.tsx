@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import ResignedEmployeesList from "./ResignedEmployeesList";
+import ResignedEmployeesList from "@/components/ResignedEmployeesList";
 import type { Employee } from "@/types/employee";
 import type { ResignedEmployeesStatistics, PaginationInfo } from "@/types/resignation";
 

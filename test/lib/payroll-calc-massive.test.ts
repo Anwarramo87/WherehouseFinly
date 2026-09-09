@@ -31,7 +31,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { calcEarnedSalary, calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "./payroll-calc";
+import { calcEarnedSalary, calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "@/lib/payroll-calc";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

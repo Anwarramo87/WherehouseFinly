@@ -8,7 +8,7 @@
 import {
   isPermission,
   type Permission,
-} from "./types";
+} from "@/lib/permissions/types";
 
 describe("Permission Types", () => {
   describe("isPermission type guard", () => {

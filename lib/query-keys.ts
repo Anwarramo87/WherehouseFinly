@@ -91,4 +91,96 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => [...queryKeys.notifications.all, params] as const,
     unreadCount: () => [...queryKeys.notifications.all, "unread-count"] as const,
   },
+
+  // --------------------------------------------------------- WMS extension
+  batches: {
+    all: ["batches"] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.batches.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.batches.all, "detail", id] as const,
+    label: (id: string) => [...queryKeys.batches.all, "label", id] as const,
+  },
+  expiry: {
+    all: ["expiry"] as const,
+    dashboard: (horizonDays?: number) =>
+      [...queryKeys.expiry.all, "dashboard", horizonDays ?? null] as const,
+    rules: () => [...queryKeys.expiry.all, "rules"] as const,
+  },
+  pricing: {
+    all: ["pricing"] as const,
+    taxRates: () => [...queryKeys.pricing.all, "tax-rates"] as const,
+    tiers: () => [...queryKeys.pricing.all, "tiers"] as const,
+    productPrices: (params?: Record<string, unknown>) =>
+      [...queryKeys.pricing.all, "product-prices", params] as const,
+  },
+  purchasing: {
+    all: ["purchasing"] as const,
+    suppliers: (params?: Record<string, unknown>) =>
+      [...queryKeys.purchasing.all, "suppliers", params] as const,
+    orders: (params?: Record<string, unknown>) =>
+      [...queryKeys.purchasing.all, "orders", params] as const,
+    order: (id: string) => [...queryKeys.purchasing.all, "order", id] as const,
+    invoices: (params?: Record<string, unknown>) =>
+      [...queryKeys.purchasing.all, "invoices", params] as const,
+    invoice: (id: string) => [...queryKeys.purchasing.all, "invoice", id] as const,
+  },
+  salesDomain: {
+    all: ["sales"] as const,
+    customers: (params?: Record<string, unknown>) =>
+      [...queryKeys.salesDomain.all, "customers", params] as const,
+    orders: (params?: Record<string, unknown>) =>
+      [...queryKeys.salesDomain.all, "orders", params] as const,
+    order: (id: string) => [...queryKeys.salesDomain.all, "order", id] as const,
+    invoices: (params?: Record<string, unknown>) =>
+      [...queryKeys.salesDomain.all, "invoices", params] as const,
+    invoice: (id: string) => [...queryKeys.salesDomain.all, "invoice", id] as const,
+    deliveryNotes: (params?: Record<string, unknown>) =>
+      [...queryKeys.salesDomain.all, "delivery-notes", params] as const,
+  },
+  locations: {
+    all: ["locations"] as const,
+    zones: (warehouseId?: string) =>
+      [...queryKeys.locations.all, "zones", warehouseId ?? null] as const,
+    bins: (params?: Record<string, unknown>) => [...queryKeys.locations.all, "bins", params] as const,
+    occupancy: (warehouseId?: string) =>
+      [...queryKeys.locations.all, "occupancy", warehouseId ?? null] as const,
+    putaway: (params?: Record<string, unknown>) =>
+      [...queryKeys.locations.all, "putaway", params] as const,
+  },
+  cycleCounts: {
+    all: ["cycle-counts"] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.cycleCounts.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.cycleCounts.all, "detail", id] as const,
+    variances: (id: string) => [...queryKeys.cycleCounts.all, "variances", id] as const,
+  },
+  quality: {
+    all: ["quality"] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.quality.all, "list", params] as const,
+    pending: () => [...queryKeys.quality.all, "pending"] as const,
+  },
+  fulfillment: {
+    all: ["fulfillment"] as const,
+    pickLists: (params?: Record<string, unknown>) =>
+      [...queryKeys.fulfillment.all, "pick-lists", params] as const,
+    pickList: (id: string) => [...queryKeys.fulfillment.all, "pick-list", id] as const,
+    carriers: () => [...queryKeys.fulfillment.all, "carriers"] as const,
+    shipments: (params?: Record<string, unknown>) =>
+      [...queryKeys.fulfillment.all, "shipments", params] as const,
+    shipment: (id: string) => [...queryKeys.fulfillment.all, "shipment", id] as const,
+    performance: (days?: number) =>
+      [...queryKeys.fulfillment.all, "performance", days ?? null] as const,
+  },
+  wmsAnalytics: {
+    all: ["wms-analytics"] as const,
+    kpis: (days?: number) => [...queryKeys.wmsAnalytics.all, "kpis", days ?? null] as const,
+    forecast: (params?: Record<string, unknown>) =>
+      [...queryKeys.wmsAnalytics.all, "forecast", params] as const,
+    suppliers: (days?: number) =>
+      [...queryKeys.wmsAnalytics.all, "suppliers", days ?? null] as const,
+  },
+  integrations: {
+    all: ["integrations"] as const,
+    connections: () => [...queryKeys.integrations.all, "connections"] as const,
+    connection: (id: string) => [...queryKeys.integrations.all, "connection", id] as const,
+    webhooks: () => [...queryKeys.integrations.all, "webhooks"] as const,
+  },
 } as const;

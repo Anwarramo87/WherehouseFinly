@@ -12,7 +12,7 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 import apiClient from "@/lib/api-client";
-import FinancialSettlementModal from "./FinancialSettlementModal";
+import FinancialSettlementModal from "@/components/FinancialSettlementModal";
 import type { Employee } from "@/types/employee";
 
 const defaultGetMock = { data: { earnedSalary: 0, bonuses: 0, deductions: 0 } };

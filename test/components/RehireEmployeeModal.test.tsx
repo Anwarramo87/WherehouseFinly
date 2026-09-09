@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import RehireEmployeeModal from './RehireEmployeeModal';
+import RehireEmployeeModal from '@/components/RehireEmployeeModal';
 import type { Employee } from '@/types/employee';
 
 // Mock createPortal to render directly

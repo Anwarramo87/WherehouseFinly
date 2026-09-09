@@ -10,7 +10,7 @@ import type { AuditUserContext } from '@/types/audit';
 
 describe('AuditService', () => {
   // Create a fresh instance for each test
-  let service: typeof import('./audit-service').auditService;
+  let service: typeof import('@/lib/audit-service').auditService;
   let mockPost: ReturnType<typeof vi.fn>;
   let mockGet: ReturnType<typeof vi.fn>;
 
@@ -29,7 +29,7 @@ describe('AuditService', () => {
     });
 
     // Mock the api-client module
-    vi.doMock('./api-client', () => ({
+    vi.doMock('@/lib/api-client', () => ({
       default: {
         post: mockPost,
         get: mockGet,
@@ -37,7 +37,7 @@ describe('AuditService', () => {
     }));
 
     // Import the service after mocking
-    const moduleImport = await import('./audit-service');
+    const moduleImport = await import('@/lib/audit-service');
     service = moduleImport.auditService;
     service.clearInMemoryLog();
   });
@@ -246,7 +246,7 @@ describe('AuditService', () => {
 
   describe('createAuditUserContextWithData', () => {
     it('should create user context with provided data', async () => {
-      const { createAuditUserContextWithData } = await import('./audit-service');
+      const { createAuditUserContextWithData } = await import('@/lib/audit-service');
       const context = createAuditUserContextWithData('user-123', 'John Doe', 'hr_manager');
 
       expect(context.userId).toBe('user-123');

@@ -15,7 +15,7 @@ import {
   ResignationStatisticsService,
   ResignationStatisticsError,
   STATISTICS_ERROR_CODES,
-} from './resignation-statistics';
+} from '@/lib/resignation-statistics';
 import type { Employee } from '@/types/employee';
 
 // ============================================================================

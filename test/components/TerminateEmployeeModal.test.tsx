@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import TerminateEmployeeModal from "./TerminateEmployeeModal";
+import TerminateEmployeeModal from "@/components/TerminateEmployeeModal";
 import type { Employee } from "@/types/employee";
 
 describe("TerminateEmployeeModal", () => {

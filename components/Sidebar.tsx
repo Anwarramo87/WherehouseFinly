@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Users, ClipboardList,
   Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
-  UserMinus, X, ChevronsRight, Trash2
+  UserMinus, X, ChevronsRight, Trash2,
+  ShoppingCart, Truck, BarChart3, Plug
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -55,10 +56,45 @@ const menuItems: MenuItem[] = [
     permissions: ['view_inventory'],
     subItems: [
       { name: 'الأصناف', href: '/inventory' },
+      { name: 'الدفعات والصلاحية', href: '/inventory/batches' },
+      { name: 'لوحة الصلاحية', href: '/inventory/expiry' },
       { name: 'حركات المخزون', href: '/inventory/movements' },
       { name: 'المخازن', href: '/inventory/warehouses' },
+      { name: 'المواقع والخانات', href: '/inventory/locations' },
+      { name: 'الجرد الدوري', href: '/inventory/counts' },
+      { name: 'فحص الجودة', href: '/inventory/quality' },
     ]
   },
+  {
+    name: 'المشتريات',
+    icon: ShoppingCart,
+    permissions: ['view_purchasing'],
+    subItems: [
+      { name: 'أوامر الشراء', href: '/purchasing' },
+      { name: 'فواتير الشراء', href: '/purchasing/invoices' },
+    ]
+  },
+  {
+    name: 'المبيعات',
+    icon: Wallet,
+    permissions: ['view_sales'],
+    subItems: [
+      { name: 'طلبات البيع', href: '/sales' },
+      { name: 'فواتير البيع', href: '/sales/invoices' },
+      { name: 'التسعير والضرائب', href: '/sales/pricing' },
+    ]
+  },
+  {
+    name: 'التجهيز والشحن',
+    icon: Truck,
+    permissions: ['view_sales'],
+    subItems: [
+      { name: 'جولات الالتقاط', href: '/fulfillment' },
+      { name: 'الشحنات', href: '/fulfillment/shipments' },
+    ]
+  },
+  { name: 'مؤشرات المخزن', icon: BarChart3, href: '/wms/analytics', permissions: ['view_inventory'] },
+  { name: 'الربط والتكامل', icon: Plug, href: '/settings/integrations', permissions: ['manage_users'] },
   { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
   { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },
