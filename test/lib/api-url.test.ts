@@ -11,10 +11,10 @@ describe("api-url", () => {
   it("keeps /api path when already provided", () => {
     expect(
       normalizeApiUrl(
-        "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1",
+        "https://warehousebackend-deployment-production.up.railway.app/api/v1",
         "http://127.0.0.1:5001/api/v1",
       ),
-    ).toBe("https://warehousebackend-depolyemnt-production.up.railway.app/api/v1");
+    ).toBe("https://warehousebackend-deployment-production.up.railway.app/api/v1");
   });
 
   it("supports relative api URLs", () => {
