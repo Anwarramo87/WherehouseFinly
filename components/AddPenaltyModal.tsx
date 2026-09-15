@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, Calendar, Coins, FileText, Search, X } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export type PenaltyPayload = {
   employeeId: string;
@@ -132,7 +133,7 @@ export default function AddPenaltyModal({ isOpen, onClose, onSave, isPending, em
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-colors"
                         >
                           <EmployeeAvatar
-                            src={emp.photo}
+                            src={resolveEmployeePhotoSrc(emp)}
                             name={emp.name}
                             gender={emp.gender}
                             employeeId={emp.employeeId}

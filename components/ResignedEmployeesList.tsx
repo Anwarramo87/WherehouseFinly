@@ -18,6 +18,7 @@ import type { Employee } from "@/types/employee";
 import type { ResignedEmployeesStatistics, PaginationInfo } from "@/types/resignation";
 import { RehireEmployeeGuard, ProcessSettlementGuard } from "@/components/PermissionGuard";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 interface ResignedEmployeesListProps {
   employees: Employee[];
@@ -185,7 +186,7 @@ export default function ResignedEmployeesList({
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-3">
                           <EmployeeAvatar
-                            src={employee.photo}
+                            src={resolveEmployeePhotoSrc(employee)}
                             name={employee.name}
                             gender={employee.gender}
                             employeeId={employee.employeeId}

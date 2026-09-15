@@ -24,6 +24,7 @@ import apiClient from "@/lib/api-client";
 
 import { DataDrilldownModalLazy as DataDrilldownModal } from "@/components/DataDrilldownModalLazy";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   ssr: false,
@@ -168,8 +169,7 @@ export default function DashboardPage() {
   const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
   
-  // Call useDepartments early so updateDepartment is available
-  const { data: deptsData, updateDepartment, clearSupervisor } = useDepartments();
+  const { data: deptsData, clearSupervisor } = useDepartments();
 
   // Show skeleton only while dashboard KPIs are loading — not waiting for employees list
   const isSkeleton = isDashboardLoading;
@@ -332,7 +332,7 @@ export default function DashboardPage() {
           repaymentStatus: "pending" as const,
           remainingBalance: Number(advance.remainingAmount ?? 0),
           avatar: employee?.avatar,
-          photo: employee?.photo ?? null,
+          photo: resolveEmployeePhotoSrc(employee) ?? null,
           gender: employee?.gender ?? null,
         };
       })
@@ -371,7 +371,7 @@ export default function DashboardPage() {
           issuedBy: "",
           status: "active" as const,
           avatar: employee?.avatar,
-          photo: employee?.photo ?? null,
+          photo: resolveEmployeePhotoSrc(employee) ?? null,
           gender: employee?.gender ?? null,
         };
       })
@@ -411,7 +411,7 @@ export default function DashboardPage() {
             amount,
             reason: bonus.bonusReason || "مكافأة",
             date: bonus.period ? `${bonus.period}-01` : (bonus.createdAt || "").slice(0, 10),
-            photo: employee?.photo ?? null,
+            photo: resolveEmployeePhotoSrc(employee) ?? null,
             gender: employee?.gender ?? null,
           };
         },

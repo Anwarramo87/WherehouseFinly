@@ -242,6 +242,7 @@ import { createPortal } from "react-dom";
 import { X, Save, Search, Gift, FileText, Coins, Calendar, Sparkles, Users } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export type RewardPayload = {
   employeeId: string;
@@ -382,7 +383,7 @@ export default function AddRewardModal({ isOpen, onClose, onSave, isPending, emp
                       filteredEmployees.map((emp) => (
                         <div key={emp.employeeId} onClick={() => handleSelectEmployee(emp)} className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-colors">
                           <EmployeeAvatar
-                            src={emp.photo}
+                            src={resolveEmployeePhotoSrc(emp)}
                             name={emp.name}
                             gender={emp.gender}
                             employeeId={emp.employeeId}

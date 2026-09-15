@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import type { AggregatedPayroll } from '@/types/payroll-aggregated';
 import EmployeeAvatar from '@/components/EmployeeAvatar';
+import { resolveEmployeePhotoSrc } from '@/lib/employee-photo';
 
 interface PayrollRowProps {
   item: AggregatedPayroll;
@@ -31,7 +32,7 @@ const PayrollRow: React.FC<PayrollRowProps> = ({ item, onSelectPayslip, style })
         <div className="flex items-center gap-2.5 min-w-0">
           <Link href={`/employees/${item.employeeId}`} onClick={(e) => e.stopPropagation()} className="shrink-0">
             <EmployeeAvatar
-              src={item.photo}
+              src={resolveEmployeePhotoSrc(item)}
               name={item.employeeName}
               gender={item.gender}
               employeeId={item.employeeId}

@@ -6,6 +6,7 @@ import { X, Building2, UserCog, CalendarDays, Save, Loader2, Search, ChevronLeft
 import useDepartments from "@/hooks/useDepartments";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export interface DeptFormData {
   name: string;
@@ -186,7 +187,7 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
                 {selectedEmployee ? (
                   <div className="flex items-center gap-2">
                     <EmployeeAvatar
-                      src={selectedEmployee.photo}
+                      src={resolveEmployeePhotoSrc(selectedEmployee)}
                       name={selectedEmployee.name}
                       gender={selectedEmployee.gender}
                       employeeId={selectedEmployee.employeeId}
@@ -235,7 +236,7 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
                         >
                           <div className="flex items-center gap-3">
                             <EmployeeAvatar
-                              src={emp.photo}
+                              src={resolveEmployeePhotoSrc(emp)}
                               name={emp.name}
                               gender={emp.gender}
                               employeeId={emp.employeeId}

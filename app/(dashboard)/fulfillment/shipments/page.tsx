@@ -13,7 +13,6 @@ import {
   Stat,
   StatusPill,
   TableFrame,
-  fmtDate,
   fmtInt,
   fmtMoney,
   inputClass,

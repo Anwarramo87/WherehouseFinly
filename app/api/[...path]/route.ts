@@ -6,8 +6,8 @@ export const fetchCache = "force-no-store";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
-const DEPLOYED_BACKEND_URL = "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Resolved once at module load — stable for the lifetime of the server process.
 // NEXT_PUBLIC_API_URL is set in .env.local → http://localhost:5003/api/v1
@@ -149,9 +149,15 @@ async function handler(request: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // The server log gets the target and the reason; the browser does not.
+    // Echoing them told any anonymous caller the internal backend URL and the
+    // shape of its failures.
     console.error(`[proxy] ${request.method} ${targetUrl} failed:`, msg);
     return NextResponse.json(
-      { error: "Backend unreachable", message: msg, target: targetUrl },
+      {
+        error: "Backend unreachable",
+        ...(IS_PRODUCTION ? {} : { message: msg, target: targetUrl }),
+      },
       { status: 502, headers: corsHeaders(request) },
     );
   }

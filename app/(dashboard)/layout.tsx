@@ -5,6 +5,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import SessionRefresh from "@/components/SessionRefresh";
+import FactoryScopeBanner from "@/components/FactoryScopeBanner";
+import EntitlementGate from "@/components/EntitlementGate";
 import apiClient from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import axios from "axios";
@@ -123,6 +125,8 @@ export default function DashboardLayout({
 
       {/* ── Main content ── */}
       <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning>
+        {/* Only renders when the overseer has drilled into a factory. */}
+        <FactoryScopeBanner />
         {/* Floating notifications bell (top-left in RTL) */}
         <div className="fixed top-3 left-3 z-40 flex items-center gap-2 print:hidden">
           <Suspense fallback={null}>
@@ -138,7 +142,7 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        {children}
+        <EntitlementGate>{children}</EntitlementGate>
 
         {/* Available on every dashboard page; hides itself when unconfigured. */}
         <div className="print:hidden">

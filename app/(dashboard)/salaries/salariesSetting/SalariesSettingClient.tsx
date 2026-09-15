@@ -14,6 +14,7 @@ import apiClient from "@/lib/api-client";
 import type { Advance } from "@/types/advance";
 import { Edit, Trash, Gift, Plus, Sparkles, Loader2, HandCoins, Wallet, ChevronLeft, TrendingUp, X } from "lucide-react";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import type { Salary } from "@/types/salary";
 import type { Employee } from "@/types/employee";
 import type { Bonus } from "@/types/bonus";
@@ -350,7 +351,7 @@ allIds.map((id: string) => {
                               <td className="p-4 text-center ">
                                 <div className="flex items-center justify-center gap-3">
                                   <EmployeeAvatar
-                                    src={emp?.photo}
+                                    src={resolveEmployeePhotoSrc(emp)}
                                     name={employeeName}
                                     gender={emp?.gender}
                                     employeeId={id}

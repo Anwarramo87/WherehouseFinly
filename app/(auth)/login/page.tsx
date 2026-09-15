@@ -258,9 +258,14 @@ export default function LoginPage() {
               <p className="text-slate-500 font-bold text-sm">أدخل بيانات الاعتماد الخاصة بك للوصول</p>
             </div>
 
+            {/* role="alert" so a screen reader announces the failure; without it
+                the only signal that sign-in was rejected is visual. */}
             {errorMessage && (
-              <div className="mb-6 p-4 bg-rose-50 border-r-4 border-rose-500 text-rose-700 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm animate-in slide-in-from-top-2">
-                <AlertCircle size={20} className="shrink-0" />
+              <div
+                role="alert"
+                className="mb-6 p-4 bg-rose-50 border-r-4 border-rose-500 text-rose-700 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm animate-in slide-in-from-top-2"
+              >
+                <AlertCircle size={20} className="shrink-0" aria-hidden="true" />
                 <p>{errorMessage}</p>
               </div>
             )}
@@ -269,12 +274,26 @@ export default function LoginPage() {
               
               {/* حقل اسم المستخدم */}
               <div className="w-full relative group">
+                {/* The visible design carries no label text, so the accessible
+                    name comes from a visually hidden <label>. A placeholder is
+                    not a label: it disappears on the first keystroke, and screen
+                    readers are not required to announce it. */}
+                <label htmlFor="login-username" className="sr-only">
+                  اسم المستخدم أو الإيميل
+                </label>
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <User className="text-slate-400 group-focus-within:text-[#263544] transition-colors" size={20} />
+                  <User
+                    className="text-slate-400 group-focus-within:text-[#263544] transition-colors"
+                    size={20}
+                    aria-hidden="true"
+                  />
                 </div>
                 <input
+                  id="login-username"
+                  name="username"
                   type="text"
                   required
+                  autoComplete="username"
                   className="w-full pl-4 pr-12 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#263544]/20 focus:border-[#263544] outline-none transition-all shadow-sm text-[#263544] font-bold placeholder:text-slate-400 placeholder:font-medium"
                   placeholder="اسم المستخدم أو الإيميل"
                   value={username}
@@ -285,20 +304,34 @@ export default function LoginPage() {
 
               {/* حقل كلمة المرور */}
               <div className="w-full relative group">
+                <label htmlFor="login-password" className="sr-only">
+                  كلمة المرور
+                </label>
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <Lock className="text-slate-400 group-focus-within:text-[#263544] transition-colors" size={20} />
+                  <Lock
+                    className="text-slate-400 group-focus-within:text-[#263544] transition-colors"
+                    size={20}
+                    aria-hidden="true"
+                  />
                 </div>
+                {/* An icon-only control needs a name of its own: `title` is a
+                    tooltip, not a reliable accessible name. */}
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 hover:text-[#263544] transition-colors"
+                  aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  aria-pressed={showPassword}
                   title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
                 </button>
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   required
+                  autoComplete="current-password"
                   className="w-full pl-12 pr-12 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#263544]/20 focus:border-[#263544] outline-none transition-all shadow-sm text-[#263544] font-bold placeholder:text-slate-400 placeholder:font-medium"
                   placeholder="كلمة المرور"
                   value={password}
@@ -307,10 +340,12 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="flex justify-between items-center w-full px-1">
-                <button type="button" className="text-xs font-bold text-[#C89355] hover:text-[#a67741] transition-colors">
-                  نسيت كلمة المرور؟
-                </button>
+              {/* A "forgot password" button used to sit here with no onClick and
+                  no backend behind it - there is no password-reset endpoint. A
+                  control that silently does nothing is worse than none: a
+                  locked-out user clicks it and waits. Restore it together with
+                  the endpoint. */}
+              <div className="flex justify-end items-center w-full px-1">
                 <a 
                   href="/clear-cache" 
                   className="text-xs font-bold text-slate-400 hover:text-[#263544] transition-colors"
@@ -324,6 +359,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
+                aria-busy={isLoading}
+                aria-label={isLoading ? "جارٍ تسجيل الدخول" : undefined}
                 className="w-full relative overflow-hidden bg-[#263544] hover:bg-[#1a2530] active:scale-[0.98] text-[#C89355] font-black py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(38,53,68,0.2)] flex justify-center items-center h-14 mt-4 disabled:opacity-70 disabled:cursor-not-allowed group"
               >
                 {/* خطوط خياطة داخلية للزر */}

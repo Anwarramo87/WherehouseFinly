@@ -1,3 +1,5 @@
+import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
+
 const USER_KEY = "auth_user_profile";
 const ACCESS_TOKEN_KEY = "auth_access_token";
 // Aligned with backend JWT_EXPIRE default (15 minutes)
@@ -55,7 +57,11 @@ export const clearAuthSession = () => {
   if (!isBrowser()) return;
   localStorage.removeItem(USER_KEY);
   removeCookie(ACCESS_TOKEN_KEY);
-  
+  // The persisted React Query cache is the one store that actually holds the
+  // previous user's records — employees, salaries, stock. Clearing
+  // sessionStorage below never touched it, because it lives in localStorage.
+  localStorage.removeItem(PERSISTED_QUERY_CACHE_KEY);
+
   // مسح كل الـ cache
   try {
     // مسح sessionStorage

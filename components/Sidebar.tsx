@@ -9,7 +9,7 @@ import {
   Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
-  ShoppingCart, Truck, BarChart3, Plug
+  ShoppingCart, Truck, BarChart3, Plug, Building2, Database
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -17,7 +17,10 @@ import { resetAuthVerificationCache } from '@/lib/auth-verify';
 import apiClient from '@/lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_STALE_TIME } from '@/lib/query-cache';
+import { purgePersistedQueryCache } from '@/lib/query-client-config';
 import { queryKeys } from '@/lib/query-keys';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { isRouteEnabled } from '@/lib/entitlements';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -27,6 +30,8 @@ interface SidebarProps {
 
 interface MenuItem {
   name: string;
+  /** Rendered only for the overseer. Not expressible as a permission. */
+  superAdminOnly?: boolean;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   href?: string;
   permissions?: string[];
@@ -99,6 +104,11 @@ const menuItems: MenuItem[] = [
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
   { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },
   { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
+  // Overseer-only; filtered in by role below rather than by a permission, so no
+  // amount of role editing puts it in a factory admin's menu.
+  { name: 'المصانع', icon: Building2, href: '/admin/factories', superAdminOnly: true },
+  { name: 'جميع الموظفين', icon: Users, href: '/admin/employees', superAdminOnly: true },
+  { name: 'النسخ الاحتياطي', icon: Database, href: '/admin/backups', superAdminOnly: true },
 ];
 
 function useIsHydrated() {
@@ -114,6 +124,9 @@ function useIsHydrated() {
 
 export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }: SidebarProps) {
   const queryClient = useQueryClient();
+  // Drives the menu from the same source the API enforces, so a module the
+  // factory has not been sold does not appear as a dead link.
+  const { data: entitlements } = useEntitlements();
 
   const prefetchMap: Record<string, () => void> = useMemo(() => ({
     '/salaries/payroll': () => queryClient.prefetchQuery({
@@ -210,17 +223,33 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const clear = useAuthStore((state) => state.clear);
 
   const userPermissions = currentUser?.permissions || [];
+  const isSuperAdmin =
+    currentUser?.roles?.includes('superadmin') || currentUser?.role === 'superadmin';
 
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const displayName = currentUser?.name || currentUser?.username || 'مدير النظام';
   const displayRole = currentUser?.role || 'مشرف عام';
 
-  const visibleMenuItems = menuItems.filter((item) => {
-    if (!item.permissions || item.permissions.length === 0) return true;
-    if (!isHydrated) return false;
-    return userPermissions.some(perm => item.permissions!.includes(perm));
-  });
+  // Two independent filters, and both must pass:
+  //   entitlements — what this FACTORY was sold
+  //   permissions  — what THIS PERSON may do with it
+  // A sub-menu whose every page is disabled is dropped entirely rather than
+  // rendered as an empty group.
+  const visibleMenuItems = menuItems
+    .map((item) => {
+      if (!item.subItems) return item;
+      const subItems = item.subItems.filter((sub) => isRouteEnabled(sub.href, entitlements));
+      return { ...item, subItems };
+    })
+    .filter((item) => {
+      if (item.superAdminOnly) return isSuperAdmin;
+      if (item.subItems && item.subItems.length === 0) return false;
+      if (item.href && !isRouteEnabled(item.href, entitlements)) return false;
+      if (!item.permissions || item.permissions.length === 0) return true;
+      if (!isHydrated) return false;
+      return userPermissions.some((perm) => item.permissions!.includes(perm));
+    });
 
   const isHrefActive = (href: string) => {
     const [targetPath, queryString] = href.split('?');
@@ -251,6 +280,10 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
     try { await apiClient.post('/auth/logout'); } catch { }
     clear();
     resetAuthVerificationCache();
+    // The query cache is persisted to localStorage and holds employee records,
+    // salaries and stock. Without this it outlived the session and was rehydrated
+    // for whoever signed in next on the same browser.
+    purgePersistedQueryCache(queryClient);
     // Safe navigation to avoid HMR race condition
     try {
       router.replace('/login');

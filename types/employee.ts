@@ -24,7 +24,14 @@ export interface Employee {
   workDaysInPeriod?: number;
   hoursPerDay?: number;
   avatar?: string;
+  /** Present on single-employee reads only. Absent from list rows — see photoUrl. */
   photo?: string | null;
+  /**
+   * API-relative path to this employee's avatar, present on list rows when a
+   * photo exists. Resolve it with resolveEmployeePhotoSrc rather than using it
+   * raw; it needs the /api proxy prefix.
+   */
+  photoUrl?: string | null;
   currency?: string;
   createdAt?: string;
   updatedAt?: string;

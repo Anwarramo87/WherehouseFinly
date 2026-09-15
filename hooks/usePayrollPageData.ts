@@ -64,8 +64,10 @@ export function usePayrollPageData(month: string) {
     limit: 500,
   });
 
-  // Secondary queries — fire after critical data loads to reduce initial waterfall
-  const isSecondaryEnabled = !salariesLoading && !employeesLoading;
+  // NOTE: these were meant to be gated on the critical queries finishing, to
+  // flatten the initial request burst. The gate was computed but never passed
+  // to any of them, so they have always fired immediately. Removed rather than
+  // left as a value that reads like an implemented optimisation.
   const { data: bonuses = [], isLoading: bonusesLoading } = useBonuses({ period: month });
   const { data: discounts = [], isLoading: discountsLoading } = useDiscounts(undefined, month);
   const { data: penalties = [], isLoading: penaltiesLoading } = usePenalties({

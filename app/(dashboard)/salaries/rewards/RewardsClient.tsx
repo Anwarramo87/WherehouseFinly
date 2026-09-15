@@ -6,13 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import { Plus, Gift, ChevronLeft, Search, Trash2, Users, ChevronDown, ChevronUp, Coins } from "lucide-react";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
-import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { Bonus, BonusInput } from "@/types/bonus";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
 
@@ -24,7 +24,6 @@ export default function RewardsClient() {
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
-  const { data: salaries = [] } = useSalaries();
   const queryClient = useQueryClient();
   const initialEmployeeId = searchParams.get("employeeId") ?? "";
   const initialType = searchParams.get("type") ?? "";
@@ -71,18 +70,6 @@ export default function RewardsClient() {
     return 0;
   };
 
-  const resolveAssistance = (value: Bonus["assistanceAmount"]) => {
-    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-    if (value && typeof value === "object" && "$numberDecimal" in value) {
-      const parsed = Number(value.$numberDecimal || 0);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    if (typeof value === "string") {
-      const parsed = Number(value.replace(/,/g, "").trim());
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  };
 
   const employeesLookup = useMemo(() => {
     return new Map(employees.map((emp) => [emp.employeeId, emp.name]));
@@ -119,7 +106,6 @@ export default function RewardsClient() {
         ? "جميع الموظفين"
         : employeesLookup.get(employeeId) || "موظف غير معروف";
       const bonusAmount = resolveAmount(bonus.bonusAmount);
-      const assistanceAmount = resolveAssistance(bonus.assistanceAmount);
       const periodDate = bonus.period ? `${bonus.period}-01` : new Date().toISOString();
 
       // فقط عرض السجلات التي فيها مكافآت (bonusAmount فقط) واستبعد سجلات الزيادة والاعانات
@@ -374,7 +360,7 @@ export default function RewardsClient() {
                               {isGlobal && <Users size={16} className="text-[#C89355]" />}
                               {!isGlobal && (
                                 <EmployeeAvatar
-                                  src={employeesRecordMap.get(group.employeeId)?.photo}
+                                  src={resolveEmployeePhotoSrc(employeesRecordMap.get(group.employeeId))}
                                   name={group.name}
                                   gender={employeesRecordMap.get(group.employeeId)?.gender}
                                   employeeId={group.employeeId}

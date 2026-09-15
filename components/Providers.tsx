@@ -6,13 +6,17 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { useState, useEffect, useRef } from "react";
 import { Toaster } from "react-hot-toast";
 import { createQueryClient } from "@/lib/query-client-config";
+import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
 import RealtimeInvalidator from "@/components/RealtimeInvalidator";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
   const [persister] = useState(() =>
     typeof window !== "undefined"
-      ? createSyncStoragePersister({ storage: window.localStorage })
+      ? createSyncStoragePersister({
+          storage: window.localStorage,
+          key: PERSISTED_QUERY_CACHE_KEY,
+        })
       : undefined,
   );
   const didPersist = useRef(false);

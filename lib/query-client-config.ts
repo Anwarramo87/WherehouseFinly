@@ -1,6 +1,23 @@
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import axios from "axios";
+import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
+
+/**
+ * Drops everything cached for the user who is signing out — the in-memory
+ * cache and the copy on disk.
+ */
+export function purgePersistedQueryCache(queryClient?: QueryClient) {
+  queryClient?.clear();
+
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PERSISTED_QUERY_CACHE_KEY);
+  } catch {
+    // Storage can be unavailable (private mode, blocked cookies); the
+    // in-memory clear above is the part that matters for this session.
+  }
+}
 
 /**
  * إنشاء QueryClient محسّن للأداء

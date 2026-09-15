@@ -7,6 +7,7 @@ import type { BusData, Passenger } from "@/app/(dashboard)/Transportation/Transp
 import type { Employee } from "@/types/employee";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import apiClient from "@/lib/api-client";
 
 interface Props {
@@ -304,7 +305,7 @@ export default function AddPassengerModal({ isOpen, onClose, onSave, busData }: 
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <EmployeeAvatar
-                      src={emp.photo}
+                      src={resolveEmployeePhotoSrc(emp)}
                       name={emp.name}
                       gender={emp.gender}
                       employeeId={emp.employeeId}

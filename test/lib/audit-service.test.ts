@@ -61,15 +61,19 @@ describe('AuditService', () => {
 
       await service.logTermination('emp-456', 'Jane Smith', userContext, details);
 
-      // Verify API was called
-      expect(mockPost).toHaveBeenCalledWith(
-        '/audit-log',
+      // The durable trail is written server-side by the endpoint that performs
+      // the termination. This service no longer posts one: the route it used to
+      // call authorised on a header the client never sent, so every write was
+      // rejected and swallowed. What it still owes is the in-session record the
+      // screens read back immediately.
+      expect(mockPost).not.toHaveBeenCalled();
+      expect(service.getRecentEntries()).toContainEqual(
         expect.objectContaining({
           action: 'EMPLOYEE_TERMINATED',
           employeeId: 'emp-456',
           employeeName: 'Jane Smith',
           performedBy: 'user-123',
-        })
+        }),
       );
     });
 
@@ -82,7 +86,7 @@ describe('AuditService', () => {
 
       await service.logTermination('emp-456', 'Jane Smith', userContext);
 
-      expect(mockPost).toHaveBeenCalled();
+      expect(service.getRecentEntries()).toHaveLength(1);
     });
   });
 
@@ -103,14 +107,13 @@ describe('AuditService', () => {
 
       await service.logRehire('emp-456', 'Jane Smith', userContext, details);
 
-      expect(mockPost).toHaveBeenCalledWith(
-        '/audit-log',
+      expect(service.getRecentEntries()).toContainEqual(
         expect.objectContaining({
           action: 'EMPLOYEE_REHIRED',
           employeeId: 'emp-456',
           employeeName: 'Jane Smith',
           performedBy: 'user-123',
-        })
+        }),
       );
     });
   });
@@ -134,55 +137,73 @@ describe('AuditService', () => {
 
       await service.logFinancialSettlement('emp-456', 'Jane Smith', userContext, details);
 
-      expect(mockPost).toHaveBeenCalledWith(
-        '/audit-log',
+      expect(service.getRecentEntries()).toContainEqual(
         expect.objectContaining({
           action: 'FINANCIAL_SETTLEMENT_COMPLETED',
           employeeId: 'emp-456',
           employeeName: 'Jane Smith',
           performedBy: 'user-789',
-        })
+        }),
       );
     });
   });
 
   describe('getEmployeeAuditTrail', () => {
     it('should return audit logs for specific employee', async () => {
-      const mockAuditLogs = [
-        {
-          id: 'audit-1',
-          action: 'EMPLOYEE_TERMINATED' as const,
-          employeeId: 'emp-456',
-          employeeName: 'Jane Smith',
-          performedBy: 'user-123',
-          performedByName: 'John Doe',
-          userRole: 'hr_manager',
-          timestamp: new Date(),
-          details: {},
-          ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0',
-        },
-      ];
-
+      // The backend's own row shape: it audits every kind of change, so it
+      // speaks actor/target rather than this module's HR vocabulary.
+      const createdAt = new Date('2026-01-15T10:00:00.000Z');
       mockGet.mockResolvedValueOnce({
         data: {
           success: true,
-          auditLogs: mockAuditLogs,
+          auditLogs: [
+            {
+              id: 'audit-1',
+              action: 'employee.terminate',
+              actorId: 'user-123',
+              actorUsername: 'John Doe',
+              targetType: 'employee',
+              targetId: 'emp-456',
+              ipAddress: '192.168.1.1',
+              userAgent: 'Mozilla/5.0',
+              metadata: { employeeName: 'Jane Smith', userRole: 'hr_manager' },
+              createdAt: createdAt.toISOString(),
+            },
+          ],
           pagination: { total: 1, page: 1, limit: 50, totalPages: 1 },
         },
       });
 
       const result = await service.getEmployeeAuditTrail('emp-456');
 
+      // An employee filter has to go out as the backend's (targetType, targetId)
+      // pair: its DTO whitelists query parameters, so `employeeId` would be a
+      // 400 rather than a filter it quietly ignored.
       expect(mockGet).toHaveBeenCalledWith('/audit-log', {
         params: expect.objectContaining({
-          employeeId: 'emp-456',
+          targetType: 'employee',
+          targetId: 'emp-456',
           limit: 50,
           sortBy: 'timestamp',
           sortOrder: 'desc',
         }),
       });
-      expect(result).toEqual(mockAuditLogs);
+      expect(result).toEqual([
+        {
+          id: 'audit-1',
+          action: 'EMPLOYEE_TERMINATED',
+          employeeId: 'emp-456',
+          employeeName: 'Jane Smith',
+          performedBy: 'user-123',
+          performedByName: 'John Doe',
+          userRole: 'hr_manager',
+          timestamp: createdAt,
+          details: { employeeName: 'Jane Smith', userRole: 'hr_manager' },
+          notes: undefined,
+          ipAddress: '192.168.1.1',
+          userAgent: 'Mozilla/5.0',
+        },
+      ]);
     });
 
     it('should return in-memory logs when API fails', async () => {

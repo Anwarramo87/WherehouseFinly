@@ -7,8 +7,8 @@ import {
   Calendar, Coins, FileText 
 } from "lucide-react";
 import { BonusInput } from "@/types/bonus";
-import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 interface AddBonusModalProps {
   isOpen: boolean;
@@ -202,7 +202,7 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98]"
                         >
                           <EmployeeAvatar
-                            src={emp.photo}
+                            src={resolveEmployeePhotoSrc(emp)}
                             name={emp.name}
                             gender={emp.gender}
                             employeeId={emp.employeeId}

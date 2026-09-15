@@ -9,6 +9,7 @@ import useTransportation, {
 } from "@/hooks/useTransportation";
 import { useEmployees } from "@/hooks/useEmployees";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const AddBusModal = dynamic(() => import("@/components/AddBusModal"), { loading: () => null });
 const AddPassengerModal = dynamic(() => import("@/components/AddPassengerModal"), {
@@ -633,7 +634,7 @@ export default function TransportationClient() {
                                     <td className="p-3 text-right font-bold text-[#1a2530] text-sm">
                                       <div className="flex items-center justify-end gap-3">
                                         <EmployeeAvatar
-                                          src={employeeRecordMap.get(p.employeeId)?.photo}
+                                          src={resolveEmployeePhotoSrc(employeeRecordMap.get(p.employeeId))}
                                           name={displayName || p.name}
                                           gender={employeeRecordMap.get(p.employeeId)?.gender}
                                           employeeId={p.employeeId}

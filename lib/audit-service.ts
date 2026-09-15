@@ -84,6 +84,101 @@ export const AUDIT_SERVICE_ERROR_CODES = {
  * 
  * Validates: Requirement 9.4
  */
+/**
+ * The audit row as the backend stores it.
+ *
+ * The backend's vocabulary is generic (actor / target) because it audits every
+ * kind of change, not just employment ones; this module's vocabulary is the
+ * HR-specific one the screens are written against. The two are translated here
+ * rather than bent into each other.
+ */
+interface BackendAuditRow {
+  id: string;
+  action: string;
+  actorId?: string | null;
+  actorUsername?: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+interface BackendAuditLogResponse {
+  success: boolean;
+  auditLogs?: BackendAuditRow[];
+  pagination: AuditLogResponse['pagination'];
+}
+
+/** Backend action name → the action this module reports. */
+const BACKEND_ACTION_TO_AUDIT_ACTION: Record<string, AuditAction> = {
+  'employee.terminate': 'EMPLOYEE_TERMINATED',
+  'employee.resign': 'EMPLOYEE_TERMINATED',
+  'employee.bulk-terminate-department': 'EMPLOYEE_TERMINATED',
+  'employee.rehire': 'EMPLOYEE_REHIRED',
+  'employee.restore': 'EMPLOYEE_REHIRED',
+  'employee.financial-settlement': 'FINANCIAL_SETTLEMENT_COMPLETED',
+  'employee.settle': 'FINANCIAL_SETTLEMENT_COMPLETED',
+};
+
+/**
+ * Translates this module's filters into the ones the backend DTO accepts.
+ *
+ * The backend runs a whitelisting ValidationPipe, so an unknown query
+ * parameter is a 400, not a silently ignored filter.
+ */
+function toBackendAuditQuery(query: AuditLogQuery): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+
+  if (query.page) params.page = query.page;
+  if (query.limit) params.limit = query.limit;
+  if (query.search) params.search = query.search;
+  if (query.startDate) params.startDate = query.startDate;
+  if (query.endDate) params.endDate = query.endDate;
+  if (query.performedBy) params.actorId = query.performedBy;
+  if (query.employeeId) {
+    params.targetType = 'employee';
+    params.targetId = query.employeeId;
+  }
+  if (query.action) {
+    // Reverse the map: several backend actions can fold into one reported
+    // action, so filter on the first that does.
+    const backendAction = Object.entries(BACKEND_ACTION_TO_AUDIT_ACTION).find(
+      ([, mapped]) => mapped === query.action,
+    )?.[0];
+    if (backendAction) params.action = backendAction;
+  }
+  if (query.sortOrder) params.sortOrder = query.sortOrder;
+  // 'employeeId' is not a column the backend can sort on; the rest map straight
+  // across, and anything else falls back to the backend's own default.
+  if (query.sortBy === 'timestamp' || query.sortBy === 'action') {
+    params.sortBy = query.sortBy;
+  }
+
+  return params;
+}
+
+function fromBackendAuditRow(row: BackendAuditRow): AuditLog {
+  const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+  const asText = (value: unknown) => (typeof value === 'string' ? value : '');
+
+  return {
+    id: row.id,
+    action: BACKEND_ACTION_TO_AUDIT_ACTION[row.action] ?? (row.action as AuditAction),
+    employeeId: row.targetType === 'employee' ? (row.targetId ?? '') : '',
+    employeeName: asText(metadata.employeeName) || asText(metadata.name),
+    performedBy: row.actorId ?? '',
+    performedByName: row.actorUsername ?? '',
+    userRole: asText(metadata.userRole),
+    timestamp: new Date(row.createdAt),
+    details: metadata,
+    notes: asText(metadata.notes) || undefined,
+    ipAddress: row.ipAddress ?? 'unknown',
+    userAgent: row.userAgent ?? 'unknown',
+  };
+}
+
 export class AuditService {
   private static instance: AuditService;
   private inMemoryLog: AuditLog[] = [];
@@ -258,8 +353,14 @@ export class AuditService {
    */
   async getAuditTrail(query: AuditLogQuery): Promise<AuditLogResponse> {
     try {
-      const response = await apiClient.get('/audit-log', { params: query });
-      return response.data as AuditLogResponse;
+      const response = await apiClient.get('/audit-log', {
+        params: toBackendAuditQuery(query),
+      });
+      const payload = response.data as BackendAuditLogResponse;
+      return {
+        ...payload,
+        auditLogs: (payload.auditLogs ?? []).map(fromBackendAuditRow),
+      };
     } catch (error) {
       const apiError = error as { response?: { data?: { message?: string }; status?: number } };
       
@@ -356,16 +457,15 @@ export class AuditService {
       userAgent: userContext.userAgent || 'unknown',
     };
 
-    // Store in memory for client-side access
+    // Kept for the in-session views that read it back immediately.
+    //
+    // This used to POST the entry to /api/audit-log as well. That route was a
+    // Next.js mock which authorised on an `x-user-role` header the client never
+    // sent, so every write was rejected 403 and swallowed by this method's
+    // caller — and even a successful write landed in a per-instance array that
+    // died with the process. The durable trail is now written server-side by
+    // the endpoint performing the change, where it cannot be forged or skipped.
     this.inMemoryLog.push(auditEntry);
-
-    // Send to backend API
-    try {
-      await apiClient.post('/audit-log', auditEntry);
-    } catch {
-      // Silently fail - in-memory log still has the entry
-      // Don't let audit logging failures affect main operations
-    }
   }
 
   /**

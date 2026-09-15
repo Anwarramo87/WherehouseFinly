@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, AlertTriangle, Calendar, FileText, MessageSquare } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export interface TerminationData {
   terminationDate: string;
@@ -109,7 +110,7 @@ export default function TerminateEmployeeModal({
               <AlertTriangle className="text-rose-500" size={24} />
             </div>
             <EmployeeAvatar
-              src={employee?.photo}
+              src={resolveEmployeePhotoSrc(employee)}
               name={employee?.name}
               gender={employee?.gender}
               employeeId={employee?.employeeId}

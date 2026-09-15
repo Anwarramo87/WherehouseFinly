@@ -9,7 +9,6 @@ import {
   Field,
   Loading,
   Panel,
-  Pill,
   Stat,
   StatusPill,
   TableFrame,

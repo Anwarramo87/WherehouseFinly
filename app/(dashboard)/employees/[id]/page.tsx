@@ -210,6 +210,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   }, [
     attendanceData?.dailyRecords,
     attendanceRange.totalDays,
+    employee?.gracePeriodMinutes,
     employee?.scheduledEnd,
     employee?.scheduledStart,
     employeeId,

@@ -21,7 +21,6 @@ import { useCustomers, useDeliveryNotes, usePriceTiers, useSalesOrders } from "@
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { toNum } from "@/types/wms";
 import { toast } from "react-hot-toast";
 
 const SO_STATUS: Record<string, { label: string; tone: "slate" | "blue" | "green" | "red" }> = {

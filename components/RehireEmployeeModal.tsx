@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, UserCheck, Calendar, MessageSquare } from "lucide-react";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export interface RehireData {
   rehireDate: string;
@@ -111,7 +112,7 @@ export default function RehireEmployeeModal({
               <UserCheck className="text-emerald-500" size={24} />
             </div>
             <EmployeeAvatar
-              src={employee.photo}
+              src={resolveEmployeePhotoSrc(employee)}
               name={employee.name}
               gender={employee.gender}
               employeeId={employee.employeeId}

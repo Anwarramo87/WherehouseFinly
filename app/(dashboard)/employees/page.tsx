@@ -27,6 +27,7 @@ import {
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), {
   loading: () => null,
@@ -589,7 +590,7 @@ export default function EmployeesPage() {
                         <td className="p-4 text-center">
                           <div className="flex justify-center">
                             <EmployeeAvatar
-                              src={emp.photo ?? emp.avatar}
+                              src={resolveEmployeePhotoSrc(emp)}
                               name={emp.name}
                               gender={emp.gender}
                               employeeId={emp.employeeId}

@@ -6,6 +6,7 @@ import { X, Save, Bus, User, Phone, Hash, MapPin, Coins, Percent, Search, Users 
 import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const formatWithCommas = (value: string | number) => {
   if (!value) return "";
@@ -227,7 +228,7 @@ export default function AddBusModal({ isOpen, onClose, onSave, initialData }: Pr
                             className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-xl cursor-pointer transition-all"
                           >
                             <EmployeeAvatar
-                              src={emp.photo}
+                              src={resolveEmployeePhotoSrc(emp)}
                               name={emp.name}
                               gender={emp.gender}
                               employeeId={emp.employeeId}

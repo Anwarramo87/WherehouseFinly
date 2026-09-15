@@ -20,6 +20,7 @@ import { SALARY_CONSTANTS } from "@/lib/salary-constants"; // eslint-disable-lin
 
 import { useEmployees } from "@/hooks/useEmployees";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import {
   usePayrollInputs,
   UpsertPayrollInputPayload,
@@ -551,11 +552,10 @@ export default function TimeTablePage() {
       const { effectiveGross, baseSalary, livingAllowance, transportAllowance, insuranceAmount } =
         calcEffectiveGross(emp, salaryRec, manualInput ?? null);
 
-      // أسعار اليوم والدقيقة مبنية على effectiveGrossSalary
+      // calcEarnedSalaryHourly derives the day and minute rates itself from
+      // effectiveGross; the copies that used to be computed here were dead.
       const workDaysInPeriod = emp.workDaysInPeriod ?? STANDARD_WORK_DAYS;
       const hoursPerDayEmp = emp.hoursPerDay ?? HOURS_PER_DAY;
-      const dailyRate = workDaysInPeriod > 0 ? effectiveGross / workDaysInPeriod : 0;
-      const minuteRate = hoursPerDayEmp > 0 ? dailyRate / (hoursPerDayEmp * 60) : 0;
 
       // الراتب المستحق على أساس الساعات الفعلية
       const workedMinutes = autoInput?.workedMinutes ?? 0;
@@ -600,16 +600,20 @@ export default function TimeTablePage() {
         unpaidLeaveDays,
       };
     });
+    // Depend on the derived maps this body actually reads, not on the raw
+    // arrays they were built from. The two agreed only by coincidence — each
+    // map memoises on the same arrays — so adding an input to any of those maps
+    // would have left this computation reading a stale one, and payroll figures
+    // are the last place to want that.
   }, [
     employees,
-    payrollInputs,
-    autoDeductions,
+    payrollInputsById,
+    autoDeductionsById,
+    adminLeaveByEmp,
+    deathLeaveByEmp,
     salaryMap,
     employeeLeavesMap,
     localPresentDaysMap,
-    monthlyLeaves,
-    periodStart,
-    periodEnd,
   ]);
 
   const filteredRecords = useMemo(() => {
@@ -833,7 +837,7 @@ export default function TimeTablePage() {
                       >
                         <div className="flex items-center gap-3">
                           <EmployeeAvatar
-                            src={record.photo}
+                            src={resolveEmployeePhotoSrc(record)}
                             name={record.name}
                             gender={record.gender}
                             employeeId={record.employeeId}

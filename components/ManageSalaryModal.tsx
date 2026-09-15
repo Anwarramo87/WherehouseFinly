@@ -12,6 +12,7 @@ import {
 import type { Employee } from "@/types/employee";
 import type { Salary } from "@/types/salary";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
 const salarySchema = z.object({
@@ -287,7 +288,7 @@ export default function ManageSalaryModal({
                             className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-colors"
                           >
                             <EmployeeAvatar
-                              src={emp.photo}
+                              src={resolveEmployeePhotoSrc(emp)}
                               name={emp.name}
                               gender={emp.gender}
                               employeeId={emp.employeeId}

@@ -3,6 +3,7 @@ import { clearAuthAccessToken, clearAuthSession, getAuthAccessToken } from "@/li
 import { resetAuthVerificationCache } from "@/lib/auth-verify";
 import { useAuthStore } from "@/stores/auth-store";
 import { resolveApiUrl } from "@/lib/api-url";
+import { getActiveFactoryId } from "@/stores/factory-scope-store";
 
 const isBrowser = typeof window !== "undefined";
 const serverApiUrl = resolveApiUrl(process.env.NEXT_PUBLIC_API_URL);
@@ -81,6 +82,16 @@ const isEmptyParam = (value: unknown): boolean =>
   (typeof value === "string" && value.trim().toLowerCase() === "undefined");
 
 apiClient.interceptors.request.use((config) => {
+  // When the overseer has drilled into a factory, every request carries it and
+  // the backend narrows the ordinary handlers to that factory. The API refuses
+  // the header from anyone who is not the super admin, so sending it is safe
+  // even if the store somehow holds a value for the wrong user.
+  const factoryId = getActiveFactoryId();
+  if (factoryId) {
+    config.headers = config.headers || {};
+    (config.headers as Record<string, unknown>)["x-factory-id"] = factoryId;
+  }
+
   const token = getAuthAccessToken();
   if (token) {
     config.headers = config.headers || {};

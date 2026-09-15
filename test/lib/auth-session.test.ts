@@ -1,4 +1,5 @@
 import { clearAuthSession, getStoredUser, setAuthSession } from "@/lib/auth-session";
+import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
 import { describe, expect, it } from "vitest";
 
 describe("auth-session", () => {
@@ -18,6 +19,20 @@ describe("auth-session", () => {
     setAuthSession({ name: "Temp" });
     setAuthSession(null);
     expect(getStoredUser<{ name: string }>()).toBeNull();
+  });
+
+  // The persisted query cache holds employee records, salaries and stock. It
+  // lives in localStorage, so clearing sessionStorage never touched it, and it
+  // was rehydrated for whoever signed in next on the same browser.
+  it("drops the persisted query cache so the next user cannot read it", () => {
+    localStorage.setItem(
+      PERSISTED_QUERY_CACHE_KEY,
+      JSON.stringify({ clientState: { queries: [{ queryKey: ["employees"] }] } }),
+    );
+
+    clearAuthSession();
+
+    expect(localStorage.getItem(PERSISTED_QUERY_CACHE_KEY)).toBeNull();
   });
 });
 

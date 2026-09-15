@@ -28,10 +28,16 @@ export const toMinutes = (time?: string) => {
   return (h * 60) + m;
 };
 
+/**
+ * Present / late / absent, decided entirely from the check-in.
+ *
+ * It used to accept a `scheduledEnd` it never read, which made the signature
+ * promise an early-leave verdict it does not produce. Early leave is tracked
+ * separately, as minutes, by the metrics below.
+ */
 export const getStatus = (
   checkIn?: string,
   scheduledStart?: string,
-  scheduledEnd?: string,
 ): TableStatus => {
   if (!checkIn) return "absent";
 
@@ -102,7 +108,7 @@ export const calculateAttendanceMetrics = (
     const scheduledStart = employee?.scheduledStart || "08:00";
     const scheduledEnd = employee?.scheduledEnd || "16:00";
 
-    const status = getStatus(daily?.checkIn, scheduledStart, scheduledEnd);
+    const status = getStatus(daily?.checkIn, scheduledStart);
     counts[status] += 1;
 
     const checkInMinutes = toMinutes(daily?.checkIn);

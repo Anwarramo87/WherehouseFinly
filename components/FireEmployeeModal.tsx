@@ -19,6 +19,7 @@ import type { Employee } from "@/types/employee";
 import apiClient from "@/lib/api-client";
 import useDepartments from "@/hooks/useDepartments";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 export type FireEmployeePayload = {
   employeeId: string;
@@ -197,7 +198,7 @@ export default function FireEmployeeModal({
               )}
             </div>
             <EmployeeAvatar
-              src={employee?.photo}
+              src={resolveEmployeePhotoSrc(employee)}
               name={employee?.name}
               gender={employee?.gender}
               employeeId={employee?.employeeId}

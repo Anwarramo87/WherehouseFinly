@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 import type { DashboardKpis } from "@/types/dashboard";
 import apiClient from "@/lib/api-client";

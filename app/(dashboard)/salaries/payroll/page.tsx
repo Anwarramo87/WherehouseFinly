@@ -27,6 +27,7 @@ import { PayrollVirtualTable } from "@/components/PayrollVirtualTable";
 import { usePayrollPageData } from "@/hooks/usePayrollPageData";
 import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import type { AggregatedPayroll } from "@/types/payroll-aggregated";
 
 // Lazy load heavy components
@@ -96,7 +97,7 @@ export default function PayrollPage() {
     return allRows.map((row) => {
       const emp = employeeRecordMap.get(row.employeeId);
       if (!emp) return row;
-      return { ...row, photo: emp.photo ?? null, gender: emp.gender ?? null };
+      return { ...row, photo: resolveEmployeePhotoSrc(emp) ?? null, gender: emp.gender ?? null };
     });
   }, [allRows, employeeRecordMap]);
 

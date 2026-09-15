@@ -24,7 +24,6 @@ import {
   useCreatePutawayTask,
   useOccupancy,
   usePutawayTasks,
-  useSaveBin,
   useSaveZone,
   useSuggestPutaway,
   useZones,
@@ -179,7 +178,6 @@ function BinsTab({ warehouses }: { warehouses: Array<{ id: string; name: string;
   const { data: bins, isLoading } = useBins({ zoneId: zoneFilter || undefined, limit: 200 });
 
   const saveZone = useSaveZone();
-  const saveBin = useSaveBin();
   const bulk = useBulkCreateBins();
 
   const [zoneForm, setZoneForm] = useState({ warehouseId: "", code: "", name: "", type: "PICKING" });

@@ -11,6 +11,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Employee } from "@/types/employee";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import type { DiscountPayload, DiscountRecord } from "@/hooks/useDiscounts";
 
 const discountSchema = z.object({
@@ -214,7 +215,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
                           className="flex items-center gap-3 p-3 hover:bg-[#263544] rounded-xl cursor-pointer transition-all hover:scale-[0.98]"
                         >
                           <EmployeeAvatar
-                            src={emp.photo}
+                            src={resolveEmployeePhotoSrc(emp)}
                             name={emp.name}
                             gender={emp.gender}
                             employeeId={emp.employeeId}

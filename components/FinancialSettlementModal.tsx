@@ -10,6 +10,7 @@ import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction"
 import type { Salary } from "@/types/salary";
 import type { Leave } from "../types/leave";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 type AttendanceEventRecord = {
   employeeId?: string;
@@ -554,7 +555,7 @@ const isMounted = typeof document !== "undefined";
               <DollarSign className="text-blue-400" size={20} />
             </div>
             <EmployeeAvatar
-              src={employee.photo}
+              src={resolveEmployeePhotoSrc(employee)}
               name={employee.name}
               gender={employee.gender}
               employeeId={employee.employeeId}

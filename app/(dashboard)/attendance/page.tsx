@@ -32,6 +32,7 @@ import LeaveManageModal, { type LeaveRecord } from "@/components/LeaveManageModa
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import PunchesModal from "@/components/PunchesModal";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const LeaveRequestModal = dynamic(() => import("@/components/LeaveRequestModal"), {
   loading: () => null,
@@ -578,7 +579,7 @@ export default function AttendancePage() {
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-3">
                             <EmployeeAvatar
-                              src={employeeRecordMap.get(row.employeeId)?.photo}
+                              src={resolveEmployeePhotoSrc(employeeRecordMap.get(row.employeeId))}
                               name={row.employeeName}
                               gender={employeeRecordMap.get(row.employeeId)?.gender}
                               employeeId={row.employeeId}

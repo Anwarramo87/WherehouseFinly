@@ -10,6 +10,7 @@ import { useAdvances } from "@/hooks/useAdvances";
 import { Advance, AdvanceInput } from "@/types/advance";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
+import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
@@ -115,6 +116,11 @@ export default function DiscountsPage() {
     setIsModalOpen(true);
   };
 
+  // GAP: nothing on this page calls this, so AddAdvanceModal below can never
+  // be opened for a *new* advance -- the only path into it is editing. Left in
+  // place rather than deleted, because the missing piece is the button, not
+  // this handler.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleOpenAddAdvance = () => {
     setEditingAdvance(null);
     setIsAdvanceModalOpen(true);
@@ -281,7 +287,7 @@ export default function DiscountsPage() {
                               {isGlobal && <Users size={16} className="text-[#C89355]" />}
                               {!isGlobal && (
                                 <EmployeeAvatar
-                                  src={employeesRecordMap.get(group.employeeId)?.photo}
+                                  src={resolveEmployeePhotoSrc(employeesRecordMap.get(group.employeeId))}
                                   name={group.name}
                                   gender={employeesRecordMap.get(group.employeeId)?.gender}
                                   employeeId={group.employeeId}
