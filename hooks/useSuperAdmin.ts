@@ -129,8 +129,13 @@ export function useToggleEntitlement(tenantId: string | null) {
       void queryClient.invalidateQueries({ queryKey: entitlementsQueryKey });
       toast.success(input.enabled ? "تم التفعيل" : "تم الإيقاف");
     },
-    onError: () => {
-      toast.error("تعذّر حفظ التغيير");
+    onError: (error) => {
+      const axiosError = error as { response?: { data?: unknown; status?: number } };
+      console.error('[useToggleEntitlement] 400 body:', JSON.stringify(axiosError?.response?.data));
+      const msg =
+        (axiosError as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ?? "تعذّر حفظ التغيير";
+      toast.error(msg);
     },
   });
 }
