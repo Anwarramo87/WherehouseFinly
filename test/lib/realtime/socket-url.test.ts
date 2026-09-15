@@ -20,7 +20,7 @@ describe("resolveSocketUrl", () => {
   it("follows a deployed API base", () => {
     expect(
       resolveSocketUrl({
-        apiUrl: "https://warehousebackend-deployment-production.up.railway.app/api/v1",
+        apiUrl: "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1",
       }),
       ).toBe("https://warehousebackend-deployment-production.up.railway.app");
   });
