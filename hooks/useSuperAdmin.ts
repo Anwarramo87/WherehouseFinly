@@ -53,9 +53,10 @@ export function useFactoryEntitlements(tenantId: string | null) {
 /**
  * Toggles a module or a single page for one factory.
  *
- * Both the factory list and that factory's detail are invalidated, and so is
- * the caller's own entitlement cache — a Super Admin editing their way into or
- * out of a module should see their own nav follow, not wait for a stale cache.
+ * Uses PUT /entitlements (setPages) rather than the module/page toggle
+ * endpoints — computes the new page list on the frontend and sends it whole.
+ * This avoids the boolean-coercion 400 that the toggle endpoints produce when
+ * the backend ValidationPipe has enableImplicitConversion enabled.
  */
 export function useToggleEntitlement(tenantId: string | null) {
   const queryClient = useQueryClient();
@@ -66,9 +67,55 @@ export function useToggleEntitlement(tenantId: string | null) {
       key: string;
       enabled: boolean;
     }) => {
+      // Read the current entitlements from cache to compute the new page list.
+      const current = queryClient.getQueryData<FactoryEntitlements>(
+        superAdminKeys.entitlements(tenantId ?? "none"),
+      );
+
+      let pageKeys: string[];
+
+      if (current) {
+        const currentSet = new Set(current.enabledPages);
+
+        if (input.scope === "module") {
+          const module = current.modules.find((m) => m.key === input.key);
+          if (module) {
+            for (const page of module.pages) {
+              if (input.enabled) currentSet.add(page.key);
+              else currentSet.delete(page.key);
+            }
+          }
+        } else {
+          if (input.enabled) currentSet.add(input.key);
+          else currentSet.delete(input.key);
+        }
+
+        pageKeys = [...currentSet];
+      } else {
+        // No cached data — fall back to fetching current state first.
+        const fresh = (await apiClient.get(`/admin/tenants/${tenantId}/entitlements`))
+          .data as FactoryEntitlements;
+        const freshSet = new Set(fresh.enabledPages);
+
+        if (input.scope === "module") {
+          const module = fresh.modules.find((m) => m.key === input.key);
+          if (module) {
+            for (const page of module.pages) {
+              if (input.enabled) freshSet.add(page.key);
+              else freshSet.delete(page.key);
+            }
+          }
+        } else {
+          if (input.enabled) freshSet.add(input.key);
+          else freshSet.delete(input.key);
+        }
+
+        pageKeys = [...freshSet];
+      }
+
       const response = await apiClient.put(
-        `/admin/tenants/${tenantId}/entitlements/${input.scope}`,
-        { key: input.key, enabled: input.enabled },
+        `/admin/tenants/${tenantId}/entitlements`,
+        { pageKeys },
       );
       return response.data as FactoryEntitlements;
     },
