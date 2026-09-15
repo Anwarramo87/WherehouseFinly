@@ -51,6 +51,24 @@ export function useFactoryEntitlements(tenantId: string | null) {
 }
 
 /**
+ * Derives the current enabled page keys from the modules array.
+ *
+ * Uses modules[].pages[].enabled rather than enabledPages because the DB may
+ * still hold legacy flat keys (e.g. "employees") from before the catalogue was
+ * namespaced (e.g. "hr.employees"). The backend builds the modules view from
+ * the catalogue, so page.key is always a valid namespaced key.
+ */
+function enabledKeysFromModules(entitlements: FactoryEntitlements): Set<string> {
+  const set = new Set<string>();
+  for (const mod of entitlements.modules) {
+    for (const page of mod.pages) {
+      if (page.enabled) set.add(page.key);
+    }
+  }
+  return set;
+}
+
+/**
  * Toggles a module or a single page for one factory.
  *
  * Uses PUT /entitlements (setPages) rather than the module/page toggle
@@ -68,54 +86,35 @@ export function useToggleEntitlement(tenantId: string | null) {
       enabled: boolean;
     }) => {
       // Read the current entitlements from cache to compute the new page list.
-      const current = queryClient.getQueryData<FactoryEntitlements>(
+      // Always derive from modules[].pages[].enabled — never from enabledPages
+      // which may contain legacy flat keys the backend will reject.
+      let data = queryClient.getQueryData<FactoryEntitlements>(
         superAdminKeys.entitlements(tenantId ?? "none"),
       );
 
-      let pageKeys: string[];
-
-      if (current) {
-        const currentSet = new Set(current.enabledPages);
-
-        if (input.scope === "module") {
-          const module = current.modules.find((m) => m.key === input.key);
-          if (module) {
-            for (const page of module.pages) {
-              if (input.enabled) currentSet.add(page.key);
-              else currentSet.delete(page.key);
-            }
-          }
-        } else {
-          if (input.enabled) currentSet.add(input.key);
-          else currentSet.delete(input.key);
-        }
-
-        pageKeys = [...currentSet];
-      } else {
-        // No cached data — fall back to fetching current state first.
-        const fresh = (await apiClient.get(`/admin/tenants/${tenantId}/entitlements`))
+      if (!data) {
+        data = (await apiClient.get(`/admin/tenants/${tenantId}/entitlements`))
           .data as FactoryEntitlements;
-        const freshSet = new Set(fresh.enabledPages);
+      }
 
-        if (input.scope === "module") {
-          const module = fresh.modules.find((m) => m.key === input.key);
-          if (module) {
-            for (const page of module.pages) {
-              if (input.enabled) freshSet.add(page.key);
-              else freshSet.delete(page.key);
-            }
+      const currentSet = enabledKeysFromModules(data);
+
+      if (input.scope === "module") {
+        const mod = data.modules.find((m) => m.key === input.key);
+        if (mod) {
+          for (const page of mod.pages) {
+            if (input.enabled) currentSet.add(page.key);
+            else currentSet.delete(page.key);
           }
-        } else {
-          if (input.enabled) freshSet.add(input.key);
-          else freshSet.delete(input.key);
         }
-
-        pageKeys = [...freshSet];
+      } else {
+        if (input.enabled) currentSet.add(input.key);
+        else currentSet.delete(input.key);
       }
 
       const response = await apiClient.put(
         `/admin/tenants/${tenantId}/entitlements`,
-        { pageKeys },
+        { pageKeys: [...currentSet] },
       );
       return response.data as FactoryEntitlements;
     },
@@ -129,13 +128,8 @@ export function useToggleEntitlement(tenantId: string | null) {
       void queryClient.invalidateQueries({ queryKey: entitlementsQueryKey });
       toast.success(input.enabled ? "تم التفعيل" : "تم الإيقاف");
     },
-    onError: (error) => {
-      const axiosError = error as { response?: { data?: unknown; status?: number } };
-      console.error('[useToggleEntitlement] 400 body:', JSON.stringify(axiosError?.response?.data));
-      const msg =
-        (axiosError as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "تعذّر حفظ التغيير";
-      toast.error(msg);
+    onError: () => {
+      toast.error("تعذّر حفظ التغيير");
     },
   });
 }
