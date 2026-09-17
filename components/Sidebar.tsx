@@ -9,11 +9,14 @@ import {
   Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
-  ShoppingCart, Truck, BarChart3, Plug, Building2, Database
+  ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
+import { useFactoryScopeStore } from '@/stores/factory-scope-store';
 import { resetAuthVerificationCache } from '@/lib/auth-verify';
+import { stopSessionRefreshLoop } from '@/lib/session-refresh';
+import { disconnectAttendanceSocket } from '@/lib/realtime/attendance-socket';
 import apiClient from '@/lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_STALE_TIME } from '@/lib/query-cache';
@@ -102,6 +105,7 @@ const menuItems: MenuItem[] = [
   { name: 'الربط والتكامل', icon: Plug, href: '/settings/integrations', permissions: ['manage_users'] },
   { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
+  { name: 'الملفات', icon: FolderOpen, href: '/files', permissions: ['run_imports'] },
   { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },
   { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
   // Overseer-only; filtered in by role below rather than by a permission, so no
@@ -226,6 +230,13 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const isSuperAdmin =
     currentUser?.roles?.includes('superadmin') || currentUser?.role === 'superadmin';
 
+  // The overseer has no factory of their own — they borrow one. The daily
+  // management pages make no sense until they pick a factory in the
+  // supervision centreched, so while out of any scope the sidebar shows only
+  // the overseer's own items and nothing else.<banner - supervision only>
+  const scopedFactoryId = useFactoryScopeStore((state) => state.factoryId);
+  const awaitingFactoryScope = isSuperAdmin && !scopedFactoryId;
+
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const displayName = currentUser?.name || currentUser?.username || 'مدير النظام';
@@ -244,6 +255,15 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
     })
     .filter((item) => {
       if (item.superAdminOnly) return isSuperAdmin;
+
+      // The overseer "reels in" a factory to work with it. While they hold no
+      // factory scope, the sidebar offers only the supervision centre (home)
+      // and the oversight-only tools — the daily management pages are hidden
+      // so the overseer has no reason to wander into un-scoped screens.
+      if (isSuperAdmin && !scopedFactoryId) {
+        return item.href === '/home';
+      }
+
       if (item.subItems && item.subItems.length === 0) return false;
       if (item.href && !isRouteEnabled(item.href, entitlements)) return false;
       if (!item.permissions || item.permissions.length === 0) return true;
@@ -278,6 +298,11 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
 
   const handleLogout = async () => {
     try { await apiClient.post('/auth/logout'); } catch { }
+    // Full teardown so nothing keeps polling with a dead session (the
+    // me/refresh 401 storm and stray socket errors after logout).
+    stopSessionRefreshLoop();
+    disconnectAttendanceSocket();
+    try { await queryClient.cancelQueries(); } catch { }
     clear();
     resetAuthVerificationCache();
     // The query cache is persisted to localStorage and holds employee records,

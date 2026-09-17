@@ -67,12 +67,13 @@ export const useEmployeeSalary = (employeeId?: string) =>
  *   - lumpSumSalary + livingAllowance are now included so the backend can
  *     correctly store the user's intended salary split.
  */
-export const useSalaries = () => {
+export const useSalaries = (enabled = true) => {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   const salariesQuery = useQuery<Salary[]>({
     queryKey: queryKeys.salaries.all,
+    enabled,
     queryFn: async () => {
       const res = await apiClient.get("/salary");
       const data = res.data?.salaries ?? res.data;

@@ -20,7 +20,12 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRoles } from "@/hooks/useRoles";
+import { useAuthStore } from "@/stores/auth-store";
 import useDepartments from "@/hooks/useDepartments";
+
+// Roles only the overseer may hand out. A factory admin creating employees
+// must never see (or default into) these — the backend rejects them anyway.
+const PRIVILEGED_ROLE_NAMES = ["superadmin", "admin"];
 import type { Employee } from "@/types/employee";
 import PhotoUploadField from "@/components/PhotoUploadField";
 
@@ -140,6 +145,13 @@ export default function AddEmployeeModal({
   const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
 
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const isSuperadminViewer = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
+  // Non-superadmins only see ordinary roles (employees, department heads…).
+  const visibleRoles = isSuperadminViewer
+    ? roleOptions
+    : roleOptions.filter(
+        (r) => !PRIVILEGED_ROLE_NAMES.includes(String(r.name ?? "").trim().toLowerCase()),
+      );
   const { data: deptsData } = useDepartments();
   const prevIsOpen = useRef(isOpen);
 
@@ -228,7 +240,7 @@ export default function AddEmployeeModal({
     }
   };
 
-  const resolvedRoleId = formData.roleId || roleOptions[0]?.id || "";
+  const resolvedRoleId = formData.roleId || visibleRoles[0]?.id || "";
 
   const liveTotalSalary = useCallback(() => {
     const base = Number(removeCommas(formData.baseSalary) || 0);
@@ -534,17 +546,17 @@ export default function AddEmployeeModal({
 
               <div>
                 <label className="block text-sm font-bold text-[#C89355] mb-2">الدور الوظيفي</label>
-                {roleOptions.length > 0 ? (
+                {visibleRoles.length > 0 ? (
                   <select
                     required={step === 2}
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
-                    value={formData.roleId || roleOptions[0]?.id || ""}
+                    value={formData.roleId || visibleRoles[0]?.id || ""}
                     onChange={(e) => {
                       setFormData({ ...formData, roleId: e.target.value });
                       if (roleError) setRoleError("");
                     }}
                   >
-                    {roleOptions.map((role) => (
+                    {visibleRoles.map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.name}
                       </option>

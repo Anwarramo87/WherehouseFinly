@@ -8,7 +8,7 @@ import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
  * cache and the copy on disk.
  */
 export function purgePersistedQueryCache(queryClient?: QueryClient) {
-  queryClient?.clear();
+  (queryClient ?? activeQueryClient)?.clear();
 
   if (typeof window === "undefined") return;
   try {
@@ -17,6 +17,25 @@ export function purgePersistedQueryCache(queryClient?: QueryClient) {
     // Storage can be unavailable (private mode, blocked cookies); the
     // in-memory clear above is the part that matters for this session.
   }
+}
+
+// The live QueryClient, registered by <Providers/>. Lets non-React modules
+// (api-client's forceLogout) wipe in-memory state on session end — otherwise
+// the next login reuses the previous user's rows until staleTime expires.
+let activeQueryClient: QueryClient | null = null;
+
+export function setActiveQueryClient(client: QueryClient | null) {
+  activeQueryClient = client;
+}
+
+/** Wipe in-memory + persisted caches without needing React context. */
+export function clearAllQueryCaches() {
+  try {
+    activeQueryClient?.clear();
+  } catch {
+    // ignore — client may be mid-teardown
+  }
+  purgePersistedQueryCache();
 }
 
 /**

@@ -81,6 +81,9 @@ export const getAttendanceSocket = () => {
   }
 
   const authToken = getAuthToken();
+  // Don't open a socket at all when unauthenticated — prevents WS 401 spam
+  // when the session has expired (which also explains the /api 401s above).
+  if (!authToken) return null;
 
   const backendUrl = resolveSocketUrl({
     socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL,
@@ -88,29 +91,47 @@ export const getAttendanceSocket = () => {
     origin: window.location.origin,
   });
 
+  // Same-origin fallback with no backendUrl means no socket to open.
+  if (!backendUrl) return null;
+
   const socket = io(`${backendUrl}/realtime`, {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     withCredentials: true,
     autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 3,
-    reconnectionDelay: 5000,
+    reconnectionAttempts: 2,
+    reconnectionDelay: 8000,
     reconnectionDelayMax: 30000,
-    timeout: 10000,
-    auth: authToken
-      ? {
-          token: authToken,
-        }
-      : undefined,
+    timeout: 8000,
+    auth: { token: authToken },
   });
 
-  // Suppress connection errors — socket is optional (realtime biometric updates)
+  // Realtime is optional — never spam console when backend is down.
   socket.on("connect_error", () => {
-    // Silently ignore — realtime updates are a nice-to-have, not required
+    // Silently ignore — attendance live updates are nice-to-have.
   });
+  // Also silence low-level engine errors that bypass connect_error in some browsers
+  const engine: unknown = (socket as unknown as { io?: { engine?: unknown } }).io?.engine;
+  if (engine && typeof (engine as { on?: unknown }).on === "function") {
+    try {
+      (engine as { on: (ev: string, fn: () => void) => void }).on("upgradeError", () => {});
+    } catch {}
+  }
 
   window.__factoryAttendanceSocket = socket;
   return socket;
+};
+
+/** Tear down the realtime socket (call on logout so a stale authenticated
+ *  socket never lingers or spams reconnect errors after the session ends). */
+export const disconnectAttendanceSocket = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.__factoryAttendanceSocket?.disconnect();
+  } catch {
+    // ignore — socket may already be closed
+  }
+  window.__factoryAttendanceSocket = undefined;
 };
 

@@ -5,7 +5,7 @@ import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { useState, useEffect, useRef } from "react";
 import { Toaster } from "react-hot-toast";
-import { createQueryClient } from "@/lib/query-client-config";
+import { createQueryClient, setActiveQueryClient } from "@/lib/query-client-config";
 import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
 import RealtimeInvalidator from "@/components/RealtimeInvalidator";
 
@@ -20,6 +20,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       : undefined,
   );
   const didPersist = useRef(false);
+
+  useEffect(() => {
+    setActiveQueryClient(queryClient);
+    return () => setActiveQueryClient(null);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!persister || didPersist.current) return;

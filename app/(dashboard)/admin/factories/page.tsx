@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Check, Loader2, Minus, ShieldAlert, Users } from "lucide-react";
-import {
-  useFactories,
-  useFactoryEntitlements,
-  useToggleEntitlement,
-  type FactorySummary,
-} from "@/hooks/useSuperAdmin";
+import { Building2, Loader2, ShieldAlert, Users } from "lucide-react";
+import { useFactories, type FactorySummary } from "@/hooks/useSuperAdmin";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFactoryScopeStore } from "@/stores/factory-scope-store";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,8 +24,6 @@ export default function FactoriesPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { data: factories = [], isLoading, isError } = useFactories();
-  const { data: detail, isLoading: detailLoading } = useFactoryEntitlements(selectedId);
-  const toggle = useToggleEntitlement(selectedId);
   const enterFactory = useFactoryScopeStore((state) => state.enter);
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -65,7 +58,7 @@ export default function FactoriesPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-black text-[#263544]">المصانع</h1>
         <p className="mt-1 text-sm text-slate-500">
-          إدارة الوحدات والصفحات المتاحة لكل مصنع. التغيير يسري فوراً على الواجهة والـ API.
+          إدارة حسابات كل مصنع — حدّد صلاحيات كل آدمن على حدة. لا يوجد تفعيل "للکل"، كل حساب له وحداته وصفحاته الخاصة.
         </p>
       </header>
 
@@ -108,14 +101,7 @@ export default function FactoriesPage() {
             </p>
           )}
 
-          {selected && detailLoading && (
-            <div className="flex items-center gap-3 text-slate-500">
-              <Loader2 className="animate-spin" size={18} aria-hidden="true" />
-              <span>جارٍ تحميل الوحدات…</span>
-            </div>
-          )}
-
-          {selected && detail && (
+          {selected && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-[#263544]">{selected.name}</h2>
@@ -129,69 +115,6 @@ export default function FactoriesPage() {
               </div>
 
               <FactoryUsersPanel tenantId={selected.id} factoryName={selected.name} />
-
-              {detail.modules.map((module) => (
-                <article
-                  key={module.key}
-                  className="rounded-2xl border border-slate-200 bg-white p-5"
-                >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-bold text-[#263544]">{module.label}</h3>
-                      <p className="text-xs text-slate-500">{module.description}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <StateBadge state={module.state} />
-                      <button
-                        type="button"
-                        disabled={toggle.isPending}
-                        onClick={() =>
-                          toggle.mutate({
-                            scope: "module",
-                            key: module.key,
-                            enabled: module.state !== "all",
-                          })
-                        }
-                        className="rounded-lg border border-[#263544] px-3 py-1.5 text-xs font-bold text-[#263544] transition-colors hover:bg-[#263544] hover:text-white disabled:opacity-50"
-                      >
-                        {module.state === "all" ? "إيقاف الوحدة" : "تفعيل الوحدة"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <ul className="flex flex-wrap gap-2">
-                    {module.pages.map((page) => (
-                      <li key={page.key}>
-                        <button
-                          type="button"
-                          disabled={toggle.isPending}
-                          aria-pressed={page.enabled}
-                          onClick={() =>
-                            toggle.mutate({
-                              scope: "page",
-                              key: page.key,
-                              enabled: !page.enabled,
-                            })
-                          }
-                          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${
-                            page.enabled
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                              : "border-slate-200 bg-slate-50 text-slate-400"
-                          }`}
-                        >
-                          {page.enabled ? (
-                            <Check size={13} aria-hidden="true" />
-                          ) : (
-                            <Minus size={13} aria-hidden="true" />
-                          )}
-                          {page.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
             </div>
           )}
         </section>
@@ -253,14 +176,4 @@ function FactoryCard({
   );
 }
 
-function StateBadge({ state }: { state: "all" | "none" | "partial" }) {
-  const label = state === "all" ? "مفعّلة" : state === "none" ? "موقوفة" : "جزئية";
-  const tone =
-    state === "all"
-      ? "bg-emerald-100 text-emerald-800"
-      : state === "none"
-        ? "bg-slate-100 text-slate-500"
-        : "bg-amber-100 text-amber-800";
 
-  return <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${tone}`}>{label}</span>;
-}

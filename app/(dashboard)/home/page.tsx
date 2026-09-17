@@ -15,6 +15,7 @@ import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
 import { useAdvances } from "@/hooks/useAdvances";
 import { usePenalties } from "@/hooks/usePenalties";
 import { useBonuses } from "@/hooks/useBonuses";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { Employee } from "@/types/employee";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
@@ -25,6 +26,8 @@ import apiClient from "@/lib/api-client";
 import { DataDrilldownModalLazy as DataDrilldownModal } from "@/components/DataDrilldownModalLazy";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
 import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
+import SupervisionCenter from "@/components/admin/SupervisionCenter";
+import { useFactoryScopeStore } from "@/stores/factory-scope-store";
 
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   ssr: false,
@@ -150,7 +153,7 @@ interface BonusDisplay {
 
 type ModalType = "present" | "absent" | "late" | "overtime" | null;
 
-export default function DashboardPage() {
+export function DashboardPage() {
   const {
     kpis,
     isLoading: isDashboardLoading,
@@ -168,6 +171,15 @@ export default function DashboardPage() {
   const userPermissions = useAuthStore((state) => state.user?.permissions);
   const canViewFinancialRecords = userPermissions?.includes("manage_users") ?? false;
   const router = useRouter();
+
+  // Entitlement gates: never fire payroll queries the user has no pages for —
+  // otherwise every dashboard load spams 403s for HR-only admins.
+  const { data: entitlements } = useEntitlements();
+  const hasEntitlementPage = (key: string) =>
+    entitlements?.enabledPages?.includes(key) ?? false;
+  const canPayrollReports = hasEntitlementPage("payroll.reports");
+  const canPayrollDiscounts = hasEntitlementPage("payroll.discounts");
+  const canPayrollRewards = hasEntitlementPage("payroll.rewards");
   
   const { data: deptsData, clearSupervisor } = useDepartments();
 
@@ -274,7 +286,7 @@ export default function DashboardPage() {
   }, []);
 
   // إجمالي المقبوص = صافي الرواتب المستحقة للشهر الحالي (active فقط — يطابق صفحة الرواتب)
-  const { data: payrollReport } = usePayrollReport(monthKey);
+  const { data: payrollReport } = usePayrollReport(monthKey, canPayrollReports);
 
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(
@@ -291,13 +303,17 @@ export default function DashboardPage() {
 
   // Deferred queries — only fire when dashboard KPIs have loaded (below-the-fold data)
   const isSecondaryReady = !isDashboardLoading && mounted;
-  const { data: advances = [] } = useAdvances(undefined, undefined, isSecondaryReady && canViewFinancialRecords);
+  const { data: advances = [] } = useAdvances(
+    undefined,
+    undefined,
+    isSecondaryReady && canViewFinancialRecords && canPayrollDiscounts,
+  );
   const { data: penaltiesData = [] } = usePenalties({
-    enabled: isSecondaryReady && canViewFinancialRecords,
+    enabled: isSecondaryReady && canViewFinancialRecords && canPayrollDiscounts,
   });
   const { data: bonusesData = [] } = useBonuses({
     period: monthKey,
-    enabled: isSecondaryReady && canViewFinancialRecords,
+    enabled: isSecondaryReady && canViewFinancialRecords && canPayrollRewards,
   });
 
   const employeeListMemo = useMemo<Employee[]>(() => {
@@ -1227,4 +1243,22 @@ export default function DashboardPage() {
       )}
     </>
   );
+}
+
+/**
+ * The overseer's home is the supervision centre: factory cards to drill into.
+ * A factory admin still gets the ordinary dashboard. The decision keys off the
+ * factory scope — once inside a factory (amber banner), the dashboard renders.
+ */
+export default function HomePage() {
+  const roles = useAuthStore((state) => state.user?.roles);
+  const role = useAuthStore((state) => state.user?.role);
+  const isSuperAdmin = roles?.includes("superadmin") || role === "superadmin";
+  const factoryId = useFactoryScopeStore((state) => state.factoryId);
+
+  if (isSuperAdmin && !factoryId) {
+    return <SupervisionCenter />;
+  }
+
+  return <DashboardPage />;
 }

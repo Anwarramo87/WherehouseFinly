@@ -4,8 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import type { EntitlementsResponse } from "@/lib/entitlements";
 import { QUERY_STALE_TIME } from "@/lib/query-cache";
+import { useAuthStore } from "@/stores/auth-store";
 
-export const entitlementsQueryKey = ["entitlements", "me"] as const;
+// Scoped by user id: without it, logging in as a different account reuses
+// the previous user's menu until the cache expires — one admin seeing
+// another admin's pages.
+export const entitlementsQueryKey = (userId?: string | null) =>
+  ["entitlements", "me", userId ?? "none"] as const;
 
 /**
  * The modules and pages this factory holds.
@@ -16,8 +21,9 @@ export const entitlementsQueryKey = ["entitlements", "me"] as const;
  * the nav shows.
  */
 export function useEntitlements() {
+  const userId = useAuthStore((s) => s.user?.id ?? s.user?._id ?? null);
   return useQuery<EntitlementsResponse>({
-    queryKey: entitlementsQueryKey,
+    queryKey: entitlementsQueryKey(userId),
     queryFn: async () => {
       const response = await apiClient.get("/entitlements/me");
       return response.data as EntitlementsResponse;

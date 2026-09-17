@@ -53,6 +53,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, string[]> = {
   "/inventory": ["view_inventory"],
   "/Transportation": ["view_employees"],
   "/importData": ["run_imports"],
+  "/files": ["run_imports"],
   "/settings": ["manage_users"], // Admin-only settings
   "/payroll": ["view_payroll"],
   "/finances": ["view_payroll"],

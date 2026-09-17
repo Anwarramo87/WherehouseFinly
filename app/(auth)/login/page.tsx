@@ -6,7 +6,9 @@ import { User, Lock, Loader2, AlertCircle, Eye, EyeOff, Shield, Tag } from "luci
 import apiClient from "@/lib/api-client";
 import axios from "axios";
 import { resetAuthVerificationCache, verifyAuthSession } from "@/lib/auth-verify";
+import { purgePersistedQueryCache } from "@/lib/query-client-config";
 import { useAuthStore } from "@/stores/auth-store";
+import { useQueryClient } from "@tanstack/react-query";
 import { clearAuthAccessToken, setAuthAccessToken } from "@/lib/auth-session";
 import { resolveApiUrl } from "@/lib/api-url";
 
@@ -34,6 +36,7 @@ const safeNavigate = (router: ReturnType<typeof useRouter>, path: string) => {
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const setUser = useAuthStore((state) => state.setUser);
   const setStatus = useAuthStore((state) => state.setStatus);
   const authStatus = useAuthStore((state) => state.status);
@@ -140,6 +143,14 @@ export default function LoginPage() {
         : null;
       setUser(mergedUser as { name?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] } | null);
       resetAuthVerificationCache();
+      // A different account may have used this browser before — drop every
+      // cached row so the new session can never render the previous user's
+      // employees, salaries or menus from stale cache.
+      try {
+        purgePersistedQueryCache(queryClient);
+      } catch {
+        // non-fatal: worst case React Query refetches on mount
+      }
 
       setStatus("authenticated");
       safeNavigate(router, "/home");

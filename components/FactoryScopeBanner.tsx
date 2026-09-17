@@ -1,7 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, X, ShieldCheck } from "lucide-react";
 import { useFactoryScopeStore } from "@/stores/factory-scope-store";
 
 /**
@@ -13,6 +14,7 @@ import { useFactoryScopeStore } from "@/stores/factory-scope-store";
  * deliberately always dismissible.
  */
 export default function FactoryScopeBanner() {
+  const router = useRouter();
   const factoryId = useFactoryScopeStore((state) => state.factoryId);
   const factoryName = useFactoryScopeStore((state) => state.factoryName);
   const leave = useFactoryScopeStore((state) => state.leave);
@@ -25,6 +27,9 @@ export default function FactoryScopeBanner() {
     // Every cached query was fetched under the old factory's scope. Keeping any
     // of it would show one factory's rows under another's name.
     queryClient.clear();
+    // The overseer returns to the supervision centre. The daily pages they
+    // were on are now un-scoped and hidden behind the centre anyway.
+    router.push('/home');
   };
 
   return (

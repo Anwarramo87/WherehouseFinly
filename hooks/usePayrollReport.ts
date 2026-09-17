@@ -21,10 +21,10 @@ const convertToDecimalString = (value: number | string | { $numberDecimal: strin
   return "0"; // Fallback
 };
 
-export const usePayrollReport = (month: string) => {
+export const usePayrollReport = (month: string, enabled = true) => {
   return useQuery<PayrollReportResponse>({
     queryKey: ["payroll", "report", month],
-    enabled: MONTH_REGEX.test(month),
+    enabled: MONTH_REGEX.test(month) && enabled,
     queryFn: async () => {
       const response = await apiClient.get(`/payroll/report/${month}`);
       const payload = response.data;

@@ -125,7 +125,109 @@ export function useToggleEntitlement(tenantId: string | null) {
           queryKey: superAdminKeys.entitlements(tenantId),
         });
       }
-      void queryClient.invalidateQueries({ queryKey: entitlementsQueryKey });
+      // Prefix-invalidate every ["entitlements", ...] key: a factory change
+      // reshapes all its admins' inherited views, whatever user scope they sit
+      // under after the per-user key change.
+      void queryClient.invalidateQueries({ queryKey: ["entitlements"] });
+      toast.success(input.enabled ? "تم التفعيل" : "تم الإيقاف");
+    },
+    onError: () => {
+      toast.error("تعذّر حفظ التغيير");
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-admin entitlements (this admin's own pages within the factory grant).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const superAdminUserKeys = {
+  userEntitlements: (tenantId: string, userId: string) =>
+    ["super-admin", "user-entitlements", tenantId, userId] as const,
+};
+
+/**
+ * The catalogue annotated through ONE admin's own grant. A missing per-user row
+ * falls back to the whole factory grant, so factories that never per-configure
+ * keep working exactly as before.
+ */
+export function useFactoryUserEntitlements(
+  tenantId: string | null,
+  userId: string | null,
+) {
+  return useQuery<FactoryEntitlements>({
+    queryKey: superAdminUserKeys.userEntitlements(tenantId ?? "none", userId ?? "none"),
+    enabled: Boolean(tenantId && userId),
+    queryFn: async () =>
+      (
+        await apiClient.get(
+          `/admin/tenants/${tenantId}/users/${userId}/entitlements`,
+        )
+      ).data as FactoryEntitlements,
+  });
+}
+
+/**
+ * Toggles one module or one page for ONE admin account — never for their
+ * whole factory. Same whole-page-list PUT strategy as the factory-level
+ * toggle, so the backend sees one consistent replacement instead of many
+ * drifting single-flips.
+ */
+export function useToggleUserEntitlement(
+  tenantId: string | null,
+  userId: string | null,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      scope: "module" | "page";
+      key: string;
+      enabled: boolean;
+    }) => {
+      let data = queryClient.getQueryData<FactoryEntitlements>(
+        superAdminUserKeys.userEntitlements(tenantId ?? "none", userId ?? "none"),
+      );
+
+      if (!data) {
+        data = (
+          await apiClient.get(
+            `/admin/tenants/${tenantId}/users/${userId}/entitlements`,
+          )
+        ).data as FactoryEntitlements;
+      }
+
+      const currentSet = enabledKeysFromModules(data);
+
+      if (input.scope === "module") {
+        const mod = data.modules.find((m) => m.key === input.key);
+        if (mod) {
+          for (const page of mod.pages) {
+            if (input.enabled) currentSet.add(page.key);
+            else currentSet.delete(page.key);
+          }
+        }
+      } else {
+        if (input.enabled) currentSet.add(input.key);
+        else currentSet.delete(input.key);
+      }
+
+      const response = await apiClient.put(
+        `/admin/tenants/${tenantId}/users/${userId}/entitlements`,
+        { pageKeys: [...currentSet] },
+      );
+      return response.data as FactoryEntitlements;
+    },
+    onSuccess: (_data, input) => {
+      if (tenantId && userId) {
+        void queryClient.invalidateQueries({
+          queryKey: superAdminUserKeys.userEntitlements(tenantId, userId),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: superAdminKeys.factories });
+      // Same prefix invalidation: the edited admin's own /me view (and any
+      // other cached scope) must refetch immediately so the green state shows.
+      void queryClient.invalidateQueries({ queryKey: ["entitlements"] });
       toast.success(input.enabled ? "تم التفعيل" : "تم الإيقاف");
     },
     onError: () => {

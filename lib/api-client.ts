@@ -1,6 +1,7 @@
 import axios from "axios";
 import { clearAuthAccessToken, clearAuthSession, getAuthAccessToken } from "@/lib/auth-session";
 import { resetAuthVerificationCache } from "@/lib/auth-verify";
+import { clearAllQueryCaches } from "@/lib/query-client-config";
 import { useAuthStore } from "@/stores/auth-store";
 import { resolveApiUrl } from "@/lib/api-url";
 import { getActiveFactoryId } from "@/stores/factory-scope-store";
@@ -146,6 +147,10 @@ const forceLogout = () => {
   clearAuthSession();
   useAuthStore.getState().clear();
   resetAuthVerificationCache();
+  // Wipe query caches too: without this, an expired session keeps serving
+  // the previous user's rows (employees, entitlements) to whoever logs in
+  // next until staleTime expires — the "admin still sees employees" ghost.
+  clearAllQueryCaches();
 
   const now = Date.now();
   if (
@@ -172,12 +177,19 @@ apiClient.interceptors.response.use(
     const requestPathname = getRequestPathname(error?.config?.url);
     const originalConfig = error?.config;
 
-    // فقط عند 401 وخارج نقاط المصادقة وبدون retry سابق
+    // فقط عند 401 وخارج نقاط المصادقة وبدون retry سابق.
+    // تخطَّي الـrefresh تماماً عندما نعرف أننا مسجّلون خروج: لا كوكيز أصلاً،
+    // فالـrefresh سيفشل حتماً — وهذا ما كان يصنع عاصفة me/refresh 401 بعد كل
+    // تسجيل خروج. الحالة "unknown" (أول تحميل) تمرّ بشكل طبيعي لأن الجلسة
+    // قد تكون حيّة بكوكيز فقط.
+    const authStatus =
+      typeof window !== "undefined" ? useAuthStore.getState().status : "unknown";
     if (
       status === 401 &&
       typeof window !== "undefined" &&
       !isAuthEndpoint(requestPathname) &&
-      !originalConfig?._retry
+      !originalConfig?._retry &&
+      authStatus !== "unauthenticated"
     ) {
       // Single-flight refresh: كل الـ 401s تنتظر نفس الـ refresh
       let refreshSucceeded = false;

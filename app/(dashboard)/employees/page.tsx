@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEmployees, getErrorMessage, filterEmployeesByOptions } from "@/hooks/useEmployees";
 import { useSalaries } from "@/hooks/useSalaries";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import useDepartments from "@/hooks/useDepartments";
 import { toast } from "react-hot-toast";
 import type { Employee } from "@/types/employee";
@@ -134,7 +135,10 @@ export default function EmployeesPage() {
     [allEmployeesForId],
   );
   const refetchAllEmployees = refetch;
-  const { data: salaries = [], refetch: refetchSalaries } = useSalaries();
+  // Salary mirror is payroll data — don't fire it for admins without the page.
+  const { data: entitlements } = useEntitlements();
+  const canViewSalaries = entitlements?.enabledPages?.includes("payroll.settings") ?? false;
+  const { data: salaries = [], refetch: refetchSalaries } = useSalaries(canViewSalaries);
 
   const salaryMap = useMemo(() => {
     const m = new Map<string, Salary>();
