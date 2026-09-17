@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/http/api";
 import { queryKeys } from "@/lib/query-keys";
+import { useAuthStore } from "@/stores/auth-store";
+import { useFactoryScopeStore } from "@/stores/factory-scope-store";
 
 interface Department {
   id: string;
@@ -19,9 +21,16 @@ interface DepartmentsResponse {
 export const useDepartments = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
+  // tenantId arrives via /auth/me (now includes tenantId from toPublicAuthUser).
+  // It scopes the React Query key per factory so an admin can never be served
+  // another factory's cached departments after switching accounts on one browser.
+  // The super admin drilling into a factory is additionally keyed by factory scope.
+  const authTenantId = useAuthStore((s) => s.user?.tenantId ?? null);
+  const factoryId = useFactoryScopeStore((s) => s.factoryId);
+  const scopeKey = factoryId ?? authTenantId ?? "no-tenant";
 
   const listQuery = useQuery({
-    queryKey: queryKeys.departments.all,
+    queryKey: [...queryKeys.departments.all, scopeKey],
     queryFn: async () => {
       const data = await api.get<DepartmentsResponse | Department[]>("/departments");
       // normalize shape

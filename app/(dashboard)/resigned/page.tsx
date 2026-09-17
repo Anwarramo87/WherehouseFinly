@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Loader2, UserMinus, BadgeInfo, ChevronLeft, Scissors, Download, UserCheck, DollarSign, Building2, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Lock } from "lucide-react";
 import { useResignedEmployees } from "@/hooks/useEmployees";
+import useDepartments from "@/hooks/useDepartments";
 import { useQueryClient } from "@tanstack/react-query";
 import ResignedEmployeesList from "@/components/ResignedEmployeesList";
 import RehireEmployeeModal from "@/components/RehireEmployeeModal";
@@ -165,14 +166,19 @@ export default function ResignedEmployeesPage() {
     };
   }, [resignedOrTerminated]);
 
-  // Get unique departments
+  // الأقسام الحقيقية المسجلة في النظام (نفس مصدر صفحة الموظفين)
+  // وليست النصوص الحرة المحفوظة على سجلات الموظفين القدامى — لتجنب ظهور أقسام وهمية/مكررة
+  const { data: departmentsData } = useDepartments();
   const departments = useMemo(() => {
+    const names = (departmentsData?.departments ?? []).map((d) => d.name).filter(Boolean);
+    if (names.length > 0) return Array.from(new Set(names)).sort();
+    // fallback: اشتقاق من الموظفين فقط إذا لم تصل قائمة الأقسام بعد
     const depts = new Set<string>();
     resignedOrTerminated.forEach(emp => {
       if (emp.department) depts.add(emp.department);
     });
     return Array.from(depts).sort();
-  }, [resignedOrTerminated]);
+  }, [departmentsData, resignedOrTerminated]);
 
   // Pagination
   const paginatedEmployees = useMemo(() => {

@@ -29,3 +29,9 @@
 [proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
 [proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
 [proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed | cause: NotSupportedError: expect header not supported
+[proxy] POST http://localhost:5003/api/v1/auth/logout failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed

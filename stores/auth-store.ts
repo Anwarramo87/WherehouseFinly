@@ -15,6 +15,7 @@ export type AuthUser = {
   permissions?: string[];
   roleId?: string;
   email?: string;
+  tenantId?: string | null;
 };
 
 type AuthStatus = "unknown" | "authenticated" | "unauthenticated";

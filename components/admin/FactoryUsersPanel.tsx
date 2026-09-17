@@ -73,6 +73,7 @@ export default function FactoryUsersPanel({
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [entitlementsUserId, setEntitlementsUserId] = useState<string | null>(null);
+  const [showEmployees, setShowEmployees] = useState(false);
   const [form, setForm] = useState({ username: "", email: "", password: "", roleId: "" });
 
   const { data: userEntitlements } = useFactoryUserEntitlements(tenantId, entitlementsUserId);
@@ -116,7 +117,18 @@ export default function FactoryUsersPanel({
   const canSubmit =
     form.username.trim().length > 0 && form.password.length >= 8 && form.roleId.length > 0;
 
-  const activeCount = users.filter((u) => u.status === "active").length;
+  // Rank-and-file employees each hold a login account (payslips, self-service),
+  // but this panel manages the factory's *admins* — employee accounts stay
+  // hidden unless explicitly revealed, so a 500-worker factory doesn't bury
+  // the 2 people who actually run it.
+  const isEmployeeAccount = (user: FactoryUser) => {
+    const role = (user.role?.name ?? "").trim().toLowerCase();
+    return role === "employee" || role === "staff";
+  };
+  const employeeCount = users.filter(isEmployeeAccount).length;
+  const visibleUsers = showEmployees ? users : users.filter((u) => !isEmployeeAccount(u));
+
+  const activeCount = visibleUsers.filter((u) => u.status === "active").length;
   const selectedUser = entitlementsUserId ? users.find((u) => u.id === entitlementsUserId) : null;
 
   return (
@@ -132,8 +144,20 @@ export default function FactoryUsersPanel({
               <h3 className="flex items-center gap-2 text-[15px] font-black text-[#263544]">
                 حسابات الدخول
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                  {users.length} حساب
+                  {visibleUsers.length} حساب
                 </span>
+                {employeeCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEmployees((v) => !v)}
+                    className="rounded-full bg-[#C89355]/15 px-2 py-0.5 text-[11px] font-bold text-[#263544] ring-1 ring-[#C89355]/30 hover:bg-[#C89355]/25"
+                    title={showEmployees ? "إخفاء حسابات الموظفين" : "إظهار حسابات الموظفين"}
+                  >
+                    {showEmployees
+                      ? `إخفاء الموظفين (${employeeCount})`
+                      : `+ ${employeeCount} موظف مخفي`}
+                  </button>
+                )}
               </h3>
               <p className="mt-0.5 max-w-[42ch] text-xs leading-5 text-slate-500">
                 من يستطيع الدخول إلى <span className="font-bold text-[#263544]">{factoryName}</span>
@@ -254,7 +278,7 @@ export default function FactoryUsersPanel({
           </div>
         )}
 
-        {!isLoading && users.length === 0 && (
+        {!isLoading && visibleUsers.length === 0 && (
           <div className="px-6 py-10 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <Search size={20} aria-hidden="true" />
@@ -266,7 +290,7 @@ export default function FactoryUsersPanel({
           </div>
         )}
 
-        {users.length > 0 && (
+        {visibleUsers.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -279,7 +303,7 @@ export default function FactoryUsersPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((user) => {
+                {visibleUsers.map((user) => {
                   const isSelected = entitlementsUserId === user.id;
                   return (
                     <tr
