@@ -35,3 +35,26 @@
 [proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
 [proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
 [proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: This operation was aborted
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: This operation was aborted
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: This operation was aborted
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
