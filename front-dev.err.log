@@ -1,0 +1,31 @@
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[browser] The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[proxy] POST http://localhost:5003/api/v1/auth/refresh failed: This operation was aborted
+[browser] The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed | cause: NotSupportedError: expect header not supported

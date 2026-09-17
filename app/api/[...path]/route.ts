@@ -20,6 +20,11 @@ const HOP_BY_HOP = new Set([
   "connection",
   "content-encoding",
   "content-length",
+  // Undici (Node fetch) throws `NotSupportedError: expect header not
+  // supported` when the browser/.NET client sends `Expect: 100-continue` on
+  // POSTs with a body. A proxy must consume it, never forward it — every such
+  // request otherwise dies here as a 502 before reaching the backend.
+  "expect",
   "host",
   "keep-alive",
   "proxy-authenticate",
@@ -139,7 +144,23 @@ async function handler(request: NextRequest) {
   // No fallback switching — mixing backends causes 401s because each has its
   // own JWT secret and Redis refresh-token store.
   // If you want to use the deployed backend, change NEXT_PUBLIC_API_URL in .env.local.
-  const targetUrl = PRIMARY_BACKEND_URL + apiPath + qs;
+  //
+  // Exception: /health* is excluded from the backend's global /api prefix
+  // (main.ts) but still carries the default URI version, so the live route is
+  // /v1/health — NOT /api/health (404) and NOT /api/v1/health (404).
+  // Only the exact /health subtree takes this branch; everything else keeps
+  // the versioned base exactly as before.
+  const isUnversionedHealth = apiPath === "/health" || apiPath.startsWith("/health/");
+  let backendOrigin = "";
+  try {
+    backendOrigin = new URL(PRIMARY_BACKEND_URL).origin;
+  } catch {
+    backendOrigin = "";
+  }
+  const targetUrl =
+    (isUnversionedHealth && backendOrigin
+      ? backendOrigin + "/v1" + apiPath
+      : PRIMARY_BACKEND_URL + apiPath) + qs;
 
   try {
     const upstream = await fetchWithTimeout(targetUrl);

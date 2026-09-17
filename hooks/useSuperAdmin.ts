@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { EntitlementModule } from "@/lib/entitlements";
-import { entitlementsQueryKey } from "@/hooks/useEntitlements";
 
 export interface FactorySummary {
   id: string;
@@ -19,6 +18,15 @@ export interface FactorySummary {
   modules: Array<{ key: string; label: string; state: "all" | "none" | "partial" }>;
   entitlementsUpdatedAt: string | null;
   entitlementsUpdatedBy: string | null;
+  subscription?: SubscriptionView | null;
+}
+
+export interface SubscriptionView {
+  plan: string;
+  startsAt: string;
+  endsAt: string;
+  status: "active" | "expired" | "none";
+  daysLeft: number;
 }
 
 export interface FactoryEntitlements {
@@ -30,6 +38,7 @@ export interface FactoryEntitlements {
 export const superAdminKeys = {
   factories: ["super-admin", "factories"] as const,
   entitlements: (tenantId: string) => ["super-admin", "entitlements", tenantId] as const,
+  subscription: (tenantId: string) => ["super-admin", "subscription", tenantId] as const,
 };
 
 /** Every factory. Super-admin only — the API refuses anyone else. */
@@ -232,6 +241,58 @@ export function useToggleUserEntitlement(
     },
     onError: () => {
       toast.error("تعذّر حفظ التغيير");
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscription (time-boxed factory access: month / year, then modules close).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One factory's subscription window, or null when never set (legacy open). */
+export function useTenantSubscription(tenantId: string | null) {
+  return useQuery<SubscriptionView | null>({
+    queryKey: superAdminKeys.subscription(tenantId ?? "none"),
+    enabled: Boolean(tenantId),
+    queryFn: async () =>
+      (
+        await apiClient.get(`/admin/tenants/${tenantId}/subscription`)
+      ).data as SubscriptionView | null,
+  });
+}
+
+/**
+ * (Re)starts a factory's subscription. months=1 → شهر, months=12 → سنة from
+ * now. Expiry empties the factory's pages, so sidebar modules vanish and the
+ * API 403s — only the always-available routes survive.
+ */
+export function useSetSubscription(tenantId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { months?: number; endsAt?: string }) => {
+      const response = await apiClient.put(
+        `/admin/tenants/${tenantId}/subscription`,
+        input,
+      );
+      return response.data as SubscriptionView;
+    },
+    onSuccess: (data) => {
+      if (tenantId) {
+        void queryClient.invalidateQueries({
+          queryKey: superAdminKeys.subscription(tenantId),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: superAdminKeys.factories });
+      void queryClient.invalidateQueries({ queryKey: ["entitlements"] });
+      toast.success(
+        data.status === "expired"
+          ? "انتهى الاشتراك — أُغلقت وحدات المصنع"
+          : "تم حفظ الاشتراك",
+      );
+    },
+    onError: () => {
+      toast.error("تعذّر حفظ الاشتراك");
     },
   });
 }
