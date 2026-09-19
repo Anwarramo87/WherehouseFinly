@@ -72,3 +72,9 @@
 [proxy] GET http://localhost:5003/api/v1/auth/roles failed: fetch failed
 [proxy] GET http://localhost:5003/api/v1/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription failed: fetch failed
 [proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
