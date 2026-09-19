@@ -8,6 +8,7 @@ import {
   CalendarPlus,
   ChevronLeft,
   ExternalLink,
+  Infinity as InfinityIcon,
   Layers,
   Loader2,
   Lock,
@@ -254,6 +255,7 @@ function HeroStat({
 function planLabel(plan: string) {
   if (plan === "monthly") return "شهري";
   if (plan === "yearly") return "سنوي";
+  if (plan === "lifetime") return "دائم";
   return "مخصص";
 }
 
@@ -434,6 +436,12 @@ function FactorySubscriptionPanel({
                 pending={setSubscription.isPending}
                 onClick={() => setSubscription.mutate({ months: 12 })}
               />
+              <PlanButton
+                icon={<InfinityIcon size={14} aria-hidden="true" />}
+                label="اشتراك دائم"
+                pending={setSubscription.isPending}
+                onClick={() => setSubscription.mutate({ permanent: true })}
+              />
             </span>
           </div>
         )}
@@ -458,6 +466,14 @@ function SubscriptionChip({ subscription }: { subscription: SubscriptionView }) 
       <span className="inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white">
         <Lock size={11} aria-hidden="true" />
         منتهٍ — المصنع مغلق
+      </span>
+    );
+  }
+  if (subscription.permanent) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#C89355] px-2 py-0.5 text-[11px] font-bold text-[#263544]">
+        <InfinityIcon size={11} aria-hidden="true" />
+        اشتراك دائم
       </span>
     );
   }
@@ -513,7 +529,8 @@ function SubscriptionState({
   onStop: () => void;
 }) {
   const expired = subscription.status === "expired";
-  const windowDays = planWindowDays(subscription.plan);
+  const permanent = subscription.permanent;
+  const windowDays = permanent ? null : planWindowDays(subscription.plan);
   const share =
     windowDays && !expired
       ? Math.max(0, Math.min(100, Math.round((subscription.daysLeft / windowDays) * 100)))
@@ -526,10 +543,11 @@ function SubscriptionState({
       }`}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-sm font-black text-[#263544]">
-          {planLabel(subscription.plan)} · ينتهي {formatEndDate(subscription.endsAt)}
+        <span className="inline-flex items-center gap-1.5 text-sm font-black text-[#263544]">
+          {permanent && <InfinityIcon size={15} className="text-[#C89355]" aria-hidden="true" />}
+          {permanent ? "اشتراك دائم — لا ينتهي" : `${planLabel(subscription.plan)} · ينتهي ${formatEndDate(subscription.endsAt)}`}
         </span>
-        {!expired && (
+        {!expired && !permanent && (
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200 tabular-nums">
             متبقي {subscription.daysLeft} يوم
           </span>
@@ -542,24 +560,28 @@ function SubscriptionState({
         )}
 
         <span className="mr-auto flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onMonth}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
-          >
-            <CalendarPlus size={13} aria-hidden="true" />
-            تجديد شهر
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onYear}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
-          >
-            <CalendarCheck size={13} aria-hidden="true" />
-            تجديد سنة
-          </button>
+          {!permanent && (
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={onMonth}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
+              >
+                <CalendarPlus size={13} aria-hidden="true" />
+                تجديد شهر
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={onYear}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
+              >
+                <CalendarCheck size={13} aria-hidden="true" />
+                تجديد سنة
+              </button>
+            </>
+          )}
           {!expired && (
             <button
               type="button"
@@ -568,7 +590,7 @@ function SubscriptionState({
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-700 shadow-sm transition-all hover:bg-rose-50 disabled:opacity-50"
             >
               <Power size={13} aria-hidden="true" />
-              إيقاف الآن
+              {permanent ? "إنهاء الاشتراك الدائم" : "إيقاف الآن"}
             </button>
           )}
         </span>
@@ -695,15 +717,25 @@ function FactoryCard({
                 ? isSelected
                   ? "bg-rose-400/15 text-rose-200"
                   : "bg-rose-50 text-rose-700"
-                : isSelected
-                  ? "bg-white/10 text-slate-100"
-                  : "bg-sky-50 text-sky-800"
+                : factory.subscription.permanent
+                  ? isSelected
+                    ? "bg-[#C89355]/20 text-[#C89355]"
+                    : "bg-amber-50 text-amber-800"
+                  : isSelected
+                    ? "bg-white/10 text-slate-100"
+                    : "bg-sky-50 text-sky-800"
             }`}
           >
-            <CalendarClock size={12} aria-hidden="true" className="shrink-0" />
+            {factory.subscription.permanent ? (
+              <InfinityIcon size={12} aria-hidden="true" className="shrink-0" />
+            ) : (
+              <CalendarClock size={12} aria-hidden="true" className="shrink-0" />
+            )}
             {expired
               ? "اشتراك منتهٍ — المصنع مغلق"
-              : `اشتراك حتى ${formatEndDate(factory.subscription.endsAt)}`}
+              : factory.subscription.permanent
+                ? "اشتراك دائم"
+                : `اشتراك حتى ${formatEndDate(factory.subscription.endsAt)}`}
           </div>
         )}
       </div>

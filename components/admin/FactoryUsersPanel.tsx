@@ -14,6 +14,7 @@ import {
   Mail,
   Crown,
   UserCheck,
+  CalendarClock,
   Sparkles,
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
@@ -23,6 +24,7 @@ import {
 } from "@/hooks/useSuperAdmin";
 
 import { UserEntitlementsPanel } from "./UserEntitlementsPanel";
+import { UserSubscriptionPanel } from "./UserSubscriptionPanel";
 
 interface FactoryUser {
   id: string;
@@ -73,6 +75,7 @@ export default function FactoryUsersPanel({
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [entitlementsUserId, setEntitlementsUserId] = useState<string | null>(null);
+  const [subscriptionUserId, setSubscriptionUserId] = useState<string | null>(null);
   const [showEmployees, setShowEmployees] = useState(false);
   const [form, setForm] = useState({ username: "", email: "", password: "", roleId: "" });
 
@@ -130,6 +133,19 @@ export default function FactoryUsersPanel({
 
   const activeCount = visibleUsers.filter((u) => u.status === "active").length;
   const selectedUser = entitlementsUserId ? users.find((u) => u.id === entitlementsUserId) : null;
+  const selectedSubUser = subscriptionUserId
+    ? users.find((u) => u.id === subscriptionUserId)
+    : null;
+
+  // Only one inline drawer at a time: opening one side closes the other.
+  const toggleEntitlements = (id: string) => {
+    setSubscriptionUserId(null);
+    setEntitlementsUserId((current) => (current === id ? null : id));
+  };
+  const toggleSubscription = (id: string) => {
+    setEntitlementsUserId(null);
+    setSubscriptionUserId((current) => (current === id ? null : id));
+  };
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -283,10 +299,30 @@ export default function FactoryUsersPanel({
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <Search size={20} aria-hidden="true" />
             </div>
-            <p className="text-sm font-bold text-slate-600">لا توجد حسابات لهذا المصنع بعد</p>
-            <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
-              أنشئ أول حساب ليتمكن فريقه من تسجيل الدخول وإدارة بياناته.
-            </p>
+            {users.length > 0 ? (
+              <>
+                <p className="text-sm font-bold text-slate-600">
+                  كل حسابات هذا المصنع ({users.length}) لموظفين
+                </p>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                  حسابات الموظفين مخفية افتراضياً لأنها للإدارة الذاتية فقط.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowEmployees(true)}
+                  className="mt-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10"
+                >
+                  عرض حسابات الموظفين ({employeeCount})
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-slate-600">لا توجد حسابات لهذا المصنع بعد</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                  أنشئ أول حساب ليتمكن فريقه من تسجيل الدخول وإدارة بياناته.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -298,13 +334,14 @@ export default function FactoryUsersPanel({
                   <th className="whitespace-nowrap px-4 py-3 text-right sm:px-6">المستخدم</th>
                   <th className="whitespace-nowrap px-3 py-3 text-right">الدور</th>
                   <th className="whitespace-nowrap px-3 py-3 text-center">الحالة</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-center">الصلاحيات</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-center">الإعدادات</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right sm:px-6">آخر دخول</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visibleUsers.map((user) => {
-                  const isSelected = entitlementsUserId === user.id;
+                  const isSelected =
+                    entitlementsUserId === user.id || subscriptionUserId === user.id;
                   return (
                     <tr
                       key={user.id}
@@ -368,24 +405,36 @@ export default function FactoryUsersPanel({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEntitlementsUserId((current) =>
-                              current === user.id ? null : user.id
-                            )
-                          }
-                          aria-expanded={isSelected}
-                          aria-label={`صلاحيات ${user.username}`}
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm ring-1 transition-all ${
-                            isSelected
-                              ? "bg-[#263544] text-white ring-[#263544] shadow"
-                              : "bg-white text-[#263544] ring-slate-200 hover:border-[#C89355]/40 hover:bg-[#C89355]/10 hover:text-[#263544] hover:ring-[#C89355]/30"
-                          }`}
-                        >
-                          <KeyRound size={13} aria-hidden="true" />
-                          {isSelected ? "مفتوحة" : "الصلاحيات"}
-                        </button>
+                        <span className="inline-flex flex-wrap items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleEntitlements(user.id)}
+                            aria-expanded={entitlementsUserId === user.id}
+                            aria-label={`صلاحيات ${user.username}`}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm ring-1 transition-all ${
+                              entitlementsUserId === user.id
+                                ? "bg-[#263544] text-white ring-[#263544] shadow"
+                                : "bg-white text-[#263544] ring-slate-200 hover:border-[#C89355]/40 hover:bg-[#C89355]/10 hover:text-[#263544] hover:ring-[#C89355]/30"
+                            }`}
+                          >
+                            <KeyRound size={13} aria-hidden="true" />
+                            {entitlementsUserId === user.id ? "مفتوحة" : "الصلاحيات"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleSubscription(user.id)}
+                            aria-expanded={subscriptionUserId === user.id}
+                            aria-label={`اشتراك ${user.username}`}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm ring-1 transition-all ${
+                              subscriptionUserId === user.id
+                                ? "bg-[#263544] text-white ring-[#263544] shadow"
+                                : "bg-white text-[#263544] ring-slate-200 hover:border-[#C89355]/40 hover:bg-[#C89355]/10 hover:text-[#263544] hover:ring-[#C89355]/30"
+                            }`}
+                          >
+                            <CalendarClock size={13} aria-hidden="true" />
+                            {subscriptionUserId === user.id ? "مفتوحة" : "الاشتراك"}
+                          </button>
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right sm:px-6">
                         <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -422,6 +471,30 @@ export default function FactoryUsersPanel({
             tenantId={tenantId}
             userId={entitlementsUserId}
             onClose={() => setEntitlementsUserId(null)}
+          />
+        </div>
+      )}
+
+      {/* ── per-admin subscription drawer ── */}
+      {subscriptionUserId && (
+        <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/80 to-white px-4 py-4 sm:px-6">
+          {selectedSubUser && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#263544]/10 bg-white px-3 py-1 font-bold text-[#263544] shadow-sm">
+                <CalendarClock size={12} className="text-[#C89355]" aria-hidden="true" />
+                اشتراك: {selectedSubUser.username}
+                {selectedSubUser.email && (
+                  <span className="font-normal text-slate-400">· {selectedSubUser.email}</span>
+                )}
+              </span>
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+            </div>
+          )}
+          <UserSubscriptionPanel
+            tenantId={tenantId}
+            userId={subscriptionUserId}
+            onClose={() => setSubscriptionUserId(null)}
           />
         </div>
       )}

@@ -27,6 +27,8 @@ export interface SubscriptionView {
   endsAt: string;
   status: "active" | "expired" | "none";
   daysLeft: number;
+  /** Lifetime rows (plan=lifetime) — shown as "دائم", never counted down. */
+  permanent: boolean;
 }
 
 export interface FactoryEntitlements {
@@ -153,6 +155,8 @@ export function useToggleEntitlement(tenantId: string | null) {
 export const superAdminUserKeys = {
   userEntitlements: (tenantId: string, userId: string) =>
     ["super-admin", "user-entitlements", tenantId, userId] as const,
+  userSubscription: (tenantId: string, userId: string) =>
+    ["super-admin", "user-subscription", tenantId, userId] as const,
 };
 
 /**
@@ -263,14 +267,15 @@ export function useTenantSubscription(tenantId: string | null) {
 
 /**
  * (Re)starts a factory's subscription. months=1 → شهر, months=12 → سنة from
- * now. Expiry empties the factory's pages, so sidebar modules vanish and the
- * API 403s — only the always-available routes survive.
+ * now, permanent=true → دائم (never expires). Expiry empties the factory's
+ * pages, so sidebar modules vanish and the API 403s — only the
+ * always-available routes survive.
  */
 export function useSetSubscription(tenantId: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { months?: number; endsAt?: string }) => {
+    mutationFn: async (input: { months?: number; endsAt?: string; permanent?: boolean }) => {
       const response = await apiClient.put(
         `/admin/tenants/${tenantId}/subscription`,
         input,
@@ -289,6 +294,64 @@ export function useSetSubscription(tenantId: string | null) {
         data.status === "expired"
           ? "انتهى الاشتراك — أُغلقت وحدات المصنع"
           : "تم حفظ الاشتراك",
+      );
+    },
+    onError: () => {
+      toast.error("تعذّر حفظ الاشتراك");
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-ADMIN subscription (one account's own time-boxed window). The roster
+// endpoint does not embed a subscription, so the panel fetches it lazily with
+// the key below and caches it per (tenantId, userId).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ONE admin account's personal subscription window — null when the account has
+ * no row (it simply inherits whatever access its factory grants). Kept apart
+ * from the tenant subscription: an admin can own a tighter or wider window
+ * than their factory.
+ */
+export function useAdminSubscription(tenantId: string | null, userId: string | null) {
+  return useQuery<SubscriptionView | null>({
+    queryKey: superAdminUserKeys.userSubscription(tenantId ?? "none", userId ?? "none"),
+    enabled: Boolean(tenantId && userId),
+    queryFn: async () =>
+      (
+        await apiClient.get(`/admin/tenants/${tenantId}/users/${userId}/subscription`)
+      ).data as SubscriptionView | null,
+  });
+}
+
+/**
+ * (Re)sets ONE admin's subscription window: months from now, an absolute
+ * endsAt, or permanent (never expires). Passing endsAt = now stops the account
+ * immediately — same semantics as the factory-level subscription.
+ */
+export function useSetAdminSubscription(tenantId: string | null, userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { months?: number; endsAt?: string; permanent?: boolean }) => {
+      const response = await apiClient.put(
+        `/admin/tenants/${tenantId}/users/${userId}/subscription`,
+        input,
+      );
+      return response.data as SubscriptionView;
+    },
+    onSuccess: (data) => {
+      if (tenantId && userId) {
+        void queryClient.invalidateQueries({
+          queryKey: superAdminUserKeys.userSubscription(tenantId, userId),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: superAdminKeys.factories });
+      toast.success(
+        data.status === "expired"
+          ? "انتهى اشتراك الحساب — أُغلقت وحداته"
+          : "تم حفظ اشتراك الحساب",
       );
     },
     onError: () => {

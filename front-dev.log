@@ -1320,3 +1320,68 @@
  GET /api/notifications/unread-count 502 in 106ms (next.js: 58ms, application-code: 47ms)
  GET /api/notifications/unread-count 502 in 16ms (next.js: 5ms, application-code: 11ms)
  GET /api/notifications/unread-count 502 in 23ms (next.js: 11ms, application-code: 12ms)
+
+> factory@0.1.0 dev
+> next dev --turbo
+
+▲ Next.js 16.3.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://100.127.255.253:3000
+- Environments: .env.local
+✓ Ready in 5.1s
+✓ Running next.config.ts took 355ms
+- Experiments (use with caution):
+  · optimizePackageImports
+  · webVitalsAttribution
+
+ GET /login?unauthorized=true&status=401 200 in 505ms (next.js: 207ms, proxy.ts: 19ms, application-code: 279ms)
+ GET /admin/factories 200 in 821ms (next.js: 180ms, proxy.ts: 510ms, application-code: 130ms)
+ GET /api/entitlements/me 200 in 1383ms (next.js: 1277ms, application-code: 105ms)
+ GET /api/assistant/status 200 in 1054ms (next.js: 920ms, application-code: 135ms)
+ GET /api/entitlements/me 200 in 38ms (next.js: 15ms, application-code: 23ms)
+ GET /api/assistant/status 200 in 27ms (next.js: 6ms, application-code: 22ms)
+ GET /api/notifications/unread-count 200 in 1217ms (next.js: 934ms, application-code: 283ms)
+ GET /api/auth/me 200 in 1724ms (next.js: 1277ms, application-code: 446ms)
+ GET /api/admin/tenants 200 in 3.5s (next.js: 919ms, application-code: 2.6s)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 200 in 463ms (next.js: 33ms, application-code: 431ms)
+ GET /api/auth/roles 200 in 479ms (next.js: 23ms, application-code: 456ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/users 200 in 482ms (next.js: 16ms, application-code: 466ms)
+ PUT /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 200 in 2.9s (next.js: 8ms, application-code: 2.9s)
+ GET /api/entitlements/me 200 in 50ms (next.js: 22ms, application-code: 28ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 200 in 200ms (next.js: 16ms, application-code: 184ms)
+ GET /api/admin/tenants 200 in 1826ms (next.js: 35ms, application-code: 1791ms)
+ GET /api/notifications/unread-count 200 in 187ms (next.js: 10ms, application-code: 177ms)
+ POST /api/auth/refresh 502 in 35ms (next.js: 18ms, application-code: 18ms)
+✓ Compiled in 1102ms
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 502 in 183ms (next.js: 32ms, application-code: 151ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/users 502 in 193ms (next.js: 69ms, application-code: 124ms)
+ GET /api/auth/roles 502 in 202ms (next.js: 101ms, application-code: 101ms)
+ GET /api/admin/tenants 502 in 211ms (next.js: 128ms, application-code: 83ms)
+ GET /admin/factories 200 in 320ms (next.js: 70ms, proxy.ts: 67ms, application-code: 183ms)
+✓ Compiled in 542ms
+ GET /admin/factories 200 in 210ms (next.js: 69ms, proxy.ts: 27ms, application-code: 114ms)
+✓ Compiled in 412ms
+ GET /admin/factories 200 in 197ms (next.js: 49ms, proxy.ts: 30ms, application-code: 118ms)
+✓ Compiled in 396ms
+ GET /admin/factories 200 in 134ms (next.js: 24ms, proxy.ts: 15ms, application-code: 95ms)
+✓ Compiled in 407ms
+ GET /admin/factories 200 in 160ms (next.js: 43ms, proxy.ts: 20ms, application-code: 97ms)
+✓ Compiled in 381ms
+ GET /admin/factories 200 in 145ms (next.js: 38ms, proxy.ts: 15ms, application-code: 92ms)
+✓ Compiled in 410ms
+ GET /admin/factories 200 in 177ms (next.js: 45ms, proxy.ts: 24ms, application-code: 108ms)
+✓ Compiled in 588ms
+ GET /admin/factories 200 in 182ms (next.js: 54ms, proxy.ts: 25ms, application-code: 103ms)
+✓ Compiled in 570ms
+ GET /admin/factories 200 in 167ms (next.js: 47ms, proxy.ts: 23ms, application-code: 97ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/users 502 in 205ms (next.js: 93ms, application-code: 112ms)
+ GET /api/admin/tenants 502 in 213ms (next.js: 130ms, application-code: 82ms)
+ GET /api/auth/roles 502 in 214ms (next.js: 162ms, application-code: 52ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 502 in 222ms (next.js: 186ms, application-code: 35ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/users 502 in 33ms (next.js: 12ms, application-code: 21ms)
+ GET /api/admin/tenants 502 in 33ms (next.js: 6ms, application-code: 27ms)
+ GET /api/auth/roles 502 in 24ms (next.js: 4ms, application-code: 20ms)
+ GET /api/admin/tenants/9c112187-fafc-4262-a586-fe17eeb49bc4/subscription 502 in 26ms (next.js: 10ms, application-code: 16ms)
+ GET /login 200 in 212ms (next.js: 31ms, proxy.ts: 4ms, application-code: 178ms)
+ GET /api/auth/me 502 in 159ms (next.js: 19ms, application-code: 140ms)
+ GET /login?unauthorized=true&status=401 200 in 190ms (next.js: 43ms, proxy.ts: 19ms, application-code: 128ms)
