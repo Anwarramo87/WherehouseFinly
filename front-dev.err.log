@@ -78,3 +78,161 @@
 [proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
 [proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
 [proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] POST http://localhost:5003/api/v1/auth/login failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/assistant/status failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/assistant/status failed: fetch failed
+[browser] [assistant] hidden: /assistant/status failed — 502 (components/assistant/AssistantLauncher.tsx:38:17)
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/auth/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/assistant/status failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/assistant/status failed: fetch failed
+[browser] [assistant] hidden: /assistant/status failed — 502 (components/assistant/AssistantLauncher.tsx:38:17)
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/entitlements/me failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/notifications/unread-count failed: fetch failed
+[proxy] GET http://localhost:5003/api/v1/admin/tenants failed: fetch failed
+⚠ Fast Refresh had to perform a full reload when ./app/(dashboard)/admin/factories/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./app/(dashboard)/admin/factories/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+⨯ The directory at "C:\Users\BootCamp\Downloads\anwarfinly\front\Factory\.next\dev" was deleted.
+
+Deleting this directory while Next.js is running can lead to undefined behavior. Restarting the server to recover...
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/shared/lib/router/router.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"
+⨯ ./app/(dashboard)/admin/factories/page.tsx
+Error: Module not found: Can't resolve './page.tsx'
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/(dashboard)/admin/factories/page.tsx
+Error: Module not found: Can't resolve './page.tsx'
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/(dashboard)/admin/factories/page.tsx
+Error: Module not found: Can't resolve './page.tsx'
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/(dashboard)/admin/factories/page.tsx
+Error: Module not found: Can't resolve './page.tsx'
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/admin/factories/page"
+    at ignore-listed frames {
+  page: '/admin/factories'
+}
+[browser] Uncaught Error: The default export is not a React Component in "/admin/factories/page"

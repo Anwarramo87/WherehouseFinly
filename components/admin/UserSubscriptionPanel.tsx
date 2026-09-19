@@ -37,7 +37,7 @@ function formatDate(iso: string | null | undefined) {
   }
 }
 
-const presets = [
+const monthPresets = [
   { label: "شهر", months: 1 },
   { label: "3 أشهر", months: 3 },
   { label: "6 أشهر", months: 6 },
@@ -56,6 +56,7 @@ export function UserSubscriptionPanel({
   const { data: subscription, isLoading } = useAdminSubscription(tenantId, userId);
   const setSubscription = useSetAdminSubscription(tenantId, userId);
   const [customMonths, setCustomMonths] = useState("");
+  const [customDays, setCustomDays] = useState("");
 
   const pending = setSubscription.isPending;
   const expired = subscription?.status === "expired";
@@ -65,11 +66,20 @@ export function UserSubscriptionPanel({
   const makePermanent = () => setSubscription.mutate({ permanent: true });
   const stopNow = () => setSubscription.mutate({ endsAt: new Date().toISOString() });
 
-  const applyCustom = () => {
+  const applyCustomMonths = () => {
     const n = Math.floor(Number(customMonths));
     if (!Number.isFinite(n) || n < 1) return;
     applyMonths(n);
     setCustomMonths("");
+  };
+
+  const applyCustomDays = () => {
+    const n = Math.floor(Number(customDays));
+    if (!Number.isFinite(n) || n < 1) return;
+    const endsAt = new Date();
+    endsAt.setDate(endsAt.getDate() + n);
+    setSubscription.mutate({ endsAt: endsAt.toISOString() });
+    setCustomDays("");
   };
 
   return (
@@ -119,8 +129,11 @@ export function UserSubscriptionPanel({
               <PlanActions
                 pending={pending}
                 customMonths={customMonths}
+                customDays={customDays}
                 onCustomMonths={setCustomMonths}
-                onApplyCustom={applyCustom}
+                onCustomDays={setCustomDays}
+                onApplyCustomMonths={applyCustomMonths}
+                onApplyCustomDays={applyCustomDays}
                 onMonths={applyMonths}
                 onPermanent={makePermanent}
               />
@@ -179,8 +192,11 @@ export function UserSubscriptionPanel({
                 <PlanActions
                   pending={pending}
                   customMonths={customMonths}
+                  customDays={customDays}
                   onCustomMonths={setCustomMonths}
-                  onApplyCustom={applyCustom}
+                  onCustomDays={setCustomDays}
+                  onApplyCustomMonths={applyCustomMonths}
+                  onApplyCustomDays={applyCustomDays}
                   onMonths={applyMonths}
                   onPermanent={makePermanent}
                 />
@@ -205,73 +221,105 @@ export function UserSubscriptionPanel({
   );
 }
 
-/** Preset durations + permanent + a custom months input, one shared action row. */
+/** Preset durations + permanent + custom months + custom days. */
 function PlanActions({
   pending,
   customMonths,
+  customDays,
   onCustomMonths,
-  onApplyCustom,
+  onCustomDays,
+  onApplyCustomMonths,
+  onApplyCustomDays,
   onMonths,
   onPermanent,
 }: {
   pending: boolean;
   customMonths: string;
-  onCustomMonths: (value: string) => void;
-  onApplyCustom: () => void;
+  customDays: string;
+  onCustomMonths: (v: string) => void;
+  onCustomDays: (v: string) => void;
+  onApplyCustomMonths: () => void;
+  onApplyCustomDays: () => void;
   onMonths: (months: number) => void;
   onPermanent: () => void;
 }) {
-  const customValue = Number(customMonths);
-  const customValid = Number.isFinite(customValue) && Math.floor(customValue) >= 1;
+  const monthsValid = Number.isFinite(Number(customMonths)) && Math.floor(Number(customMonths)) >= 1;
+  const daysValid = Number.isFinite(Number(customDays)) && Math.floor(Number(customDays)) >= 1;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {presets.map((preset) => (
+    <div className="flex flex-col gap-3">
+      {/* preset months */}
+      <div className="flex flex-wrap items-center gap-2">
+        {monthPresets.map((preset) => (
+          <button
+            key={preset.months}
+            type="button"
+            disabled={pending}
+            onClick={() => onMonths(preset.months)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#263544] px-3.5 py-2 text-xs font-bold text-[#C89355] shadow-sm transition-all hover:bg-[#1e2a36] hover:shadow disabled:opacity-50 disabled:shadow-none"
+          >
+            {preset.months === 1 ? (
+              <CalendarPlus size={13} aria-hidden="true" />
+            ) : (
+              <CalendarCheck size={13} aria-hidden="true" />
+            )}
+            {preset.label}
+          </button>
+        ))}
         <button
-          key={preset.months}
           type="button"
           disabled={pending}
-          onClick={() => onMonths(preset.months)}
+          onClick={onPermanent}
           className="inline-flex items-center gap-1.5 rounded-xl bg-[#263544] px-3.5 py-2 text-xs font-bold text-[#C89355] shadow-sm transition-all hover:bg-[#1e2a36] hover:shadow disabled:opacity-50 disabled:shadow-none"
         >
-          {preset.months === 1 ? (
-            <CalendarPlus size={13} aria-hidden="true" />
-          ) : (
-            <CalendarCheck size={13} aria-hidden="true" />
-          )}
-          {preset.label}
+          <InfinityIcon size={13} aria-hidden="true" />
+          دائم
         </button>
-      ))}
+      </div>
 
-      <button
-        type="button"
-        disabled={pending}
-        onClick={onPermanent}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-[#263544] px-3.5 py-2 text-xs font-bold text-[#C89355] shadow-sm transition-all hover:bg-[#1e2a36] hover:shadow disabled:opacity-50 disabled:shadow-none"
-      >
-        <InfinityIcon size={13} aria-hidden="true" />
-        دائم
-      </button>
-
-      <span className="flex items-center gap-2">
+      {/* custom months */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold text-slate-500 w-20 shrink-0">أشهر مخصصة</span>
         <input
           type="number"
           min={1}
           value={customMonths}
-          onChange={(event) => onCustomMonths(event.target.value)}
-          placeholder="أشهر مخصصة"
+          onChange={(e) => onCustomMonths(e.target.value)}
+          placeholder="عدد الأشهر"
           aria-label="عدد الأشهر المخصصة"
           className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 outline-none transition-all focus:border-[#263544] focus:ring-2 focus:ring-[#263544]/10"
         />
         <button
           type="button"
-          disabled={pending || !customValid}
-          onClick={onApplyCustom}
+          disabled={pending || !monthsValid}
+          onClick={onApplyCustomMonths}
           className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
         >
           تطبيق
         </button>
-      </span>
+      </div>
+
+      {/* custom days */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold text-slate-500 w-20 shrink-0">أيام مخصصة</span>
+        <input
+          type="number"
+          min={1}
+          value={customDays}
+          onChange={(e) => onCustomDays(e.target.value)}
+          placeholder="عدد الأيام"
+          aria-label="عدد الأيام المخصصة"
+          className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 outline-none transition-all focus:border-[#263544] focus:ring-2 focus:ring-[#263544]/10"
+        />
+        <button
+          type="button"
+          disabled={pending || !daysValid}
+          onClick={onApplyCustomDays}
+          className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10 disabled:opacity-50"
+        >
+          تطبيق
+        </button>
+      </div>
     </div>
   );
 }

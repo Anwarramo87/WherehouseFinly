@@ -334,7 +334,7 @@ export function useSetAdminSubscription(tenantId: string | null, userId: string 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { months?: number; endsAt?: string; permanent?: boolean }) => {
+    mutationFn: async (input: { months?: number; days?: number; endsAt?: string; permanent?: boolean }) => {
       const response = await apiClient.put(
         `/admin/tenants/${tenantId}/users/${userId}/subscription`,
         input,

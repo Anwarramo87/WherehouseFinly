@@ -17,6 +17,7 @@ import {
   CalendarClock,
   Sparkles,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/auth-store";
 import apiClient from "@/lib/api-client";
 import {
   useFactoryUserEntitlements,
@@ -117,8 +118,19 @@ export default function FactoryUsersPanel({
     },
   });
 
+  const currentRoles = useAuthStore((s) => s.user?.roles);
+  const currentRole = useAuthStore((s) => s.user?.role);
+  const isSuperAdmin =
+    currentRoles?.includes("superadmin") || currentRole === "superadmin";
+
   const canSubmit =
     form.username.trim().length > 0 && form.password.length >= 8 && form.roleId.length > 0;
+
+  /** حسابات السوبر أدمن لا تخضع للاشتراك — وصول مفتوح دائماً */
+  const isSuperAdminAccount = (user: FactoryUser) => {
+    const r = (user.role?.name ?? "").trim().toLowerCase();
+    return r === "superadmin" || r === "super_admin" || r === "super admin";
+  };
 
   // Rank-and-file employees each hold a login account (payslips, self-service),
   // but this panel manages the factory's *admins* — employee accounts stay
@@ -420,20 +432,22 @@ export default function FactoryUsersPanel({
                             <KeyRound size={13} aria-hidden="true" />
                             {entitlementsUserId === user.id ? "مفتوحة" : "الصلاحيات"}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleSubscription(user.id)}
-                            aria-expanded={subscriptionUserId === user.id}
-                            aria-label={`اشتراك ${user.username}`}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm ring-1 transition-all ${
-                              subscriptionUserId === user.id
-                                ? "bg-[#263544] text-white ring-[#263544] shadow"
-                                : "bg-white text-[#263544] ring-slate-200 hover:border-[#C89355]/40 hover:bg-[#C89355]/10 hover:text-[#263544] hover:ring-[#C89355]/30"
-                            }`}
-                          >
-                            <CalendarClock size={13} aria-hidden="true" />
-                            {subscriptionUserId === user.id ? "مفتوحة" : "الاشتراك"}
-                          </button>
+                          {!isSuperAdminAccount(user) && (
+                            <button
+                              type="button"
+                              onClick={() => toggleSubscription(user.id)}
+                              aria-expanded={subscriptionUserId === user.id}
+                              aria-label={`اشتراك ${user.username}`}
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm ring-1 transition-all ${
+                                subscriptionUserId === user.id
+                                  ? "bg-[#263544] text-white ring-[#263544] shadow"
+                                  : "bg-white text-[#263544] ring-slate-200 hover:border-[#C89355]/40 hover:bg-[#C89355]/10 hover:text-[#263544] hover:ring-[#C89355]/30"
+                              }`}
+                            >
+                              <CalendarClock size={13} aria-hidden="true" />
+                              {subscriptionUserId === user.id ? "مفتوحة" : "الاشتراك"}
+                            </button>
+                          )}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right sm:px-6">
