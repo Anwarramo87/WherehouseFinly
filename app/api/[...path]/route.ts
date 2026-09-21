@@ -14,6 +14,7 @@ const LONG_RUNNING_PREFIXES = [
   '/payroll',
   '/transportation/calculate-deductions',
   '/imports',
+  '/purchasing/invoices',
 ];
 const LONG_RUNNING_TIMEOUT_MS = 180_000;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
