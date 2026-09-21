@@ -53,7 +53,9 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
     queryFn: async () => {
       if (!periodStart || !periodEnd) return [];
 
-      const params = { periodStart, periodEnd };
+      // limit مرتفع: تعديلات الشهر تُجلب كاملةً — الباك كان يُرجع 50 فقط
+      // افتراضياً فيُسقط تعديلات ويظهر التقرير قيماً قديمة لبعض الموظفين.
+      const params = { periodStart, periodEnd, limit: 500 };
       const res = await apiClient.get("/payroll/inputs", { params });
 
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
@@ -111,6 +113,9 @@ export const usePayrollInputs = (periodStart?: string, periodEnd?: string) => {
       await queryClient.invalidateQueries({ queryKey: ["payrollInputs"] });
       // Also invalidate deductions so the UI picks up fresh EARLY_LEAVE_MINUTES
       await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"] });
+      // تقارير الرواتب (backend run) تُعاد قراءتها لتتقارب مع التعديل —
+      // صفحة التقارير تُرقّع الصفوف المعدّلة يدوياً محلياً لحين إعادة حساب المسير.
+      await queryClient.invalidateQueries({ queryKey: ["payroll"] });
       router.refresh();
       toast.success("تم الحفظ بنجاح!");
     },

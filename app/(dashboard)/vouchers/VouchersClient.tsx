@@ -20,6 +20,7 @@ import useSalaries from "@/hooks/useSalaries";
 import { useBonuses } from "@/hooks/useBonuses";
 import { useAdvances } from "@/hooks/useAdvances";
 import { usePayrollInputs } from "@/hooks/usePayrollInputs";
+import type { PayrollInputRecord } from "@/hooks/usePayrollInputs";
 import usePayrollReceipts from "@/hooks/usePayrollReceipts";
 import { useAttendanceDeductions } from "@/hooks/useAttendanceDeductions";
 import { useAttendance } from "@/hooks/useAttendance";
@@ -130,6 +131,39 @@ const getFallbackPresentDaysForDeparture = (employee: Employee, month: string) =
   const terminationDate = new Date(`${employee.terminationDate.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(terminationDate.getTime())) return 0;
   return Math.min(terminationDate.getDate(), STANDARD_WORK_DAYS);
+};
+
+type ManualOverrides = {
+  absenceDays?: number | null;
+  unpaidLeaveDays?: number | null;
+  sickLeaveDays?: number | null;
+  paidLeaveDays?: number | null;
+  lateMinutes?: number | null;
+  earlyLeaveMinutes?: number | null;
+  overtimeMinutes?: number | null;
+  weekendOvertimeMinutes?: number | null;
+  unpaidHours?: number | null;
+};
+
+/**
+ * تعديلات زر "تعديل المجاميع" كـ source of truth لحساب القسيمة —
+ * نفس القاعدة في جدول الدوام والتقرير النهائي ودورة الرواتب بالباك إند.
+ */
+const buildVoucherManualOverrides = (
+  manualInput: PayrollInputRecord | undefined,
+): ManualOverrides | undefined => {
+  if (!manualInput) return undefined;
+  return {
+    absenceDays: manualInput.absenceDays ?? null,
+    unpaidLeaveDays: manualInput.unpaidLeaveDays ?? 0,
+    sickLeaveDays: manualInput.sickLeaveDays ?? 0,
+    paidLeaveDays: (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0),
+    lateMinutes: manualInput.lateMinutes ?? 0,
+    earlyLeaveMinutes: manualInput.earlyLeaveMinutes ?? 0,
+    overtimeMinutes: manualInput.overtimeRegularMinutes ?? 0,
+    weekendOvertimeMinutes: manualInput.overtimeWeekendDays ?? 0,
+    unpaidHours: manualInput.unpaidHours ?? 0,
+  };
 };
 
 export default function VouchersClient() {
@@ -341,10 +375,12 @@ export default function VouchersClient() {
       const hasManualInput = Boolean(manualInput);
       const leaveData = employeeLeavesMap.get(employeeId);
 
-      const lateMinutes =
-        hasManualInput && (manualInput?.lateMinutes ?? 0) > 0
-          ? (manualInput?.lateMinutes ?? 0)
-          : (autoInput?.delayMinutes ?? 0);
+      // التعديل اليدوي (زر تعديل المجاميع في جدول الدوام) يُقدَّم دائماً على
+      // الآلي — حتى لو صفراً أو أقل من الآلي (نفس قاعدة جدول الدوام والتقرير
+      // النهائي ودورة الرواتب في الباك إند). الصفر هنا قرار صريح من المدير.
+      const lateMinutes = hasManualInput
+        ? (manualInput?.lateMinutes ?? autoInput?.delayMinutes ?? 0)
+        : (autoInput?.delayMinutes ?? 0);
 
       let actualWorkDays: number;
       if (hasManualInput && manualInput?.absenceDays !== undefined) {
@@ -358,27 +394,23 @@ export default function VouchersClient() {
         actualWorkDays = getFallbackPresentDaysForDeparture(employee, month);
       }
 
-      const sickLeaveDays = Math.max(
-        hasManualInput ? (manualInput?.sickLeaveDays ?? 0) : 0,
-        leaveData?.sickLeaveDays ?? 0,
-      );
-      const paidLeaveDays = Math.max(
-        hasManualInput
-          ? (manualInput?.adminLeaveDays ?? 0) + (manualInput?.deathLeaveDays ?? 0)
-          : 0,
-        leaveData?.paidLeaveDays ?? 0,
-      );
+      const sickLeaveDays = hasManualInput
+        ? (manualInput?.sickLeaveDays ?? leaveData?.sickLeaveDays ?? 0)
+        : (leaveData?.sickLeaveDays ?? 0);
+      const paidLeaveDays = hasManualInput
+        ? (manualInput?.adminLeaveDays ?? 0) + (manualInput?.deathLeaveDays ?? 0)
+        : (leaveData?.paidLeaveDays ?? 0);
       const effectivePaidLeaveDays = paidLeaveDays + sickLeaveDays * 0.5;
 
-      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
-      const totalOvertimeMinutes =
-        hasManualInput && (manualInput?.overtimeRegularMinutes ?? 0) > 0
-          ? (manualInput?.overtimeRegularMinutes ?? 0)
-          : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeWeekendMinutes =
-        hasManualInput && (manualInput?.overtimeWeekendDays ?? 0) > 0
-          ? (manualInput?.overtimeWeekendDays ?? 0)
-          : (autoInput?.overtimeWeekendDays ?? 0);
+      const earlyLeaveMinutes = hasManualInput
+        ? (manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0)
+        : (autoInput?.earlyLeaveMinutes ?? 0);
+      const totalOvertimeMinutes = hasManualInput
+        ? (manualInput?.overtimeRegularMinutes ?? autoInput?.overtimeMinutes ?? 0)
+        : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeWeekendMinutes = hasManualInput
+        ? (manualInput?.overtimeWeekendDays ?? autoInput?.overtimeWeekendDays ?? 0)
+        : (autoInput?.overtimeWeekendDays ?? 0);
 
       const rawEarned = calcEarnedSalaryHourly(
         calcGross,
@@ -392,6 +424,10 @@ export default function VouchersClient() {
         lateMinutes,
         earlyLeaveMinutes,
         totalOvertimeWeekendMinutes,
+        // أي تعديل يدوي في "تعديل المجاميع" ينعكس فوراً على راتب القسيمة —
+        // تُشتق أيام العمل المدفوعة من المجاميع اليدوية (غياب/بدون أجر/
+        // مرضية/مدفوعة) كما في جدول الدوام والتقرير النهائي.
+        buildVoucherManualOverrides(manualInput),
       );
       const earnedSalary = Math.max(0, rawEarned);
 

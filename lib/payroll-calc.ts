@@ -53,6 +53,9 @@ export const calcEarnedSalary = (
  * - sickRemainderMinutes → أجر بنصف المعدل (باقي يوم إجازة مرضية جزئية).
  * - أيام الإجازة الكاملة (sickLeaveDays/paidLeaveDays) تُضاف كأيام كاملة.
  * - overtimeWeekendDays = دقائق الجمعة الفعلية (من الباك إند) × 1.5×
+ * - manualOverrides: تعديلات زر "تعديل المجاميع" اليدوية — عند تمريرها
+ *   تُشتق أيام العمل المدفوعة من المجاميع اليدوية مباشرةً، فينعكس أي تعديل
+ *   (زيادة/إنقاص/تصفير) فوراً على الراتب المحسوب.
  */
 export const calcEarnedSalaryHourly = (
   grossSalary: number,
@@ -66,6 +69,17 @@ export const calcEarnedSalaryHourly = (
   lateMinutes = 0,
   earlyLeaveMinutes = 0,
   overtimeWeekendDays = 0,
+  manualOverrides?: {
+    absenceDays?: number | null;
+    unpaidLeaveDays?: number | null;
+    sickLeaveDays?: number | null;
+    paidLeaveDays?: number | null;
+    lateMinutes?: number | null;
+    earlyLeaveMinutes?: number | null;
+    overtimeMinutes?: number | null;
+    weekendOvertimeMinutes?: number | null;
+    unpaidHours?: number | null;
+  },
 ): number => {
   if (grossSalary <= 0) return 0;
   const effectiveWorkDays = workDaysInPeriod > 0 ? workDaysInPeriod : STANDARD_WORK_DAYS;
@@ -75,19 +89,46 @@ export const calcEarnedSalaryHourly = (
   const hourlyRate = dailyRate / effectiveHours;
   const minuteRate = hourlyRate / 60;
 
+  // التعديلات اليدوية تُقدَّم دائماً: أي قيمة عدّلها المدير في المودال هي
+  // مصدر الحقيقة لذلك البُعد، والبيانات الآلية تُستخدم فقط عند غياب التعديل.
+  const ov = manualOverrides;
+  const effSickDays = ov?.sickLeaveDays != null ? Math.max(0, ov.sickLeaveDays) : sickLeaveDays;
+  const effPaidDays = ov?.paidLeaveDays != null ? Math.max(0, ov.paidLeaveDays) : paidLeaveDays;
+  const effOvertime = ov?.overtimeMinutes != null ? Math.max(0, ov.overtimeMinutes) : overtimeMinutes;
+  const effWeekendOt =
+    ov?.weekendOvertimeMinutes != null ? Math.max(0, ov.weekendOvertimeMinutes) : overtimeWeekendDays;
+  const effLate = ov?.lateMinutes != null ? Math.max(0, ov.lateMinutes) : lateMinutes;
+  const effEarly =
+    ov?.earlyLeaveMinutes != null ? Math.max(0, ov.earlyLeaveMinutes) : earlyLeaveMinutes;
+
+  // أيام العمل المدفوعة: عند وجود تعديل يدوي تُشتق من المجاميع اليدوية
+  // (أيام العمل − غياب − بدون أجر − مرضية − مدفوعة) حتى ينعكس تعديل أيام
+  // الدوام/الغياب على الراتب، وإلا تُشتق من دقائق العمل الفعلية كالسابق.
+  let effectiveWorkedMinutes = workedMinutes;
+  if (ov != null) {
+    const absenceDays = Math.max(0, ov.absenceDays ?? 0);
+    const unpaidDays = Math.max(0, ov.unpaidLeaveDays ?? 0);
+    const unpaidMinutes = Math.max(0, ov.unpaidHours ?? 0) * 60;
+    const presentDays = Math.max(
+      0,
+      effectiveWorkDays - absenceDays - unpaidDays - effSickDays - effPaidDays,
+    );
+    effectiveWorkedMinutes = Math.max(0, presentDays * effectiveHours * 60 - unpaidMinutes);
+  }
+
   // Cap workedMinutes at effectiveWorkDays × hoursPerDay × 60 to prevent overpayment
   const maxContractualMinutes = effectiveWorkDays * effectiveHours * 60;
-  const cappedWorkedMinutes = Math.min(workedMinutes, maxContractualMinutes);
+  const cappedWorkedMinutes = Math.min(effectiveWorkedMinutes, maxContractualMinutes);
 
   const workedPay = minuteRate * cappedWorkedMinutes;
   const sickRemainderPay = minuteRate * sickRemainderMinutes * 0.5;
-  const fullSickPay = dailyRate * sickLeaveDays * 0.5;
-  const paidLeavePay = dailyRate * paidLeaveDays;
-  const overtimePay = minuteRate * overtimeMinutes * 1.5;
+  const fullSickPay = dailyRate * effSickDays * 0.5;
+  const paidLeavePay = dailyRate * effPaidDays;
+  const overtimePay = minuteRate * effOvertime * 1.5;
   // overtimeWeekendDays = دقائق الجمعة الفعلية × 1.5
-  const weekendOvertimePay = minuteRate * overtimeWeekendDays * WEEKEND_MULTIPLIER;
-  const lateDeduction = minuteRate * lateMinutes * 1.5;
-  const earlyLeaveDeduction = minuteRate * earlyLeaveMinutes;
+  const weekendOvertimePay = minuteRate * effWeekendOt * WEEKEND_MULTIPLIER;
+  const lateDeduction = minuteRate * effLate * 1.5;
+  const earlyLeaveDeduction = minuteRate * effEarly;
 
   return Math.max(
     0,

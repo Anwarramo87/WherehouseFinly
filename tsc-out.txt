@@ -1,0 +1,12 @@
+app/(dashboard)/salaries/discounts/page.tsx(213,30): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/discounts/page.tsx(213,64): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/discounts/page.tsx(305,33): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/discounts/page.tsx(309,106): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/discounts/page.tsx(342,116): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(185,28): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(186,28): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(291,30): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(291,57): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(377,33): error TS2552: Cannot find name 'formatNumberEn'. Did you mean 'formatNumber'?
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(381,106): error TS2304: Cannot find name 'formatNumberEn'.
+app/(dashboard)/salaries/rewards/RewardsClient.tsx(409,119): error TS2304: Cannot find name 'formatNumberEn'.

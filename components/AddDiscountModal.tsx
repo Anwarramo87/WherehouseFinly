@@ -68,6 +68,7 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
   });
 
   const currentType = useWatch({ control, name: "type" });
+  const watchedDate = useWatch({ control, name: "date" });
 
   useEffect(() => {
     if (initialData) {
@@ -252,13 +253,25 @@ export default function AddDiscountModal({ isOpen, onClose, onSave, isPending, e
             <div>
               <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">تاريخ الإجراء</label>
               <div className="relative group">
+                {/* منتقي التاريخ بنمط صفحة سجل الحضور والانصراف */}
                 <input
                   type="date"
                   {...register("date")}
-                  className={`w-full p-4 bg-[#1a2530] border rounded-2xl focus:ring-2 focus:ring-[#C89355]/20 focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 scheme-dark transition-all ${errors.date ? 'border-rose-500' : 'border-[#263544]'}`}
+                  dir="ltr"
+                  className={`w-full p-4 bg-[#1a2530] border-2 focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none text-white font-mono text-xl font-black text-center rounded-2xl cursor-pointer transition-all ${errors.date ? 'border-rose-500' : 'border-slate-200'}`}
                 />
-                <Calendar className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />
+                {/* <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-[#C89355]/70 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={22} /> */}
               </div>
+              {/* التاريخ المعروض — أرقام إنجليزية */}
+              <p className="mt-1.5 text-center font-mono text-[11px] font-black text-[#C89355]" dir="ltr">
+                {watchedDate
+                  ? new Date(watchedDate).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </p>
               {errors.date && <p className="text-rose-400 text-xs font-bold mt-1.5">{errors.date.message}</p>}
             </div>
 
