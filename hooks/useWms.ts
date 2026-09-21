@@ -56,6 +56,7 @@ const useInvalidateStock = () => {
     void qc.invalidateQueries({ queryKey: queryKeys.batches.all });
     void qc.invalidateQueries({ queryKey: queryKeys.expiry.all });
     void qc.invalidateQueries({ queryKey: queryKeys.wmsAnalytics.all });
+    void qc.invalidateQueries({ queryKey: queryKeys.locations.all });
   };
 };
 
