@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+import { ArrowRight, Building2, ChevronLeft, Loader2, Search, Users } from "lucide-react";
 import apiClient from "@/lib/api-client";
 
 interface RosterEmployee {
@@ -50,6 +50,29 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
   const employees = data?.groups.flatMap((g) => g.employees) ?? [];
   const pagination = data?.pagination;
 
+  // تجميع موظفي الصفحة الحالية حسب القسم/المعمل.
+  // ملاحظة: التجميع يتم على نتائج الصفحة الحالية فقط لأن الـ API مرقّم (50 لكل صفحة).
+  const deptGroups = useMemo(() => {
+    const map = new Map<string, RosterEmployee[]>();
+    for (const emp of employees) {
+      const key = (emp.department || "بدون قسم").trim() || "بدون قسم";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(emp);
+    }
+    return [...map.entries()].sort((a, b) => {
+      if (a[0] === "بدون قسم") return 1;
+      if (b[0] === "بدون قسم") return -1;
+      return a[0].localeCompare(b[0], "ar");
+    });
+  }, [employees]);
+
+  // القسم المفتوح حالياً — null يعني عرض شبكة المعامل (مقفلة)، اسم يعني عرض موظفي ذلك المعمل
+  const [openDept, setOpenDept] = useState<string | null>(null);
+  const openEmployees = useMemo(
+    () => deptGroups.find(([name]) => name === openDept)?.[1] ?? [],
+    [deptGroups, openDept],
+  );
+
   return (
     <div>
       <form
@@ -57,6 +80,7 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
         onSubmit={(event) => {
           event.preventDefault();
           setPage(1);
+          setOpenDept(null);
           setSubmitted(search.trim());
         }}
       >
@@ -102,40 +126,89 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
         </p>
       )}
 
-      {employees.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th className="px-4 py-2 text-right">الرقم</th>
-                <th className="px-4 py-2 text-right">الاسم</th>
-                <th className="px-4 py-2 text-right">القسم</th>
-                <th className="px-4 py-2 text-right">المسمى</th>
-                <th className="px-4 py-2 text-right">الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((employee) => (
-                <tr key={employee.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2 font-mono text-xs">{employee.employeeId}</td>
-                  <td className="px-4 py-2 font-bold text-[#263544]">{employee.name}</td>
-                  <td className="px-4 py-2 text-slate-600">{employee.department ?? "—"}</td>
-                  <td className="px-4 py-2 text-slate-600">{employee.jobTitle ?? "—"}</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-[11px] font-bold ${
-                        employee.status === "active"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {employee.status}
-                    </span>
-                  </td>
+      {employees.length > 0 && openDept === null && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {deptGroups.map(([deptName, emps]) => (
+            <button
+              key={deptName}
+              type="button"
+              onClick={() => setOpenDept(deptName)}
+              className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-sm transition-all hover:border-[#C89355]/60 hover:shadow-md active:scale-[0.99]"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#263544] text-[#C89355]">
+                  <Building2 size={20} aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-base font-black text-[#263544]">
+                    معمل {deptName}
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                    <Users size={13} className="text-[#C89355]" aria-hidden="true" />
+                    {emps.length} {emps.length === 1 ? "موظف" : "موظفين"}
+                  </span>
+                </span>
+              </span>
+              <ChevronLeft
+                size={18}
+                className="shrink-0 text-slate-300 transition-transform group-hover:-translate-x-0.5 group-hover:text-[#C89355]"
+                aria-hidden="true"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {employees.length > 0 && openDept !== null && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setOpenDept(null)}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:text-[#263544]"
+          >
+            <ArrowRight size={15} aria-hidden="true" />
+            عودة للمعامل
+          </button>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#263544] text-[#C89355]">
+              <Building2 size={18} aria-hidden="true" />
+            </span>
+            <h3 className="text-base font-black text-[#263544]">
+              معمل {openDept} · {openEmployees.length} {openEmployees.length === 1 ? "موظف" : "موظفين"}
+            </h3>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 text-right">الرقم</th>
+                  <th className="px-4 py-2 text-right">الاسم</th>
+                  <th className="px-4 py-2 text-right">المسمى</th>
+                  <th className="px-4 py-2 text-right">الحالة</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {openEmployees.map((employee) => (
+                  <tr key={employee.id} className="border-t border-slate-100">
+                    <td className="px-4 py-2 font-mono text-xs">{employee.employeeId}</td>
+                    <td className="px-4 py-2 font-bold text-[#263544]">{employee.name}</td>
+                    <td className="px-4 py-2 text-slate-600">{employee.jobTitle ?? "—"}</td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`rounded px-2 py-0.5 text-[11px] font-bold ${
+                          employee.status === "active"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {employee.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

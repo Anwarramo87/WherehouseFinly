@@ -27,8 +27,7 @@ import {
 
 // استيراد المكونات المنفصلة
 import FilterComponent from "@/components/Filter";
-import EmployeeAvatar from "@/components/EmployeeAvatar";
-import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
+import DeptGroup from "@/components/DeptGroup";
 
 const AddEmployeeModal = dynamic(() => import("@/components/AddEmployeeModal"), {
   loading: () => null,
@@ -172,6 +171,9 @@ export default function EmployeesPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("الكل");
+  // الأقسام المفتوحة في عرض المعامل — افتراضياً كلها مفتوحة
+  const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
+  const [expandInit, setExpandInit] = useState(false);
 
   const selectedEmployeeForModal = useMemo<ModalInitialEmployee | undefined>(() => {
     if (!selectedEmployee) return undefined;
@@ -235,6 +237,45 @@ export default function EmployeesPage() {
       return matchesSearch && matchesDept;
     });
   }, [visibleEmployees, searchTerm, selectedDept]);
+
+  // تجميع الموظفين حسب المعمل/القسم — كل معمل بطاقة قابلة للطي فيها موظفيها
+  const groupedByDept = useMemo(() => {
+    const groups = new Map<string, Employee[]>();
+    for (const emp of filteredEmployees) {
+      const key = (emp.department || "بدون قسم").trim() || "بدون قسم";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(emp);
+    }
+    return [...groups.entries()].sort((a, b) => {
+      if (a[0] === "بدون قسم") return 1;
+      if (b[0] === "بدون قسم") return -1;
+      return a[0].localeCompare(b[0], "ar");
+    });
+  }, [filteredEmployees]);
+
+  // افتح كل المعامل افتراضياً عند أول تحميل للبيانات
+  useEffect(() => {
+    if (!expandInit && groupedByDept.length > 0) {
+      setExpandedDepts(groupedByDept.map(([name]) => name));
+      setExpandInit(true);
+    }
+  }, [groupedByDept, expandInit]);
+
+  // عند اختيار قسم محدد من الفلتر افتحه تلقائياً
+  useEffect(() => {
+    if (selectedDept !== "الكل") {
+      setExpandedDepts((prev) => (prev.includes(selectedDept) ? prev : [...prev, selectedDept]));
+    }
+  }, [selectedDept]);
+
+  const toggleDept = (name: string) => {
+    setExpandedDepts((prev) =>
+      prev.includes(name) ? prev.filter((d) => d !== name) : [...prev, name],
+    );
+  };
+
+  const expandAll = () => setExpandedDepts(groupedByDept.map(([name]) => name));
+  const collapseAll = () => setExpandedDepts([]);
 
   const [suggestedEmployeeId, setSuggestedEmployeeId] = useState("EMP00001");
 
@@ -520,158 +561,28 @@ export default function EmployeesPage() {
           </div>
         </header>
 
-        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group">
-          <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover:border-[#C89355]/50 z-0" />
-          <div className="w-full overflow-x-auto custom-scrollbar relative z-10">
-            {isError && (
-              <div className="mx-5 mt-5 mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm font-bold flex items-center justify-between gap-4">
-                <span>{getErrorMessage(error, "فشل جلب قائمة الموظفين")}</span>
-                <button
-                  type="button"
-                  onClick={() => void refetch()}
-                  className="shrink-0 rounded-xl bg-rose-600 px-3 py-2 text-white text-xs font-black hover:bg-rose-700 transition-colors"
-                >
-                  إعادة المحاولة
-                </button>
-              </div>
-            )}
-            <table className="w-full text-right min-w-225">
-              <thead className="bg-white/40 border-b border-white/80">
-                <tr>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center w-20">
-                    الصورة
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center w-24">
-                    كود الموظف
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center ">
-                    الاسم
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">
-                    القسم / الوظيفة
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">
-                    الراتب الشهري
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">
-                    رقم الموبايل
-                  </th>
-                  <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">
-                    إجراءات
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/40">
-                {!mounted || isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="p-16 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="animate-spin text-[#C89355]" size={40} />
-                        <span className="font-black text-[#263544] animate-pulse">
-                          جاري تحميل قائمة الموظفين...
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredEmployees.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="p-16 text-center text-[#263544]/60 font-black text-lg"
-                    >
-                      لا يوجد بيانات مطابقة للبحث.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEmployees.map((emp) => {
-                    const row = emp as EmployeeRow;
-
-                    return (
-                      <tr
-                        key={emp.employeeId}
-                        className={`hover:bg-white/80 transition-all duration-300 group/row ${emp.status !== "active" ? "opacity-75 bg-rose-50/30" : ""}`}
-                      >
-                        <td className="p-4 text-center">
-                          <div className="flex justify-center">
-                            <EmployeeAvatar
-                              src={resolveEmployeePhotoSrc(emp)}
-                              name={emp.name}
-                              gender={emp.gender}
-                              employeeId={emp.employeeId}
-                              size={42}
-                              href={`/employees/${emp.employeeId}`}
-                            />
-                          </div>
-                        </td>
-                        <td className="p-4 text-center font-mono font-bold text-slate-500 text-sm">
-                          {emp.employeeId}
-                        </td>
-                        <td className="p-4 text-center">
-                          <Link
-                            href={`/employees/${emp.employeeId}`}
-                            className={`inline-flex items-center gap-1.5 font-black transition-all text-base group/link ${emp.status === "terminated" ? "text-rose-500" : "text-slate-800 hover:text-[#C89355]"}`}
-                            title="عرض بروفايل الموظف"
-                          >
-                            <span className="group-hover/link:underline underline-offset-4 decoration-2 decoration-[#C89355]/40">
-                              {emp.name}
-                            </span>
-                            {emp.status !== "active" && (
-                              <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${emp.status === "terminated" ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20"}`}
-                              >
-                                {emp.status === "terminated" ? "مقال" : "مستقيل"}
-                              </span>
-                            )}
-                          </Link>
-                        </td>
-                        <td className="p-4 text-center font-bold text-[#263544] text-sm">
-                          {emp.department} <span className="text-[#C89355] mx-1">/</span>{" "}
-                          {row.jobTitle || "موظف"}
-                        </td>
-                        <td className="p-4 text-center font-mono font-black text-[#263544] text-sm">
-                          {resolveDisplayedMonthlySalary(row, salaryMap).toLocaleString()}{" "}
-                          <span className="text-[10px] text-[#C89355] mr-1">ل.س</span>
-                        </td>
-                        <td className="p-4 text-center font-mono font-bold text-slate-600 text-sm dir-ltr">
-                          {emp.mobile || "—"}
-                        </td>
-                        <td className="p-4 text-center">
-                          <div className="flex justify-center gap-2 opacity-60 group-hover/row:opacity-100 transition-opacity">
-                            <Link
-                              href={`/employees/${emp.employeeId}`}
-                              className="text-[#1a2530] hover:bg-[#1a2530]/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-[#1a2530]/30"
-                              title="عرض بروفايل الموظف"
-                            >
-                              <Eye size={16} />
-                            </Link>
-
-                            <button
-                              onClick={() => handleEditClick(emp)}
-                              className="text-[#C89355] hover:bg-[#C89355]/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-[#C89355]/30"
-                              title="تعديل بيانات الموظف"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setEmployeeToFire(emp);
-                                setIsFireModalOpen(true);
-                              }}
-                              className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-xl transition-all duration-300 hover:scale-110 shadow-sm border border-transparent hover:border-rose-500/30"
-                              title="إنهاء خدمة موظف"
-                            >
-                              <UserMinus size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        {groupedByDept.length > 1 && (
+          <div className="flex items-center justify-end gap-2 mb-4">
+            <button type="button" onClick={expandAll} className="px-4 py-2 rounded-xl text-xs font-black bg-white/70 border border-white/80">فتح الكل</button>
+            <button type="button" onClick={collapseAll} className="px-4 py-2 rounded-xl text-xs font-black bg-white/70 border border-white/80">طي الكل</button>
           </div>
+        )}
+        <div className="flex flex-col gap-4">
+          {isError && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm font-bold flex items-center justify-between gap-4">
+              <span>{getErrorMessage(error, "فشل جلب قائمة الموظفين")}</span>
+              <button type="button" onClick={() => void refetch()} className="rounded-xl bg-rose-600 px-3 py-2 text-white text-xs font-black">إعادة المحاولة</button>
+            </div>
+          )}
+          {!mounted || isLoading ? (
+            <div className="bg-white/60 rounded-[2.5rem] border-2 border-white/90 p-16 text-center"><span className="font-black animate-pulse">جاري تحميل قائمة الموظفين...</span></div>
+          ) : groupedByDept.length === 0 ? (
+            <div className="bg-white/60 rounded-[2.5rem] border-2 border-white/90 p-16 text-center font-black">لا يوجد بيانات مطابقة للبحث.</div>
+          ) : (
+            groupedByDept.map(([deptName, emps]) => (
+              <DeptGroup key={deptName} name={deptName} emps={emps} open={expandedDepts.includes(deptName)} salaryMap={salaryMap} salaryOf={resolveDisplayedMonthlySalary} onToggle={() => toggleDept(deptName)} onEdit={handleEditClick} onFire={(e) => { setEmployeeToFire(e); setIsFireModalOpen(true); }} onBulk={() => { setBulkTerminateDept(deptName); setIsBulkTerminateModalOpen(true); }} />
+            ))
+          )}
         </div>
 
         {isModalOpen && (
