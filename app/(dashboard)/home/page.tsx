@@ -320,9 +320,22 @@ export function DashboardPage() {
     return Array.isArray(employees) ? employees : [];
   }, [employees]);
 
+  const clothingDeductions = useMemo(() => {
+    // "شراء ملابس" يُسجَّل في قاعدة البيانات كسلفة (advanceType: clothing)
+    // لكنه خصم لا سلفة — يُستخرج هنا ليُعرض ضمن الخصومات وليس ضمن السلف.
+    return advances.filter(
+      (advance) =>
+        advance.advanceType === "clothing" &&
+        (advance.issueDate || advance.createdAt || "").startsWith(monthKey) &&
+        !resignedIds.has(advance.employeeId),
+    );
+  }, [advances, monthKey, resignedIds]);
+
   const monthlyAdvances = useMemo<SalaryAdvance[]>(() => {
     return advances
       .filter((advance) => {
+        // السلف النقدية فقط: "شراء ملابس" خصم وليس سلفة
+        if (advance.advanceType === "clothing") return false;
         const advanceDate = advance.issueDate || advance.createdAt || "";
         return advanceDate.startsWith(monthKey) && !resignedIds.has(advance.employeeId);
       })
@@ -343,7 +356,7 @@ export function DashboardPage() {
           amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
           requestDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
           approvalDate: (advance.issueDate || advance.createdAt || "").slice(0, 10),
-          reason: "",
+          reason: advance.notes || "سلفة نقدية",
           status: "approved" as const,
           repaymentStatus: "pending" as const,
           remainingBalance: Number(advance.remainingAmount ?? 0),
@@ -361,7 +374,7 @@ export function DashboardPage() {
     );
     const source = monthRecords.length > 0 ? monthRecords : penaltiesData;
 
-    return source
+    const mappedPenalties = source
       .filter((penalty) => !resignedIds.has(penalty.employeeId))
       .sort((a, b) =>
         (b.issueDate || b.createdAt || "").localeCompare(a.issueDate || a.createdAt || ""),
@@ -392,7 +405,35 @@ export function DashboardPage() {
         };
       })
       .filter((item): item is EmployeePenalty => Boolean(item));
-  }, [penaltiesData, employeeListMemo, monthKey, resignedIds]);
+
+    // خصومات "شراء ملابس" تُعرض هنا (وليس ضمن السلف) مع سببها الصحيح
+    const mappedClothing = clothingDeductions
+      .map((advance): EmployeePenalty | null => {
+        const employee = employeeListMemo.find((emp) => emp.employeeId === advance.employeeId);
+        if (!employee?.name) return null;
+        return {
+          penaltyId: advance.id,
+          employeeId: advance.employeeId,
+          name: employee.name,
+          department: employee?.department || "",
+          profession: employee?.jobTitle || employee?.profession || "",
+          reason: `خصم شراء ملابس${advance.notes ? ` — ${advance.notes}` : ""}`,
+          severity: "moderate" as const,
+          amount: Number(advance.remainingAmount ?? advance.totalAmount ?? 0),
+          date: (advance.issueDate || advance.createdAt || "").slice(0, 10),
+          issuedBy: "",
+          status: "active" as const,
+          avatar: employee?.avatar,
+          photo: resolveEmployeePhotoSrc(employee) ?? null,
+          gender: employee?.gender ?? null,
+        };
+      })
+      .filter((item): item is EmployeePenalty => Boolean(item));
+
+    return [...mappedPenalties, ...mappedClothing]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 6);
+  }, [penaltiesData, clothingDeductions, employeeListMemo, monthKey, resignedIds]);
 
   const monthlyBonuses = useMemo<BonusDisplay[]>(() => {
     const records = Array.isArray(bonusesData) ? bonusesData : [];

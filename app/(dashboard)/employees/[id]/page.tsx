@@ -26,6 +26,7 @@ import apiClient from "@/lib/api-client";
 import { useAdvances } from "@/hooks/useAdvances";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useBonuses } from "@/hooks/useBonuses";
+import { usePenalties } from "@/hooks/usePenalties";
 import { useEmployeeSalary } from "@/hooks/useSalaries";
 import { toLocalDateString } from "@/lib/date-time";
 import type { Employee } from "@/types/employee";
@@ -146,7 +147,23 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     employeeId,
     period: month.period,
   });
+  const { data: employeePenaltiesData = [], isLoading: isPenaltiesLoading } = usePenalties({
+    employeeId,
+    period: month.period,
+  });
   const { data: salary = null } = useEmployeeSalary(employeeId);
+
+  // حالة اشتراك الباص: تُجلب من خدمة النقل الفعلية (وليس حقلاً غير موجود على
+  // كائن الموظف). الخريطة: employeeId → { route, plateNumber }
+  const { data: busSubscribers = {} } = useQuery<Record<string, { route: string; plateNumber: string }>>({
+    queryKey: ["transportation", "active-subscribers"],
+    queryFn: async () => {
+      const res = await apiClient.get("/transportation/active-subscribers");
+      return res.data ?? {};
+    },
+    staleTime: 60_000,
+  });
+  const busSubscription = busSubscribers[employeeId] ?? null;
 
   const attendanceRange = useMemo(() => {
     const startFromMonth = month.start;
@@ -220,7 +237,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     baseSalary?: number;
     salary?: number;
     jobTitle?: string;
-    busRoute?: string;
   };
   const extEmployee = employee as ExtendedEmployee;
 
@@ -247,25 +263,57 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
       amount: toNumber(record.bonusAmount),
     }));
 
-    const deductionsList = employeeBonuses
-      .filter((record) => toNumber(record.assistanceAmount) > 0)
-      .map((record) => ({
-        id: record.id,
-        name: record.bonusReason || "خصم",
-        department: record.period || month.period,
-        amount: toNumber(record.assistanceAmount),
-      }));
-
-    const advancesList = employeeAdvances
+    // العقوبات الحقيقية (جدول EmployeePenalty) — قسَم مستقل تماماً عن السلف
+    const penaltiesList = employeePenaltiesData
       .filter((record) => (record.issueDate || "").slice(0, 7) === month.period)
       .map((record) => ({
         id: record.id,
+        name: record.reason || record.category || "عقوبة إدارية",
+        department: (record.issueDate || "").slice(0, 10) || month.period,
+        amount: toNumber(record.amount),
+      }));
+
+    // "شراء ملابس" يُخزَّن كسلفة (advanceType: clothing) لكنه خصم فعلي —
+    // يُنقل من قائمة السلف إلى قائمة الخصومات هنا.
+    const clothingDeductions = employeeAdvances
+      .filter(
+        (record) =>
+          record.advanceType === "clothing" &&
+          (record.issueDate || "").slice(0, 7) === month.period,
+      )
+      .map((record) => ({
+        id: record.id,
+        name: `خصم شراء ملابس${record.notes ? ` — ${record.notes}` : ""}`,
+        department: (record.issueDate || "").slice(0, 10),
+        amount: toNumber(record.remainingAmount ?? record.totalAmount),
+      }));
+
+    const deductionsList = [
+      ...employeeBonuses
+        .filter((record) => toNumber(record.assistanceAmount) > 0)
+        .map((record) => ({
+          id: record.id,
+          name: record.bonusReason || "خصم",
+          department: record.period || month.period,
+          amount: toNumber(record.assistanceAmount),
+        })),
+      ...penaltiesList,
+      ...clothingDeductions,
+    ];
+
+    const advancesList = employeeAdvances
+      .filter(
+        (record) =>
+          // السلف النقدية فقط — "شراء ملابس" خصم وليس سلفة
+          record.advanceType !== "clothing" &&
+          (record.issueDate || "").slice(0, 7) === month.period,
+      )
+      .map((record) => ({
+        id: record.id,
         name:
-          record.advanceType === "clothing"
-            ? "سلفة ملابس"
-            : record.advanceType === "other"
-              ? "سلفة أخرى"
-              : "سلفة راتب",
+          record.advanceType === "other"
+            ? `سلفة أخرى${record.notes ? ` — ${record.notes}` : ""}`
+            : "سلفة راتب",
         department: record.notes || record.issueDate.slice(0, 10),
         amount: toNumber(record.remainingAmount ?? record.totalAmount),
       }));
@@ -300,7 +348,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
       formattedDeductions,
       formattedAdvances,
     };
-  }, [employeeAdvances, employeeBonuses, month.period, salary, extEmployee]);
+  }, [employeeAdvances, employeeBonuses, employeePenaltiesData, month.period, salary, extEmployee]);
 
   const handleOpenDrilldown = (type: DrilldownType) => {
     setActiveDrilldown(type);
@@ -328,7 +376,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     return { title: "", icon: AlertTriangle };
   };
 
-  const isSecondaryLoading = isAttendanceLoading || isAdvancesLoading || isBonusesLoading;
+  const isSecondaryLoading =
+    isAttendanceLoading || isAdvancesLoading || isBonusesLoading || isPenaltiesLoading;
 
   if (isEmployeeLoading)
     return (
@@ -503,11 +552,28 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                       {contactPhone}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-emerald-700 text-sm font-bold bg-emerald-50 backdrop-blur-md px-4 py-3 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="p-2 bg-emerald-500 rounded-xl text-white shadow-inner">
+                  <div
+                    className={`flex items-center gap-3 text-sm font-bold px-4 py-3 rounded-2xl border shadow-sm hover:shadow-md transition-shadow ${
+                      busSubscription
+                        ? "text-emerald-700 bg-emerald-50 border-emerald-100"
+                        : "text-slate-500 bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <div
+                      className={`p-2 rounded-xl shadow-inner ${
+                        busSubscription ? "bg-emerald-500 text-white" : "bg-slate-300 text-white"
+                      }`}
+                    >
                       <Bus size={14} />
                     </div>
-                    <span>مشترك بالباص - {extEmployee.busRoute || "غير محدد"}</span>
+                    {busSubscription ? (
+                      <span>
+                        مشترك في خدمة الباص — خط{" "}
+                        <span className="font-black">{busSubscription.route}</span>
+                      </span>
+                    ) : (
+                      <span>غير مشترك في خدمة الباص</span>
+                    )}
                   </div>
                 </div>
 

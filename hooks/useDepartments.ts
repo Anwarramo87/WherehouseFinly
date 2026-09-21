@@ -39,7 +39,7 @@ export const useDepartments = () => {
       // fallback: if API returns array directly
       return { departments: Array.isArray(data) ? data : [] };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes — departments change rarely
+    staleTime: 30 * 1000, // قائمة الأقسام تتغير مع إضافة المشرفين — كاش قصير فقط
   });
 
   const createMutation = useMutation({
@@ -51,8 +51,16 @@ export const useDepartments = () => {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      // refetchType: "all" يعيد الجلب حتى للاستعلامات غير النشطة (مغلفة بكاش
+      // staleTime طويل)، فلا تبقى قائمة الأقسام قديمة حتى انتهاء staleTime.
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departments.all,
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.employees.all,
+        refetchType: "all",
+      });
       router.refresh();
     },
   });
@@ -66,7 +74,10 @@ export const useDepartments = () => {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departments.all,
+        refetchType: "all",
+      });
       router.refresh();
     },
   });
@@ -76,7 +87,10 @@ export const useDepartments = () => {
       return await api.delete(`/departments/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departments.all,
+        refetchType: "all",
+      });
       router.refresh();
     },
   });
@@ -86,7 +100,10 @@ export const useDepartments = () => {
       return await api.patch(`/departments/${id}/supervisor`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.departments.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departments.all,
+        refetchType: "all",
+      });
       router.refresh();
     },
   });
