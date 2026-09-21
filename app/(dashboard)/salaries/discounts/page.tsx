@@ -29,12 +29,6 @@ export default function DiscountsPage() {
     setMounted(true); }, []);
 
   const period = searchParams.get("period") || toLocalDateString().slice(0, 7);
-  const urlDate = searchParams.get("date");
-  const todayStr = toLocalDateString();
-  // منتقي الوقت مثل سجل الحضور: شهر + يوم
-  const initialDate = urlDate || (todayStr.startsWith(period) ? todayStr : `${period}-01`);
-  const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [dayFilterEnabled, setDayFilterEnabled] = useState(Boolean(urlDate));
 
   /** عرض التاريخ بأرقام إنجليزية DD/MM/YYYY مثل سجل الحضور */
   const formatDateEn = (date: string) => {
@@ -45,27 +39,12 @@ export default function DiscountsPage() {
     return `${day}/${month}/${d.getFullYear()}`;
   };
 
-  const updateUrl = (newPeriod: string, date: string | null) => {
+  // اختيار الشهر يعرض كل خصومات الشهر — بدون اشتراط يوم محدد.
+  const handlePeriodChange = (newPeriod: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("period", newPeriod);
-    if (date) params.set("date", date);
-    else params.delete("date");
+    params.delete("date");
     router.replace(`?${params.toString()}`);
-  };
-
-  const handlePeriodChange = (newPeriod: string) => {
-    const [y, m] = newPeriod.split("-").map(Number);
-    const maxDay = new Date(y, m, 0).getDate();
-    const day = Math.min(parseInt(selectedDate.split("-")[2], 10) || 1, maxDay);
-    const clamped = `${newPeriod}-${String(day).padStart(2, "0")}`;
-    setSelectedDate(clamped);
-    updateUrl(newPeriod, dayFilterEnabled ? clamped : null);
-  };
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setDayFilterEnabled(true);
-    updateUrl(date.slice(0, 7), date);
   };
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
   const { createAdvance, updateAdvance } = useAdvances(undefined, period);
@@ -108,11 +87,6 @@ export default function DiscountsPage() {
   const filteredDiscounts = useMemo(() => {
     let result = recordsWithNames;
 
-    // فلترة حسب اليوم المحدد (مثل سجل الحضور) — عند التفعيل فقط
-    if (dayFilterEnabled) {
-      result = result.filter(d => (d.date || "").slice(0, 10) === selectedDate);
-    }
-
     // Filter by Search Term
     if (searchTerm) {
       result = result.filter(d =>
@@ -121,7 +95,7 @@ export default function DiscountsPage() {
     }
 
     return result;
-  }, [recordsWithNames, searchTerm, dayFilterEnabled, selectedDate]);
+  }, [recordsWithNames, searchTerm]);
 
   const totalDeductions = useMemo(() => {
     return filteredDiscounts.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -260,39 +234,12 @@ export default function DiscountsPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-              {/* Month + Day Selector — مثل سجل الحضور */}
+              {/* Month Period Selector — اختيار الشهر يعرض كل الشهر */}
               <MonthPeriodSelector
                 value={period}
                 onChange={handlePeriodChange}
-                selectedDate={selectedDate}
-                onDateChange={handleDateChange}
                 className="flex-1 sm:flex-none"
               />
-              {dayFilterEnabled ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDayFilterEnabled(false);
-                    updateUrl(period, null);
-                  }}
-                  className="shrink-0 px-3 py-2.5 text-xs font-black text-[#263544] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl transition-all active:scale-95 shadow-sm"
-                  title="إلغاء فلترة اليوم وعرض كل الشهر"
-                >
-                  يوم: <span className="font-mono" dir="ltr">{selectedDate}</span> ✕
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDayFilterEnabled(true);
-                    updateUrl(period, selectedDate);
-                  }}
-                  className="shrink-0 px-3 py-2.5 text-xs font-black text-slate-500 bg-white/60 hover:bg-white border border-slate-200 rounded-2xl transition-all active:scale-95 shadow-sm"
-                  title="فلترة حسب اليوم المحدد"
-                >
-                  عرض كل الشهر
-                </button>
-              )}
 
               {/* شريط البحث المدمج */}
               <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full sm:w-64 transition-all">

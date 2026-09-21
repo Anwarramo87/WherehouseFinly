@@ -33,12 +33,6 @@ export default function RewardsClient() {
   const [mounted, setMounted] = useState(false);
   const todayStr = toLocalDateString();
   const period = searchParams.get("period") || todayStr.slice(0, 7);
-  const urlDate = searchParams.get("date");
-  // منتقي الوقت مثل سجل الحضور: شهر + يوم. الافتراضي يعرض كل الشهر،
-  // وعند اختيار يوم يتم تفعيل فلترة اليوم.
-  const initialSelectedDate = urlDate || (todayStr.startsWith(period) ? todayStr : `${period}-01`);
-  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
-  const [dayFilterEnabled, setDayFilterEnabled] = useState(Boolean(urlDate));
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
@@ -88,8 +82,6 @@ export default function RewardsClient() {
     return 0;
   };
 
-  /** تطبيع فترة المكافأة إلى تاريخ YYYY-MM-DD (تدعم YYYY-MM و YYYY-MM-DD) */
-
   /** عرض التاريخ بأرقام إنجليزية DD/MM/YYYY مثل سجل الحضور */
   const formatDateEn = (date: string) => {
     const d = new Date(`${date.slice(0, 10)}T00:00:00`);
@@ -99,28 +91,12 @@ export default function RewardsClient() {
     return `${day}/${month}/${d.getFullYear()}`;
   };
 
-  const updateUrl = (newPeriod: string, date: string | null) => {
+  // اختيار الشهر يعرض كل مكافآت الشهر — بدون اشتراط يوم محدد.
+  const handlePeriodChange = (newPeriod: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("period", newPeriod);
-    if (date) params.set("date", date);
-    else params.delete("date");
+    params.delete("date");
     router.replace(`/salaries/rewards?${params.toString()}`);
-  };
-
-  const handlePeriodChange = (newPeriod: string) => {
-    const [y, m] = newPeriod.split("-").map(Number);
-    const maxDay = new Date(y, m, 0).getDate();
-    const day = Math.min(parseInt(selectedDate.split("-")[2], 10) || 1, maxDay);
-    const clamped = `${newPeriod}-${String(day).padStart(2, "0")}`;
-    setSelectedDate(clamped);
-    updateUrl(newPeriod, dayFilterEnabled ? clamped : null);
-  };
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setDayFilterEnabled(true);
-    const newPeriod = date.slice(0, 7);
-    updateUrl(newPeriod, date);
   };
 
 
@@ -177,17 +153,11 @@ export default function RewardsClient() {
     }).filter((r): r is NonNullable<typeof r> => r !== null);
   }, [bonusesData, employeesLookup, resignedIds, employees, todayStr]);
 
-  // فلترة حسب اليوم المحدد (مثل سجل الحضور) — عند التفعيل فقط
-  const dayFilteredRewards = useMemo(() => {
-    if (!dayFilterEnabled) return rewards;
-    return rewards.filter((r) => r.date.slice(0, 10) === selectedDate);
-  }, [rewards, dayFilterEnabled, selectedDate]);
-
   // تجميع السجلات حسب الموظف
   const groupedRewards = useMemo(() => {
     const groups: Record<string, { employeeId: string; name: string; totalAmount: number; records: RewardRecord[] }> = {};
 
-    dayFilteredRewards.forEach(reward => {
+    rewards.forEach(reward => {
       if (!groups[reward.employeeId]) {
         groups[reward.employeeId] = {
           employeeId: reward.employeeId,
@@ -202,7 +172,7 @@ export default function RewardsClient() {
 
     // تحويل الكائن إلى مصفوفة لسهولة العرض
     return Object.values(groups);
-  }, [dayFilteredRewards]);
+  }, [rewards]);
 
   // فلترة المجموعات المجمعة بناءً على البحث
   const filteredGroups = useMemo(() => {
@@ -354,35 +324,8 @@ export default function RewardsClient() {
             <MonthPeriodSelector
               value={period}
               onChange={handlePeriodChange}
-              selectedDate={selectedDate}
-              onDateChange={handleDateChange}
               className="shrink-0"
             />
-            {dayFilterEnabled ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setDayFilterEnabled(false);
-                  updateUrl(period, null);
-                }}
-                className="shrink-0 px-3 py-2.5 text-xs font-black text-[#263544] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl transition-all active:scale-95 shadow-sm"
-                title="إلغاء فلترة اليوم وعرض كل الشهر"
-              >
-                يوم: <span className="font-mono" dir="ltr">{selectedDate}</span> ✕
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setDayFilterEnabled(true);
-                  updateUrl(period, selectedDate);
-                }}
-                className="shrink-0 px-3 py-2.5 text-xs font-black text-slate-500 bg-white/60 hover:bg-white border border-slate-200 rounded-2xl transition-all active:scale-95 shadow-sm"
-                title="فلترة حسب اليوم المحدد"
-              >
-                عرض كل الشهر
-              </button>
-            )}
             <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full md:w-64 transition-all">
               <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none" />
               <Search size={18} className="text-[#C89355] ml-2 shrink-0 relative z-10" />
