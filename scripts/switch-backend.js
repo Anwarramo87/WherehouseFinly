@@ -17,15 +17,17 @@ const path = require('path');
 
 const envLocalPath = path.join(__dirname, '..', '.env.local');
 
+// NOTE: keep these in sync with lib/api-url.ts (production default) and the
+// backend's PORT in back/werehouse/backend-nest/.env (local default 5003).
 const BACKENDS = {
   local: {
     name: 'Local Backend',
-    url: 'http://localhost:5001/api/v1',
-    description: 'Using local backend at http://localhost:5001'
+    url: 'http://localhost:5003/api/v1',
+    description: 'Using local backend at http://localhost:5003'
   },
   remote: {
     name: 'Remote Backend (Railway)',
-    url: 'https://werehouse-production-f4f4.up.railway.app/api/v1',
+    url: 'https://warehousebackend-depolyemnt-production.up.railway.app/api/v1',
     description: 'Using Railway production backend'
   }
 };
@@ -46,25 +48,30 @@ function switchBackend(targetBackend) {
   }
 
   let envContent = getCurrentEnv() || '';
-  
+
   // Build the new content with proper commenting
   const lines = envContent.split('\n');
   const newLines = [];
-  
+  const targetUrl =
+    targetBackend.toLowerCase() === 'local' ? BACKENDS.local.url : BACKENDS.remote.url;
+  let activated = false;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Handle NEXT_PUBLIC_API_URL lines
     if (line.includes('NEXT_PUBLIC_API_URL=')) {
-      const isLocal = line.includes('http://localhost:5001');
-      const isRemote = line.includes('werehouse-production');
-      
+      const isLocal = line.includes('localhost');
+      const isRemote = line.includes('railway.app');
+
       if (isLocal && targetBackend.toLowerCase() === 'local') {
         // This is the line we want, uncomment it
-        newLines.push('NEXT_PUBLIC_API_URL=http://localhost:5001/api');
+        newLines.push(`NEXT_PUBLIC_API_URL=${BACKENDS.local.url}`);
+        activated = true;
       } else if (isRemote && targetBackend.toLowerCase() === 'remote') {
         // This is the line we want, uncomment it
-        newLines.push('NEXT_PUBLIC_API_URL=https://werehouse-production-f4f4.up.railway.app/api');
+        newLines.push(`NEXT_PUBLIC_API_URL=${BACKENDS.remote.url}`);
+        activated = true;
       } else {
         // This is not the line we want, comment it out
         if (!line.startsWith('#')) {
@@ -77,7 +84,14 @@ function switchBackend(targetBackend) {
       newLines.push(line);
     }
   }
-  
+
+  // The file never contained a line for the target backend (e.g. only the
+  // local line exists and we switch to remote): append it, otherwise the env
+  // is left with no active backend at all.
+  if (!activated) {
+    newLines.push(`NEXT_PUBLIC_API_URL=${targetUrl}`);
+  }
+
   fs.writeFileSync(envLocalPath, newLines.join('\n'));
 
   console.log(`

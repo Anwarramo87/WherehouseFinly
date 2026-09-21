@@ -174,6 +174,8 @@ export default function EmployeesPage() {
   // الأقسام المفتوحة في عرض المعامل — افتراضياً كلها مفتوحة
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandInit, setExpandInit] = useState(false);
+  // يتتبع آخر قسم فُتح تلقائياً من الفلتر، ليُعاد فتحه عند العودة إليه
+  const [lastAutoDept, setLastAutoDept] = useState<string | null>(null);
 
   const selectedEmployeeForModal = useMemo<ModalInitialEmployee | undefined>(() => {
     if (!selectedEmployee) return undefined;
@@ -253,20 +255,19 @@ export default function EmployeesPage() {
     });
   }, [filteredEmployees]);
 
-  // افتح كل المعامل افتراضياً عند أول تحميل للبيانات
-  useEffect(() => {
-    if (!expandInit && groupedByDept.length > 0) {
-      setExpandedDepts(groupedByDept.map(([name]) => name));
-      setExpandInit(true);
-    }
-  }, [groupedByDept, expandInit]);
-
-  // عند اختيار قسم محدد من الفلتر افتحه تلقائياً
-  useEffect(() => {
-    if (selectedDept !== "الكل") {
-      setExpandedDepts((prev) => (prev.includes(selectedDept) ? prev : [...prev, selectedDept]));
-    }
-  }, [selectedDept]);
+  // ضبط الحالة أثناء العرض (render-phase adjustment — النمط الموصى به من React
+  // بدل setState داخل useEffect): يفتح كل الأقسام عند أول تحميل للبيانات،
+  // ويفتح القسم المختار من الفلتر تلقائياً — بنفس سلوك النسخة السابقة تماماً.
+  if (!expandInit && groupedByDept.length > 0) {
+    setExpandInit(true);
+    setExpandedDepts(groupedByDept.map(([name]) => name));
+  }
+  if (selectedDept === "الكل") {
+    if (lastAutoDept !== null) setLastAutoDept(null);
+  } else if (selectedDept !== lastAutoDept) {
+    setLastAutoDept(selectedDept);
+    setExpandedDepts((prev) => (prev.includes(selectedDept) ? prev : [...prev, selectedDept]));
+  }
 
   const toggleDept = (name: string) => {
     setExpandedDepts((prev) =>

@@ -18,11 +18,15 @@ describe("resolveSocketUrl", () => {
   });
 
   it("follows a deployed API base", () => {
+    // The resolver strips the API path but keeps the host verbatim — including
+    // the historical "depolyemnt" typo in the real production hostname, which
+    // lib/api-url.ts pins as the default (verified live: that host answers
+    // with this backend's error shape, the corrected spelling does not).
     expect(
       resolveSocketUrl({
         apiUrl: "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1",
       }),
-      ).toBe("https://warehousebackend-deployment-production.up.railway.app");
+      ).toBe("https://warehousebackend-depolyemnt-production.up.railway.app");
   });
 
   it("lets an explicit socket URL win", () => {

@@ -106,7 +106,7 @@ const menuItems: MenuItem[] = [
   { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
   { name: 'الملفات', icon: FolderOpen, href: '/files', permissions: ['run_imports'] },
-  { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_users'] },
+  { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_trash'] },
   { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
   // Overseer-only; filtered in by role below rather than by a permission, so no
   // amount of role editing puts it in a factory admin's menu.

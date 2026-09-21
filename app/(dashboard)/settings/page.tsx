@@ -305,7 +305,7 @@ export default function SettingsPage() {
                           <button
                             onClick={() => {
                               const link = document.createElement("a");
-                              link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/backup/export/full`;
+                              link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003/api/v1"}/backup/export/full`;
                               link.click();
                             }}
                             className="w-full relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group/btn"
@@ -340,7 +340,7 @@ export default function SettingsPage() {
                                 const period = input?.value;
                                 if (!period) return;
                                 const link = document.createElement("a");
-                                link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/backup/export/month?period=${period}`;
+                                link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003/api/v1"}/backup/export/month?period=${period}`;
                                 link.click();
                               }}
                               className="relative overflow-hidden bg-[#C89355] hover:bg-[#b8834a] text-[#1a2530] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(200,147,85,0.3)] transition-all active:scale-95 text-sm font-black group/btn"

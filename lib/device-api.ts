@@ -10,7 +10,7 @@ const getBaseUrl = () => {
   if (typeof window !== "undefined") {
     return "/api";
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api/v1";
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003/api/v1";
 };
 
 export type DeviceCheckPayload = {
