@@ -7,6 +7,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
 const REQUEST_TIMEOUT_MS = 15_000;
+// Long-running computation endpoints: a payroll run aggregates attendance for
+// every employee-day and can legitimately take minutes. The proxy must wait
+// for them instead of aborting with a 502 mid-calculation.
+const LONG_RUNNING_PREFIXES = [
+  '/payroll',
+  '/transportation/calculate-deductions',
+  '/imports',
+];
+const LONG_RUNNING_TIMEOUT_MS = 180_000;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Resolved once at module load — stable for the lifetime of the server process.
@@ -123,9 +132,13 @@ async function handler(request: NextRequest) {
   const body = isGetOrHead ? undefined : await request.text();
   const headers = upstreamHeaders(request);
 
+  const isLongRunning = LONG_RUNNING_PREFIXES.some(
+    (prefix) => apiPath === prefix || apiPath.startsWith(`${prefix}/`),
+  );
+  const timeoutMs = isLongRunning ? LONG_RUNNING_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
   const fetchWithTimeout = async (targetUrl: string): Promise<Response> => {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       return await fetch(targetUrl, {
         method: request.method,
