@@ -1,0 +1,84 @@
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 135ms
+Warning: Custom Cache-Control headers detected for the following routes:
+  - /_next/static/:path*
+
+Setting a custom Cache-Control header can break Next.js development behavior.
+- Experiments (use with caution):
+  ✓ optimizeCss
+  · optimizePackageImports
+  · webVitalsAttribution
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.8s
+  Running TypeScript ...
+  Finished TypeScript in 11.8s ...
+  Collecting page data using 19 workers ...
+  Generating static pages using 19 workers (0/49) ...
+  Generating static pages using 19 workers (12/49) 
+  Generating static pages using 19 workers (24/49) 
+  Generating static pages using 19 workers (36/49) 
+✓ Generating static pages using 19 workers (49/49) in 2.1s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin/backups
+├ ○ /admin/employees
+├ ○ /admin/factories
+├ ƒ /admin/factories/[id]
+├ ƒ /api/[...path]
+├ ƒ /api/biometric/sync
+├ ƒ /api/debug
+├ ƒ /api/telemetry/web-vitals
+├ ○ /attendance
+├ ○ /attendance/biometric
+├ ○ /clear-cache
+├ ○ /employees
+├ ƒ /employees/[id]
+├ ○ /files
+├ ○ /fulfillment
+├ ○ /fulfillment/shipments
+├ ○ /home
+├ ○ /importData
+├ ○ /inventory
+├ ○ /inventory/batches
+├ ○ /inventory/counts
+├ ○ /inventory/expiry
+├ ○ /inventory/locations
+├ ○ /inventory/movements
+├ ○ /inventory/quality
+├ ○ /inventory/warehouses
+├ ○ /login
+├ ○ /purchasing
+├ ○ /purchasing/invoices
+├ ○ /representatives
+├ ○ /representatives/workspace
+├ ○ /resigned
+├ ○ /salaries/discounts
+├ ○ /salaries/payroll
+├ ƒ /salaries/payroll/[month]
+├ ○ /salaries/rewards
+├ ○ /salaries/salariesSetting
+├ ○ /salaries/timeTable
+├ ○ /sales
+├ ○ /sales/invoices
+├ ○ /sales/pricing
+├ ○ /settings
+├ ○ /settings/integrations
+├ ○ /Transportation
+├ ○ /trash
+├ ○ /vouchers
+├ ○ /wms/analytics
+├ ○ /wms/production
+├ ○ /wms/production/bom
+└ ○ /wms/setup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

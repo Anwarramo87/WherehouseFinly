@@ -152,6 +152,10 @@ export const useInventory = (params?: InventoryProductsParams) => {
         category: payload.category,
         unitPrice: Number(payload.unitPrice),
         costPrice: Number(payload.costPrice),
+        profitPercent:
+          payload.profitPercent !== undefined && payload.profitPercent !== null && payload.profitPercent !== ""
+            ? Number(payload.profitPercent)
+            : undefined,
         reorderLevel: Number(payload.reorderLevel),
         unit: payload.unit,
         photo: payload.photo || undefined,
@@ -174,6 +178,10 @@ export const useInventory = (params?: InventoryProductsParams) => {
         category: data.category,
         unitPrice: data.unitPrice !== undefined ? Number(data.unitPrice) : undefined,
         costPrice: data.costPrice !== undefined ? Number(data.costPrice) : undefined,
+        profitPercent:
+          data.profitPercent !== undefined && data.profitPercent !== null && data.profitPercent !== ""
+            ? Number(data.profitPercent)
+            : undefined,
         reorderLevel: data.reorderLevel !== undefined ? Number(data.reorderLevel) : undefined,
         unit: data.unit,
         photo: data.photo !== undefined ? data.photo : undefined,

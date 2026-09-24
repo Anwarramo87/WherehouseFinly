@@ -28,6 +28,7 @@ import EmployeeAvatar from "@/components/EmployeeAvatar";
 import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 import SupervisionCenter from "@/components/admin/SupervisionCenter";
 import { useFactoryScopeStore } from "@/stores/factory-scope-store";
+import ContextDashboard from "@/components/ContextDashboard";
 
 const AddDepartmentModal = dynamic(() => import("@/components/AddDepartmentModal"), {
   ssr: false,
@@ -1282,6 +1283,9 @@ export function DashboardPage() {
           }}
         />
       )}
+
+      {/* Context-Aware Dashboard Sections — WMS / Manufacturing / Representatives */}
+      <ContextDashboard />
     </>
   );
 }

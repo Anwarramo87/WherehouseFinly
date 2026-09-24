@@ -9,6 +9,10 @@ export interface InventoryItem {
   minStockLevel: number;
   unitPrice?: number;
   costPrice?: number;
+  /** نسبة الربح % على التكلفة (مشتقة من السعر/التكلفة) */
+  profitPercent?: number;
+  /** الهامش % (الربح ÷ سعر البيع) — مُحسوبة من الخادم */
+  marginPercent?: number;
   photo?: string | null;
   /** Physically on hand, including anything reserved. */
   onHand?: number;
@@ -25,6 +29,8 @@ export interface ProductEnriched {
   category: string;
   unitPrice: number;
   costPrice: number;
+  profitPercent?: number;
+  marginPercent?: number;
   reorderLevel: number;
   unit: string;
   status: string;
@@ -86,6 +92,7 @@ export interface InventoryItemInput {
   category: string;
   unitPrice: number | string;
   costPrice: number | string;
+  profitPercent?: number | string;
   reorderLevel: number | string;
   unit?: string;
   photo?: string | null;
