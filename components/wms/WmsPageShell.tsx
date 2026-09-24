@@ -19,6 +19,9 @@ import {
   ShoppingCart,
   Tags,
   Plug,
+  Factory,
+  ListOrdered,
+  Settings2,
 } from "lucide-react";
 
 interface TabItem {
@@ -60,6 +63,13 @@ export const TAB_GROUPS: Record<string, TabItem[]> = {
   ],
   analytics: [{ name: "مؤشرات الأداء", href: "/wms/analytics", icon: BarChart3 }],
   integrations: [{ name: "الربط والتكامل", href: "/settings/integrations", icon: Plug }],
+  production: [
+    { name: "أوامر الإنتاج", href: "/wms/production", icon: ListOrdered },
+    { name: "قوائم المواد (BOM)", href: "/wms/production/bom", icon: Layers },
+  ],
+  wmsSetup: [
+    { name: "إعداد WMS", href: "/wms/setup", icon: Settings2 },
+  ],
 };
 
 interface WmsPageShellProps {

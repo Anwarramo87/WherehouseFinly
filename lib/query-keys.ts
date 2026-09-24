@@ -183,4 +183,45 @@ export const queryKeys = {
     connection: (id: string) => [...queryKeys.integrations.all, "connection", id] as const,
     webhooks: () => [...queryKeys.integrations.all, "webhooks"] as const,
   },
+  manufacturing: {
+    all: ["manufacturing"] as const,
+    bom: (sku: string) => [...queryKeys.manufacturing.all, "bom", sku] as const,
+    bomHistory: (sku: string) => [...queryKeys.manufacturing.all, "bom-history", sku] as const,
+    bomCost: (id: string) => [...queryKeys.manufacturing.all, "bom-cost", id] as const,
+    orders: (params?: Record<string, unknown>) =>
+      [...queryKeys.manufacturing.all, "orders", params] as const,
+    order: (id: string) => [...queryKeys.manufacturing.all, "order", id] as const,
+    summary: () => [...queryKeys.manufacturing.all, "summary"] as const,
+  },
+  representatives: {
+    all: ["representatives"] as const,
+    list: (params?: Record<string, unknown>) =>
+      [...queryKeys.representatives.all, "list", params] as const,
+    detail: (repId: string) =>
+      [...queryKeys.representatives.all, "detail", repId] as const,
+    stock: (repId: string) =>
+      [...queryKeys.representatives.all, "stock", repId] as const,
+    movements: (repId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.representatives.all, "movements", repId, params] as const,
+    sales: (repId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.representatives.all, "sales", repId, params] as const,
+    collections: (repId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.representatives.all, "collections", repId, params] as const,
+    returns: (repId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.representatives.all, "returns", repId, params] as const,
+    settlements: (repId: string) =>
+      [...queryKeys.representatives.all, "settlements", repId] as const,
+    summary: (repId: string) =>
+      [...queryKeys.representatives.all, "summary", repId] as const,
+    myProfile: () => [...queryKeys.representatives.all, "my-profile"] as const,
+  },
+  wmsSetup: {
+    all: ["wms-setup"] as const,
+    state: () => [...queryKeys.wmsSetup.all, "state"] as const,
+    completed: () => [...queryKeys.wmsSetup.all, "completed"] as const,
+  },
+  systemSettings: {
+    all: ["system-settings"] as const,
+    settings: () => [...queryKeys.systemSettings.all, "settings"] as const,
+  },
 } as const;

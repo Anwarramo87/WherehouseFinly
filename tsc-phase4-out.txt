@@ -1,0 +1,8 @@
+app/(dashboard)/representatives/page.tsx(294,32): error TS2339: Property 'customers' does not exist on type 'Representative & { summary: RepSummary; }'.
+app/(dashboard)/representatives/page.tsx(295,31): error TS2339: Property 'products' does not exist on type 'Representative & { summary: RepSummary; }'.
+app/(dashboard)/representatives/page.tsx(372,27): error TS2339: Property 'stockItems' does not exist on type 'NoInfer<Representative & { summary: RepSummary; }>'.
+app/(dashboard)/representatives/page.tsx(376,28): error TS2339: Property 'stockItems' does not exist on type 'Representative & { summary: RepSummary; }'.
+app/(dashboard)/representatives/workspace/page.tsx(179,57): error TS2322: Type '{ children: string; tone: string; className: string; }' is not assignable to type 'IntrinsicAttributes & { tone?: string | undefined; children: ReactNode; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & { tone?: string | undefined; children: ReactNode; }'.
+app/(dashboard)/wms/production/page.tsx(363,54): error TS2352: Conversion of type 'CompleteOrderPayload & { id: string; }' to type 'Record<string, number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'CompleteOrderPayload & { id: string; }'.

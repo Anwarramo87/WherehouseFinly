@@ -317,11 +317,18 @@ export default function InventoryPage() {
   };
 
   const handleSaveItem = (payload: InventoryItemInput) => {
+    const { profitPercent, ...rest } = payload;
+    const body: InventoryItemInput = { ...rest };
+    const profitValue = Number(profitPercent);
+    if (profitPercent !== undefined && profitPercent !== null && profitPercent !== "" && Number.isFinite(profitValue)) {
+      body.profitPercent = profitValue;
+    }
+
     if (selectedItem) {
       updateItem.mutate(
         {
           id: selectedItem.id,
-          data: payload,
+          data: body,
         },
         {
           onSuccess: () => {
@@ -333,7 +340,7 @@ export default function InventoryPage() {
       return;
     }
 
-    createItem.mutate(payload, {
+    createItem.mutate(body, {
       onSuccess: () => {
         setIsItemModalOpen(false);
       },
@@ -542,6 +549,7 @@ export default function InventoryPage() {
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الرصيد المتاح</th>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">حالة المخزون</th>
                 <SortableHeader label="سعر البيع" field="unitPrice" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الربح %</th>
                 <SortableHeader label="الحالة" field="status" activeField={sortBy} direction={sortDir} onSort={handleSort} />
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الإجراءات</th>
               </tr>
@@ -549,7 +557,7 @@ export default function InventoryPage() {
             <tbody className="divide-y divide-white/40">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-16">
+                  <td colSpan={10} className="p-16">
                     <div className="flex flex-col items-center gap-3 text-center">
                       <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#C89355]/30 bg-[#1a2530]">
                         <Package2 size={26} className="text-[#C89355]" />
@@ -641,6 +649,27 @@ export default function InventoryPage() {
                       : Number(item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="p-4 text-center">
+                    {(() => {
+                      const price = Number(item.unitPrice || 0);
+                      const cost = Number(item.costPrice || 0);
+                      const profit =
+                        typeof item.profitPercent === "number" && item.profitPercent !== 0
+                          ? item.profitPercent
+                          : cost > 0
+                            ? ((price - cost) / cost) * 100
+                            : null;
+                      if (profit === null) {
+                        return <span className="text-[#263544]/30 font-black text-xs">—</span>;
+                      }
+                      const positive = profit >= 0;
+                      return (
+                        <span className={`inline-block rounded-xl px-3 py-1 text-xs font-black tabular-nums ${positive ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-rose-50 text-rose-600 border border-rose-100"}`}>
+                          {positive ? "+" : ""}{profit.toFixed(1)}%
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="p-4 text-center">
                     {statusBadge(item)}
                   </td>
                   <td className="p-4">
@@ -730,6 +759,7 @@ export default function InventoryPage() {
                   unit: selectedItem.unit,
                   unitPrice: selectedItem.unitPrice ?? 0,
                   costPrice: selectedItem.costPrice ?? 0,
+                  profitPercent: selectedItem.profitPercent ?? "",
                   photo: selectedItem.photo ?? null,
                 }
               : null

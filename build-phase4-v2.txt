@@ -1,0 +1,21 @@
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 83ms
+Warning: Custom Cache-Control headers detected for the following routes:
+  - /_next/static/:path*
+
+Setting a custom Cache-Control header can break Next.js development behavior.
+- Experiments (use with caution):
+  ✓ optimizeCss
+  · optimizePackageImports
+  · webVitalsAttribution
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.0s
+  Running TypeScript ...
+app/(dashboard)/representatives/page.tsx(294,32): error TS2339: Property 'customers' does not exist on type 'Representative & { summary: RepSummary; }'.
+app/(dashboard)/representatives/page.tsx(295,31): error TS2339: Property 'products' does not exist on type 'Representative & { summary: RepSummary; }'.
+app/(dashboard)/representatives/page.tsx(372,27): error TS2339: Property 'stockItems' does not exist on type 'NoInfer<Representative & { summary: RepSummary; }>'.
+app/(dashboard)/representatives/page.tsx(376,28): error TS2339: Property 'stockItems' does not exist on type 'Representative & { summary: RepSummary; }'.
+Failed to type check.
+

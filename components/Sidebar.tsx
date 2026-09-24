@@ -9,7 +9,7 @@ import {
   Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
-  ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen
+  ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -102,6 +102,25 @@ const menuItems: MenuItem[] = [
     ]
   },
   { name: 'مؤشرات المخزن', icon: BarChart3, href: '/wms/analytics', permissions: ['view_inventory'] },
+  {
+    name: 'الإنتاج والتصنيع',
+    icon: Factory,
+    permissions: ['view_inventory'],
+    subItems: [
+      { name: 'أوامر الإنتاج', href: '/wms/production' },
+      { name: 'قوائم المواد (BOM)', href: '/wms/production/bom' },
+    ],
+  },
+  {
+    name: 'المندوبون',
+    icon: Users,
+    permissions: ['view_sales'],
+    subItems: [
+      { name: 'إدارة المندوبين', href: '/representatives' },
+      { name: 'مساحة المندوب', href: '/representatives/workspace' },
+    ],
+  },
+  { name: 'إعداد WMS', icon: Settings, href: '/wms/setup', permissions: ['view_inventory'] },
   { name: 'الربط والتكامل', icon: Plug, href: '/settings/integrations', permissions: ['manage_users'] },
   { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
   { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },

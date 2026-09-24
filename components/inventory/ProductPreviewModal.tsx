@@ -10,6 +10,8 @@ import {
   Package2,
   PackageCheck,
   Tag,
+  TrendingUp,
+  Wallet,
   Warehouse,
   X,
 } from "lucide-react";
@@ -41,6 +43,15 @@ export default function ProductPreviewModal({
 
   const isLowStock = item.quantity <= item.minStockLevel;
   const stockValue = toNumber(item.quantity) * toNumber(item.unitPrice);
+  const unitPrice = toNumber(item.unitPrice);
+  const unitCost = toNumber(item.costPrice);
+  const profitPercent =
+    typeof item.profitPercent === "number" && item.profitPercent !== 0
+      ? item.profitPercent
+      : unitCost > 0
+        ? ((unitPrice - unitCost) / unitCost) * 100
+        : null;
+  const estimatedProfit = (unitPrice - unitCost) * toNumber(item.quantity);
 
   return (
     <div
@@ -130,10 +141,19 @@ export default function ProductPreviewModal({
           <div className="grid grid-cols-2 gap-3 mb-6">
             <div className="bg-white border border-slate-200 rounded-2xl p-4">
               <p className="text-[11px] font-black text-slate-500 mb-1 flex items-center gap-1.5">
-                <Coins size={12} className="text-[#C89355]" /> سعر الوحدة
+                <Coins size={12} className="text-[#C89355]" /> سعر الوحدة / التكلفة
               </p>
               <p className="text-base font-black text-[#263544]">
-                {toNumber(item.unitPrice) > 0 ? toNumber(item.unitPrice).toLocaleString() : "—"}
+                {unitPrice > 0 ? unitPrice.toLocaleString() : "—"}
+                {unitCost > 0 ? <span className="text-[11px] font-bold text-slate-400 mr-1.5">تكلفة {unitCost.toLocaleString()}</span> : null}
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <p className="text-[11px] font-black text-slate-500 mb-1 flex items-center gap-1.5">
+                <TrendingUp size={12} className={profitPercent !== null && profitPercent >= 0 ? "text-emerald-600" : "text-rose-600"} /> الربح %
+              </p>
+              <p className={`text-base font-black ${profitPercent === null ? "text-slate-400" : profitPercent >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                {profitPercent === null ? "—" : `${profitPercent.toFixed(1)}%`}
               </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-4">
@@ -142,6 +162,14 @@ export default function ProductPreviewModal({
               </p>
               <p className="text-base font-black text-emerald-700">
                 {stockValue > 0 ? stockValue.toLocaleString() : "—"}
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <p className="text-[11px] font-black text-slate-500 mb-1 flex items-center gap-1.5">
+                <Wallet size={12} className={estimatedProfit >= 0 ? "text-emerald-600" : "text-rose-600"} /> ربح المخزون التقديري
+              </p>
+              <p className={`text-base font-black ${estimatedProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                {estimatedProfit.toLocaleString()} <span className="text-[10px] font-bold text-slate-400">ل.س</span>
               </p>
             </div>
           </div>
