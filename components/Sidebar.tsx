@@ -9,7 +9,8 @@ import {
   Wallet, Box, Bus, FileInput, Settings,
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
-  ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory
+  ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory,
+  Palette
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -129,6 +130,7 @@ const menuItems: MenuItem[] = [
   { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
   // Overseer-only; filtered in by role below rather than by a permission, so no
   // amount of role editing puts it in a factory admin's menu.
+  { name: 'التخصيص', icon: Palette, href: '/admin/customization', superAdminOnly: true },
   { name: 'المصانع', icon: Building2, href: '/admin/factories', superAdminOnly: true },
   { name: 'جميع الموظفين', icon: Users, href: '/admin/employees', superAdminOnly: true },
   { name: 'النسخ الاحتياطي', icon: Database, href: '/admin/backups', superAdminOnly: true },

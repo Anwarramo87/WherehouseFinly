@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -28,6 +29,7 @@ import useDepartments from "@/hooks/useDepartments";
 const PRIVILEGED_ROLE_NAMES = ["superadmin", "admin"];
 import type { Employee } from "@/types/employee";
 import PhotoUploadField from "@/components/PhotoUploadField";
+import apiClient from "@/lib/api-client";
 
 type EmployeeWithExtendedFields = Employee & {
   photo?: string | null;
@@ -88,6 +90,7 @@ export type AddEmployeeFormData = {
   gracePeriodMinutes: number;
   roleId: string;
   residence?: string;
+  customFields?: Record<string, unknown>;
 };
 
 interface Props {
@@ -139,8 +142,20 @@ export default function AddEmployeeModal({
     return "";
   });
   const [roleError, setRoleError] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
 
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
+  const { data: customFields = [] } = useQuery({
+    queryKey: ["tenant-custom-fields", "employee"],
+    enabled: isOpen,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const response = await apiClient.get("/customization/tenant/custom-fields", {
+        params: { entity: "employee" },
+      });
+      return Array.isArray(response.data) ? response.data : [];
+    },
+  });
   const isSuperadminViewer = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
   // Non-superadmins only see ordinary roles (employees, department heads…).
   const visibleRoles = isSuperadminViewer
@@ -299,6 +314,7 @@ export default function AddEmployeeModal({
         transportAllowance: removeCommas(formData.transportAllowance),
         insuranceAmount: removeCommas(formData.insuranceAmount),
         lumpSumSalary: "0",
+        customFields: customFieldValues,
       };
 
       onSave(dataToSave);
@@ -579,6 +595,66 @@ export default function AddEmployeeModal({
                   />
                 </div>
               </div>
+
+              {customFields.length > 0 && (
+                <div className="md:col-span-2 bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner mt-2">
+                  <div className="flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
+                    <Users size={22} className="text-[#C89355]" />
+                    <span className="text-base font-bold text-white">حقول مخصصة</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {customFields.map((field: any) => {
+                      const fieldKey = field.key ?? field.id;
+                      const value = customFieldValues[fieldKey] ?? field.defaultValue ?? "";
+
+                      const handleChange = (nextValue: unknown) => {
+                        setCustomFieldValues((prev) => ({ ...prev, [fieldKey]: nextValue }));
+                      };
+
+                      if (field.fieldType === "boolean") {
+                        return (
+                          <label key={fieldKey} className="flex items-center justify-between rounded-xl border border-[#263544] bg-[#101720] px-4 py-3 text-white">
+                            <span className="font-bold">{field.label}</span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(value)}
+                              onChange={(e) => handleChange(e.target.checked)}
+                              className="h-5 w-5 accent-[#C89355]"
+                            />
+                          </label>
+                        );
+                      }
+
+                      if (field.fieldType === "textarea") {
+                        return (
+                          <div key={fieldKey} className="md:col-span-2">
+                            <label className="mb-2 block text-xs font-bold text-[#C89355]">{field.label}</label>
+                            <textarea
+                              value={String(value ?? "")}
+                              onChange={(e) => handleChange(e.target.value)}
+                              className="w-full rounded-xl border border-[#263544] bg-[#101720] p-4 text-white outline-none focus:border-[#C89355]"
+                              rows={3}
+                            />
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={fieldKey}>
+                          <label className="mb-2 block text-xs font-bold text-[#C89355]">{field.label}</label>
+                          <input
+                            type={field.fieldType === "number" || field.fieldType === "currency" ? "number" : "text"}
+                            value={String(value ?? "")}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full rounded-xl border border-[#263544] bg-[#101720] p-4 text-white outline-none focus:border-[#C89355]"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="md:col-span-2 bg-[#1a2530] p-6 rounded-2xl border border-[#263544] shadow-inner mt-2">
                 <div className="flex items-center gap-2 border-b border-white/5 pb-4 mb-6">

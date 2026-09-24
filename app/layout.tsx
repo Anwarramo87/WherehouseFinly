@@ -14,12 +14,12 @@ try {
 }
 
 export const metadata: Metadata = {
-  title: "نظام إدارة المصنع",
+  title: "Factory ERP",
   description: "نظام متكامل لإدارة الموظفين والرواتب والمخزون",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "نظام إدارة المصنع",
+    title: "Factory ERP",
   },
   icons: {
     icon: '/icon-512.svg',
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0070f3",
+  themeColor: "#1f2937",
 };
 
 export default function RootLayout({
@@ -51,7 +51,10 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className="bg-[#f8fafc] text-slate-800 antialiased">
+      <body className="bg-[var(--brand-bg,#f8fafc)] text-[var(--brand-text,#0f172a)] antialiased" style={{
+        backgroundColor: "var(--brand-bg, #f8fafc)",
+        color: "var(--brand-text, #0f172a)",
+      }}>
         <Providers>
           <WebVitalsLoader />
           {children}

@@ -33,7 +33,6 @@ const safeNavigate = (router: ReturnType<typeof useRouter>, path: string) => {
   }
 };
 
-
 export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -78,7 +77,7 @@ export default function LoginPage() {
       active = false;
     };
   }, [authStatus, router, clear, setStatus]);
-  
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -109,12 +108,16 @@ export default function LoginPage() {
     }
 
     try {
-      const response = await apiClient.post("/auth/login", {
-        username: normalizedUsername,
-        password: normalizedPassword,
-      }, {
-        timeout: 60_000, // allow Neon cold-start / slow DB without tripping the timeout
-      });
+      const response = await apiClient.post(
+        "/auth/login",
+        {
+          username: normalizedUsername,
+          password: normalizedPassword,
+        },
+        {
+          timeout: 60_000, // allow Neon cold-start / slow DB without tripping the timeout
+        },
+      );
 
       const authResponse = response.data as {
         user?: unknown;
@@ -138,10 +141,81 @@ export default function LoginPage() {
         ? {
             ...rawUser,
             roles: (authResponse as Record<string, unknown>).roles as string[] | undefined,
-            permissions: (authResponse as Record<string, unknown>).permissions as string[] | undefined,
+            permissions: (authResponse as Record<string, unknown>).permissions as
+              string[] | undefined,
           }
         : null;
-      setUser(mergedUser as { name?: string; username?: string; role?: string; permissions?: string[]; roles?: string[] } | null);
+
+      let finalUser = mergedUser;
+
+      // #region post-login-verify
+      // Always re-fetch /auth/me after a successful login. The /auth/login body
+      // omits fields the UI needs (email, resolved permissions, tenantId for
+      // newly assigned accounts) and /auth/me also re-establishes the session
+      // cookie headers that React Query's first dashboard burst will use.
+      // Without this step we have a race: the layout renders, fires ~10 queries
+      // simultaneously, every one of them hits 401/403 while the token cookie
+      // is still being rotated and the persisted user payload is stale.
+      try {
+        resetAuthVerificationCache();
+        const meRes = await apiClient.get("/auth/me", {
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          timeout: 30_000,
+        });
+        const meData = meRes.data as Record<string, unknown>;
+        finalUser = {
+          ...(mergedUser ?? { roles: undefined, permissions: undefined }),
+          ...(meData as unknown as {
+            id?: string;
+            username?: string;
+            role?: string;
+            permissions?: string[];
+            roles?: string[];
+            tenantId?: string;
+            email?: string;
+          }),
+        } as Record<string, unknown>;
+      } catch (meError: unknown) {
+        reportDebug?.("C2", "/auth/me probe after login failed", {
+          status: axios.isAxiosError(meError) ? (meError.response?.status ?? null) : null,
+          message: axios.isAxiosError(meError)
+            ? meError.message
+            : meError instanceof Error
+              ? meError.message
+              : String(meError),
+        });
+        // If /auth/me fails with a real 401/403 even though login returned 200,
+        // treat the whole login as failed (cookie mismatch, DB role missing,
+        // suspended account, etc.) and present the error to the user instead
+        // of silently dropping them into a broken dashboard.
+        if (axios.isAxiosError(meError) && meError.response) {
+          const s = meError.response.status;
+          if (s === 401 || s === 403) {
+            setErrorMessage(
+              s === 401
+                ? "تعذر التأكد من الجلسة بعد تسجيل الدخول (401). تأكد من صحة كلمة المرور ثم أعد المحاولة."
+                : "هذا الحساب لا يملك صلاحيات للوصول للمصنع (403). تواصل مع مدير النظام.",
+            );
+            setStatus("unauthenticated");
+            clearAuthAccessToken();
+            resetAuthVerificationCache();
+            clear();
+            return;
+          }
+        }
+      }
+      // #endregion
+
+      setUser(
+        finalUser as {
+          name?: string;
+          username?: string;
+          role?: string;
+          permissions?: string[];
+          roles?: string[];
+          tenantId?: string;
+        } | null,
+      );
       resetAuthVerificationCache();
       // A different account may have used this browser before — drop every
       // cached row so the new session can never render the previous user's
@@ -154,29 +228,34 @@ export default function LoginPage() {
 
       setStatus("authenticated");
       safeNavigate(router, "/home");
-
     } catch (error: unknown) {
       // #region debug-point D:login-final-error
       reportDebug?.("D", "Login failed after retries", {
-        status: axios.isAxiosError(error) ? error.response?.status ?? null : null,
-        message: axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error),
-        responseData: axios.isAxiosError(error) ? error.response?.data ?? null : null,
+        status: axios.isAxiosError(error) ? (error.response?.status ?? null) : null,
+        message: axios.isAxiosError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error),
+        responseData: axios.isAxiosError(error) ? (error.response?.data ?? null) : null,
       });
       // #endregion
       if (axios.isAxiosError<{ message?: string }>(error) && error.response) {
         const status = error.response.status;
         const serverMessage = error.response.data?.message;
         if (status >= 500) {
-          setErrorMessage("خادم المصادقة يواجه مشكلة حالياً (500). تأكد من تشغيل الـ Backend وصحة إعداد NEXT_PUBLIC_API_URL.");
+          setErrorMessage(
+            "خادم المصادقة يواجه مشكلة حالياً (500). تأكد من تشغيل الـ Backend وصحة إعداد NEXT_PUBLIC_API_URL.",
+          );
         } else {
-          setErrorMessage(typeof serverMessage === "string" && serverMessage.trim()
-            ? serverMessage
-            : "بيانات الدخول غير صحيحة");
+          setErrorMessage(
+            typeof serverMessage === "string" && serverMessage.trim()
+              ? serverMessage
+              : "بيانات الدخول غير صحيحة",
+          );
         }
       } else if (axios.isAxiosError(error) && error.request) {
-        const isTimeout =
-          error.code === "ECONNABORTED" ||
-          /timeout/i.test(error.message);
+        const isTimeout = error.code === "ECONNABORTED" || /timeout/i.test(error.message);
         if (isTimeout) {
           setErrorMessage(
             "استغرق خادم المصادقة وقتاً أطول من المتوقع (قاعدة البيانات بطيئة/نائمة). تأكد من تشغيل قاعدة البيانات ثم أعد المحاولة.",
@@ -187,7 +266,7 @@ export default function LoginPage() {
           );
         }
       } else if (error instanceof Error) {
-          setErrorMessage(error.message || "حدث خطأ غير متوقع.");
+        setErrorMessage(error.message || "حدث خطأ غير متوقع.");
       } else {
         setErrorMessage("حدث خطأ غير متوقع.");
       }
@@ -205,14 +284,16 @@ export default function LoginPage() {
 
   return (
     /* خلفية هادئة (رمادي مزرق) تبرز فخامة الكحلي */
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans p-4 md:p-8 relative overflow-hidden" dir="rtl">
-      
+    <div
+      className="min-h-screen flex items-center justify-center bg-slate-100 font-sans p-4 md:p-8 relative overflow-hidden"
+      dir="rtl"
+    >
       {/* نقشة نسيج الجينز في الخلفية بشكل خفيف جداً */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none z-0"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12L12 0M-2 2L2 -2M10 14L14 10' stroke='%23263544' stroke-width='1' fill='none'/%3E%3C/svg%3E")`,
-          backgroundSize: '12px 12px'
+          backgroundSize: "12px 12px",
         }}
       />
 
@@ -222,33 +303,38 @@ export default function LoginPage() {
 
       {/* الحاوية الرئيسية (البطاقة الزجاجية) */}
       <div className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(38,53,68,0.3)] border border-white w-full max-w-5xl flex overflow-hidden relative z-10 min-h-150 animate-in fade-in zoom-in-95 duration-500">
-        
         {/* القسم الأيمن (هوية KU&M JEANS) - يظهر في الشاشات المتوسطة والكبيرة فقط */}
         {/* استخدمنا اللون الكحلي الخاص باللوغو #263544 */}
         <div className="hidden md:flex md:w-5/12 bg-[#263544] flex-col items-center justify-center p-12 text-center relative overflow-hidden outline-dashed outline-1 outline-white/20 outline-offset-[-12px]">
-          
           {/* زخارف مائية مأخوذة من فكرة اللوغو */}
           <div className="absolute top-12 right-12 text-white opacity-[0.03] -rotate-12 pointer-events-none">
             <Shield size={180} />
           </div>
-          
+
           <div className="relative z-10 flex flex-col items-center w-full">
             {/* أيقونة تعبر عن اللوغو مع لون رقعة الجلد #C89355 */}
             <div className="p-5 bg-[#1a2530] rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.5)] border border-[#C89355]/30 mb-8 relative outline-dashed outline-1 outline-[#C89355]/50 outline-offset-[-6px]">
               {/* لمحاكاة البرغي النحاسي (الزر) الموجود في الجينز */}
               <div className="absolute -top-3 -right-3 w-6 h-6 bg-[#C89355] rounded-full border-2 border-[#1a2530] shadow-inner flex items-center justify-center">
-                 <div className="w-2 h-2 bg-[#8c6032] rounded-full"></div>
+                <div className="w-2 h-2 bg-[#8c6032] rounded-full"></div>
               </div>
               <div className="absolute -bottom-3 -left-3 w-6 h-6 bg-[#C89355] rounded-full border-2 border-[#1a2530] shadow-inner flex items-center justify-center">
-                 <div className="w-2 h-2 bg-[#8c6032] rounded-full"></div>
+                <div className="w-2 h-2 bg-[#8c6032] rounded-full"></div>
               </div>
-              
+
               <Shield size={56} className="text-[#C89355]" strokeWidth={1.5} />
             </div>
-            
-            <h1 className="text-5xl font-serif font-black text-white tracking-wider mb-2" style={{ textShadow: "0 4px 10px rgba(0,0,0,0.5)" }}>KU&M</h1>
-            <p className="text-sm font-black text-[#C89355] uppercase tracking-[0.4em] mb-10 border-b border-[#C89355]/30 pb-4 w-full">J E A N S</p>
-            
+
+            <h1
+              className="text-5xl font-serif font-black text-white tracking-wider mb-2"
+              style={{ textShadow: "0 4px 10px rgba(0,0,0,0.5)" }}
+            >
+              KU&M
+            </h1>
+            <p className="text-sm font-black text-[#C89355] uppercase tracking-[0.4em] mb-10 border-b border-[#C89355]/30 pb-4 w-full">
+              J E A N S
+            </p>
+
             <h2 className="text-2xl font-bold text-white mb-3 tracking-wide">أصالة الصناعة</h2>
             <p className="text-slate-400 font-medium leading-relaxed text-sm px-4">
               نظام الإدارة المتكامل. يرجى تسجيل الدخول للوصول إلى لوحة تحكم الموظفين والرواتب.
@@ -258,15 +344,20 @@ export default function LoginPage() {
 
         {/* القسم الأيسر (نموذج الدخول) */}
         <div className="w-full md:w-7/12 p-8 md:p-16 flex flex-col justify-center items-center bg-transparent">
-          
           <div className="w-full max-w-sm relative z-20">
             <div className="text-center mb-10">
               <div className="md:hidden flex flex-col items-center justify-center mb-8">
-                <h1 className="text-4xl font-serif font-black text-[#263544] tracking-wider mb-1">KU&M</h1>
-                <p className="text-xs font-black text-[#C89355] uppercase tracking-[0.3em]">J E A N S</p>
+                <h1 className="text-4xl font-serif font-black text-[#263544] tracking-wider mb-1">
+                  KU&M
+                </h1>
+                <p className="text-xs font-black text-[#C89355] uppercase tracking-[0.3em]">
+                  J E A N S
+                </p>
               </div>
               <h2 className="text-3xl font-black text-[#263544] mb-2">تسجيل الدخول</h2>
-              <p className="text-slate-500 font-bold text-sm">أدخل بيانات الاعتماد الخاصة بك للوصول</p>
+              <p className="text-slate-500 font-bold text-sm">
+                أدخل بيانات الاعتماد الخاصة بك للوصول
+              </p>
             </div>
 
             {/* role="alert" so a screen reader announces the failure; without it
@@ -282,7 +373,6 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleLogin} className="space-y-5 flex flex-col text-right w-full">
-              
               {/* حقل اسم المستخدم */}
               <div className="w-full relative group">
                 {/* The visible design carries no label text, so the accessible
@@ -335,7 +425,11 @@ export default function LoginPage() {
                   aria-pressed={showPassword}
                   title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                 >
-                  {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+                  {showPassword ? (
+                    <EyeOff size={20} aria-hidden="true" />
+                  ) : (
+                    <Eye size={20} aria-hidden="true" />
+                  )}
                 </button>
                 <input
                   id="login-password"
@@ -357,8 +451,8 @@ export default function LoginPage() {
                   locked-out user clicks it and waits. Restore it together with
                   the endpoint. */}
               <div className="flex justify-end items-center w-full px-1">
-                <a 
-                  href="/clear-cache" 
+                <a
+                  href="/clear-cache"
                   className="text-xs font-bold text-slate-400 hover:text-[#263544] transition-colors"
                   title="إذا كنت تواجه مشاكل في تسجيل الدخول"
                 >
@@ -376,8 +470,10 @@ export default function LoginPage() {
               >
                 {/* خطوط خياطة داخلية للزر */}
                 <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none"></div>
-                
-                {isLoading ? <Loader2 className="animate-spin relative z-10 text-[#C89355]" size={24} /> : (
+
+                {isLoading ? (
+                  <Loader2 className="animate-spin relative z-10 text-[#C89355]" size={24} />
+                ) : (
                   <span className="flex items-center gap-2 relative z-10 tracking-wide">
                     <Tag size={18} className="text-[#C89355]" />
                     دخول إلى النظام

@@ -8,6 +8,7 @@ import { useSalaries } from "@/hooks/useSalaries";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import useDepartments from "@/hooks/useDepartments";
 import { toast } from "react-hot-toast";
+import apiClient from "@/lib/api-client";
 import type { Employee } from "@/types/employee";
 import type { AddEmployeeFormData } from "@/components/AddEmployeeModal";
 import type { FireEmployeePayload } from "@/components/FireEmployeeModal";
@@ -310,6 +311,7 @@ export default function EmployeesPage() {
   };
 
   const handleSaveEmployee = async (formData: AddEmployeeFormData) => {
+    const customFieldValues = (formData.customFields ?? {}) as Record<string, unknown>;
     const normalizedEmployeeId = formData.employeeId.trim();
     const monthlySalary = toNumber(formData.baseSalary);
     const maxHourlyRate = 99999999.99;
@@ -368,6 +370,12 @@ export default function EmployeesPage() {
     try {
       if (selectedEmployee) {
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
+        if (Object.keys(customFieldValues).length > 0) {
+          await apiClient.post(
+            `/customization/tenant/custom-field-values/employee/${selectedEmployee.employeeId}`,
+            customFieldValues,
+          );
+        }
         await Promise.all([refetchSalaries().catch(() => {})]);
       } else {
         // منع POST ب employeeId موجود مسبقاً
@@ -383,12 +391,14 @@ export default function EmployeesPage() {
         // Create employee with auto-retry on duplicate ID (backend may have IDs not in our cache)
         let currentPayload = { ...payload } as Employee;
         let currentId = normalizedEmployeeId;
+        let createdEmployeeId = currentId;
         const MAX_RETRIES = 5;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
             const result = await createEmployee.mutateAsync(currentPayload);
             void result;
+            createdEmployeeId = currentId;
             break; // success
           } catch (retryErr) {
             const errMsg = getErrorMessage(retryErr, "");
@@ -410,6 +420,13 @@ export default function EmployeesPage() {
 
             throw retryErr; // non-duplicate error or max retries reached
           }
+        }
+
+        if (Object.keys(customFieldValues).length > 0) {
+          await apiClient.post(
+            `/customization/tenant/custom-field-values/employee/${createdEmployeeId}`,
+            customFieldValues,
+          );
         }
 
         // Force immediate refresh with a small delay to ensure backend has updated

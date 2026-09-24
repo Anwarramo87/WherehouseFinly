@@ -316,13 +316,19 @@ export default function InventoryPage() {
     }
   };
 
-  const handleSaveItem = (payload: InventoryItemInput) => {
+  const handleSaveItem = (payload: InventoryItemInput, customFields: Record<string, unknown> = {}) => {
     const { profitPercent, ...rest } = payload;
     const body: InventoryItemInput = { ...rest };
     const profitValue = Number(profitPercent);
     if (profitPercent !== undefined && profitPercent !== null && profitPercent !== "" && Number.isFinite(profitValue)) {
       body.profitPercent = profitValue;
     }
+
+    const runAfterSave = async (createdOrUpdatedId: string) => {
+      if (Object.keys(customFields).length > 0) {
+        await apiClient.post(`/customization/tenant/custom-field-values/product/${createdOrUpdatedId}`, customFields);
+      }
+    };
 
     if (selectedItem) {
       updateItem.mutate(
@@ -331,7 +337,8 @@ export default function InventoryPage() {
           data: body,
         },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            await runAfterSave(selectedItem.id);
             setIsItemModalOpen(false);
             setSelectedItem(null);
           },
@@ -341,7 +348,11 @@ export default function InventoryPage() {
     }
 
     createItem.mutate(body, {
-      onSuccess: () => {
+      onSuccess: async (response) => {
+        const createdId = response?.data?.id ?? response?.data?.product?.id ?? response?.data?.productId ?? "";
+        if (createdId) {
+          await runAfterSave(createdId);
+        }
         setIsItemModalOpen(false);
       },
     });

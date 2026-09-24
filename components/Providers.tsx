@@ -8,6 +8,7 @@ import { Toaster } from "react-hot-toast";
 import { createQueryClient, setActiveQueryClient } from "@/lib/query-client-config";
 import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
 import RealtimeInvalidator from "@/components/RealtimeInvalidator";
+import TenantThemeProvider from "@/components/TenantThemeProvider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
@@ -56,6 +57,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   if (!persister) {
     return (
       <QueryClientProvider client={queryClient}>
+        <TenantThemeProvider />
         {children}
         <Toaster
           position="top-center"
@@ -71,6 +73,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <RealtimeInvalidator />
+      <TenantThemeProvider />
       {children}
       <Toaster
         position="top-center"

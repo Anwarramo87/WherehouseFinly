@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Save, X } from "lucide-react";
 import { InventoryItemInput } from "@/types/inventory";
 import PhotoUploadField from "@/components/PhotoUploadField";
+import EntityCustomFieldsForm from "@/components/EntityCustomFieldsForm";
 
 interface AddEditItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: InventoryItemInput) => void;
+  onSave: (data: InventoryItemInput, customFields?: Record<string, unknown>) => void;
   isPending?: boolean;
   initialData?: (Partial<InventoryItemInput> & { id?: string }) | null;
 }
@@ -42,6 +43,11 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
     }
     return defaultForm;
   });
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    setCustomFieldValues({});
+  }, [initialData?.id, isOpen]);
 
   const cost = Number(form.costPrice || 0);
   const price = Number(form.unitPrice || 0);
@@ -103,7 +109,7 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
           className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 text-right"
           onSubmit={(e) => {
             e.preventDefault();
-            onSave(form);
+            onSave(form, customFieldValues);
           }}
         >
           <div className="md:col-span-2">
@@ -248,6 +254,14 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
               value={form.reorderLevel}
               onChange={(e) => setForm((p) => ({ ...p, reorderLevel: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <EntityCustomFieldsForm
+              entity="product"
+              recordId={initialData?.id ?? null}
+              onChange={setCustomFieldValues}
             />
           </div>
 

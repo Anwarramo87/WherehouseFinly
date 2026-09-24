@@ -1,5 +1,7 @@
 import { clearAuthSession, getStoredUser, setAuthSession } from "@/lib/auth-session";
 import { PERSISTED_QUERY_CACHE_KEY } from "@/lib/query-cache";
+import { useAuthStore } from "@/stores/auth-store";
+import { getActiveFactoryId, useFactoryScopeStore } from "@/stores/factory-scope-store";
 import { describe, expect, it } from "vitest";
 
 describe("auth-session", () => {
@@ -33,6 +35,15 @@ describe("auth-session", () => {
     clearAuthSession();
 
     expect(localStorage.getItem(PERSISTED_QUERY_CACHE_KEY)).toBeNull();
+  });
+
+  it("clears a stale factory scope when auth ends", () => {
+    useFactoryScopeStore.getState().enter("tenant-123", "Factory A");
+    expect(getActiveFactoryId()).toBe("tenant-123");
+
+    useAuthStore.getState().clear();
+
+    expect(getActiveFactoryId()).toBeNull();
   });
 });
 

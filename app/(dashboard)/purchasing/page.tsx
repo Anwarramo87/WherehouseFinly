@@ -20,6 +20,7 @@ import {
 import { usePurchaseOrders, useSuppliers } from "@/hooks/useWms";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import EntityCustomFieldsForm from "@/components/EntityCustomFieldsForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
@@ -50,6 +51,7 @@ export default function PurchasingPage() {
   const qc = useQueryClient();
 
   const [supplierForm, setSupplierForm] = useState({ name: "", phone: "", email: "", taxNumber: "" });
+  const [supplierCustomFields, setSupplierCustomFields] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
 
   const rows = (orders?.data ?? []) as unknown as PurchaseOrderRow[];
@@ -216,14 +218,19 @@ export default function PurchasingPage() {
               }
               setSaving(true);
               try {
-                await apiClient.post("/purchasing/suppliers", {
+                const response = await apiClient.post("/purchasing/suppliers", {
                   name: supplierForm.name.trim(),
                   phone: supplierForm.phone || undefined,
                   email: supplierForm.email || undefined,
                   taxNumber: supplierForm.taxNumber || undefined,
                 });
+                const createdId = response?.data?.id ?? response?.data?.supplier?.id ?? "";
+                if (createdId && Object.keys(supplierCustomFields).length > 0) {
+                  await apiClient.post(`/customization/tenant/custom-field-values/supplier/${createdId}`, supplierCustomFields);
+                }
                 toast.success("تمت إضافة المورد");
                 setSupplierForm({ name: "", phone: "", email: "", taxNumber: "" });
+                setSupplierCustomFields({});
                 void qc.invalidateQueries({ queryKey: queryKeys.purchasing.all });
               } catch {
                 toast.error("فشل إضافة المورد");
@@ -260,6 +267,10 @@ export default function PurchasingPage() {
                 className={inputClass}
               />
             </Field>
+            <div className="md:col-span-5">
+              <EntityCustomFieldsForm entity="supplier" onChange={setSupplierCustomFields} />
+            </div>
+
             <div className="flex items-end">
               <Button type="submit" loading={saving}>
                 <Plus size={16} />

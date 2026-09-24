@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { clearAuthSession, getStoredUser, setAuthSession } from "@/lib/auth-session";
+import { useFactoryScopeStore } from "@/stores/factory-scope-store";
 
 export type AuthUser = {
   id?: string;
@@ -37,10 +38,20 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => {
         set({ user });
         setAuthSession(user);
+
+        const isSuperAdmin =
+          Array.isArray(user?.roles)
+            ? user.roles.includes("superadmin")
+            : user?.role === "superadmin";
+
+        if (!isSuperAdmin) {
+          useFactoryScopeStore.getState().leave();
+        }
       },
       setStatus: (status) => set({ status }),
       clear: () => {
         set({ user: null, status: "unauthenticated" });
+        useFactoryScopeStore.getState().leave();
         clearAuthSession();
       },
       hasAnyRole: (roles) => {

@@ -94,6 +94,7 @@ export default function DashboardLayout({
         className={`hidden lg:block shrink-0 h-screen transition-all duration-300 print:hidden ${
           isCollapsed ? "w-20" : "w-72"
         }`}
+        style={{ backgroundColor: "var(--brand-sidebar, #111827)" }}
       >
         <Suspense fallback={<aside className="hidden w-72 shrink-0 lg:block" aria-hidden="true" />}>
           <Sidebar
@@ -124,7 +125,7 @@ export default function DashboardLayout({
       </div>
 
       {/* ── Main content ── */}
-      <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning>
+      <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning style={{ backgroundColor: "var(--brand-bg, #f8fafc)" }}>
         {/* Only renders when the overseer has drilled into a factory. */}
         <FactoryScopeBanner />
         {/* Floating notifications bell (top-left in RTL) */}

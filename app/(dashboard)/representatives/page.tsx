@@ -22,6 +22,7 @@ import { useInventory } from "@/hooks/useInventory";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import apiClient from "@/lib/api-client";
+import EntityCustomFieldsForm from "@/components/EntityCustomFieldsForm";
 import { toast } from "react-hot-toast";
 
 const STATUS_TONE: Record<string, "green"|"red"|"amber"|"slate"> = {
@@ -191,6 +192,7 @@ function RepQuickActions({ repId, repName }: { repId: string; repName: string })
 function CreateRepModal({ onClose }: { onClose: () => void }) {
   const createRep = useCreateRepresentative();
   const [form, setForm] = useState({ userId: "", name: "", code: "", phone: "", email: "", notes: "" });
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
   const [users, setUsers] = useState<Array<{ id: string; username: string; email: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
@@ -206,7 +208,7 @@ function CreateRepModal({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = async () => {
     if (!form.userId || !form.name || !form.code) return toast.error("المستخدم والاسم والكود مطلوبة");
-    await createRep.mutateAsync({
+    const result = await createRep.mutateAsync({
       userId: form.userId,
       name: form.name,
       code: form.code,
@@ -214,6 +216,10 @@ function CreateRepModal({ onClose }: { onClose: () => void }) {
       email: form.email || undefined,
       notes: form.notes || undefined,
     });
+    const repId = (result as { id?: string } | undefined)?.id ?? "";
+    if (repId && Object.keys(customFieldValues).length > 0) {
+      await apiClient.post(`/customization/tenant/custom-field-values/representative/${repId}`, customFieldValues);
+    }
     onClose();
   };
 
@@ -254,6 +260,7 @@ function CreateRepModal({ onClose }: { onClose: () => void }) {
           <Field label="ملاحظات">
             <textarea value={form.notes} onChange={e => set("notes", e.target.value)} className={`${inputClass} h-20 resize-none`} />
           </Field>
+          <EntityCustomFieldsForm entity="representative" onChange={setCustomFieldValues} />
         </div>
         <div className="p-6 border-t border-white/80 bg-white/40 flex justify-end gap-3">
           <Button variant="ghost" onClick={onClose}>إلغاء</Button>
