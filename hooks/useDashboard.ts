@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { DashboardKpis } from "@/types/dashboard";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { useAuthStore } from "@/stores/auth-store";
 
 const SKELETON_TIMEOUT_MS = 4_000;
 const POLL_INTERVAL_ACTIVE_MS = 60_000;
@@ -81,9 +82,12 @@ export interface DashboardOvertimeEmployee {
 
 export const useDashboard = () => {
   const tabVisible = useIsTabVisible();
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard.home(),
+    enabled: authReady,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/dashboard/home");

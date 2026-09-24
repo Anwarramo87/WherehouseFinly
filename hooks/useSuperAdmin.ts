@@ -4,12 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import type { EntitlementModule } from "@/lib/entitlements";
+import { useAuthStore } from "@/stores/auth-store";
 
 export interface FactorySummary {
   id: string;
   name: string;
   code: string;
   status: string;
+  description?: string | null;
   createdAt: string;
   users: number;
   employees: number;
@@ -45,9 +47,50 @@ export const superAdminKeys = {
 
 /** Every factory. Super-admin only — the API refuses anyone else. */
 export function useFactories() {
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
   return useQuery<FactorySummary[]>({
     queryKey: superAdminKeys.factories,
+    enabled: authReady,
     queryFn: async () => (await apiClient.get("/admin/tenants")).data as FactorySummary[],
+  });
+}
+
+/** Next sequential factory code (factory000, factory001, ...). */
+export function useNextFactoryCode() {
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
+  return useQuery<string>({
+    queryKey: ["super-admin", "next-factory-code"],
+    enabled: authReady,
+    queryFn: async () => (await apiClient.get("/admin/tenants/next-code")).data.code as string,
+  });
+}
+
+/** Creates a zero-state factory (Tenant row only — no seed data). */
+export function useCreateFactory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      name: string;
+      code?: string;
+      description?: string;
+    }) => {
+      const response = await apiClient.post("/admin/tenants", input);
+      return response.data as FactorySummary;
+    },
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: superAdminKeys.factories });
+      void queryClient.invalidateQueries({ queryKey: ["super-admin", "next-factory-code"] });
+      toast.success(`تم إنشاء المصنع «${data.name}»`);
+    },
+    onError: (error) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "تعذّر إنشاء المصنع",
+      );
+    },
   });
 }
 

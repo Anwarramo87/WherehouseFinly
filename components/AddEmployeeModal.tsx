@@ -15,12 +15,12 @@ import {
   CalendarDays,
   Coins,
   Users,
-  UserCircle,
   Calendar,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRoles } from "@/hooks/useRoles";
 import { useAuthStore } from "@/stores/auth-store";
+import { getActiveFactoryId } from "@/stores/factory-scope-store";
 import useDepartments from "@/hooks/useDepartments";
 
 // Roles only the overseer may hand out. A factory admin creating employees
@@ -31,7 +31,6 @@ import PhotoUploadField from "@/components/PhotoUploadField";
 
 type EmployeeWithExtendedFields = Employee & {
   photo?: string | null;
-  username?: string | null;
   birthDate?: string | null;
   dateOfBirth?: string | null;
   gender?: string | null;
@@ -73,7 +72,6 @@ const normalizeDateValue = (value?: string | null) => {
 export type AddEmployeeFormData = {
   employeeId: string;
   name: string;
-  username: string;
   mobile: string;
   birthDate: string;
   gender: string;
@@ -105,7 +103,6 @@ interface Props {
 const defaultFormState = {
   employeeId: "",
   name: "",
-  username: "",
   mobile: "",
   birthDate: "",
   gender: "male",
@@ -142,7 +139,6 @@ export default function AddEmployeeModal({
     return "";
   });
   const [roleError, setRoleError] = useState("");
-  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
 
   const { data: roleOptions = [], isLoading: rolesLoading } = useRoles();
   const isSuperadminViewer = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
@@ -161,8 +157,6 @@ export default function AddEmployeeModal({
         return {
           employeeId: employee.employeeId || "",
           name: employee.name || "",
-          // تم إلغاء الدمج ليعود لأخذ الاسم الأول فقط
-          username: employee.username || employee.name?.split(" ")[0] || "",
           mobile: employee.mobile || "",
           birthDate: normalizeDateValue(employee.dateOfBirth ?? undefined),
           gender: employee.gender || "male",
@@ -229,18 +223,12 @@ export default function AddEmployeeModal({
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-
-    // تم إعادة المنطق القديم: تعبئة اسم المستخدم بالاسم الأول فقط
-    if (!isUsernameManuallyEdited) {
-      const firstName = newName.trim().split(" ")[0] || "";
-      setFormData({ ...formData, name: newName, username: firstName });
-    } else {
-      setFormData({ ...formData, name: newName });
-    }
+    setFormData({ ...formData, name: e.target.value });
   };
 
-  const resolvedRoleId = formData.roleId || visibleRoles[0]?.id || "";
+  // Role is never auto-picked: creating an employee must not silently
+  // assign admin/superadmin (or any role) — the user chooses explicitly.
+  const resolvedRoleId = formData.roleId || "";
 
   const liveTotalSalary = useCallback(() => {
     const base = Number(removeCommas(formData.baseSalary) || 0);
@@ -293,6 +281,13 @@ export default function AddEmployeeModal({
     } else {
       if (!resolvedRoleId) {
         setRoleError("يجب اختيار الدور الوظيفي");
+        return;
+      }
+
+      // المشرف العام بلا نطاق مصنع: صف الموظف سيكون بلا مصنع ويرفضه الباك (400)
+      // — نمنع الطلب مبكراً ونوجهه.
+      if (!initialData && isSuperadminViewer && !getActiveFactoryId()) {
+        toast.error("حساب المشرف العام لا ينتمي لأي مصنع — ادخل إلى المصنع المطلوب أولاً من (الإدارة ← المصانع) ثم أعد المحاولة.");
         return;
       }
 
@@ -463,28 +458,9 @@ export default function AddEmployeeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">اسم المستخدم</label>
-                <div className="relative group">
-                  <input
-                    type="text"
-                    className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner placeholder:text-slate-500 pr-11"
-                    value={formData.username}
-                    onChange={(e) => {
-                      setIsUsernameManuallyEdited(true);
-                      setFormData({ ...formData, username: e.target.value });
-                    }}
-                    placeholder="الاسم المستعار للنظام"
-                  />
-                  <UserCircle
-                    className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors"
-                    size={20}
-                  />
-                </div>
-              </div>
-
-              {/* 🌟 حقل تاريخ الميلاد بالتصميم الداكن السليم من الكود الحالي 🌟 */}
-              <div>
-                <label className="block text-sm font-bold text-[#C89355] mb-2">تاريخ الميلاد</label>
+                <label className="block text-sm font-bold text-[#C89355] mb-2">
+                  تاريخ الميلاد
+                </label>
                 <div className="relative group">
                   <input
                     type="date"
@@ -550,12 +526,15 @@ export default function AddEmployeeModal({
                   <select
                     required={step === 2}
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner cursor-pointer"
-                    value={formData.roleId || visibleRoles[0]?.id || ""}
+                    value={formData.roleId || ""}
                     onChange={(e) => {
                       setFormData({ ...formData, roleId: e.target.value });
                       if (roleError) setRoleError("");
                     }}
                   >
+                    <option value="" disabled>
+                      اختر الدور الوظيفي…
+                    </option>
                     {visibleRoles.map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.name}
@@ -566,7 +545,7 @@ export default function AddEmployeeModal({
                   <input
                     type="text"
                     required={step === 2}
-                    placeholder="أدخل اسم الدور أو معرّفه (مثال: admin)"
+                    placeholder="أدخل اسم الدور أو معرّفه (مثال: موظف)"
                     className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-xl focus:ring-2 focus:ring-[#C89355]/30 focus:border-[#C89355] outline-none transition-all text-white font-bold shadow-inner"
                     value={formData.roleId}
                     onChange={(e) => {

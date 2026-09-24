@@ -10,6 +10,7 @@ import {
   useNotificationStore,
   type NotificationItem,
 } from "@/stores/notification-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 type ListParams = {
   unreadOnly?: boolean;
@@ -20,6 +21,10 @@ type ListParams = {
 };
 
 export const useNotifications = (params?: ListParams) => {
+  // Gate on auth: firing before the session resolves yields a burst of 401s
+  // (and refresh storms) on first paint of every page with the bell.
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
   const query = useQuery<{ items: NotificationItem[]; nextCursor: string | null; hasMore: boolean }>({
     queryKey: queryKeys.notifications.list({
       unreadOnly: params?.unreadOnly,
@@ -38,7 +43,7 @@ export const useNotifications = (params?: ListParams) => {
       });
       return res.data;
     },
-    enabled: params?.enabled ?? true,
+    enabled: authReady && (params?.enabled ?? true),
     staleTime: 30_000,
   });
 
@@ -53,6 +58,8 @@ export const useNotifications = (params?: ListParams) => {
 };
 
 export const useUnreadNotificationCount = () => {
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
   const query = useQuery<number>({
     queryKey: queryKeys.notifications.unreadCount(),
     queryFn: async () => {
@@ -61,6 +68,7 @@ export const useUnreadNotificationCount = () => {
       useNotificationStore.getState().setUnreadCount(count);
       return count;
     },
+    enabled: authReady,
     refetchInterval: 60_000,
     staleTime: 30_000,
     // A 401/403 here is a permission verdict, not a blip -- retrying it just

@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Layers,
   Loader2,
+  Plus,
   Search,
   ShieldAlert,
   Users,
@@ -15,6 +16,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useFactoryScopeStore } from "@/stores/factory-scope-store";
+import CreateFactoryModal from "@/components/admin/CreateFactoryModal";
 
 export default function FactoriesPage() {
   const roles = useAuthStore((state) => state.user?.roles);
@@ -22,6 +24,7 @@ export default function FactoriesPage() {
   const isSuperAdmin = roles?.includes("superadmin") || role === "superadmin";
 
   const [query, setQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const { data: factories = [], isLoading, isError } = useFactories();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -67,14 +70,28 @@ export default function FactoriesPage() {
   return (
     <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 md:p-8" dir="rtl">
       <header className="relative mb-6 overflow-hidden rounded-3xl bg-[#263544] p-5 text-white shadow-lg sm:p-6">
-        <h1 className="flex items-center gap-2 text-xl font-black sm:text-2xl">
-          <Building2 size={22} aria-hidden="true" className="text-[#C89355]" />
-          المصانع
-        </h1>
-        <p className="mt-1 text-sm text-slate-300">
-          {stats.total} مصنع · {stats.active} نشط — اضغط على أي مصنع لفتح صفحته.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="flex items-center gap-2 text-xl font-black sm:text-2xl">
+              <Building2 size={22} aria-hidden="true" className="text-[#C89355]" />
+              المصانع
+            </h1>
+            <p className="mt-1 text-sm text-slate-300">
+              {stats.total} مصنع · {stats.active} نشط — اضغط على أي مصنع لفتح صفحته.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 rounded-2xl bg-[#C89355] px-5 py-2.5 text-sm font-black text-[#101720] shadow-[0_0_20px_rgba(200,147,85,0.3)] transition-all hover:bg-[#d0b468] active:scale-95"
+          >
+            <Plus size={18} aria-hidden="true" />
+            إنشاء معمل جديد
+          </button>
+        </div>
       </header>
+
+      <CreateFactoryModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
 
       {isLoading && (
         <p className="flex items-center gap-2 py-8 text-sm text-slate-500">
@@ -91,7 +108,7 @@ export default function FactoriesPage() {
 
       {!isLoading && !isError && factories.length === 0 && (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          لا توجد مصانع بعد.
+          لا توجد مصانع بعد — اضغط «إنشاء معمل جديد» للبدء.
         </p>
       )}
 
@@ -157,6 +174,11 @@ function FactoryCard({
             <span className="mt-0.5 block truncate font-mono text-[11px] font-bold text-slate-400">
               {factory.code}
             </span>
+            {factory.description ? (
+              <span className="mt-1 block truncate text-[11px] font-bold text-slate-400">
+                {factory.description}
+              </span>
+            ) : null}
           </span>
           <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${active ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-700 ring-amber-200"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />

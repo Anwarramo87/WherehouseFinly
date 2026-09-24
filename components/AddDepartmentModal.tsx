@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import { X, Building2, UserCog, CalendarDays, Save, Loader2, Search, ChevronLeft, Check } from "lucide-react";
 import useDepartments from "@/hooks/useDepartments";
 import { useEmployees, useResignedEmployees } from "@/hooks/useEmployees";
+import { useAuthStore } from "@/stores/auth-store";
+import { getActiveFactoryId } from "@/stores/factory-scope-store";
+import { getApiErrorMessage } from "@/lib/http/error";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
 import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
 
@@ -38,6 +41,9 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
   const empDropdownRef = useRef<HTMLDivElement>(null);
   const empInputRef = useRef<HTMLInputElement>(null);
   const { createDepartment, updateDepartment } = useDepartments();
+  // المشرف العام بلا نطاق مصنع: إنشاء قسم حينها مرفوض من الباك (400) لأن
+  // الصف سيكون يتيماً — نمنع الطلب مبكراً ونوجه المستخدم لاختيار المصنع.
+  const isSuperAdmin = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
   const { data: rawEmployees = [] } = useEmployees({ fetchAll: true });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const allEmployees = useMemo(() => {
@@ -125,6 +131,12 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
     e.preventDefault();
     if (!form.name || isSubmitting) return;
 
+    // إنشاء قسم جديد (وليس تعديل) يتطلب نطاق مصنع للمشرف العام
+    if (!initialData?.id && isSuperAdmin && !getActiveFactoryId()) {
+      setErrorMessage("حساب المشرف العام لا ينتمي لأي مصنع — ادخل إلى المصنع المطلوب أولاً من (الإدارة ← المصانع) ثم أعد المحاولة.");
+      return;
+    }
+
     setErrorMessage(null);
     setIsSubmitting(true);
 
@@ -138,7 +150,8 @@ function DepartmentModalContent({ isOpen, onClose, onSave, initialData }: Props)
       if (status === 409) {
         setErrorMessage(`القسم "${form.name}" موجود بالفعل. يرجى استخدام اسم آخر.`);
       } else {
-        setErrorMessage("تعذر حفظ القسم حالياً. حاول مرة أخرى.");
+        // يعرض رسالة الباك (مثال: رفض الإنشاء بدون مصنع) بدل رسالة عامة
+        setErrorMessage(getApiErrorMessage(error, "تعذر حفظ القسم حالياً. حاول مرة أخرى."));
       }
     } finally {
       setIsSubmitting(false);

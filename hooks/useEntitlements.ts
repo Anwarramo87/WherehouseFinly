@@ -22,8 +22,11 @@ export const entitlementsQueryKey = (userId?: string | null) =>
  */
 export function useEntitlements() {
   const userId = useAuthStore((s) => s.user?.id ?? s.user?._id ?? null);
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
   return useQuery<EntitlementsResponse>({
     queryKey: entitlementsQueryKey(userId),
+    enabled: authReady,
     queryFn: async () => {
       const response = await apiClient.get("/entitlements/me");
       return response.data as EntitlementsResponse;

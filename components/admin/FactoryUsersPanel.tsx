@@ -77,7 +77,6 @@ export default function FactoryUsersPanel({
   const [isAdding, setIsAdding] = useState(false);
   const [entitlementsUserId, setEntitlementsUserId] = useState<string | null>(null);
   const [subscriptionUserId, setSubscriptionUserId] = useState<string | null>(null);
-  const [showEmployees, setShowEmployees] = useState(false);
   const [form, setForm] = useState({ username: "", email: "", password: "", roleId: "" });
 
   const { data: userEntitlements } = useFactoryUserEntitlements(tenantId, entitlementsUserId);
@@ -126,24 +125,21 @@ export default function FactoryUsersPanel({
   const canSubmit =
     form.username.trim().length > 0 && form.password.length >= 8 && form.roleId.length > 0;
 
+  // Only admin-level roles are creatable from SuperAdmin.
+  // Regular employees (role === "employee") must be added inside the
+  // tenant's own HR module (/employees), not from here.
+  const adminRoles = roles.filter((r) => {
+    const name = (r.name ?? "").trim().toLowerCase();
+    return name !== "employee" && name !== "staff";
+  });
+
   /** حسابات السوبر أدمن لا تخضع للاشتراك — وصول مفتوح دائماً */
   const isSuperAdminAccount = (user: FactoryUser) => {
     const r = (user.role?.name ?? "").trim().toLowerCase();
     return r === "superadmin" || r === "super_admin" || r === "super admin";
   };
 
-  // Rank-and-file employees each hold a login account (payslips, self-service),
-  // but this panel manages the factory's *admins* — employee accounts stay
-  // hidden unless explicitly revealed, so a 500-worker factory doesn't bury
-  // the 2 people who actually run it.
-  const isEmployeeAccount = (user: FactoryUser) => {
-    const role = (user.role?.name ?? "").trim().toLowerCase();
-    return role === "employee" || role === "staff";
-  };
-  const employeeCount = users.filter(isEmployeeAccount).length;
-  const visibleUsers = showEmployees ? users : users.filter((u) => !isEmployeeAccount(u));
-
-  const activeCount = visibleUsers.filter((u) => u.status === "active").length;
+  const activeCount = users.filter((u) => u.status === "active").length;
   const selectedUser = entitlementsUserId ? users.find((u) => u.id === entitlementsUserId) : null;
   const selectedSubUser = subscriptionUserId
     ? users.find((u) => u.id === subscriptionUserId)
@@ -172,20 +168,8 @@ export default function FactoryUsersPanel({
               <h3 className="flex items-center gap-2 text-[15px] font-black text-[#263544]">
                 حسابات الدخول
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                  {visibleUsers.length} حساب
+                  {users.length} حساب
                 </span>
-                {employeeCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowEmployees((v) => !v)}
-                    className="rounded-full bg-[#C89355]/15 px-2 py-0.5 text-[11px] font-bold text-[#263544] ring-1 ring-[#C89355]/30 hover:bg-[#C89355]/25"
-                    title={showEmployees ? "إخفاء حسابات الموظفين" : "إظهار حسابات الموظفين"}
-                  >
-                    {showEmployees
-                      ? `إخفاء الموظفين (${employeeCount})`
-                      : `+ ${employeeCount} موظف مخفي`}
-                  </button>
-                )}
               </h3>
               <p className="mt-0.5 max-w-[42ch] text-xs leading-5 text-slate-500">
                 من يستطيع الدخول إلى <span className="font-bold text-[#263544]">{factoryName}</span>
@@ -266,7 +250,7 @@ export default function FactoryUsersPanel({
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm outline-none transition-colors focus:border-[#263544] focus:ring-2 focus:ring-[#263544]/10"
                 >
                   <option value="">اختر دوراً…</option>
-                  {roles.map((role) => (
+                  {adminRoles.map((role) => (
                     <option key={role.id} value={role.id}>
                       {role.name}
                     </option>
@@ -306,39 +290,19 @@ export default function FactoryUsersPanel({
           </div>
         )}
 
-        {!isLoading && visibleUsers.length === 0 && (
+        {!isLoading && users.length === 0 && (
           <div className="px-6 py-10 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <Search size={20} aria-hidden="true" />
             </div>
-            {users.length > 0 ? (
-              <>
-                <p className="text-sm font-bold text-slate-600">
-                  كل حسابات هذا المصنع ({users.length}) لموظفين
-                </p>
-                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
-                  حسابات الموظفين مخفية افتراضياً لأنها للإدارة الذاتية فقط.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowEmployees(true)}
-                  className="mt-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-[#C89355]/50 hover:bg-[#C89355]/10"
-                >
-                  عرض حسابات الموظفين ({employeeCount})
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-bold text-slate-600">لا توجد حسابات لهذا المصنع بعد</p>
-                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
-                  أنشئ أول حساب ليتمكن فريقه من تسجيل الدخول وإدارة بياناته.
-                </p>
-              </>
-            )}
+            <p className="text-sm font-bold text-slate-600">لا توجد حسابات لهذا المصنع بعد</p>
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
+              أنشئ أول حساب ليتمكن فريقه من تسجيل الدخول وإدارة بياناته.
+            </p>
           </div>
         )}
 
-        {visibleUsers.length > 0 && (
+        {users.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -351,7 +315,7 @@ export default function FactoryUsersPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visibleUsers.map((user) => {
+                {users.map((user) => {
                   const isSelected =
                     entitlementsUserId === user.id || subscriptionUserId === user.id;
                   return (

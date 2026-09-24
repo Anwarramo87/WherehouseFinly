@@ -15,18 +15,18 @@ import {
 import { useAuthStore } from "@/stores/auth-store";
 import { useFactories } from "@/hooks/useSuperAdmin";
 import FactoryUsersPanel from "@/components/admin/FactoryUsersPanel";
-import { FactoryEmployeesTab } from "@/components/admin/FactoryEmployeesTab";
+import { FactoryDepartmentsTab } from "@/components/admin/FactoryDepartmentsTab";
 
-type Tab = "employees" | "accounts";
+type Tab = "departments" | "accounts";
 
 const tabs = [
-  { key: "employees", label: "الموظفون", icon: Users },
-  { key: "accounts", label: "الحسابات والاشتراكات", icon: KeyRound },
+  { key: "departments" as const, label: "الأقسام", icon: Users },
+  { key: "accounts" as const, label: "الحسابات والاشتراكات", icon: KeyRound },
 ] as const;
 
 /**
  * صفحة مصنع واحد: الكبس على مصنع من /admin/factories يفتحها.
- * تبويب الموظفون = بليست موظفي هذا المصنع فقط.
+ * تبويب الأقسام = أقسام هذا المصنع فقط.
  * تبويب الحسابات = حسابات الآدمن + اشتراك كل حساب لحاله (أشهر/أيام مخصصة).
  * الاشتراك هنا لكل حساب آدمن فقط — لا يوجد اشتراك موحّد للمصنع كله.
  */
@@ -38,9 +38,9 @@ export default function FactoryDetailsPage() {
   const role = useAuthStore((state) => state.user?.role);
   const isSuperAdmin = roles?.includes("superadmin") || role === "superadmin";
 
-  const [tab, setTab] = useState<Tab>("employees");
-  const { data: factories = [], isLoading, isError } = useFactories();
-  const factory = factories.find((f) => f.id === tenantId) ?? null;
+   const [tab, setTab] = useState<Tab>("departments");
+   const { data: factories = [], isLoading, isError } = useFactories();
+   const factory = factories.find((f) => f.id === tenantId) ?? null;
 
   if (!isSuperAdmin) {
     return (
@@ -130,9 +130,9 @@ export default function FactoryDetailsPage() {
             ))}
           </nav>
 
-          {tab === "employees" && (
-            <section aria-label="موظفو المصنع">
-              <FactoryEmployeesTab tenantId={factory.id} />
+          {tab === "departments" && (
+            <section aria-label="أقسام المصنع">
+              <FactoryDepartmentsTab tenantId={factory.id} />
             </section>
           )}
 

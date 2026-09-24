@@ -26,11 +26,14 @@ export const useDepartments = () => {
   // another factory's cached departments after switching accounts on one browser.
   // The super admin drilling into a factory is additionally keyed by factory scope.
   const authTenantId = useAuthStore((s) => s.user?.tenantId ?? null);
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
   const factoryId = useFactoryScopeStore((s) => s.factoryId);
   const scopeKey = factoryId ?? authTenantId ?? "no-tenant";
 
   const listQuery = useQuery({
     queryKey: [...queryKeys.departments.all, scopeKey],
+    enabled: authReady,
     queryFn: async () => {
       const data = await api.get<DepartmentsResponse | Department[]>("/departments");
       // normalize shape

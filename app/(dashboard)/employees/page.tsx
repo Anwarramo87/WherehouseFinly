@@ -79,7 +79,6 @@ type EmployeeRow = Employee & {
 };
 
 type ModalInitialEmployee = Employee & {
-  username?: string | null;
   jobTitle?: string | null;
   baseSalary?: number | string | null;
   lumpSumSalary?: number | string | null;
@@ -99,19 +98,26 @@ const resolveDisplayedMonthlySalary = (employee: EmployeeRow, salaryMap: Map<str
       (toNumber(salaryRecord.insuranceAmount) || 0);
 
     if (Number.isFinite(fixedTotal) && fixedTotal > 0) return fixedTotal;
-
-    const g3 =
-      (toNumber(salaryRecord.baseSalary) || 0) +
-      (toNumber(salaryRecord.livingAllowance) || 0) +
-      (toNumber(salaryRecord.transportAllowance) || 0) -
-      (toNumber(salaryRecord.insuranceAmount) || 0);
-    if (g3 > 0) {
-      return g3;
-    }
   }
 
+  // Prefer the stored monthly baseSalary. Reconstructing from hourlyRate
+  // corrupted values like 1,000,000 → 888,888 when hoursPerDay was 9
+  // (hourly = 4273.50 after toFixed(2); 4273.50 × 8 × 26 = 888,888).
+  const storedBase = toNumber(employee.baseSalary);
+  if (storedBase > 0) {
+    const living = toNumber(employee.livingAllowance);
+    const transport = toNumber(employee.transportAllowance);
+    const insurance = toNumber(employee.insuranceAmount);
+    const net = storedBase + living + transport - insurance;
+    return net > 0 ? net : storedBase;
+  }
+
+  // Last resort: rebuild from hourly using the employee's OWN schedule —
+  // never hardcode 8×26, which disagrees with a 9-hour day.
   const hourly = toNumber(employee.hourlyRate);
-  return Math.round(hourly * 8 * 26);
+  const hours = toNumber((employee as { hoursPerDay?: number }).hoursPerDay) || 8;
+  const days = toNumber((employee as { workDaysInPeriod?: number }).workDaysInPeriod) || 26;
+  return Math.round(hourly * hours * days);
 };
 
 export default function EmployeesPage() {
@@ -198,9 +204,6 @@ export default function EmployeesPage() {
 
     return {
       ...selectedEmployee,
-      username:
-        (selectedEmployee as Employee & { username?: string | null }).username ||
-        selectedEmployee.name,
       birthDate: selectedEmployee.dateOfBirth || null,
       baseSalary: normalizeDecimal(selectedEmployee.baseSalary),
       lumpSumSalary: normalizeDecimal(
@@ -323,7 +326,6 @@ export default function EmployeesPage() {
     }
 
     const payload: Partial<Employee> & {
-      username?: string;
       dateOfBirth?: string;
       baseSalary?: number;
       lumpSumSalary?: number;
@@ -363,16 +365,6 @@ export default function EmployeesPage() {
     // Clearing insurance means removing the deduction, not preserving its old value.
     payload.insuranceAmount = toNumber(formData.insuranceAmount);
 
-    if (!selectedEmployee) {
-      // Generate a safe username: use trimmed input OR fall back to employeeId (guaranteed unique)
-      const rawUsername = formData.username.trim();
-      // Auto-generate unique username to avoid conflicts
-      const baseUsername =
-        rawUsername || formData.name.trim().split(" ")[0] || normalizedEmployeeId;
-      // Append employeeId suffix to ensure uniqueness
-      payload.username = `${baseUsername}_${normalizedEmployeeId}`;
-    }
-
     try {
       if (selectedEmployee) {
         await updateEmployee.mutateAsync({ id: selectedEmployee.employeeId, data: payload });
@@ -391,7 +383,6 @@ export default function EmployeesPage() {
         // Create employee with auto-retry on duplicate ID (backend may have IDs not in our cache)
         let currentPayload = { ...payload } as Employee;
         let currentId = normalizedEmployeeId;
-        let currentUsername = payload.username as string | undefined;
         const MAX_RETRIES = 5;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -410,17 +401,9 @@ export default function EmployeesPage() {
               const nextNum = numMatch ? parseInt(numMatch[1], 10) + 1 : attempt + 1;
               currentId = `EMP${String(nextNum).padStart(5, "0")}`;
 
-              // Also generate a new unique username
-              const baseUsername =
-                (currentPayload.username as string | undefined)?.replace(/_EMP\d+$/, "") ||
-                formData.name.trim().split(" ")[0] ||
-                currentId;
-              currentUsername = `${baseUsername}_${currentId}`;
-
               currentPayload = {
                 ...currentPayload,
                 employeeId: currentId,
-                username: currentUsername,
               };
               continue;
             }

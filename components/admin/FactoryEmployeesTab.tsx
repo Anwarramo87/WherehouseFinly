@@ -50,7 +50,7 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
   const employees = data?.groups.flatMap((g) => g.employees) ?? [];
   const pagination = data?.pagination;
 
-  // تجميع موظفي الصفحة الحالية حسب القسم/المعمل.
+  // تجميع موظفي الصفحة الحالية حسب القسم.
   // ملاحظة: التجميع يتم على نتائج الصفحة الحالية فقط لأن الـ API مرقّم (50 لكل صفحة).
   const deptGroups = useMemo(() => {
     const map = new Map<string, RosterEmployee[]>();
@@ -66,7 +66,7 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
     });
   }, [employees]);
 
-  // القسم المفتوح حالياً — null يعني عرض شبكة المعامل (مقفلة)، اسم يعني عرض موظفي ذلك المعمل
+  // القسم المفتوح حالياً — null يعني عرض شبكة الأقسام (مقفلة)، اسم يعني عرض موظفي ذلك القسم
   const [openDept, setOpenDept] = useState<string | null>(null);
   const openEmployees = useMemo(
     () => deptGroups.find(([name]) => name === openDept)?.[1] ?? [],
@@ -140,13 +140,13 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
                   <Building2 size={20} aria-hidden="true" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-base font-black text-[#263544]">
-                    معمل {deptName}
-                  </span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                    <Users size={13} className="text-[#C89355]" aria-hidden="true" />
-                    {emps.length} {emps.length === 1 ? "موظف" : "موظفين"}
-                  </span>
+                       <span className="block truncate text-base font-black text-[#263544]">
+                     قسم {deptName}
+                   </span>
+                   <span className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                     <Users size={13} className="text-[#C89355]" aria-hidden="true" />
+                     {emps.length} {emps.length === 1 ? "موظف" : "موظفين"}
+                   </span>
                 </span>
               </span>
               <ChevronLeft
@@ -166,16 +166,16 @@ export function FactoryEmployeesTab({ tenantId }: { tenantId: string }) {
             onClick={() => setOpenDept(null)}
             className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:text-[#263544]"
           >
-            <ArrowRight size={15} aria-hidden="true" />
-            عودة للمعامل
-          </button>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#263544] text-[#C89355]">
-              <Building2 size={18} aria-hidden="true" />
-            </span>
-            <h3 className="text-base font-black text-[#263544]">
-              معمل {openDept} · {openEmployees.length} {openEmployees.length === 1 ? "موظف" : "موظفين"}
-            </h3>
+             <ArrowRight size={15} aria-hidden="true" />
+             عودة للأقسام
+           </button>
+           <div className="mb-3 flex items-center gap-2">
+             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#263544] text-[#C89355]">
+               <Building2 size={18} aria-hidden="true" />
+             </span>
+             <h3 className="text-base font-black text-[#263544]">
+               قسم {openDept} · {openEmployees.length} {openEmployees.length === 1 ? "موظف" : "موظفين"}
+             </h3>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="min-w-full text-sm">

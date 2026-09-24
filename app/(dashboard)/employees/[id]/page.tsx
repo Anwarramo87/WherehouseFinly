@@ -241,12 +241,11 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
   const extEmployee = employee as ExtendedEmployee;
 
   const salaryBreakdown = useMemo(() => {
-    const fallbackBase =
-      toNumber(extEmployee?.baseSalary) ||
-      toNumber(extEmployee?.salary) ||
-      toNumber(extEmployee?.hourlyRate);
+    // Prefer the stored monthly base — never fall back to raw hourlyRate
+    // (that path turned 1,000,000 into 4,273 or fed the 8×26 corruption).
+    const employeeBase = toNumber(extEmployee?.baseSalary) || toNumber(extEmployee?.salary);
     const baseSalary =
-      salary && toNumber(salary.baseSalary) > 0 ? toNumber(salary.baseSalary) : fallbackBase;
+      salary && toNumber(salary.baseSalary) > 0 ? toNumber(salary.baseSalary) : employeeBase;
     const fixedEarnings = salary
       ? toNumber(salary.baseSalary) +
         (toNumber(salary.lumpSumSalary) || 0) +

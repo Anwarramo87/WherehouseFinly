@@ -7,6 +7,7 @@ import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { getApiErrorMessage } from "@/lib/http/error";
 import { queryKeys } from "@/lib/query-keys";
 import axios from "axios";
+import { useAuthStore } from "@/stores/auth-store";
 
 /** Re-export for backwards-compat with components that import getErrorMessage from here */
 export const getErrorMessage = getApiErrorMessage;
@@ -70,6 +71,10 @@ export const filterEmployeesByOptions = (employees: Employee[], options?: UseEmp
 export const useEmployees = (options?: UseEmployeesOptions) => {
   const queryClient = useQueryClient();
   const router = useRouter();
+  // Never fire before the session resolves — a pre-auth GET /employees is a
+  // guaranteed 401 (and a refresh storm on first paint).
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
   const safeLimit = Math.min(Math.max(options?.limit ?? 500, 1), 500); // Changed from 200 to 500
   const fetchAll = options?.fetchAll ?? false;
@@ -87,6 +92,7 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       limit: safeLimit,
       fetchAll,
     }),
+    enabled: authReady,
     queryFn: async () => {
       const requestEmployees = async (page?: number) => {
         const params = {
@@ -208,11 +214,11 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
       // Only send fields accepted by CreateEmployeeDto
       // forbidNonWhitelisted:true on the backend rejects any unknown fields
+      // No username/password: employee creation does not create a login
+      // account — those are created explicitly via FactoryUsersPanel.
       const payload: Record<string, unknown> = {
         employeeId: newEmployee.employeeId,
         name: newEmployee.name,
-        username: (newEmployee as unknown as Record<string, unknown>).username,
-        password: (newEmployee as unknown as Record<string, unknown>).password,
         mobile: newEmployee.mobile,
         nationalId: newEmployee.nationalId,
         dateOfBirth: newEmployee.dateOfBirth,
@@ -326,7 +332,6 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
       pick("roleId"); pick("scheduledStart"); pick("scheduledEnd");
       pick("employmentStartDate"); pick("workDaysInPeriod"); pick("hoursPerDay");
       pick("gracePeriodMinutes"); pick("biometricNumber"); pick("photo");
-      pick("username"); pick("password");
 
       if (normalizedHourlyRate !== undefined) payload.hourlyRate = normalizedHourlyRate;
 
@@ -445,9 +450,12 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 // regardless of which month is being viewed.
 export const useResignedEmployees = (month?: string) => {
   const queryClient = useQueryClient();
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
   const query = useQuery<Employee[]>({
     queryKey: ["resigned-employees", month ?? "all"],
+    enabled: authReady,
     queryFn: async () => {
       const response = await apiClient.get("/employees/resigned", {
         params: { limit: 500, page: 1, ...(month ? { month } : {}) },

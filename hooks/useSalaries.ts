@@ -8,6 +8,7 @@ import { QUERY_GC_TIME, QUERY_STALE_TIME } from "@/lib/query-cache";
 import { queryKeys } from "@/lib/query-keys";
 import { getApiErrorMessage as getErrorMessage } from "@/lib/http/error";
 import { toNumber } from "@/lib/number-utils";
+import { useAuthStore } from "@/stores/auth-store";
 
 const normalizeSalary = (raw: Record<string, unknown>): Salary => {
   const baseSalary = toNumber(raw.baseSalary);
@@ -35,10 +36,12 @@ const normalizeSalary = (raw: Record<string, unknown>): Salary => {
   } as Salary;
 };
 
-export const useEmployeeSalary = (employeeId?: string) =>
-  useQuery<Salary | null>({
+export const useEmployeeSalary = (employeeId?: string) => {
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
+  return useQuery<Salary | null>({
     queryKey: queryKeys.salaries.detail(employeeId || ""),
-    enabled: !!employeeId,
+    enabled: authReady && !!employeeId,
     queryFn: async () => {
       try {
         const res = await apiClient.get(`/salary/${employeeId}`);
@@ -56,6 +59,7 @@ export const useEmployeeSalary = (employeeId?: string) =>
     staleTime: QUERY_STALE_TIME.RELAXED,
     gcTime: QUERY_GC_TIME.RELAXED,
   });
+};
 
 /**
  * Hook that provides salaries list + helpers for single salary + mutations.
@@ -70,10 +74,12 @@ export const useEmployeeSalary = (employeeId?: string) =>
 export const useSalaries = (enabled = true) => {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const authReady =
+    useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
   const salariesQuery = useQuery<Salary[]>({
     queryKey: queryKeys.salaries.all,
-    enabled,
+    enabled: authReady && enabled,
     queryFn: async () => {
       const res = await apiClient.get("/salary");
       const data = res.data?.salaries ?? res.data;

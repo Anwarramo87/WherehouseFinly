@@ -75,11 +75,21 @@ const apiClient = axios.create({
   },
 });
 
-// Remove undefined / null / "undefined" values from query params and body so
-// axios never serializes them as the literal string "undefined" (which makes
-// the backend reject the request with a 400 validation error).
+// Remove undefined / "undefined" values from query params and body so axios
+// never serializes them as the literal string "undefined" (which makes the
+// backend reject the request with a 400 validation error).
 const isEmptyParam = (value: unknown): boolean =>
   value === undefined ||
+  (typeof value === "string" && value.trim().toLowerCase() === "undefined");
+
+// Query params only: also drop null and blank strings. Nest's forbidNonWhitelisted
+// + @IsNumberString reject `?page=` / `?page=null` with a 400 before the DTO
+// transform ever runs. Body keeps the looser isEmptyParam so intentional
+// clear-to-empty / clear-to-null field updates still go through.
+const isEmptyQueryParam = (value: unknown): boolean =>
+  value === null ||
+  value === undefined ||
+  (typeof value === "string" && value.trim() === "") ||
   (typeof value === "string" && value.trim().toLowerCase() === "undefined");
 
 apiClient.interceptors.request.use((config) => {
@@ -121,7 +131,7 @@ apiClient.interceptors.request.use((config) => {
   if (config.params && typeof config.params === "object") {
     const cleaned: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(config.params)) {
-      if (!isEmptyParam(value)) cleaned[key] = value;
+      if (!isEmptyQueryParam(value)) cleaned[key] = value;
     }
     config.params = cleaned;
   }
