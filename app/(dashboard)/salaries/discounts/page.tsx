@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,8 @@ import { Advance, AdvanceInput } from "@/types/advance";
 import { MonthPeriodSelector } from "@/components/MonthPeriodSelector";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
 import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
+import { formatNumberEn } from "@/lib/number-utils";
+import { toLocalDateString } from "@/lib/date-time";
 
 const AddDiscountModal = dynamic(() => import("@/components/AddDiscountModal"), { loading: () => null });
 const AddAdvanceModal = dynamic(() => import("@/components/AddAdvanceModal"), { loading: () => null });
@@ -26,7 +28,24 @@ export default function DiscountsPage() {
   React.useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true); }, []);
 
-  const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
+  const period = searchParams.get("period") || toLocalDateString().slice(0, 7);
+
+  /** عرض التاريخ بأرقام إنجليزية DD/MM/YYYY مثل سجل الحضور */
+  const formatDateEn = (date: string) => {
+    const d = new Date(`${date.slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return date.slice(0, 10);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `${day}/${month}/${d.getFullYear()}`;
+  };
+
+  // اختيار الشهر يعرض كل خصومات الشهر — بدون اشتراط يوم محدد.
+  const handlePeriodChange = (newPeriod: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("period", newPeriod);
+    params.delete("date");
+    router.replace(`?${params.toString()}`);
+  };
   const { data: discounts = [], createDiscount, updateDiscount, deleteDiscount } = useDiscounts(undefined, period);
   const { createAdvance, updateAdvance } = useAdvances(undefined, period);
 
@@ -209,20 +228,16 @@ export default function DiscountsPage() {
               <div className="relative z-10 flex flex-col">
                 <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider mb-0.5">إجمالي الاقتطاعات</span>
                 <span className="text-xl font-mono font-black text-rose-300 drop-shadow-md">
-                  {mounted ? totalDeductions.toLocaleString() : "0"} <span className="text-[10px] text-rose-400/70">ل.س</span>
+                  {mounted ? formatNumberEn(totalDeductions) : formatNumberEn(0)} <span className="text-[10px] text-rose-400/70">ل.س</span>
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-              {/* Month Period Selector */}
+              {/* Month Period Selector — اختيار الشهر يعرض كل الشهر */}
               <MonthPeriodSelector
                 value={period}
-                onChange={(newPeriod) => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("period", newPeriod);
-                  router.replace(`?${params.toString()}`);
-                }}
+                onChange={handlePeriodChange}
                 className="flex-1 sm:flex-none"
               />
 
@@ -260,12 +275,13 @@ export default function DiscountsPage() {
                   <th className="p-5 text-[#263544] font-black text-xs uppercase text-center w-28">الكود</th>
                   <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">الموظف / المستهدف</th>
                   <th className="p-5 text-rose-600 font-black text-xs uppercase text-center">إجمالي الخصومات</th>
+                  <th className="p-5 text-[#263544] font-black text-xs uppercase text-center">عدد السجلات</th>
                   <th className="p-5 text-[#263544] font-black text-xs uppercase text-center w-24">التفاصيل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/40">
                 {!mounted || groupedDiscounts.length === 0 ? (
-                  <tr><td colSpan={4} className="p-16 text-center text-[#263544]/60 font-black">{mounted ? "لا توجد سجلات خصومات أو سلف مسجلة." : ""}</td></tr>
+                  <tr><td colSpan={5} className="p-16 text-center text-[#263544]/60 font-black">{mounted ? "لا توجد سجلات خصومات أو سلف مسجلة." : ""}</td></tr>
                 ) : (
                   groupedDiscounts.map((group) => {
                     const isExpanded = expandedRows[group.employeeId];
@@ -300,11 +316,11 @@ export default function DiscountsPage() {
                           </td>
                           <td className="p-5 text-center">
                             <span className="inline-block px-4 py-1.5 rounded-xl font-mono font-black text-rose-700 bg-rose-100/50 border border-rose-200 shadow-sm">
-                              −{group.totalDeductions.toLocaleString()} <span className="text-[10px] text-rose-600">ل.س</span>
+                              −{formatNumberEn(group.totalDeductions)} <span className="text-[10px] text-rose-600">ل.س</span>
                             </span>
                           </td>
                           <td className="p-5 text-center font-bold text-sm text-[#263544]/70">
-                            <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{group.records.length} إجراء</span>
+                            <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{formatNumberEn(group.records.length)} إجراء</span>
                           </td>
                           <td className="p-5 text-center">
                             <button className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-[#263544] text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
@@ -316,7 +332,7 @@ export default function DiscountsPage() {
                         {/* الصف المنسدل (التفاصيل) */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={4} className="p-0 border-b border-slate-200/50">
+                            <td colSpan={5} className="p-0 border-b border-slate-200/50">
                               <div className="bg-slate-50/80 p-6 shadow-inner border-y border-slate-200/40 overflow-x-auto">
                                 <table className="w-full text-right text-sm border border-slate-200/50 rounded-xl overflow-hidden bg-white/50">
                                   <thead className="text-[#263544] bg-slate-100/80 border-b border-slate-200/60">
@@ -337,8 +353,8 @@ export default function DiscountsPage() {
                                             {record.type}
                                           </span>
                                         </td>
-                                        <td className="py-3 px-4 font-mono font-black text-rose-600 text-center">−{record.amount.toLocaleString()}</td>
-                                        <td className="py-3 px-4 font-mono text-slate-500 text-center">{new Date(record.date).toLocaleDateString("ar-EG")}</td>
+                                        <td className="py-3 px-4 font-mono font-black text-rose-600 text-center">−{formatNumberEn(record.amount)}</td>
+                                        <td className="py-3 px-4 font-mono text-slate-500 text-center" dir="ltr">{formatDateEn(record.date)}</td>
                                         <td className="py-3 px-4 text-xs font-medium text-slate-500 max-w-50 truncate">{record.notes || "—"}</td>
                                         <td className="py-3 px-4 text-center">
                                           <div className="flex items-center justify-center gap-2">

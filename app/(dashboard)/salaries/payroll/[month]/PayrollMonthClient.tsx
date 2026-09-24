@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import usePayrollReport from "@/hooks/usePayrollReport";
+import { usePayrollPageData } from "@/hooks/usePayrollPageData";
 
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -14,12 +15,62 @@ const toNumber = (value: unknown) => {
   return Number(value || 0);
 };
 
+type MonthRow = {
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  earned: number;
+  discounts: number;
+  net: number;
+  netRounded: number;
+};
+
 export default function PayrollMonthClient() {
   const params = useParams<{ month: string }>();
   const month = typeof params?.month === "string" ? params.month : "";
   const isValidMonth = MONTH_REGEX.test(month);
 
-  const { data, isLoading, isError, error } = usePayrollReport(month);
+  // نفس مصدر صفحة التقرير النهائي — يشمل ترقيع التعديلات اليدوية
+  // (زر تعديل المجاميع) فوق أي run قديم في الباك إند.
+  const { payrollData, allResignedList, resignedPayrollMap, isLoading } =
+    usePayrollPageData(isValidMonth ? month : "");
+
+  const rows = useMemo<MonthRow[]>(() => {
+    const actives: MonthRow[] = payrollData.map((r) => ({
+      employeeId: r.employeeId,
+      employeeName: r.employeeName,
+      department: r.department,
+      earned: toNumber(r.earnedSalary),
+      discounts: toNumber(r.discountsTotal),
+      net: toNumber(r.netPay),
+      netRounded: toNumber(r.netPayRounded),
+    }));
+    const resigned: MonthRow[] = allResignedList.map((emp) => {
+      const calc = resignedPayrollMap.get(emp.employeeId);
+      return {
+        employeeId: emp.employeeId,
+        employeeName: emp.name,
+        department: emp.department || emp.profession || "—",
+        earned: toNumber(calc?.earnedSalary),
+        discounts: toNumber(calc?.discountsTotal),
+        net: toNumber(calc?.earnedSalary) + toNumber(calc?.bonusesTotal) - toNumber(calc?.discountsTotal),
+        netRounded: toNumber(calc?.netPayRounded),
+      };
+    });
+    return [...actives, ...resigned];
+  }, [payrollData, allResignedList, resignedPayrollMap]);
+
+  const totals = useMemo(() => {
+    return rows.reduce(
+      (acc, r) => ({
+        earned: acc.earned + r.earned,
+        discounts: acc.discounts + r.discounts,
+        net: acc.net + r.net,
+        netRounded: acc.netRounded + r.netRounded,
+      }),
+      { earned: 0, discounts: 0, net: 0, netRounded: 0 },
+    );
+  }, [rows]);
 
   if (!isValidMonth) {
     return (
@@ -39,22 +90,13 @@ export default function PayrollMonthClient() {
     );
   }
 
-  if (isError) {
-    return (
-      <div className="p-8" dir="rtl">
-        <h1 className="text-xl font-bold text-rose-700">تعذر تحميل التقرير</h1>
-        <p className="text-slate-600 mt-2">{error instanceof Error ? error.message : "حدث خطأ غير متوقع"}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen p-8 bg-slate-50" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">تفاصيل الرواتب لشهر {month}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            الفترة: {data?.period.startDate} إلى {data?.period.endDate}
+            الفترة: {month}-01 إلى {month}-{String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, "0")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -69,21 +111,21 @@ export default function PayrollMonthClient() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">إجمالي الأجور</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{(data?.items || []).reduce((sum, item) => sum + toNumber(item.grossPay), 0).toLocaleString()}</p>
+          <p className="text-xs text-slate-500">إجمالي الأجور المستحقة</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{totals.earned.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">إجمالي الخصومات</p>
-          <p className="text-2xl font-bold text-rose-700 mt-1">{(data?.items || []).reduce((sum, item) => sum + toNumber(item.totalDeductions), 0).toLocaleString()}</p>
+          <p className="text-2xl font-bold text-rose-700 mt-1">{totals.discounts.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">صافي الرواتب</p>
-          <p className="text-2xl font-bold text-emerald-700 mt-1">{(data?.items || []).reduce((sum, item) => sum + toNumber(item.netPay), 0).toLocaleString()}</p>
+          <p className="text-2xl font-bold text-emerald-700 mt-1">{totals.net.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">إجمالي الراتب المقبض</p>
           <p className="text-2xl font-bold text-blue-700 mt-1">
-            {(data?.items || []).reduce((sum, item) => sum + toNumber(item.netPayRounded || item.netPay), 0).toLocaleString()}
+            {totals.netRounded.toLocaleString()}
           </p>
         </div>
       </div>
@@ -101,15 +143,15 @@ export default function PayrollMonthClient() {
             </tr>
           </thead>
           <tbody>
-            {data?.items.length ? (
-              data.items.map((item) => (
-                <tr key={item.id} className="border-t border-slate-100 text-sm hover:bg-slate-50">
+            {rows.length ? (
+              rows.map((item) => (
+                <tr key={item.employeeId} className="border-t border-slate-100 text-sm hover:bg-slate-50">
                   <td className="p-3 font-mono">{item.employeeId}</td>
                   <td className="p-3">{item.employeeName}</td>
                   <td className="p-3">{item.department || "—"}</td>
-                  <td className="p-3">{toNumber(item.attendanceBasedSalary).toLocaleString()}</td>
-                  <td className="p-3 text-rose-700">{toNumber(item.totalDeductions).toLocaleString()}</td>
-                  <td className="p-3 font-semibold text-emerald-700">{toNumber(item.netPay).toLocaleString()}</td>
+                  <td className="p-3">{item.earned.toLocaleString()}</td>
+                  <td className="p-3 text-rose-700">{item.discounts.toLocaleString()}</td>
+                  <td className="p-3 font-semibold text-emerald-700">{item.net.toLocaleString()}</td>
                 </tr>
               ))
             ) : (

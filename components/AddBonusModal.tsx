@@ -45,19 +45,28 @@ const formatWithCommas = (value: string | number) => {
   return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
 };
 
-const currentPeriod = (() => {
+const currentDate = (() => {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 })();
+
+/** تطبيع أي فترة (YYYY-MM أو YYYY-MM-DD) إلى تاريخ كامل لمدخل يوم-شهر-سنة */
+const toDateInput = (period?: string | null) => {
+  if (!period) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(period.slice(0, 10))) return period.slice(0, 10);
+  if (/^\d{4}-\d{2}$/.test(period.slice(0, 7))) return `${period.slice(0, 7)}-01`;
+  return "";
+};
 
 const defaultForm: BonusInput = {
   employeeId: "",
   bonusAmount: "",
   bonusReason: "",
   assistanceAmount: "",
-  period: currentPeriod,
+  period: currentDate,
 };
 
 export default function AddBonusModal({ isOpen, onClose, onSave, isPending, employees, initialData }: AddBonusModalProps) {
@@ -83,13 +92,11 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
         bonusAmount: asStringAmount(initialData.bonusAmount),
         bonusReason: initialData.bonusReason || "",
         assistanceAmount: asStringAmount(initialData.assistanceAmount),
-        period: initialData.period || currentPeriod,
+        period: toDateInput(initialData.period) || currentDate,
       };
     }
     return defaultForm;
   });
-
-  const [includeDate, setIncludeDate] = useState(false);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -219,30 +226,31 @@ export default function AddBonusModal({ isOpen, onClose, onSave, isPending, empl
             </div>
 
             <div>
-              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">الفترة المستحقة</label>
+              <label className="block text-xs font-black text-[#C89355] mb-2 uppercase tracking-widest">تاريخ الاستحقاق </label>
               <div className="relative group">
+                {/* منتقي التاريخ بنمط مودال الخصومات وسجل الحضور: خلفية فاتحة،
+                    أرقام عريضة بالوسط، وإطار ذهبي عند التركيز */}
                 <input
-                  type={includeDate ? "date" : "month"}
-                  value={includeDate ? (form.period ? `${form.period}-01` : "") : (form.period || "")}
+                  type="date"
+                  value={toDateInput(form.period)}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (includeDate) {
-                      setForm((p) => ({ ...p, period: val.slice(0, 7) }));
-                    } else {
-                      setForm((p) => ({ ...p, period: val }));
-                    }
+                    setForm((p) => ({ ...p, period: e.target.value }));
                   }}
-                  className="w-full p-4 bg-[#1a2530] border border-[#263544] rounded-2xl focus:ring-2 focus:ring-[#C89355]/20 focus:border-[#C89355] outline-none text-white font-mono font-bold pr-12 scheme-dark transition-all"
+                  dir="ltr"
+                  className="w-full p-4 bg-[#1a2530] border-2 border-slate-200 focus:ring-2 focus:ring-[#C89355]/50 focus:border-[#C89355] outline-none font-mono text-xl font-black text-center text-white transition-all rounded-2xl cursor-pointer"
                 />
-                <Calendar className="absolute right-4 top-4 text-slate-500 group-focus-within:text-[#C89355] transition-colors" size={22} />
+                {/* <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-[#C89355]/70 group-focus-within:text-[#C89355] transition-colors pointer-events-none" size={22} /> */}
               </div>
-              <button
-                type="button"
-                onClick={() => setIncludeDate(!includeDate)}
-                className="text-xs font-bold text-[#C89355]/70 hover:text-[#C89355] mt-1.5 transition-colors"
-              >
-                {includeDate ? "تحديد شهر فقط" : "تحديد يوم محدد"}
-              </button>
+              {/* التاريخ المعروض — أرقام إنجليزية */}
+              <p className="mt-1.5 text-center font-mono text-[11px] font-black text-[#C89355]" dir="ltr">
+                {form.period && toDateInput(form.period)
+                  ? new Date(`${toDateInput(form.period)}T00:00:00`).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </p>
             </div>
 
             {/*قيمة المكافأة*/}

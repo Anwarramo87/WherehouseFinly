@@ -463,63 +463,61 @@ export default function TimeTablePage() {
 
       const hasManualInput = !!manualInput;
 
-      // ── الإجازات: نأخذ الأكبر بين اليدوي (payrollInput) والآلي (leaves API) ──
-      // هذا يضمن أن التعديل اليدوي للمدير يُقدَّم دائماً على البيانات التلقائية
+      // ── الإجازات: التعديل اليدوي للمدير يُقدَّم دائماً على البيانات التلقائية ──
+      // FIX: كان `Math.max(يدوي، آلي)` يتجاهل أي تعديل يُنقِص القيمة أو يُصفّرها.
+      // الآن: إذا وُجد سجل يدوي، نستخدم قيمه كما هي (حتى لو صفراً) — الصفر هنا
+      // قرار صريح من المدير وليس غياب بيانات.
 
       // مرضية (50% مدفوعة)
       const sickLeaveFromAPI = leaveData?.sickLeaveDays ?? 0;
-      const sickLeaveDays = Math.max(
-        hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
-        sickLeaveFromAPI,
-      );
+      const sickLeaveDays = hasManualInput
+        ? (manualInput.sickLeaveDays ?? sickLeaveFromAPI)
+        : sickLeaveFromAPI;
 
       // إدارية (100% مدفوعة)
       const adminLeaveFromAPI = adminLeaveByEmp.get(emp.employeeId) ?? 0;
-      const adminLeaveDays = Math.max(
-        hasManualInput ? (manualInput.adminLeaveDays ?? 0) : 0,
-        adminLeaveFromAPI,
-      );
+      const adminLeaveDays = hasManualInput
+        ? (manualInput.adminLeaveDays ?? adminLeaveFromAPI)
+        : adminLeaveFromAPI;
 
       // وفاة (100% مدفوعة)
       const deathLeaveFromAPI = deathLeaveByEmp.get(emp.employeeId) ?? 0;
-      const deathLeaveDays = Math.max(
-        hasManualInput ? (manualInput.deathLeaveDays ?? 0) : 0,
-        deathLeaveFromAPI,
-      );
+      const deathLeaveDays = hasManualInput
+        ? (manualInput.deathLeaveDays ?? deathLeaveFromAPI)
+        : deathLeaveFromAPI;
 
       // بدون أجر (غير مدفوعة)
-      const unpaidLeaveDays = Math.max(
-        hasManualInput ? (manualInput.unpaidLeaveDays ?? 0) : 0,
-        leaveData?.unpaidLeaveDays ?? 0,
-      );
+      const unpaidLeaveFromAPI = leaveData?.unpaidLeaveDays ?? 0;
+      const unpaidLeaveDays = hasManualInput
+        ? (manualInput.unpaidLeaveDays ?? unpaidLeaveFromAPI)
+        : unpaidLeaveFromAPI;
 
       // الإجازات المدفوعة 100%: إدارية + وفاة + PAID من الـ API
       const paidLeaveDaysFromAPI = leaveData?.paidLeaveDays ?? 0;
       const paidLeaveDaysManual = adminLeaveDays + deathLeaveDays;
       const paidLeaveDays = Math.max(paidLeaveDaysManual, paidLeaveDaysFromAPI);
 
-      // أيام الغياب الصافية: نطرح الإجازات المدفوعة من القادمة من الباك إند
-      // لأن backend قد يحسب أيام الإجازة كـ "absent" إذا لم يسجل الموظف بصمة
-      const rawAbsentDays =
-        hasManualInput && (manualInput.absenceDays ?? 0) > 0
-          ? (manualInput.absenceDays ?? 0)
-          : (autoInput?.absentDays ?? 0);
+      // أيام الغياب: اليدوي يُقدَّم دائماً (حتى لو صفر — التصفير قرار صريح)،
+      // وإلا القيمة الآلية من calculate-deductions.
+      const rawAbsentDays = hasManualInput
+        ? (manualInput.absenceDays ?? autoInput?.absentDays ?? 0)
+        : (autoInput?.absentDays ?? 0);
 
       // الغياب الصافي = مجموع الغياب - الإجازات المدفوعة 100% - الإجازات المرضية (لا نخصم مرتين)
       const absenceDays = Math.max(0, rawAbsentDays - paidLeaveDays - sickLeaveDays);
 
       const autoLateMinutes = autoInput?.delayMinutes ?? 0;
-      const lateMinutes =
-        hasManualInput && (manualInput.lateMinutes ?? 0) > 0
-          ? (manualInput.lateMinutes ?? 0)
-          : autoLateMinutes;
+      const lateMinutes = hasManualInput
+        ? (manualInput.lateMinutes ?? autoLateMinutes)
+        : autoLateMinutes;
 
       const totalLeaves = sickLeaveDays + unpaidLeaveDays + adminLeaveDays + deathLeaveDays;
       // إجمالي الغياب والإجازات للعرض — نستخدم الغياب الصافي
       const totalAbsencesLeaves = absenceDays + totalLeaves;
       const totalDelayMinutes = lateMinutes;
-      const totalEarlyLeaveMinutes =
-        manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
+      const totalEarlyLeaveMinutes = hasManualInput
+        ? (manualInput.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0)
+        : (autoInput?.earlyLeaveMinutes ?? 0);
 
       // أيام الحضور الفعلية:
       // أولوية 1: presentDays من الباك إند (calculate-deductions) — الأدق
@@ -533,19 +531,17 @@ export default function TimeTablePage() {
             ? localPresentDays
             : null;
 
-      // دقائق الإضافي: يدوي إن وُجد، وإلا آلي من calculate-deductions
+      // دقائق الإضافي: اليدوي يُقدَّم دائماً (حتى لو صفر)، وإلا آلي من calculate-deductions
       const autoOvertimeMinutes = autoInput?.overtimeMinutes ?? 0;
-      const totalOvertimeMinutes =
-        hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
-          ? (manualInput.overtimeRegularMinutes ?? 0)
-          : autoOvertimeMinutes;
+      const totalOvertimeMinutes = hasManualInput
+        ? (manualInput.overtimeRegularMinutes ?? autoOvertimeMinutes)
+        : autoOvertimeMinutes;
 
-      // دقائق الجمعة الفعلية: يدوي إن وُجد، وإلا آلي
+      // دقائق الجمعة الفعلية: اليدوي يُقدَّم دائماً (حتى لو صفر)، وإلا آلي
       const autoWeekendDays = autoInput?.overtimeWeekendDays ?? 0;
-      const totalOvertimeWeekendMinutes =
-        hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
-          ? (manualInput.overtimeWeekendDays ?? 0)
-          : autoWeekendDays;
+      const totalOvertimeWeekendMinutes = hasManualInput
+        ? (manualInput.overtimeWeekendDays ?? autoWeekendDays)
+        : autoWeekendDays;
 
       // الراتب الإجمالي الفعلي (base + معيشة + مواصلات) — التأمينات تخصم في التقرير النهائي فقط
       const salaryRec = salaryMap.get(emp.employeeId);
@@ -576,6 +572,21 @@ export default function TimeTablePage() {
                 lateMinutes,
                 manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0,
                  totalOvertimeWeekendMinutes,
+                // أي تعديل يدوي في المودال ينعكس فوراً على الراتب المستحق
+                // المعروض — نفس القاعدة المطبقة في الباك إند لدورة الرواتب.
+                manualInput
+                  ? {
+                      absenceDays: manualInput.absenceDays ?? null,
+                      unpaidLeaveDays: manualInput.unpaidLeaveDays ?? 0,
+                      sickLeaveDays: manualInput.sickLeaveDays ?? 0,
+                      paidLeaveDays: (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0),
+                      lateMinutes: manualInput.lateMinutes ?? 0,
+                      earlyLeaveMinutes: manualInput.earlyLeaveMinutes ?? 0,
+                      overtimeMinutes: manualInput.overtimeRegularMinutes ?? 0,
+                      weekendOvertimeMinutes: manualInput.overtimeWeekendDays ?? 0,
+                      unpaidHours: manualInput.unpaidHours ?? 0,
+                    }
+                  : undefined,
               ),
             )
           : null;

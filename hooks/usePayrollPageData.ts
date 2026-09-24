@@ -187,11 +187,16 @@ export function usePayrollPageData(month: string) {
     workedDays: number;
   };
 
+  // خريطة المدخلات اليدوية لكل موظف — مشتركة بين المعاينة والتقرير النهائي
+  const payrollInputsById = useMemo(
+    () => new Map(payrollInputs.map((pi) => [pi.employeeId, pi])),
+    [payrollInputs],
+  );
+
   const payrollByEmployee = useMemo(() => {
     const map = new Map<string, ComputedRow>();
 
     const salariesById = new Map(salaries.map((s) => [s.employeeId, s]));
-    const payrollInputsById = new Map(payrollInputs.map((pi) => [pi.employeeId, pi]));
     const autoDeductionsById = new Map(
       autoDeductions.map((d: AttendanceDeductionBreakdown) => [d.employeeId, d]),
     );
@@ -244,29 +249,28 @@ export function usePayrollPageData(month: string) {
       const hasManualInput = !!manualInput;
       const leaveData = employeeLeavesMap.get(employeeId);
 
+      // التعديل اليدوي (زر تعديل المجاميع) يُقدَّم دائماً على الآلي — حتى لو
+      // صفراً أو أقل من الآلي (نفس قاعدة جدول الدوام والباك إند).
       const autoLateMinutes = autoInput?.delayMinutes ?? localLateMinutesMap.get(employeeId) ?? 0;
-      const lateMinutes =
-        hasManualInput && (manualInput.lateMinutes ?? 0) > 0
-          ? (manualInput.lateMinutes ?? 0)
-          : autoLateMinutes;
+      const lateMinutes = hasManualInput
+        ? (manualInput.lateMinutes ?? autoLateMinutes)
+        : autoLateMinutes;
 
-      const sickLeaveDays = Math.max(
-        hasManualInput ? (manualInput.sickLeaveDays ?? 0) : 0,
-        leaveData?.sickLeaveDays ?? 0,
-      );
-      const paidLeaveDays = Math.max(
-        hasManualInput ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0) : 0,
-        leaveData?.paidLeaveDays ?? 0,
-      );
-      const earlyLeaveMinutes = manualInput?.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0;
-      const totalOvertimeMinutes =
-        hasManualInput && (manualInput.overtimeRegularMinutes ?? 0) > 0
-          ? (manualInput.overtimeRegularMinutes ?? 0)
-          : (autoInput?.overtimeMinutes ?? 0);
-      const totalOvertimeWeekendMinutes =
-        hasManualInput && (manualInput.overtimeWeekendDays ?? 0) > 0
-          ? (manualInput.overtimeWeekendDays ?? 0)
-          : (autoInput?.overtimeWeekendDays ?? 0);
+      const sickLeaveDays = hasManualInput
+        ? (manualInput.sickLeaveDays ?? leaveData?.sickLeaveDays ?? 0)
+        : (leaveData?.sickLeaveDays ?? 0);
+      const paidLeaveDays = hasManualInput
+        ? (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0)
+        : (leaveData?.paidLeaveDays ?? 0);
+      const earlyLeaveMinutes = hasManualInput
+        ? (manualInput.earlyLeaveMinutes ?? autoInput?.earlyLeaveMinutes ?? 0)
+        : (autoInput?.earlyLeaveMinutes ?? 0);
+      const totalOvertimeMinutes = hasManualInput
+        ? (manualInput.overtimeRegularMinutes ?? autoInput?.overtimeMinutes ?? 0)
+        : (autoInput?.overtimeMinutes ?? 0);
+      const totalOvertimeWeekendMinutes = hasManualInput
+        ? (manualInput.overtimeWeekendDays ?? autoInput?.overtimeWeekendDays ?? 0)
+        : (autoInput?.overtimeWeekendDays ?? 0);
 
       const insuranceAmount = salaryConfig ? toNumber(salaryConfig.insuranceAmount) : 0;
       const workDaysInPeriod =
@@ -292,6 +296,22 @@ export function usePayrollPageData(month: string) {
               lateMinutes,
               earlyLeaveMinutes,
               totalOvertimeWeekendMinutes,
+              // أي تعديل يدوي في "تعديل المجاميع" ينعكس فوراً على الراتب —
+              // نفس القاعدة المطبقة في جدول الدوام وفي دورة الرواتب بالباك إند.
+              manualInput
+                ? {
+                    absenceDays: manualInput.absenceDays ?? null,
+                    unpaidLeaveDays: manualInput.unpaidLeaveDays ?? 0,
+                    sickLeaveDays: manualInput.sickLeaveDays ?? 0,
+                    paidLeaveDays:
+                      (manualInput.adminLeaveDays ?? 0) + (manualInput.deathLeaveDays ?? 0),
+                    lateMinutes: manualInput.lateMinutes ?? 0,
+                    earlyLeaveMinutes: manualInput.earlyLeaveMinutes ?? 0,
+                    overtimeMinutes: manualInput.overtimeRegularMinutes ?? 0,
+                    weekendOvertimeMinutes: manualInput.overtimeWeekendDays ?? 0,
+                    unpaidHours: manualInput.unpaidHours ?? 0,
+                  }
+                : undefined,
             )
           : 0;
       const earnedSalary = Math.max(0, rawEarned);
@@ -363,7 +383,7 @@ export function usePayrollPageData(month: string) {
     discounts,
     penalties,
     month,
-    payrollInputs,
+    payrollInputsById,
     autoDeductions,
     localLateMinutesMap,
     localPresentDaysMap,
@@ -390,7 +410,19 @@ export function usePayrollPageData(month: string) {
 
     for (const emp of allResignedList) {
       const payrollItem = backendPayrollById.get(emp.employeeId);
-      if (payrollItem) {
+      const computed = payrollByEmployee.get(emp.employeeId);
+      // التعديل اليدوي (زر تعديل المجاميع) يُقدَّم حتى للمستقيلين: إذا وُجد
+      // وحُسب محلياً، نستخدمه بدل الـ run القديم في الباك إند.
+      if (payrollInputsById.has(emp.employeeId) && computed) {
+        map.set(emp.employeeId, {
+          earnedSalary: computed.row.earnedSalary,
+          bonusesTotal: computed.row.bonusesTotal,
+          discountsTotal: computed.row.discountsTotal,
+          netPayRounded: computed.row.netPayRounded,
+          workedMinutes: computed.workedMinutes,
+          workedDays: computed.workedDays,
+        });
+      } else if (payrollItem) {
         map.set(emp.employeeId, {
           earnedSalary: toNumber(payrollItem.attendanceBasedSalary),
           bonusesTotal: toNumber(payrollItem.totalBonuses),
@@ -400,7 +432,6 @@ export function usePayrollPageData(month: string) {
           workedDays: 0,
         });
       } else {
-        const computed = payrollByEmployee.get(emp.employeeId);
         map.set(emp.employeeId, {
           earnedSalary: computed?.row.earnedSalary ?? 0,
           bonusesTotal: computed?.row.bonusesTotal ?? 0,
@@ -412,7 +443,7 @@ export function usePayrollPageData(month: string) {
       }
     }
     return map;
-  }, [allResignedList, reportData?.items, payrollByEmployee]);
+  }, [allResignedList, reportData?.items, payrollByEmployee, payrollInputsById]);
 
   // ── Preview data (when no backend payroll run yet) ─────────────────────────
   const previewData = useMemo<AggregatedPayroll[]>(() => {
@@ -453,8 +484,43 @@ export function usePayrollPageData(month: string) {
 
       // نقرأ fixedDeductions من الإعدادات المحلية (الراتب) لعرض التأمينات كبند منفصل
       // attendanceBasedSalary من الباك إند — نفترض أنها قبل خصم التأمينات (netPay سليم)
-      const earnedSalary = attendanceBasedSalary;
+      let earnedSalary = attendanceBasedSalary;
       const variableDeductionsVal = Math.max(0, totalDeductions - fixedDeductions);
+
+      // FIX: إذا كان للموظف تعديل يدوي (زر تعديل المجاميع) والـ run في
+      // الباك إند أقدم من التعديل، نُعيد الحساب محلياً بنفس قاعدة جدول الدوام
+      // حتى لا يظهر راتب قديم (أو 0) في التقرير النهائي.
+      const previewRow = payrollByEmployee.get(employeeId)?.row;
+      const hasManualInput = payrollInputsById.has(employeeId);
+      if (hasManualInput && previewRow) {
+        earnedSalary = previewRow.earnedSalary;
+        const localGross = earnedSalary + totalBonuses;
+        const localNet = localGross - totalDeductions;
+        const localNetRounded = Math.ceil(localNet / 1000) * 1000;
+        return {
+          employeeId,
+          employeeName,
+          department,
+          grossPay: localGross,
+          totalDeductions,
+          netPay: localNet,
+          netPayRounded: localNetRounded,
+          roundingDifference: localNetRounded - localNet,
+          anomalies,
+          attendanceBasedSalary: earnedSalary,
+          earnedSalary,
+          bonusesTotal: totalBonuses,
+          discountsTotal: variableDeductionsVal,
+          fixedEarnings: localGross,
+          variableEarnings: totalBonuses,
+          fixedDeductions,
+          variableDeductions: variableDeductionsVal,
+          totalEarlyLeaveMinutes: earlyLeaveMinutes,
+          earlyLeaveDeduction,
+          busDeduction,
+          details: { salaryConfig, bonuses: [], deductions: [], attendance: null },
+        } satisfies AggregatedPayroll;
+      }
 
       return {
         employeeId,
@@ -480,7 +546,7 @@ export function usePayrollPageData(month: string) {
         details: { salaryConfig, bonuses: [], deductions: [], attendance: null },
       } satisfies AggregatedPayroll;
     });
-  }, [reportData, salaries, previewData, resignedEmployeeIds]);
+  }, [reportData, salaries, previewData, resignedEmployeeIds, payrollByEmployee, payrollInputsById]);
 
   const isLoading =
     salariesLoading ||

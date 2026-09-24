@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
@@ -13,14 +13,26 @@ import apiClient from "@/lib/api-client";
 import type { Bonus, BonusInput } from "@/types/bonus";
 import EmployeeAvatar from "@/components/EmployeeAvatar";
 import { resolveEmployeePhotoSrc } from "@/lib/employee-photo";
+import { formatNumberEn } from "@/lib/number-utils";
+import { toLocalDateString } from "@/lib/date-time";
 
 const AddBonusModal = dynamic(() => import("@/components/AddBonusModal"), { loading: () => null });
+
+/** تطبيع فترة المكافأة إلى تاريخ YYYY-MM-DD (تدعم YYYY-MM و YYYY-MM-DD) */
+const normalizeBonusDate = (bonusPeriod: string | null | undefined, fallback: string) => {
+  if (!bonusPeriod) return fallback;
+  const p = bonusPeriod.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(p)) return p;
+  if (/^\d{4}-\d{2}$/.test(p)) return `${p}-01`;
+  return fallback;
+};
 
 export default function RewardsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  const period = searchParams.get("period") || new Date().toISOString().slice(0, 7);
+  const todayStr = toLocalDateString();
+  const period = searchParams.get("period") || todayStr.slice(0, 7);
   const { data: employees = [] } = useEmployees({ limit: 200, status: "active", fetchAll: false });
   const { data: resignedEmployees = [] } = useResignedEmployees();
   const resignedIds = useMemo(() => new Set(resignedEmployees.map(e => e.employeeId)), [resignedEmployees]);
@@ -70,6 +82,23 @@ export default function RewardsClient() {
     return 0;
   };
 
+  /** عرض التاريخ بأرقام إنجليزية DD/MM/YYYY مثل سجل الحضور */
+  const formatDateEn = (date: string) => {
+    const d = new Date(`${date.slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return date.slice(0, 10);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `${day}/${month}/${d.getFullYear()}`;
+  };
+
+  // اختيار الشهر يعرض كل مكافآت الشهر — بدون اشتراط يوم محدد.
+  const handlePeriodChange = (newPeriod: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("period", newPeriod);
+    params.delete("date");
+    router.replace(`/salaries/rewards?${params.toString()}`);
+  };
+
 
   const employeesLookup = useMemo(() => {
     return new Map(employees.map((emp) => [emp.employeeId, emp.name]));
@@ -106,7 +135,7 @@ export default function RewardsClient() {
         ? "جميع الموظفين"
         : employeesLookup.get(employeeId) || "موظف غير معروف";
       const bonusAmount = resolveAmount(bonus.bonusAmount);
-      const periodDate = bonus.period ? `${bonus.period}-01` : new Date().toISOString();
+      const periodDate = normalizeBonusDate(bonus.period, todayStr);
 
       // فقط عرض السجلات التي فيها مكافآت (bonusAmount فقط) واستبعد سجلات الزيادة والاعانات
       if (bonusAmount <= 0 || bonus.bonusReason === 'زيادة راتب') return null;
@@ -122,7 +151,7 @@ export default function RewardsClient() {
         allEmployees: isAll,
       };
     }).filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [bonusesData, employeesLookup, resignedIds, employees]);
+  }, [bonusesData, employeesLookup, resignedIds, employees, todayStr]);
 
   // تجميع السجلات حسب الموظف
   const groupedRewards = useMemo(() => {
@@ -181,8 +210,8 @@ export default function RewardsClient() {
         await queryClient.refetchQueries({ queryKey: ["employees"] });
         toast.success(
           data.employeeId === "ALL"
-            ? `تمت إضافة ${Number(data.bonusAmount).toLocaleString()} ل.س على الراتب الأساسي لكل الموظفين بشكل دائم`
-            : `تمت إضافة ${Number(data.bonusAmount).toLocaleString()} ل.س على الراتب الأساسي بشكل دائم`,
+            ? `تمت إضافة ${formatNumberEn(Number(data.bonusAmount))} ل.س على الراتب الأساسي لكل الموظفين بشكل دائم`
+            : `تمت إضافة ${formatNumberEn(Number(data.bonusAmount))} ل.س على الراتب الأساسي بشكل دائم`,
         );
       } else {
         // مكافأة عادية أو بدل — تُحفظ كـ bonus record
@@ -287,14 +316,14 @@ export default function RewardsClient() {
               <div className="relative z-10 flex flex-col">
                 <span className="text-xs font-black text-emerald-500 uppercase tracking-wider mb-0.5">مجموع المكافآت (المعروض)</span>
                 <span className="text-2xl font-mono font-black text-white drop-shadow-md">
-                  {mounted ? totalSum.toLocaleString() : "0"} <span className="text-xs text-white/70">ل.س</span>
+                  {mounted ? formatNumberEn(totalSum) : formatNumberEn(0)} <span className="text-xs text-white/70">ل.س</span>
                 </span>
               </div>
             </div>
 
             <MonthPeriodSelector
               value={period}
-              onChange={(p) => router.replace(`/salaries/rewards?period=${p}`)}
+              onChange={handlePeriodChange}
               className="shrink-0"
             />
             <div className="relative overflow-hidden flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-[#C89355] focus-within:ring-2 focus-within:ring-[#C89355]/20 hover:shadow-md w-full md:w-64 transition-all">
@@ -373,11 +402,11 @@ export default function RewardsClient() {
                           </td>
                           <td className="p-5 text-center">
                             <span className="inline-block px-4 py-1.5 rounded-xl font-mono font-black text-emerald-700 bg-emerald-100/50 border border-emerald-200 shadow-sm">
-                              +{group.totalAmount.toLocaleString()} <span className="text-[10px] text-emerald-600">ل.س</span>
+                              +{formatNumberEn(group.totalAmount)} <span className="text-[10px] text-emerald-600">ل.س</span>
                             </span>
                           </td>
                           <td className="p-5 text-center font-bold text-sm text-[#263544]/70">
-                            <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{group.records.length} إضافة</span>
+                            <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{formatNumberEn(group.records.length)} إضافة</span>
                           </td>
                           <td className="p-5 text-center">
                             <button className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-[#263544] text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
@@ -405,8 +434,8 @@ export default function RewardsClient() {
                                     {group.records.map((record) => (
                                       <tr key={record.id} className="hover:bg-white transition-colors">
                                         <td className="py-3 px-4 font-bold text-slate-700">{record.type}</td>
-                                        <td className="py-3 px-4 font-mono font-black text-emerald-600 text-center">+{record.amount.toLocaleString()}</td>
-                                        <td className="py-3 px-4 font-mono text-slate-500 text-center">{record.date?.slice(0, 10).replace(/-/g, "/") || "—"}</td>
+                                        <td className="py-3 px-4 font-mono font-black text-emerald-600 text-center">+{formatNumberEn(record.amount)}</td>
+                                        <td className="py-3 px-4 font-mono text-slate-500 text-center" dir="ltr">{record.date ? formatDateEn(record.date) : "—"}</td>
                                         <td className="py-3 px-4 text-xs font-medium text-slate-500 max-w-50 truncate">{record.notes || "—"}</td>
                                         <td className="py-3 px-4 text-center">
                                           <button
