@@ -123,7 +123,10 @@ export default function FactoryUsersPanel({
     currentRoles?.includes("superadmin") || currentRole === "superadmin";
 
   const canSubmit =
-    form.username.trim().length > 0 && form.password.length >= 8 && form.roleId.length > 0;
+    form.username.trim().length > 0 &&
+    form.email.trim().length > 0 &&
+    form.password.length >= 8 &&
+    form.roleId.length > 0;
 
   // Only admin-level roles are creatable from SuperAdmin.
   // Regular employees (role === "employee") must be added inside the
@@ -220,15 +223,15 @@ export default function FactoryUsersPanel({
               onChange={(value) => setForm((f) => ({ ...f, username: value }))}
               autoComplete="off"
             />
-            <Field
-              id="new-email"
-              label="الإيميل (اختياري)"
-              placeholder="anwar@factory.com"
-              type="email"
-              value={form.email}
-              onChange={(value) => setForm((f) => ({ ...f, email: value }))}
-              autoComplete="off"
-            />
+              <Field
+                id="new-email"
+                label={<><span className="text-rose-500">*</span> الإيميل</>}
+                placeholder="anwar@factory.com"
+                type="email"
+                value={form.email}
+                onChange={(value) => setForm((f) => ({ ...f, email: value }))}
+                autoComplete="off"
+              />
             <Field
               id="new-password"
               label="كلمة المرور (8 أحرف على الأقل)"
@@ -490,7 +493,7 @@ function Field({
   autoComplete,
 }: {
   id: string;
-  label: string;
+  label: React.ReactNode;
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
