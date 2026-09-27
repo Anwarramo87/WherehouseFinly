@@ -6,7 +6,12 @@ export const fetchCache = "force-no-store";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveApiUrl } from "@/lib/api-url";
 
-const REQUEST_TIMEOUT_MS = 15_000;
+// 30s: Neon cold-starts and dead-socket retries inside the pg pool can make a
+// first request take 15-20s+ (observed: /representatives/me/profile at 21s).
+// A 15s timeout aborted such requests at the proxy with a 502 even though the
+// backend answered successfully moments later. 30s matches the backend pool's
+// own connectionTimeoutMillis.
+const REQUEST_TIMEOUT_MS = Number(process.env.BACKEND_PROXY_TIMEOUT_MS) || 30_000;
 // Long-running computation endpoints: a payroll run aggregates attendance for
 // every employee-day and can legitimately take minutes. The proxy must wait
 // for them instead of aborting with a 502 mid-calculation.
