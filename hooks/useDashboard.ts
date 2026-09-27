@@ -5,6 +5,7 @@ import type { DashboardKpis } from "@/types/dashboard";
 import apiClient from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
+import { usePermissions } from "@/lib/permissions/hooks";
 
 const SKELETON_TIMEOUT_MS = 4_000;
 const POLL_INTERVAL_ACTIVE_MS = 60_000;
@@ -85,9 +86,16 @@ export const useDashboard = () => {
   const authReady =
     useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
+  // /dashboard/home is gated by the view_employees permission. Admin and
+  // superadmin bypass the permission list on the backend; reps/other roles may
+  // not, and firing the poll anyway spams the console every minute with 403s.
+  const { hasPermission, isAdmin } = usePermissions();
+  const isSuperAdmin = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
+  const canViewDashboard = isAdmin || isSuperAdmin || hasPermission("view_employees");
+
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard.home(),
-    enabled: authReady,
+    enabled: authReady && canViewDashboard,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/dashboard/home");

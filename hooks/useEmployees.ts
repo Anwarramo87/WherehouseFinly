@@ -8,6 +8,8 @@ import { getApiErrorMessage } from "@/lib/http/error";
 import { queryKeys } from "@/lib/query-keys";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth-store";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { isRouteEnabled } from "@/lib/entitlements";
 
 /** Re-export for backwards-compat with components that import getErrorMessage from here */
 export const getErrorMessage = getApiErrorMessage;
@@ -453,9 +455,19 @@ export const useResignedEmployees = (month?: string) => {
   const authReady =
     useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
 
+  // The backend gates /employees/resigned behind the sellable page
+  // hr.resigned. Factories that never bought it get a 403; firing the query
+  // anyway spammed the console on every page that just wants to EXCLUDE
+  // departed employees (home, vouchers, salaries...). Wait for the resolved
+  // entitlement and only call when this user's factory actually holds the page.
+  const entitlementsQuery = useEntitlements();
+  const resignedPageEnabled = !entitlementsQuery.isLoading
+    ? isRouteEnabled("/resigned", entitlementsQuery.data)
+    : false;
+
   const query = useQuery<Employee[]>({
     queryKey: ["resigned-employees", month ?? "all"],
-    enabled: authReady,
+    enabled: authReady && resignedPageEnabled,
     queryFn: async () => {
       const response = await apiClient.get("/employees/resigned", {
         params: { limit: 500, page: 1, ...(month ? { month } : {}) },

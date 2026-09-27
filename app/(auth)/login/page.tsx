@@ -33,12 +33,47 @@ const safeNavigate = (router: ReturnType<typeof useRouter>, path: string) => {
   }
 };
 
+/**
+ * Landing page after login, by role.
+ *
+ * A representative has their own workspace (stock, sales, collections, returns,
+ * settlements) and must never land on /home — that dashboard is built from
+ * employee/payroll endpoints the rep has no permission for, so it answers 403
+ * for every query and the page renders as a wall of errors. Send the rep to
+ * the one screen that is actually theirs instead.
+ */
+const homePathFor = (
+  user?: { role?: string; roles?: string[] } | Record<string, unknown> | null,
+  fallbackUser?: { role?: string; roles?: string[] } | Record<string, unknown> | null,
+): string => {
+  const source = (user ?? fallbackUser ?? null) as
+    | { role?: string; roles?: string[] }
+    | Record<string, unknown>
+    | null;
+  if (!source) return "/home";
+
+  const roleStr = (source as { role?: string }).role;
+  const rolesArr = (source as { roles?: string[] }).roles;
+  const roles = Array.isArray(rolesArr) && rolesArr.length > 0
+    ? rolesArr
+    : roleStr
+      ? [roleStr]
+      : [];
+
+  if (roles.some((r) => String(r).trim().toLowerCase() === "representative")) {
+    return "/representatives/workspace";
+  }
+
+  return "/home";
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setUser = useAuthStore((state) => state.setUser);
   const setStatus = useAuthStore((state) => state.setStatus);
   const authStatus = useAuthStore((state) => state.status);
+  const currentUser = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
   const skipInitialSessionProbeRef = useRef(false);
 
@@ -46,7 +81,7 @@ export default function LoginPage() {
     let active = true;
 
     if (authStatus === "authenticated") {
-      safeNavigate(router, "/home");
+      safeNavigate(router, homePathFor(currentUser));
       return () => {
         active = false;
       };
@@ -61,7 +96,7 @@ export default function LoginPage() {
 
       if (result.authorized) {
         setStatus("authenticated");
-        safeNavigate(router, "/home");
+        safeNavigate(router, homePathFor(currentUser));
         return;
       }
 
@@ -76,7 +111,7 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [authStatus, router, clear, setStatus]);
+  }, [authStatus, router, clear, setStatus, currentUser]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -137,7 +172,7 @@ export default function LoginPage() {
         setAuthAccessToken(token);
       }
       const rawUser = authResponse.user as Record<string, unknown> | null;
-      const mergedUser = rawUser
+      const mergedUser: Record<string, unknown> | null = rawUser
         ? {
             ...rawUser,
             roles: (authResponse as Record<string, unknown>).roles as string[] | undefined,
@@ -146,7 +181,7 @@ export default function LoginPage() {
           }
         : null;
 
-      let finalUser = mergedUser;
+      let finalUser: Record<string, unknown> | null = mergedUser;
 
       // #region post-login-verify
       // Always re-fetch /auth/me after a successful login. The /auth/login body
@@ -227,7 +262,7 @@ export default function LoginPage() {
       }
 
       setStatus("authenticated");
-      safeNavigate(router, "/home");
+      safeNavigate(router, homePathFor(finalUser, currentUser));
     } catch (error: unknown) {
       // #region debug-point D:login-final-error
       reportDebug?.("D", "Login failed after retries", {

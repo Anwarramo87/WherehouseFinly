@@ -10,7 +10,7 @@ import {
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
   ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory,
-  Palette
+  Palette, Package, DollarSign, RotateCcw, FileText, MapPin
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -36,13 +36,38 @@ interface MenuItem {
   name: string;
   /** Rendered only for the overseer. Not expressible as a permission. */
   superAdminOnly?: boolean;
+  /** Rendered only for a representative. A rep's whole job is their workspace —
+   * the management pages behind it are admin-only endpoints that answer 403,
+   * and /home is built from employee/payroll data the rep cannot see.
+   */
+  repOnly?: boolean;
+  /** Factory admin or overseer only — regular employees with stray access to a
+   * related permission (e.g. view_sales) must not see the reps console.
+   */
+  adminOnly?: boolean;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   href?: string;
+  /** When true, the item is highlighted only when the pathname equals href
+   * exactly (used for the rep workspace root so it doesn't stay lit while the
+   * rep drills into a section like /stock or /sales). */
+  exact?: boolean;
   permissions?: string[];
   subItems?: { name: string; href: string }[];
 }
 
 const menuItems: MenuItem[] = [
+  // A representative's entire workspace lives here. Each section is its own
+  // repOnly item so a rep's sidebar mirrors the workspace pages and nothing
+  // else (every other route is an admin endpoint that 403s for them). The
+  // root item is flagged exact so it clears itself once the rep drills into
+  // a section.
+  { name: 'مساحة المندوب', icon: LayoutDashboard, href: '/representatives/workspace', repOnly: true, exact: true },
+  { name: 'مخزوني', icon: Package, href: '/representatives/workspace/stock', repOnly: true },
+  { name: 'توزيعاتي', icon: ShoppingCart, href: '/representatives/workspace/sales', repOnly: true },
+  { name: 'تحصيلاتي', icon: DollarSign, href: '/representatives/workspace/collections', repOnly: true },
+  { name: 'مرتجعاتي', icon: RotateCcw, href: '/representatives/workspace/returns', repOnly: true },
+  { name: 'التسوية', icon: FileText, href: '/representatives/workspace/settlement', repOnly: true },
+  { name: 'خطي ومحلاتي', icon: MapPin, href: '/representatives/workspace/route', repOnly: true },
   { name: 'الرئيسية: إحصائيات', icon: LayoutDashboard, href: '/home' },
   { name: 'إدارة الموظفين', icon: Users, href: '/employees', permissions: ['view_employees'] },
   { name: 'المستقيلون', icon: UserMinus, href: '/resigned', permissions: ['view_employees'] },
@@ -115,6 +140,7 @@ const menuItems: MenuItem[] = [
   {
     name: 'المندوبون',
     icon: Users,
+    adminOnly: true,
     permissions: ['view_sales'],
     subItems: [
       { name: 'إدارة المندوبين', href: '/representatives' },
@@ -250,6 +276,10 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
   const userPermissions = currentUser?.permissions || [];
   const isSuperAdmin =
     currentUser?.roles?.includes('superadmin') || currentUser?.role === 'superadmin';
+  const isRepresentative =
+    currentUser?.roles?.includes('representative') || currentUser?.role === 'representative';
+  const isAdmin =
+    currentUser?.roles?.includes('admin') || currentUser?.role === 'admin';
 
   // The overseer has no factory of their own — they borrow one. The daily
   // management pages make no sense until they pick a factory in the
@@ -276,6 +306,15 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
     })
     .filter((item) => {
       if (item.superAdminOnly) return isSuperAdmin;
+      if (item.adminOnly) return isAdmin || isSuperAdmin;
+
+      // repOnly items render for representatives ONLY — never for an admin,
+      // overseer or regular employee browsing the same sidebar.
+      if (item.repOnly) return isRepresentative;
+
+      // A representative gets exactly one screen — their workspace. Every
+      // other item is an admin endpoint that would 403 for them.
+      if (isRepresentative) return false;
 
       // The overseer "reels in" a factory to work with it. While they hold no
       // factory scope, the sidebar offers only the supervision centre (home)
@@ -292,7 +331,8 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       return userPermissions.some((perm) => item.permissions!.includes(perm));
     });
 
-  const isHrefActive = (href: string) => {
+  const isHrefActive = (href: string, exact = false) => {
+    if (exact) return pathname === href;
     const [targetPath, queryString] = href.split('?');
     if (!pathname.startsWith(targetPath)) return false;
 
@@ -388,7 +428,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
       <nav className="flex-1 space-y-2 px-3 pb-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {visibleMenuItems.map((item) => {
           const hasSubItems = !!item.subItems;
-          const isMainActive = (item.href && isHrefActive(item.href)) ||
+          const isMainActive = (item.href && isHrefActive(item.href, item.exact)) ||
             (hasSubItems && item.subItems?.some(sub => isHrefActive(sub.href)));
           const isOpen = openMenu === item.name || activeSubMenu === item.name;
 

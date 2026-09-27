@@ -77,4 +77,94 @@ describe("isRouteEnabled", () => {
     expect(isRouteEnabled("/inventory/batches", null)).toBe(true);
     expect(isRouteEnabled("/inventory/batches", undefined)).toBe(true);
   });
+
+  it("gates the newly saleable pages by their own module keys", () => {
+    const entitled = build({
+      modules: [
+        {
+          key: "production",
+          label: "الإنتاج والتصنيع",
+          description: "",
+          state: "all",
+          pages: [
+            {
+              key: "production.orders",
+              route: "/wms/production",
+              label: "أوامر الإنتاج",
+              enabled: true,
+            },
+            {
+              key: "production.bom",
+              route: "/wms/production/bom",
+              label: "قوائم المواد (BOM)",
+              enabled: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    // Whole page enabled → route (and its children) open.
+    expect(isRouteEnabled("/wms/production", entitled)).toBe(true);
+    expect(isRouteEnabled("/wms/production/orders/AB-1", entitled)).toBe(true);
+    // BOM sold separately and held off → its own route is refused.
+    expect(isRouteEnabled("/wms/production/bom", entitled)).toBe(false);
+  });
+
+  it("gates the representatives, WMS-setup and files routes like any sellable page", () => {
+    const closed = build({
+      modules: [
+        {
+          key: "reps",
+          label: "المندوبون",
+          description: "",
+          state: "none",
+          pages: [
+            {
+              key: "reps.management",
+              route: "/representatives",
+              label: "إدارة المندوبين",
+              enabled: false,
+            },
+            {
+              key: "reps.workspace",
+              route: "/representatives/workspace",
+              label: "مساحة المندوب",
+              enabled: false,
+            },
+          ],
+        },
+        {
+          key: "wms",
+          label: "إعداد WMS",
+          description: "",
+          state: "none",
+          pages: [
+            { key: "wms.setup", route: "/wms/setup", label: "إعداد WMS", enabled: false },
+          ],
+        },
+        {
+          key: "imports",
+          label: "استيراد البيانات",
+          description: "",
+          state: "partial",
+          pages: [
+            {
+              key: "imports.data",
+              route: "/importData",
+              label: "استيراد البيانات",
+              enabled: true,
+            },
+            { key: "imports.files", route: "/files", label: "الملفات", enabled: false },
+          ],
+        },
+      ],
+    });
+
+    expect(isRouteEnabled("/representatives", closed)).toBe(false);
+    expect(isRouteEnabled("/representatives/workspace", closed)).toBe(false);
+    expect(isRouteEnabled("/wms/setup", closed)).toBe(false);
+    expect(isRouteEnabled("/files", closed)).toBe(false);
+    expect(isRouteEnabled("/importData", closed)).toBe(true);
+  });
 });

@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarClock,
   KeyRound,
+  LayoutGrid,
   Loader2,
   ShieldAlert,
   Users,
@@ -16,12 +17,14 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useFactories } from "@/hooks/useSuperAdmin";
 import FactoryUsersPanel from "@/components/admin/FactoryUsersPanel";
 import { FactoryDepartmentsTab } from "@/components/admin/FactoryDepartmentsTab";
+import { FactoryModulesPanel } from "@/components/admin/FactoryModulesPanel";
 
-type Tab = "departments" | "accounts";
+type Tab = "departments" | "accounts" | "modules";
 
 const tabs = [
   { key: "departments" as const, label: "الأقسام", icon: Users },
   { key: "accounts" as const, label: "الحسابات والاشتراكات", icon: KeyRound },
+  { key: "modules" as const, label: "الوحدات والصلاحيات", icon: LayoutGrid },
 ] as const;
 
 /**
@@ -139,6 +142,12 @@ export default function FactoryDetailsPage() {
           {tab === "accounts" && (
             <section aria-label="حسابات المصنع واشتراكاتها">
               <FactoryUsersPanel tenantId={factory.id} factoryName={factory.name} />
+            </section>
+          )}
+
+          {tab === "modules" && (
+            <section aria-label="وحدات المصنع وصلاحياته">
+              <FactoryModulesPanel tenantId={factory.id} factoryName={factory.name} />
             </section>
           )}
         </>

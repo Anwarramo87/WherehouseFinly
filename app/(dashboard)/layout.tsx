@@ -37,6 +37,22 @@ export default function DashboardLayout({
   const router = useRouter();
   const authChecked = useRef(false);
 
+  // A representative has one screen — their workspace. Every other dashboard
+  // route is backed by admin endpoints (employees, payroll, dashboard/home)
+  // that answer 403 for a rep, so a rep landing anywhere else is walked back
+  // to the one place that is actually theirs. Keeps the back button and
+  // hand-typed URLs from dumping them into a wall of forbidden queries.
+  const isRepresentative =
+    !!user?.roles?.includes('representative') || user?.role === 'representative';
+
+  useEffect(() => {
+    if (!user) return;
+    if (!isRepresentative) return;
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname.startsWith('/representatives/workspace')) return;
+    router.replace('/representatives/workspace');
+  }, [user, isRepresentative, router]);
+
   useEffect(() => {
     if (authChecked.current) return;
     if (user?.permissions) {
@@ -128,12 +144,17 @@ export default function DashboardLayout({
       <main className="flex-1 min-w-0 overflow-y-auto relative print:overflow-visible print:h-auto print:block" suppressHydrationWarning style={{ backgroundColor: "var(--brand-bg, #f8fafc)" }}>
         {/* Only renders when the overseer has drilled into a factory. */}
         <FactoryScopeBanner />
-        {/* Floating notifications bell (top-left in RTL) */}
+        {/* Floating notifications bell (top-left in RTL).
+            Hidden for a representative — /notifications/unread-count is gated
+            behind notifications.view, which a rep does not hold, so the bell
+            would just sit there throwing a 403 on every page load. */}
         <div className="fixed top-3 left-3 z-40 flex items-center gap-2 print:hidden">
-          <Suspense fallback={null}>
-            <NotificationBell />
-          </Suspense>
-          {/* Mobile menu button */}
+          {!isRepresentative && (
+            <Suspense fallback={null}>
+              <NotificationBell />
+            </Suspense>
+          )}
+          {/* Mobile menu button (always available, even for a rep on mobile) */}
           <button
             onClick={openMobile}
             className="lg:hidden p-2.5 bg-[#263544] text-[#C89355] rounded-xl border border-[#C89355]/30 shadow-lg"
@@ -145,12 +166,16 @@ export default function DashboardLayout({
 
         <EntitlementGate>{children}</EntitlementGate>
 
-        {/* Available on every dashboard page; hides itself when unconfigured. */}
-        <div className="print:hidden">
-          <Suspense fallback={null}>
-            <AssistantLauncher />
-          </Suspense>
-        </div>
+        {/* Available on every dashboard page; hides itself when unconfigured.
+            Also skipped for a representative — /assistant/status answers 403
+            for a role with no assistant permissions. */}
+        {!isRepresentative && (
+          <div className="print:hidden">
+            <Suspense fallback={null}>
+              <AssistantLauncher />
+            </Suspense>
+          </div>
+        )}
       </main>
     </div>
   );

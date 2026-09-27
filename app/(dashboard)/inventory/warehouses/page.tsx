@@ -6,11 +6,33 @@ import { useWarehouses } from "@/hooks/useInventory";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import InventoryPageShell from "@/components/inventory/InventoryPageShell";
+import { usePermissionOrPrivilege } from "@/lib/permissions/hooks";
 
 export default function InventoryWarehousesPage() {
   const { data: warehouses, isLoading } = useWarehouses();
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "" });
   const [isSaving, setIsSaving] = useState(false);
+
+  // The inventory endpoints refuse accounts without the permission; show a
+  // clear verdict instead of a wall of 403s, and hide the create form when the
+  // account cannot edit.
+  const canView = usePermissionOrPrivilege("view_inventory");
+  const canEdit = usePermissionOrPrivilege("edit_inventory");
+
+  if (!canView) {
+    return (
+      <InventoryPageShell
+        title="المخازن"
+        subtitle="إدارة المواقع والمخازن وتوزيع الأصناف بينها."
+      >
+        <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden p-8">
+          <p className="text-sm font-black text-amber-700 bg-amber-50 p-4 rounded-2xl border border-amber-200">
+            حسابك لا يملك صلاحية المخزون. سجّل دخولاً بحساب إدارة المصنع (admin) لعرض وإدارة المخازن.
+          </p>
+        </div>
+      </InventoryPageShell>
+    );
+  }
 
   const handleAddWarehouse = async (event: { preventDefault: () => void }) => {
     event.preventDefault();
@@ -52,6 +74,7 @@ export default function InventoryWarehousesPage() {
             <span className="text-xs font-black text-[#C89355] bg-[#1a2530] px-4 py-1.5 rounded-xl shadow-sm border border-[#C89355]/30">{warehouses?.length ?? 0} مخزن</span>
           </div>
 
+          {canEdit && (
           <form onSubmit={handleAddWarehouse} className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-white/60 bg-white/20">
             <div>
               <label className="block text-xs font-black text-[#263544]/70 mb-1.5">اسم المخزن</label>
@@ -91,6 +114,7 @@ export default function InventoryWarehousesPage() {
               </button>
             </div>
           </form>
+          )}
 
           <div className="p-6">
             {isLoading ? (

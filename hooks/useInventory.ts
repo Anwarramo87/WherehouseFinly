@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
+import { usePermissionOrPrivilege } from "@/lib/permissions/hooks";
 import {
   AdjustStockInput,
   InventoryItem,
@@ -102,12 +103,16 @@ export const useStockMovements = (params?: {
 };
 
 export const useWarehouses = () => {
+  // The list endpoint is behind the view_inventory permission. Accounts without
+  // it (reps, employees) must not fire the request only to get a 403 verdict.
+  const canView = usePermissionOrPrivilege("view_inventory");
   return useQuery({
     queryKey: queryKeys.inventory.warehouses(),
     queryFn: async () => {
       const res = await apiClient.get<Warehouse[]>("/inventory/warehouses");
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled: canView,
     staleTime: QUERY_STALE_TIME.STANDARD,
     gcTime: QUERY_GC_TIME.STANDARD,
   });

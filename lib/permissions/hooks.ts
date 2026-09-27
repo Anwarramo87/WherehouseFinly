@@ -132,3 +132,16 @@ export function useRequiredPermissions(permissions: Permission[]): boolean {
   const { hasAnyPermission } = usePermissions();
   return hasAnyPermission(permissions);
 }
+
+/**
+ * True when the user may exercise `permission`, mirroring the backend
+ * PermissionsGuard: factory admins and the super admin bypass the explicit
+ * list. `permission` is a raw string because the Permission union below does
+ * not cover every backend-issued permission (e.g. notifications.view).
+ */
+export function usePermissionOrPrivilege(permission: string): boolean {
+  const isAdmin = useAuthStore((s) => s.hasAnyRole(["admin"]));
+  const isSuperAdmin = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
+  const permissions = useAuthStore((s) => s.user?.permissions);
+  return isAdmin || isSuperAdmin || Boolean(permissions?.includes(permission));
+}

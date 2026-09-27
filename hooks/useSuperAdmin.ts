@@ -191,6 +191,38 @@ export function useToggleEntitlement(tenantId: string | null) {
   });
 }
 
+/**
+ * Replaces the factory's whole page list in one PUT — used by the module panel
+ * presets ("باقة", "شاملة", "إيقاف الكل") so a preset is one request, not one
+ * per module.
+ */
+export function useSetFactoryEntitlements(tenantId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pageKeys: string[]) => {
+      const response = await apiClient.put(
+        `/admin/tenants/${tenantId}/entitlements`,
+        { pageKeys },
+      );
+      return response.data as FactoryEntitlements;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: superAdminKeys.factories });
+      if (tenantId) {
+        void queryClient.invalidateQueries({
+          queryKey: superAdminKeys.entitlements(tenantId),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ["entitlements"] });
+      toast.success("تم حفظ وحدات المصنع");
+    },
+    onError: () => {
+      toast.error("تعذّر حفظ التغيير");
+    },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-admin entitlements (this admin's own pages within the factory grant).
 // ─────────────────────────────────────────────────────────────────────────────

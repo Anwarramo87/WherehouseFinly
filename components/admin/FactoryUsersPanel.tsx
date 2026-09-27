@@ -142,10 +142,20 @@ export default function FactoryUsersPanel({
     return r === "superadmin" || r === "super_admin" || r === "super admin";
   };
 
-  const activeCount = users.filter((u) => u.status === "active").length;
-  const selectedUser = entitlementsUserId ? users.find((u) => u.id === entitlementsUserId) : null;
+  /** هذه لوحة الأدمن المسؤولة عن الحسابات والصلاحيات — الموظفون العاديون لا
+   * يملكون حسابات دخول، فلا مكان لأدوارهم هنا. تُعرض حسابات الأدمن فقط. */
+  const isAdminAccount = (user: FactoryUser) => {
+    const r = (user.role?.name ?? "").trim().toLowerCase();
+    return r.includes("admin");
+  };
+
+  // حسابات الدخول الظاهرة: الأدمن فقط (admin / superadmin وأي دور إداري مستقبلي).
+  const adminUsers = users.filter(isAdminAccount);
+
+  const activeCount = adminUsers.filter((u) => u.status === "active").length;
+  const selectedUser = entitlementsUserId ? adminUsers.find((u) => u.id === entitlementsUserId) : null;
   const selectedSubUser = subscriptionUserId
-    ? users.find((u) => u.id === subscriptionUserId)
+    ? adminUsers.find((u) => u.id === subscriptionUserId)
     : null;
 
   // Only one inline drawer at a time: opening one side closes the other.
@@ -171,7 +181,7 @@ export default function FactoryUsersPanel({
               <h3 className="flex items-center gap-2 text-[15px] font-black text-[#263544]">
                 حسابات الدخول
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                  {users.length} حساب
+                  {adminUsers.length} حساب
                 </span>
               </h3>
               <p className="mt-0.5 max-w-[42ch] text-xs leading-5 text-slate-500">
@@ -293,19 +303,19 @@ export default function FactoryUsersPanel({
           </div>
         )}
 
-        {!isLoading && users.length === 0 && (
+        {!isLoading && adminUsers.length === 0 && (
           <div className="px-6 py-10 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <Search size={20} aria-hidden="true" />
             </div>
-            <p className="text-sm font-bold text-slate-600">لا توجد حسابات لهذا المصنع بعد</p>
+            <p className="text-sm font-bold text-slate-600">لا توجد حسابات أدمن لهذا المصنع</p>
             <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
-              أنشئ أول حساب ليتمكن فريقه من تسجيل الدخول وإدارة بياناته.
+              حساب واحد على الأقل يملك الصلاحيات والأسعار والاشتراكات المخصصة للآدمن.
             </p>
           </div>
         )}
 
-        {users.length > 0 && (
+        {adminUsers.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -318,7 +328,7 @@ export default function FactoryUsersPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((user) => {
+                {adminUsers.map((user) => {
                   const isSelected =
                     entitlementsUserId === user.id || subscriptionUserId === user.id;
                   return (

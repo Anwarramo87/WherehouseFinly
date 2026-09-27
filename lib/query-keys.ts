@@ -213,6 +213,10 @@ export const queryKeys = {
       [...queryKeys.representatives.all, "settlements", repId] as const,
     summary: (repId: string) =>
       [...queryKeys.representatives.all, "summary", repId] as const,
+    routes: (repId: string) =>
+      [...queryKeys.representatives.all, "routes", repId] as const,
+    shops: (repId: string) =>
+      [...queryKeys.representatives.all, "shops", repId] as const,
     myProfile: () => [...queryKeys.representatives.all, "my-profile"] as const,
   },
   wmsSetup: {

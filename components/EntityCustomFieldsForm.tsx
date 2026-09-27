@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 type CustomFieldDefinition = {
   id?: string;
@@ -46,6 +47,12 @@ const normalizeFieldValue = (field: CustomFieldDefinition, value: unknown) => {
   return value;
 };
 
+// Module-scope stable empties. A `= {}` / `= []` default inside the component
+// would create a NEW object each render, and `savedValues` feeds the merge
+// effect's dependency array, which would loop setValues forever.
+const EMPTY_CUSTOM_FIELDS: CustomFieldDefinition[] = [];
+const EMPTY_VALUES: Record<string, unknown> = {};
+
 export default function EntityCustomFieldsForm({
   entity,
   recordId,
@@ -53,10 +60,22 @@ export default function EntityCustomFieldsForm({
   initialValues = {},
 }: EntityCustomFieldsFormProps) {
   const [values, setValues] = useState<Record<string, unknown>>(initialValues);
+  // initialValues prop identity must NOT be a dependency: callers that omit it
+  // get a brand-new {} default object on every render, which previously sent
+  // the effect below into a setState → re-render → new object → setState loop
+  // ("Maximum update depth exceeded").
+  const initialValuesRef = useRef(initialValues);
+  useEffect(() => {
+    initialValuesRef.current = initialValues;
+  }, [initialValues]);
 
-  const { data: customFields = [] } = useQuery({
+  // The current-tenant endpoints reject users without a tenant scope (super
+  // admin) with 403 - those factory-bound fields do not exist for them.
+  const hasTenantScope = useAuthStore((state) => Boolean(state.user?.tenantId));
+
+  const { data: customFieldsData } = useQuery({
     queryKey: ["tenant-custom-fields", entity, recordId ?? "new"],
-    enabled: Boolean(entity),
+    enabled: Boolean(entity) && hasTenantScope,
     staleTime: 60_000,
     queryFn: async () => {
       const response = await apiClient.get("/customization/tenant/custom-fields", {
@@ -66,9 +85,9 @@ export default function EntityCustomFieldsForm({
     },
   });
 
-  const { data: savedValues = {} } = useQuery({
+  const { data: savedValuesData } = useQuery({
     queryKey: ["tenant-custom-values", entity, recordId ?? "new"],
-    enabled: Boolean(entity) && Boolean(recordId),
+    enabled: hasTenantScope && Boolean(entity) && Boolean(recordId),
     staleTime: 60_000,
     queryFn: async () => {
       const response = await apiClient.get(`/customization/tenant/custom-field-values/${entity}/${recordId}`);
@@ -76,10 +95,13 @@ export default function EntityCustomFieldsForm({
     },
   });
 
+  const customFields = customFieldsData ?? EMPTY_CUSTOM_FIELDS;
+  const savedValues = savedValuesData ?? EMPTY_VALUES;
+
   useEffect(() => {
-    const merged = { ...initialValues, ...savedValues };
+    const merged = { ...initialValuesRef.current, ...savedValues };
     setValues(merged);
-  }, [initialValues, savedValues]);
+  }, [savedValues]);
 
   useEffect(() => {
     onChange?.(values);

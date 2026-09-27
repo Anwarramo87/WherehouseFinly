@@ -20,11 +20,26 @@ type ListParams = {
   enabled?: boolean;
 };
 
+// Every notifications endpoint requires the notifications.view permission on
+// the backend. Admin and superadmin bypass the list; reps and other roles may
+// not, so this helper makes the queries below skip the request entirely
+// instead of polling a 403 every minute. The permission string is read raw from
+// the store because the frontend Permission union does not list it.
+const useCanViewNotifications = () => {
+  const isAdmin = useAuthStore((s) => s.hasAnyRole(["admin"]));
+  const isSuperAdmin = useAuthStore((s) => s.hasAnyRole(["superadmin"]));
+  const permissions = useAuthStore((s) => s.user?.permissions);
+  return (
+    isAdmin || isSuperAdmin || (permissions ?? []).includes("notifications.view")
+  );
+};
+
 export const useNotifications = (params?: ListParams) => {
   // Gate on auth: firing before the session resolves yields a burst of 401s
   // (and refresh storms) on first paint of every page with the bell.
   const authReady =
     useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
+  const canViewNotifications = useCanViewNotifications();
   const query = useQuery<{ items: NotificationItem[]; nextCursor: string | null; hasMore: boolean }>({
     queryKey: queryKeys.notifications.list({
       unreadOnly: params?.unreadOnly,
@@ -43,7 +58,7 @@ export const useNotifications = (params?: ListParams) => {
       });
       return res.data;
     },
-    enabled: authReady && (params?.enabled ?? true),
+    enabled: authReady && canViewNotifications && (params?.enabled ?? true),
     staleTime: 30_000,
   });
 
@@ -60,6 +75,7 @@ export const useNotifications = (params?: ListParams) => {
 export const useUnreadNotificationCount = () => {
   const authReady =
     useAuthStore((s) => s.status === "authenticated" || Boolean(s.user));
+  const canViewNotifications = useCanViewNotifications();
   const query = useQuery<number>({
     queryKey: queryKeys.notifications.unreadCount(),
     queryFn: async () => {
@@ -68,7 +84,7 @@ export const useUnreadNotificationCount = () => {
       useNotificationStore.getState().setUnreadCount(count);
       return count;
     },
-    enabled: authReady,
+    enabled: authReady && canViewNotifications,
     refetchInterval: 60_000,
     staleTime: 30_000,
     // A 401/403 here is a permission verdict, not a blip -- retrying it just

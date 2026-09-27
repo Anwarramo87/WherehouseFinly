@@ -13,6 +13,7 @@ import apiClient from "@/lib/api-client";
 import { toast } from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { usePermissionOrPrivilege } from "@/lib/permissions/hooks";
 
 const STEP_ICONS = [Warehouse, Package, Factory, Layers, DollarSign, Tag, ClipboardCheck, Rocket];
 const STEP_COLORS = ["#3b82f6","#10b981","#f59e0b","#8b5cf6","#ef4444","#C89355","#14b8a6","#22c55e"];
@@ -237,13 +238,22 @@ function Step1Warehouse() {
   const [loaded, setLoaded] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", code: "", address: "" });
+  const canManage = usePermissionOrPrivilege("edit_inventory");
 
-  useState(() => {
+  useEffect(() => {
+    // The list endpoint 403s for accounts without inventory permissions;
+    // accounts with them populate the list through the same request.
+    if (!canManage) return;
+    let alive = true;
     apiClient.get("/inventory/warehouses").then(r => {
-      setWarehouses((r.data as { data?: unknown[] }).data as Array<{ id: string; name: string; code: string }> ?? []);
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
-  });
+      if (!alive) return;
+      const list = Array.isArray(r.data) ? r.data : Array.isArray((r.data as { data?: unknown })?.data) ? ((r.data as { data?: unknown }).data as unknown[]) : [];
+      setWarehouses(list as Array<{ id: string; name: string; code: string }>);
+    }).catch(() => undefined).finally(() => {
+      if (alive) setLoaded(true);
+    });
+    return () => { alive = false; };
+  }, [canManage]);
 
   const create = async () => {
     if (!form.name || !form.code) return toast.error("الاسم والكود مطلوبان");
@@ -252,12 +262,24 @@ function Step1Warehouse() {
       await apiClient.post("/inventory/warehouses", form);
       toast.success("تم إنشاء المخزن");
       const r = await apiClient.get("/inventory/warehouses");
-      setWarehouses((r.data as { data?: unknown[] }).data as Array<{ id: string; name: string; code: string }> ?? []);
+      const list = Array.isArray(r.data) ? r.data : Array.isArray((r.data as { data?: unknown })?.data) ? ((r.data as { data?: unknown }).data as unknown[]) : [];
+      setWarehouses(list as Array<{ id: string; name: string; code: string }>);
     } catch { toast.error("فشل إنشاء المخزن"); }
     finally { setCreating(false); }
   };
 
   if (!loaded) return <Loading />;
+
+  if (!canManage) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm font-bold text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200">
+          حسابك لا يملك صلاحية المخزون. سجّل دخولاً بحساب إدارة المصنع (admin) لإنشاء المخزن وإكمال إعداد WMS.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <p className="text-sm font-bold text-[#263544]/70">

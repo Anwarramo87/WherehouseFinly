@@ -98,6 +98,37 @@ export interface RepSettlement {
   notes?: string;
 }
 
+export interface RepRoute {
+  id: string;
+  name: string;
+  areas: string[];
+  schedule?: string | null;
+  isActive: boolean;
+}
+
+export interface RepShop {
+  customerId: string;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+  createdAt: string;
+  memory: {
+    totalBought: number;
+    saleCount: number;
+    lastSaleDate: string | null;
+  };
+}
+
+export interface EmployeeOption {
+  id: string;
+  employeeId: string;
+  name: string;
+  mobile?: string | null;
+  userId: string | null;
+  department?: string | null;
+  jobTitle?: string | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +146,8 @@ const useInvalidateRep = (repId?: string) => {
       void qc.invalidateQueries({ queryKey: queryKeys.representatives.detail(repId) });
       void qc.invalidateQueries({ queryKey: queryKeys.representatives.stock(repId) });
       void qc.invalidateQueries({ queryKey: queryKeys.representatives.summary(repId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.representatives.routes(repId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.representatives.shops(repId) });
     }
   };
 };
@@ -338,6 +371,62 @@ export const useCreateRepReturn = (repId: string) => {
     onError: (e) => toast.error(errMsg(e, "فشل تسجيل المرتجع")),
   });
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rep-Scoped — Route & Shops (خطي ومحلاتي)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const useRepRoutes = (repId: string) =>
+  useQuery({
+    queryKey: queryKeys.representatives.routes(repId),
+    queryFn: async () => {
+      const res = await apiClient.get<RepRoute[]>(`/representatives/${repId}/routes`);
+      return res.data;
+    },
+    enabled: !!repId,
+    staleTime: QUERY_STALE_TIME.FAST,
+  });
+
+export const useCreateRepRoute = (repId: string) => {
+  const invalidate = useInvalidateRep(repId);
+  return useMutation({
+    mutationFn: (payload: { name: string; areas?: string[]; schedule?: string }) =>
+      apiClient.post<RepRoute>(`/representatives/${repId}/route`, payload).then((r) => r.data),
+    onSuccess: () => { toast.success("تم إنشاء الخط"); invalidate(); },
+    onError: (e) => toast.error(errMsg(e, "فشل إنشاء الخط")),
+  });
+};
+
+export const useRepShops = (repId: string) =>
+  useQuery({
+    queryKey: queryKeys.representatives.shops(repId),
+    queryFn: async () => {
+      const res = await apiClient.get<RepShop[]>(`/representatives/${repId}/shops`);
+      return res.data;
+    },
+    enabled: !!repId,
+    staleTime: QUERY_STALE_TIME.FAST,
+  });
+
+export const useCreateRepShop = (repId: string) => {
+  const invalidate = useInvalidateRep(repId);
+  return useMutation({
+    mutationFn: (payload: { name: string; phone?: string; address?: string; routeId?: string }) =>
+      apiClient.post(`/representatives/${repId}/shops`, payload).then((r) => r.data),
+    onSuccess: () => { toast.success("تمت إضافة المحل"); invalidate(); },
+    onError: (e) => toast.error(errMsg(e, "فشل إضافة المحل")),
+  });
+};
+
+export const useEmployeeOptions = () =>
+  useQuery({
+    queryKey: ["representatives", "employee-options"],
+    queryFn: async () => {
+      const res = await apiClient.get<EmployeeOption[]>("/representatives/employee-options");
+      return res.data;
+    },
+    staleTime: QUERY_STALE_TIME.STANDARD,
+  });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rep-Scoped — Settlement
