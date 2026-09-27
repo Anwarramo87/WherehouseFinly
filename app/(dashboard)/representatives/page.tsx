@@ -11,7 +11,7 @@ import {
 import {
   useRepresentatives, useRepresentative,
   useCreateRepresentative,
-  useAssignCustomers, useAssignProducts, useTransferStock,
+  useAssignCustomers, useCreateAndAssignCustomer, useAssignProducts, useTransferStock,
   useApproveSettlement, useRepSettlements, useEmployeeOptions,
   type Representative,
 } from "@/hooks/useRepresentatives";
@@ -369,6 +369,63 @@ function CreateRepModal({ onClose }: { onClose: () => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// QuickAddCustomerForm (إضافة عميل جديد وربطه بالمندوب فوراً)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function QuickAddCustomerForm({ repId }: { repId: string }) {
+  const createAndAssign = useCreateAndAssignCustomer(repId);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-dashed border-[#C89355]/50 text-sm font-black text-[#C89355] hover:bg-[#C89355]/5 transition-colors"
+      >
+        <Plus size={16} /> إضافة عميل جديد وربطه بالمندوب
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="space-y-2 p-4 rounded-2xl bg-[#C89355]/5 border border-[#C89355]/30"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!name.trim()) return toast.error("اسم العميل مطلوب");
+        await createAndAssign.mutateAsync({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined });
+        setName(""); setPhone(""); setAddress(""); setOpen(false);
+      }}
+    >
+      <p className="text-sm font-black text-[#263544]">عميل جديد لهذا المندوب</p>
+      <Field label="اسم العميل *">
+        <input value={name} onChange={e => setName(e.target.value)} className={inputClass} placeholder="مثال: محل النور" />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="الهاتف">
+          <input value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} placeholder="09xxxxxxxx" />
+        </Field>
+        <Field label="العنوان">
+          <input value={address} onChange={e => setAddress(e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Button type="submit" loading={createAndAssign.isPending} className="flex-1">
+          <Plus size={16} /> إنشاء وربط
+        </Button>
+        <Button type="button" onClick={() => setOpen(false)} className="bg-white text-slate-600 ring-1 ring-slate-200">
+          <X size={16} />
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Rep Manage Drawer (حساب المندوب بإدارة الأسهم، العملاء، المنتجات، التسليم)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -525,6 +582,7 @@ function RepManageDrawer({ repId, onClose }: { repId: string; onClose: () => voi
               {activeTab === "customers" && (
                 <div className="space-y-4">
                   <p className="text-sm font-bold text-[#263544]/50">حدد العملاء المخصصين لهذا المندوب</p>
+                  <QuickAddCustomerForm repId={repId} />
                   <div className="space-y-2 max-h-[55vh] overflow-y-auto">
                     {allCustomers.map(c => (
                       <label key={c.id} className="flex items-center gap-3 p-3 bg-white/70 rounded-2xl border border-white/90 cursor-pointer hover:bg-white shadow-sm transition-colors">

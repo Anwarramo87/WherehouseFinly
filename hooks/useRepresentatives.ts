@@ -213,12 +213,32 @@ export const useUpdateRepresentative = (repId: string) => {
 };
 
 export const useAssignCustomers = (repId: string) => {
+  const qc = useQueryClient();
   const invalidate = useInvalidateRep(repId);
   return useMutation({
     mutationFn: (customerIds: string[]) =>
       apiClient.post(`/representatives/${repId}/customers`, { customerIds }).then((r) => r.data),
-    onSuccess: () => { toast.success("تم تعيين العملاء"); invalidate(); },
+    onSuccess: () => {
+      toast.success("تم تعيين العملاء"); invalidate();
+      void qc.invalidateQueries({ queryKey: queryKeys.salesDomain.all });
+    },
     onError: (e) => toast.error(errMsg(e, "فشل تعيين العملاء")),
+  });
+};
+
+/** إنشاء عميل جديد وربطه بالمندوب مباشرة من شاشة إدارة المندوب */
+export const useCreateAndAssignCustomer = (repId: string) => {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateRep(repId);
+  return useMutation({
+    mutationFn: (payload: { name: string; phone?: string; address?: string }) =>
+      apiClient.post(`/representatives/${repId}/customers/create`, payload).then((r) => r.data),
+    onSuccess: (data: { name?: string }) => {
+      toast.success(`تم إنشاء العميل ${data?.name ?? ""} وربطه بالمندوب`.trim());
+      invalidate();
+      void qc.invalidateQueries({ queryKey: queryKeys.salesDomain.all });
+    },
+    onError: (e) => toast.error(errMsg(e, "فشل إنشاء العميل")),
   });
 };
 
