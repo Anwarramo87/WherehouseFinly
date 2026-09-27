@@ -463,9 +463,14 @@ function RepManageDrawer({ repId, onClose }: { repId: string; onClose: () => voi
       .filter(([, qty]) => Number(qty) > 0)
       .map(([sku, qty]) => ({ sku, quantity: Number(qty) }));
     if (!items.length) return toast.error("أضف كمية لصنف واحد على الأقل");
-    await transferStock.mutateAsync({ items, warehouseLocation: transferLocation });
-    setTransferItems({});
-    toast.success("تم تسليم البضاعة للمندوب");
+    try {
+      await transferStock.mutateAsync({ items, warehouseLocation: transferLocation });
+      setTransferItems({});
+    } catch {
+      // useTransferStock's onError already toasted the backend's reason
+      // (e.g. مخزون غير كافٍ) — swallowing here only stops the
+      // unhandled promise rejection.
+    }
   };
 
   const TABS = [

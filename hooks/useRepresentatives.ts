@@ -134,8 +134,11 @@ export interface EmployeeOption {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const errMsg = (e: unknown, fallback: string) => {
-  const err = e as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message ?? fallback;
+  // The backend's GlobalExceptionFilter wraps everything as
+  // { error: { message } } — read that first; some older surfaces reply with a
+  // flat { message }.
+  const err = e as { response?: { data?: { error?: { message?: string }; message?: string } } };
+  return err?.response?.data?.error?.message ?? err?.response?.data?.message ?? fallback;
 };
 
 const useInvalidateRep = (repId?: string) => {
