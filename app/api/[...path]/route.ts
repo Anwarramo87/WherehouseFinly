@@ -4,7 +4,7 @@ export const fetchCache = "force-no-store";
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { resolveApiUrl } from "@/lib/api-url";
+import { resolveApiUrl, DEPLOYED_API_URL, LOCAL_API_URL } from "@/lib/api-url";
 
 // 30s: Neon cold-starts and dead-socket retries inside the pg pool can make a
 // first request take 15-20s+ (observed: /representatives/me/profile at 21s).
@@ -12,6 +12,9 @@ import { resolveApiUrl } from "@/lib/api-url";
 // backend answered successfully moments later. 30s matches the backend pool's
 // own connectionTimeoutMillis.
 const REQUEST_TIMEOUT_MS = Number(process.env.BACKEND_PROXY_TIMEOUT_MS) || 30_000;
+// How long to wait for the deployed backend before giving up and trying local.
+// Keep this short so the fallback feels instant to the user.
+const DEPLOYED_TIMEOUT_MS = Number(process.env.DEPLOYED_BACKEND_TIMEOUT_MS) || 5_000;
 // Long-running computation endpoints: a payroll run aggregates attendance for
 // every employee-day and can legitimately take minutes. The proxy must wait
 // for them instead of aborting with a 502 mid-calculation.
@@ -24,11 +27,12 @@ const LONG_RUNNING_PREFIXES = [
 const LONG_RUNNING_TIMEOUT_MS = 180_000;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
-// Resolved once at module load — stable for the lifetime of the server process.
-// NEXT_PUBLIC_API_URL is set in .env.local → http://localhost:5003/api/v1
+// Primary = deployed Railway backend. Fallback = local dev server.
+// If NEXT_PUBLIC_API_URL is explicitly set in .env.local it overrides the deployed URL.
 const PRIMARY_BACKEND_URL = resolveApiUrl(
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL,
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? DEPLOYED_API_URL,
 );
+const FALLBACK_BACKEND_URL = LOCAL_API_URL;
 
 const HOP_BY_HOP = new Set([
   "accept-encoding",
@@ -142,9 +146,9 @@ async function handler(request: NextRequest) {
     (prefix) => apiPath === prefix || apiPath.startsWith(`${prefix}/`),
   );
   const timeoutMs = isLongRunning ? LONG_RUNNING_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
-  const fetchWithTimeout = async (targetUrl: string): Promise<Response> => {
+  const fetchWithTimeout = async (targetUrl: string, overrideMs?: number): Promise<Response> => {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(() => ctrl.abort(), overrideMs ?? timeoutMs);
     try {
       return await fetch(targetUrl, {
         method: request.method,
@@ -159,47 +163,56 @@ async function handler(request: NextRequest) {
     }
   };
 
-  // ── Simple strategy: always use PRIMARY_BACKEND_URL (set in .env.local).
-  // No fallback switching — mixing backends causes 401s because each has its
-  // own JWT secret and Redis refresh-token store.
-  // If you want to use the deployed backend, change NEXT_PUBLIC_API_URL in .env.local.
-  //
-  // Exception: /health* is excluded from the backend's global /api prefix
-  // (main.ts) but still carries the default URI version, so the live route is
-  // /v1/health — NOT /api/health (404) and NOT /api/v1/health (404).
-  // Only the exact /health subtree takes this branch; everything else keeps
-  // the versioned base exactly as before.
   const isUnversionedHealth = apiPath === "/health" || apiPath.startsWith("/health/");
-  let backendOrigin = "";
-  try {
-    backendOrigin = new URL(PRIMARY_BACKEND_URL).origin;
-  } catch {
-    backendOrigin = "";
-  }
-  const targetUrl =
-    (isUnversionedHealth && backendOrigin
+
+  const buildTargetUrl = (base: string) => {
+    let backendOrigin = "";
+    try { backendOrigin = new URL(base).origin; } catch { /* ignore */ }
+    return (isUnversionedHealth && backendOrigin
       ? backendOrigin + "/v1" + apiPath
-      : PRIMARY_BACKEND_URL + apiPath) + qs;
+      : base + apiPath) + qs;
+  };
+
+  const primaryUrl = buildTargetUrl(PRIMARY_BACKEND_URL);
+  // Use a short timeout for the deployed backend so fallback to local is fast.
+  // Long-running endpoints skip this — they need the full timeout even on Railway.
+  const primaryTimeoutMs = isLongRunning ? LONG_RUNNING_TIMEOUT_MS : DEPLOYED_TIMEOUT_MS;
 
   try {
-    const upstream = await fetchWithTimeout(targetUrl);
+    const upstream = await fetchWithTimeout(primaryUrl, primaryTimeoutMs);
     return new NextResponse(upstream.body, {
       status: upstream.status,
       headers: responseHeaders(upstream, request, apiPath),
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // The server log gets the target and the reason; the browser does not.
-    // Echoing them told any anonymous caller the internal backend URL and the
-    // shape of its failures.
-    console.error(`[proxy] ${request.method} ${targetUrl} failed:`, msg);
-    return NextResponse.json(
-      {
-        error: "Backend unreachable",
-        ...(IS_PRODUCTION ? {} : { message: msg, target: targetUrl }),
-      },
-      { status: 502, headers: corsHeaders(request) },
-    );
+  } catch (primaryErr) {
+    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+    console.warn(`[proxy] primary ${request.method} ${primaryUrl} failed (${primaryMsg}), trying fallback...`);
+
+    // Only fall back to local if primary is the deployed backend (not already local)
+    if (PRIMARY_BACKEND_URL === FALLBACK_BACKEND_URL) {
+      console.error(`[proxy] ${request.method} ${primaryUrl} failed:`, primaryMsg);
+      return NextResponse.json(
+        { error: "Backend unreachable", ...(IS_PRODUCTION ? {} : { message: primaryMsg, target: primaryUrl }) },
+        { status: 502, headers: corsHeaders(request) },
+      );
+    }
+
+    const fallbackUrl = buildTargetUrl(FALLBACK_BACKEND_URL);
+    try {
+      const fallback = await fetchWithTimeout(fallbackUrl);
+      console.info(`[proxy] fallback succeeded: ${fallbackUrl}`);
+      return new NextResponse(fallback.body, {
+        status: fallback.status,
+        headers: responseHeaders(fallback, request, apiPath),
+      });
+    } catch (fallbackErr) {
+      const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      console.error(`[proxy] both backends failed. fallback ${fallbackUrl}:`, msg);
+      return NextResponse.json(
+        { error: "Backend unreachable", ...(IS_PRODUCTION ? {} : { message: msg, target: fallbackUrl }) },
+        { status: 502, headers: corsHeaders(request) },
+      );
+    }
   }
 }
 
