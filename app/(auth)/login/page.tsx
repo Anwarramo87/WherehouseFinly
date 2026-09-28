@@ -73,7 +73,6 @@ export default function LoginPage() {
   const setUser = useAuthStore((state) => state.setUser);
   const setStatus = useAuthStore((state) => state.setStatus);
   const authStatus = useAuthStore((state) => state.status);
-  const currentUser = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
   const skipInitialSessionProbeRef = useRef(false);
 
@@ -81,7 +80,7 @@ export default function LoginPage() {
     let active = true;
 
     if (authStatus === "authenticated") {
-      safeNavigate(router, homePathFor(currentUser));
+      safeNavigate(router, homePathFor(useAuthStore.getState().user));
       return () => {
         active = false;
       };
@@ -96,7 +95,7 @@ export default function LoginPage() {
 
       if (result.authorized) {
         setStatus("authenticated");
-        safeNavigate(router, homePathFor(currentUser));
+        safeNavigate(router, homePathFor(useAuthStore.getState().user));
         return;
       }
 
@@ -111,7 +110,8 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [authStatus, router, clear, setStatus, currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, router, clear, setStatus]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -262,7 +262,7 @@ export default function LoginPage() {
       }
 
       setStatus("authenticated");
-      safeNavigate(router, homePathFor(finalUser, currentUser));
+      safeNavigate(router, homePathFor(finalUser));
     } catch (error: unknown) {
       // #region debug-point D:login-final-error
       reportDebug?.("D", "Login failed after retries", {
