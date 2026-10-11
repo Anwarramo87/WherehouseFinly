@@ -24,6 +24,11 @@ const defaultForm: InventoryItemInput = {
   reorderLevel: "10",
   unit: "قطعة",
   photo: null,
+  productType: "RAW_MATERIAL",
+  size: "",
+  feature: "",
+  barcode: "",
+  description: "",
 };
 
 export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = false, initialData }: AddEditItemModalProps) {
@@ -39,6 +44,11 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
         reorderLevel: initialData.reorderLevel?.toString() || "10",
         unit: initialData.unit || "قطعة",
         photo: initialData.photo ?? null,
+        productType: initialData.productType || "RAW_MATERIAL",
+        size: initialData.size || "",
+        feature: initialData.feature || "",
+        barcode: initialData.barcode || "",
+        description: initialData.description || "",
       };
     }
     return defaultForm;
@@ -132,14 +142,68 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">SKU / الباركود</label>
+            <label className="block text-sm font-bold text-slate-700 mb-2">SKU / الباركود (اختياري)</label>
             <input
-              required
               value={form.sku}
               onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
               placeholder="LAB-GLV-001"
               disabled={Boolean(initialData?.id)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">نوع المنتج *</label>
+            <select
+              value={form.productType}
+              onChange={(e) => setForm((p) => ({ ...p, productType: e.target.value }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="RAW_MATERIAL">مادة خام</option>
+              <option value="SEMI_FINISHED">نصف مصنّع</option>
+              <option value="FINISHED">منتج نهائي</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">الحجم *</label>
+            <input
+              required
+              value={form.size}
+              onChange={(e) => setForm((p) => ({ ...p, size: e.target.value }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="مثال: 10x20 سم"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">الخصائص / اللون *</label>
+            <input
+              required
+              value={form.feature}
+              onChange={(e) => setForm((p) => ({ ...p, feature: e.target.value }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="مثال: بلاستيك، أزرق"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">الباركود</label>
+            <input
+              value={form.barcode}
+              onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              placeholder="اختياري"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">الوصف</label>
+            <input
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="وصف الصنف"
             />
           </div>
 

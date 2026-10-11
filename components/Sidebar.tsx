@@ -89,11 +89,14 @@ const menuItems: MenuItem[] = [
     icon: Box,
     permissions: ['view_inventory'],
     subItems: [
-      { name: 'الأصناف', href: '/inventory' },
+      { name: 'المخازن', href: '/inventory/warehouses' },
+      { name: 'المواد الخام', href: '/inventory/raw-materials' },
+      { name: 'المنتجات النهائية', href: '/inventory/products' },
+      { name: 'حركات المخزون', href: '/inventory/movements' },
+      { name: 'جرد المخزون', href: '/inventory/take' },
       { name: 'الدفعات والصلاحية', href: '/inventory/batches' },
       { name: 'لوحة الصلاحية', href: '/inventory/expiry' },
-      { name: 'حركات المخزون', href: '/inventory/movements' },
-      { name: 'المخازن', href: '/inventory/warehouses' },
+      { name: 'دفتر الأستاذ', href: '/inventory/ledger' },
       { name: 'المواقع والخانات', href: '/inventory/locations' },
       { name: 'الجرد الدوري', href: '/inventory/counts' },
       { name: 'فحص الجودة', href: '/inventory/quality' },
@@ -419,8 +422,8 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
           </div>
         </div>
         <div className={`overflow-hidden transition-all duration-300 ease-out flex flex-col justify-center ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-full opacity-100'}`}>
-          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">KU&M</h1>
-          <p className="text-[9px] font-black text-[#C89355] uppercase tracking-[0.4em] mt-1 border-b border-[#C89355]/20 w-fit pb-1">J E A N S</p>
+          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">كنوز الطبيعة</h1>
+          {/* <p className="text-[9px] font-black text-[#C89355] uppercase tracking-[0.4em] mt-1 border-b border-[#C89355]/20 w-fit pb-1">J E A N S</p> */}
         </div>
       </div>
 
