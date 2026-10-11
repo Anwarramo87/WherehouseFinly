@@ -1,8 +1,11 @@
-const PRODUCTION_API_URL = "https://warehousebackend-depolyemnt-production.up.railway.app/api/v1";
-const DEVELOPMENT_API_URL = "http://localhost:5003/api/v1";
+const PRODUCTION_API_URL = "https://werehouse-production.up.railway.app/api/v1";
+const FALLBACK_API_URL = "http://localhost:5003/api/v1";
+
+export const DEPLOYED_API_URL = PRODUCTION_API_URL;
+export const LOCAL_API_URL = FALLBACK_API_URL;
 
 export const DEFAULT_API_URL =
-  process.env.NODE_ENV === "production" ? PRODUCTION_API_URL : DEVELOPMENT_API_URL;
+  process.env.NODE_ENV === "production" ? PRODUCTION_API_URL : FALLBACK_API_URL;
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 

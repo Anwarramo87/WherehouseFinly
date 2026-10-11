@@ -1,22 +1,132 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Save, Building2, Users, Fingerprint, 
-  Bell, ShieldCheck, Box, Server, Settings,
-  Database, Download, Calendar
+import { useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  BellRing,
+  Box,
+  Building2,
+  Check,
+  Database,
+  Fingerprint,
+  Lock,
+  Save,
+  Server,
+  Settings,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
+import { api } from "@/lib/http/api";
+
+type InventorySettings = {
+  lowStockAlertsEnabled: boolean;
+  lowStockThreshold: number;
+  expiryAlertDays: number;
+  autoReorderSuggestions: boolean;
+};
+
+type SecuritySettings = {
+  strongPasswordRequired: boolean;
+  enforceSingleSession: boolean;
+  sessionTimeoutMinutes: number;
+  lockoutMinutes: number;
+};
+
+const DEFAULT_INVENTORY: InventorySettings = {
+  lowStockAlertsEnabled: true,
+  lowStockThreshold: 5,
+  expiryAlertDays: 30,
+  autoReorderSuggestions: true,
+};
+
+const DEFAULT_SECURITY: SecuritySettings = {
+  strongPasswordRequired: false,
+  enforceSingleSession: false,
+  sessionTimeoutMinutes: 60,
+  lockoutMinutes: 15,
+};
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function asInventory(value: unknown): InventorySettings {
+  if (!value || typeof value !== "object") return DEFAULT_INVENTORY;
+  const v = value as Record<string, unknown>;
+  return {
+    lowStockAlertsEnabled:
+      typeof v.lowStockAlertsEnabled === "boolean" ? v.lowStockAlertsEnabled : DEFAULT_INVENTORY.lowStockAlertsEnabled,
+    lowStockThreshold:
+      typeof v.lowStockThreshold === "number" && v.lowStockThreshold >= 0 ? v.lowStockThreshold : DEFAULT_INVENTORY.lowStockThreshold,
+    expiryAlertDays:
+      typeof v.expiryAlertDays === "number" && v.expiryAlertDays >= 0 ? v.expiryAlertDays : DEFAULT_INVENTORY.expiryAlertDays,
+    autoReorderSuggestions:
+      typeof v.autoReorderSuggestions === "boolean" ? v.autoReorderSuggestions : DEFAULT_INVENTORY.autoReorderSuggestions,
+  };
+}
+
+function asSecurity(value: unknown): SecuritySettings {
+  if (!value || typeof value !== "object") return DEFAULT_SECURITY;
+  const v = value as Record<string, unknown>;
+  return {
+    strongPasswordRequired:
+      typeof v.strongPasswordRequired === "boolean" ? v.strongPasswordRequired : DEFAULT_SECURITY.strongPasswordRequired,
+    enforceSingleSession:
+      typeof v.enforceSingleSession === "boolean" ? v.enforceSingleSession : DEFAULT_SECURITY.enforceSingleSession,
+    sessionTimeoutMinutes:
+      typeof v.sessionTimeoutMinutes === "number" && v.sessionTimeoutMinutes > 0
+        ? v.sessionTimeoutMinutes
+        : DEFAULT_SECURITY.sessionTimeoutMinutes,
+    lockoutMinutes:
+      typeof v.lockoutMinutes === "number" && v.lockoutMinutes > 0 ? v.lockoutMinutes : DEFAULT_SECURITY.lockoutMinutes,
+  };
+}
 
 export default function SettingsPage() {
-  // حالة التبويب النشط
   const [activeTab, setActiveTab] = useState("hr");
+  const [inventory, setInventory] = useState<InventorySettings>(DEFAULT_INVENTORY);
+  const [security, setSecurity] = useState<SecuritySettings>(DEFAULT_SECURITY);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  // التبويبات المتاحة
+  useEffect(() => {
+    api
+      .get<{ settings?: Record<string, unknown> }>("/settings/system")
+      .then((res) => {
+        setInventory(asInventory(res.settings?.inventory));
+        setSecurity(asSecurity(res.settings?.security));
+      })
+      .catch(() => {
+        // Leave defaults; the panels still render and the save button reports
+        // any failure instead of silently dropping the values.
+        setSaveState("idle");
+      });
+  }, []);
+
+  const saveAll = useCallback(async () => {
+    setSaveState("saving");
+    try {
+      await api.patch("/settings/system", {
+        settings: { inventory, security },
+      });
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2500);
+    } catch {
+      setSaveState("error");
+      setTimeout(() => setSaveState("idle"), 4000);
+    }
+  }, [inventory, security]);
+
+  const setInventoryField = useCallback(<K extends keyof InventorySettings>(key: K, value: InventorySettings[K]) => {
+    setInventory((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const setSecurityField = useCallback(<K extends keyof SecuritySettings>(key: K, value: SecuritySettings[K]) => {
+    setSecurity((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
   const tabs = [
     { id: "general", name: "إعدادات عامة", icon: Building2 },
     { id: "hr", name: "قواعد الرواتب والحضور", icon: Users },
     { id: "devices", name: "أجهزة البصمة والربط", icon: Fingerprint },
-    { id: "inventory", name: "المخزون والتنبيهات", icon: Box },
+    { id: "inventory", name: "المخزون والتنبيهات", icon: BoxIcon },
     { id: "security", name: "الأمان والصلاحيات", icon: ShieldCheck },
     { id: "backup", name: "النسخ الاحتياطي", icon: Database },
   ];
@@ -24,9 +134,9 @@ export default function SettingsPage() {
   return (
     /* الحاوية الرئيسية: تأثير زجاجي مع درازة خارجية متطابقة مع باقي النظام */
     <div className="relative z-10 w-full max-w-7xl min-h-[85vh] mx-auto bg-white/50 backdrop-blur-[40px] rounded-[3rem] shadow-[0_40px_80px_-20px_rgba(38,53,68,0.2)] border-2 border-dashed border-[#C89355]/60 flex flex-col" dir="rtl">
-        
+
         {/* نقشة الفايبر (القماش) الثابتة والشفافة */}
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 12h24M12 0v24' stroke='%23263544' stroke-width='1' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`,
@@ -36,7 +146,7 @@ export default function SettingsPage() {
 
         {/* المحتوى الداخلي */}
         <div className="p-6 md:p-10 h-full overflow-y-auto custom-scrollbar relative z-10">
-          
+
           {/* الهيدر وزر الحفظ العام */}
           <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#263544]/10 pb-8 relative">
             <div>
@@ -50,20 +160,32 @@ export default function SettingsPage() {
               <p className="text-slate-600 text-sm font-bold pr-14 mt-1">إعدادات النظام، قواعد المحاسبة، وتفضيلات المعمل</p>
             </div>
 
-            <button className="relative overflow-hidden inline-flex items-center gap-2 rounded-2xl bg-[#1a2530] hover:bg-[#263544] px-6 py-3.5 text-sm font-black text-[#C89355] shadow-[0_10px_20px_rgba(38,53,68,0.4)] transition-all active:scale-95 border border-[#C89355]/40 group/btn w-full md:w-auto justify-center">
+            <button
+              onClick={saveAll}
+              disabled={saveState === "saving"}
+              className="relative overflow-hidden inline-flex items-center gap-2 rounded-2xl bg-[#1a2530] hover:bg-[#263544] disabled:opacity-60 px-6 py-3.5 text-sm font-black text-[#C89355] shadow-[0_10px_20px_rgba(38,53,68,0.4)] transition-all active:scale-95 border border-[#C89355]/40 group/btn w-full md:w-auto justify-center"
+            >
               <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/50" />
-              <Save size={18} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
-              <span className="relative z-10">حفظ التعديلات</span>
+              {saveState === "saved" ? (
+                <Check size={18} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
+              ) : saveState === "error" ? (
+                <AlertTriangle size={18} className="relative z-10" />
+              ) : (
+                <Save size={18} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
+              )}
+              <span className="relative z-10">
+                {saveState === "saving" ? "جارٍ الحفظ..." : saveState === "saved" ? "تم الحفظ" : saveState === "error" ? "فشل الحفظ" : "حفظ التعديلات"}
+              </span>
             </button>
           </header>
 
           <div className="flex flex-col lg:flex-row gap-8">
-            
+
             {/* القائمة الجانبية للإعدادات (Tabs) بتصميم Glassmorphism */}
             <div className="w-full lg:w-72 shrink-0">
               <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-4 flex flex-col gap-2 overflow-hidden group/sidebar">
                 <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/sidebar:border-[#C89355]/50 z-0" />
-                
+
                 <div className="relative z-10 flex flex-col gap-2">
                   {tabs.map((tab) => {
                     const isActive = activeTab === tab.id;
@@ -78,10 +200,10 @@ export default function SettingsPage() {
                         }`}
                       >
                         {isActive && <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/20 pointer-events-none" />}
-                        
+
                         <div className={`p-2.5 rounded-xl transition-all duration-300 relative z-10 shadow-sm border ${
-                          isActive 
-                            ? 'bg-[#263544] text-[#C89355] border-[#C89355]/30 shadow-inner' 
+                          isActive
+                            ? 'bg-[#263544] text-[#C89355] border-[#C89355]/30 shadow-inner'
                             : 'bg-white text-slate-400 group-hover/tab:text-[#C89355] border-slate-100 group-hover/tab:border-[#C89355]/30'
                         }`}>
                           <tab.icon size={18} className={`transition-all duration-300 group-hover/tab:animate-pulse ${isActive ? "" : "group-hover/tab:scale-110"}`} />
@@ -100,15 +222,15 @@ export default function SettingsPage() {
 
             {/* محتوى الإعدادات */}
             <div className="flex-1">
-              
+
               {/* --- قسم الموارد البشرية والرواتب --- */}
               {activeTab === "hr" && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  
+
                   {/* بطاقة قواعد التأخير */}
                   <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
                     <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
-                    
+
                     <div className="relative z-10">
                       <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
                         <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-inner">
@@ -116,25 +238,25 @@ export default function SettingsPage() {
                         </div>
                         قواعد التأخير والانصراف
                       </h2>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">مدة السماح (بالدقائق)</label>
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             defaultValue="5"
                             className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
                           />
                           <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span> 
+                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span>
                             الدقائق المسموح بها بعد بدء الدوام دون خصم.
                           </p>
                         </div>
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">نسبة خصم التأخير</label>
                           <div className="relative">
-                            <input 
-                              type="number" 
+                            <input
+                              type="number"
                               defaultValue="100"
                               className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all pl-14"
                             />
@@ -143,7 +265,7 @@ export default function SettingsPage() {
                             </div>
                           </div>
                           <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse"></span> 
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse"></span>
                             100% تعني خصم الدقيقة بدقيقة من الراتب.
                           </p>
                         </div>
@@ -154,7 +276,7 @@ export default function SettingsPage() {
                   {/* بطاقة حساب الأجر الإضافي */}
                   <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
                     <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
-                    
+
                     <div className="relative z-10">
                       <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
                         <div className="p-2.5 bg-[#1a2530] rounded-xl border border-[#C89355]/40 shadow-inner">
@@ -165,27 +287,27 @@ export default function SettingsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">مُعامل الإضافي (الأيام العادية)</label>
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             step="0.1"
                             defaultValue="1.5"
                             className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
                           />
                           <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#263544] shadow-[0_0_8px_rgba(38,53,68,0.6)]"></span> 
+                            <span className="w-2 h-2 rounded-full bg-[#263544] shadow-[0_0_8px_rgba(38,53,68,0.6)]"></span>
                             تحسب الساعة بساعة ونصف.
                           </p>
                         </div>
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">مُعامل الإضافي (العطل الرسمية)</label>
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             step="0.1"
                             defaultValue="2.0"
                             className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
                           />
                           <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span> 
+                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span>
                             تحسب الساعة بساعتين.
                           </p>
                         </div>
@@ -199,10 +321,10 @@ export default function SettingsPage() {
               {/* --- قسم أجهزة البصمة --- */}
               {activeTab === "devices" && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  
+
                   <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
                     <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
-                    
+
                     <div className="relative z-10">
                       <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
                         <div className="p-2.5 bg-[#1a2530] rounded-xl border border-[#C89355]/40 shadow-inner">
@@ -210,20 +332,20 @@ export default function SettingsPage() {
                         </div>
                         إعدادات جهاز البصمة الأساسي
                       </h2>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">عنوان IP للجهاز</label>
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             defaultValue="192.168.1.100"
                             className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] font-mono text-left dir-ltr shadow-inner transition-all tracking-widest"
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-black text-[#263544] mb-3">منفذ الاتصال (Port)</label>
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             defaultValue="4370"
                             className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] font-mono text-left dir-ltr shadow-inner transition-all tracking-widest"
                           />
@@ -252,7 +374,7 @@ export default function SettingsPage() {
               {activeTab === "general" && (
                 <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
                   <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
-                  
+
                   <div className="relative z-10">
                     <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
                       <div className="p-2.5 bg-[#C89355]/20 rounded-xl border border-[#C89355]/30 shadow-inner">
@@ -263,11 +385,143 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <label className="block text-sm font-black text-[#263544] mb-3">اسم المعمل / المنشأة</label>
-                        <input 
-                          type="text" 
-                          defaultValue="KU&M JEANS" 
-                          className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all" 
+                        <input
+                          type="text"
+                          defaultValue="KU&M JEANS"
+                          className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
                         />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- قسم المخزون والتنبيهات --- */}
+              {activeTab === "inventory" && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
+                    <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
+                    <div className="relative z-10">
+                      <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
+                        <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30 shadow-inner">
+                          <BellRing className="text-[#C89355] group-hover/card:animate-pulse transition-all duration-300" />
+                        </div>
+                        تنبيهات المخزون
+                      </h2>
+
+                      <div className="border border-white rounded-2xl bg-white/50 p-5 flex items-center justify-between mb-8">
+                        <div>
+                          <h4 className="text-sm font-black text-[#263544]">تفعيل تنبيهات انخفاض المخزون</h4>
+                          <p className="text-[11px] font-bold text-slate-500 mt-1">بمجرد اقتراب الكمية من الحد الأدنى يُبرز الصنف في حالة منخفض.</p>
+                        </div>
+                        <Toggle checked={inventory.lowStockAlertsEnabled} onChange={(v) => setInventoryField("lowStockAlertsEnabled", v)} />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                          <label className="block text-sm font-black text-[#263544] mb-3">حد التنبيه الأدنى للكمية</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={inventory.lowStockThreshold}
+                            onChange={(e) => setInventoryField("lowStockThreshold", Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                            className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
+                          />
+                          <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span>
+                            يُعامل الصنف كمنخفض عندما تصبح الكمية المتاحة أقل من هذه القيمة.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-black text-[#263544] mb-3">تنبيه انتهاء الصلاحية (أيام)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={inventory.expiryAlertDays}
+                            onChange={(e) => setInventoryField("expiryAlertDays", Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                            className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
+                          />
+                          <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse"></span>
+                            يظهر التحذير للدفعات التي تنتهي خلال هذا العدد من الأيام.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 pt-8 border-t border-white/80">
+                        <div className="border border-white rounded-2xl bg-white/50 p-5 flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-black text-[#263544]">اقتراح إعادة الطلب (Reorder)</h4>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">عرض كميات إعادة الطلب المقترحة لأصناف المعمعة على لوحة التحليلات.</p>
+                          </div>
+                          <Toggle checked={inventory.autoReorderSuggestions} onChange={(v) => setInventoryField("autoReorderSuggestions", v)} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- قسم الأمان والصلاحيات --- */}
+              {activeTab === "security" && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
+                    <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
+                    <div className="relative z-10">
+                      <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
+                        <div className="p-2.5 bg-[#1a2530] rounded-xl border border-[#C89355]/40 shadow-inner">
+                          <Lock className="text-[#C89355] group-hover/card:animate-pulse transition-all duration-300" />
+                        </div>
+                        سياسات الدخول والأمان
+                      </h2>
+
+                      <div className="space-y-4">
+                        <div className="border border-white rounded-2xl bg-white/50 p-5 flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-black text-[#263544]">اشتراط كلمة مرور قوية</h4>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">تفريض ٨ أحرف على الأقل مع خلط بين الأحرف والأرقام.</p>
+                          </div>
+                          <Toggle checked={security.strongPasswordRequired} onChange={(v) => setSecurityField("strongPasswordRequired", v)} />
+                        </div>
+
+                        <div className="border border-white rounded-2xl bg-white/50 p-5 flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-black text-[#263544]">جلسة عمل واحدة لكل مستخدم</h4>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">تسجيل الدخول من جهاز جديد يُنهي جلسات الأجهزة الأخرى لهذا المستخدم.</p>
+                          </div>
+                          <Toggle checked={security.enforceSingleSession} onChange={(v) => setSecurityField("enforceSingleSession", v)} />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 pt-8 border-t border-white/80">
+                        <div>
+                          <label className="block text-sm font-black text-[#263544] mb-3">مهلة انتهاء الجلسة (دقائق)</label>
+                          <input
+                            type="number"
+                            min={5}
+                            value={security.sessionTimeoutMinutes}
+                            onChange={(e) => setSecurityField("sessionTimeoutMinutes", Math.max(5, Math.floor(Number(e.target.value) || 60)))}
+                            className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
+                          />
+                          <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#C89355] shadow-[0_0_8px_rgba(200,147,85,0.6)] animate-pulse"></span>
+                            إذ لا نشاط يطلب إعادة التحقق بعد هذه الفترة.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-black text-[#263544] mb-3">قفل الحساب بعد محاولات فاشلة (دقائق)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={security.lockoutMinutes}
+                            onChange={(e) => setSecurityField("lockoutMinutes", Math.max(1, Math.floor(Number(e.target.value) || 15)))}
+                            className="w-full bg-white/80 backdrop-blur-sm border-2 border-white rounded-2xl px-5 py-3 text-xl font-black text-[#263544] focus:outline-none focus:ring-2 focus:ring-[#C89355]/40 focus:border-[#C89355] shadow-inner transition-all"
+                          />
+                          <p className="text-[11px] font-bold text-slate-500 mt-3 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse"></span>
+                            تُجمَّد محاولات الدخول الخاطئة تلقائياً بعد Exceed الحد الأعلى.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -277,11 +531,11 @@ export default function SettingsPage() {
               {/* --- قسم النسخ الاحتياطي --- */}
               {activeTab === "backup" && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  
+
                   {/* بطاقة النسخ الاحتياطي الكامل */}
                   <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border-2 border-white/90 shadow-[0_15px_40px_rgba(38,53,68,0.08)] p-8 group/card overflow-hidden">
                     <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/card:border-[#C89355]/50 z-0" />
-                    
+
                     <div className="relative z-10">
                       <h2 className="text-xl font-black text-[#263544] mb-8 flex items-center gap-3 border-b border-white/80 pb-6">
                         <div className="p-2.5 bg-[#1a2530] rounded-xl border border-[#C89355]/40 shadow-inner">
@@ -289,13 +543,13 @@ export default function SettingsPage() {
                         </div>
                         النسخ الاحتياطي
                       </h2>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* نسخة احتياطية كاملة */}
                         <div className="bg-white/60 backdrop-blur-md p-6 rounded-2xl border border-white shadow-sm hover:shadow-md transition-all">
                           <div className="flex items-center gap-3 mb-4">
                             <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30">
-                              <Download size={20} className="text-[#C89355]" />
+                              <DownloadIcon className="text-[#C89355]" />
                             </div>
                             <h3 className="text-lg font-black text-[#263544]">نسخة احتياطية كاملة</h3>
                           </div>
@@ -311,7 +565,7 @@ export default function SettingsPage() {
                             className="w-full relative overflow-hidden bg-[#1a2530] hover:bg-[#263544] text-[#C89355] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-[0_10px_20px_rgba(38,53,68,0.3)] transition-all active:scale-95 text-sm font-black border border-[#C89355]/40 group/btn"
                           >
                             <div className="absolute inset-1.5 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/50" />
-                            <Download size={18} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
+                            <DownloadIcon className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
                             <span className="relative z-10">تحميل النسخة الكاملة</span>
                           </button>
                         </div>
@@ -320,7 +574,7 @@ export default function SettingsPage() {
                         <div className="bg-white/60 backdrop-blur-md p-6 rounded-2xl border border-white shadow-sm hover:shadow-md transition-all">
                           <div className="flex items-center gap-3 mb-4">
                             <div className="p-2.5 bg-[#C89355]/10 rounded-xl border border-[#C89355]/30">
-                              <Calendar size={20} className="text-[#C89355]" />
+                              <CalendarIcon className="text-[#C89355]" />
                             </div>
                             <h3 className="text-lg font-black text-[#263544]">نسخة احتياطية شهرية</h3>
                           </div>
@@ -345,7 +599,7 @@ export default function SettingsPage() {
                               }}
                               className="relative overflow-hidden bg-[#C89355] hover:bg-[#b8834a] text-[#1a2530] px-5 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(200,147,85,0.3)] transition-all active:scale-95 text-sm font-black group/btn"
                             >
-                              <Download size={18} className="group-hover/btn:-translate-y-1 transition-transform" />
+                              <DownloadIcon className="group-hover/btn:-translate-y-1 transition-transform" />
                               <span>تحميل</span>
                             </button>
                           </div>
@@ -363,17 +617,6 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* أقسام قيد التطوير */}
-              {(activeTab === "inventory" || activeTab === "security") && (
-                <div className="relative bg-white/40 backdrop-blur-2xl rounded-[2.5rem] border-2 border-dashed border-[#C89355]/40 p-16 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-500 shadow-[0_15px_40px_rgba(38,53,68,0.05)] overflow-hidden group">
-                  <div className="relative z-10 w-20 h-20 bg-white/80 backdrop-blur-md rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-white">
-                    <Bell size={40} className="text-[#C89355] group-hover:animate-pulse transition-all duration-300" />
-                  </div>
-                  <h3 className="relative z-10 text-2xl text-[#263544] font-black mb-3">هذا القسم قيد التطوير</h3>
-                  <p className="relative z-10 text-[#263544]/60 text-sm font-bold">يمكنك إضافة إعدادات التنبيهات والصلاحيات المخصصة هنا قريباً.</p>
-                </div>
-              )}
-
             </div>
           </div>
         </div>
@@ -381,10 +624,40 @@ export default function SettingsPage() {
   );
 }
 
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`w-14 h-7 rounded-full relative cursor-pointer shadow-inner border transition-colors ${
+        checked ? "bg-[#C89355] border-[#C89355]/60" : "bg-[#1a2530] border-[#C89355]/40"
+      } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+    >
+      <div
+        className={`w-5 h-5 rounded-full absolute top-1 transition-transform shadow-[0_0_10px_rgba(200,147,85,0.8)] ${
+          checked ? "bg-white translate-x-8" : "bg-[#C89355] left-1"
+        }`}
+      ></div>
+    </button>
+  );
+}
+
 // الأيقونات بصيغة SVG متوافقة
+function BoxIcon(props: React.SVGProps<SVGSVGElement>) {
+  return <Box {...props} />;
+}
 function ClockIcon(props: React.SVGProps<SVGSVGElement>) {
   return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 }
 function CalculatorIcon(props: React.SVGProps<SVGSVGElement>) {
   return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+}
+function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
+  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+}
+function CalendarIcon(props: React.SVGProps<SVGSVGElement>) {
+  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
 }

@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://werehouse-production.up.railway.app/api/v1",
+    "API_URL": "https://werehouse-production.up.railway.app/api/v1",
+    "NEXT_PUBLIC_APP_URL": "https://wherehouse-finly.vercel.app"
+  }
+}
