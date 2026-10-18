@@ -53,7 +53,7 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
-export type MovementType = "IN" | "OUT" | "ADJUSTMENT" | "RESERVE" | "RELEASE";
+export type MovementType = "IN" | "OUT" | "ADJUSTMENT" | "RESERVE" | "RELEASE" | "PURCHASE_RECEIPT" | "PRODUCTION_OUTPUT" | "RETURN_TO_STOCK" | "SALES_SHIPMENT" | "PRODUCTION_CONSUMPTION" | "DAMAGE_LOSS" | "WAREHOUSE_TRANSFER";
 
 export interface StockMovementRecord {
   id: string;
@@ -77,6 +77,10 @@ export interface Warehouse {
   status: string;
   createdAt: string;
   updatedAt: string;
+  totalQuantity?: number;
+  totalAvailable?: number;
+  totalReserved?: number;
+  stockRecordCount?: number;
 }
 
 export interface InventoryStats {
@@ -90,7 +94,7 @@ export interface InventoryStats {
 }
 
 export interface InventoryItemInput {
-  sku: string;
+  sku?: string;
   name: string;
   category: string;
   unitPrice?: number | string;
@@ -104,14 +108,54 @@ export interface InventoryItemInput {
 
 export interface AdjustStockInput {
   productId: string;
-  type: "IN" | "OUT" | "ADJUSTMENT";
+  type: "IN" | "OUT" | "ADJUSTMENT" | "PURCHASE_RECEIPT" | "PRODUCTION_OUTPUT" | "RETURN_TO_STOCK" | "SALES_SHIPMENT" | "PRODUCTION_CONSUMPTION" | "DAMAGE_LOSS" | "WAREHOUSE_TRANSFER";
   quantity: number | string;
   note: string;
   location?: string;
+  category?: string;
 }
 
 export interface WarehouseInput {
   name: string;
   code: string;
   address?: string;
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  type: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CategoryType {
+  id: string;
+  name: string;
+  label: string;
+}
+
+export const CATEGORY_TYPES: CategoryType[] = [
+  { id: "RAW_MATERIALS", name: "RAW_MATERIALS", label: "مواد خام" },
+  { id: "PACKAGING", name: "PACKAGING", label: "مواد تغليف" },
+  { id: "SERVICES", name: "SERVICES", label: "خدمات" },
+  { id: "FINISHED_GOODS", name: "FINISHED_GOODS", label: "منتجات نهائية" },
+  { id: "OTHER", name: "OTHER", label: "إضافة نوع جديد" },
+];
+
+export interface CreateCategoryInput {
+  name: string;
+  type: string;
+  customTypeName?: string;
+}
+
+export interface ProductInput {
+  name: string;
+  productType?: string;
+  sku?: string;
+  size?: string;
+  color?: string;
+  costPrice: number | string;
+  unitPrice: number | string;
 }

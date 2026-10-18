@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, Package2, History, Warehouse as WarehouseIcon } from "lucide-react";
+import { Sparkles, Package2, History, Warehouse as WarehouseIcon, Layers, ClipboardCheck, ShieldAlert, BookOpen, MapPin, ClipboardList, ShieldCheck, Boxes } from "lucide-react";
 
 interface TabItem {
   name: string;
@@ -12,9 +12,17 @@ interface TabItem {
 }
 
 const TABS: TabItem[] = [
-  { name: "الأصناف", href: "/inventory", icon: Package2 },
-  { name: "حركات المخزون", href: "/inventory/movements", icon: History },
   { name: "المخازن", href: "/inventory/warehouses", icon: WarehouseIcon },
+  { name: "المواد الخام", href: "/inventory/raw-materials", icon: Boxes },
+  { name: "المنتجات النهائية", href: "/inventory/products", icon: Package2 },
+  { name: "حركات المخزون", href: "/inventory/movements", icon: History },
+  { name: "جرد المخزون", href: "/inventory/take", icon: ClipboardCheck },
+  { name: "الدفعات والصلاحية", href: "/inventory/batches", icon: Layers },
+  { name: "لوحة الصلاحية", href: "/inventory/expiry", icon: ShieldAlert },
+  { name: "دفتر الأستاذ", href: "/inventory/ledger", icon: BookOpen },
+  { name: "المواقع والخانات", href: "/inventory/locations", icon: MapPin },
+  { name: "الجرد الدوري", href: "/inventory/counts", icon: ClipboardList },
+  { name: "فحص الجودة", href: "/inventory/quality", icon: ShieldCheck },
 ];
 
 interface InventoryPageShellProps {
@@ -57,16 +65,15 @@ export default function InventoryPageShell({ title, subtitle, actions, children 
           ) : null}
         </header>
 
-        <div className="flex flex-wrap items-center gap-2 mb-8">
+        <div className="flex flex-wrap items-center gap-2 mb-8 overflow-x-auto custom-scrollbar pb-2 -mx-2 px-2">
           {TABS.map((tab) => {
-            const isActive = tab.href === "/inventory"
-              ? pathname === "/inventory"
-              : pathname.startsWith(tab.href);
+            const isActive = pathname === tab.href ||
+              (tab.href !== "/inventory/raw-materials" && tab.href !== "/inventory/products" && pathname.startsWith(tab.href));
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-black transition-all active:scale-95 ${
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-black transition-all active:scale-95 whitespace-nowrap shrink-0 ${
                   isActive
                     ? "bg-[#1a2530] text-[#C89355] shadow-[0_10px_20px_rgba(38,53,68,0.4)] border border-[#C89355]/40"
                     : "bg-white/60 backdrop-blur-md text-[#263544]/70 border border-white/80 hover:bg-white hover:text-[#263544] hover:border-[#C89355]/30 shadow-sm"

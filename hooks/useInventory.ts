@@ -27,6 +27,8 @@ const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   minStockLevel: Number(product.reorderLevel || 0),
   unitPrice: product.unitPrice ? Number(product.unitPrice) : undefined,
   costPrice: product.costPrice ? Number(product.costPrice) : undefined,
+  profitPercent: product.profitPercent,
+  marginPercent: product.marginPercent,
   photo: product.photo || null,
   onHand: Number(product.totalQuantity ?? 0),
   reserved: Number(product.totalReserved ?? 0),
@@ -68,6 +70,7 @@ type InventoryProductsParams = {
   search?: string;
   category?: string;
   status?: string;
+  productType?: string;
   sortBy?: ProductSortField;
   sortDir?: SortDirection;
 };
@@ -114,8 +117,6 @@ export const useStockMovements = (params?: {
 };
 
 export const useWarehouses = () => {
-  // The list endpoint is behind the view_inventory permission. Accounts without
-  // it (reps, employees) must not fire the request only to get a 403 verdict.
   const canView = usePermissionOrPrivilege("view_inventory");
   return useQuery({
     queryKey: queryKeys.inventory.warehouses(),
@@ -125,7 +126,19 @@ export const useWarehouses = () => {
     },
     enabled: canView,
     staleTime: QUERY_STALE_TIME.STANDARD,
-    gcTime: QUERY_GC_TIME.STANDARD,
+    gcTime: QUERY_STALE_TIME.STANDARD,
+  });
+};
+
+export const useNextWarehouseCode = () => {
+  return useQuery({
+    queryKey: queryKeys.inventory.warehousesNextCode(),
+    queryFn: async () => {
+      const res = await apiClient.get<{ code: string }>("/inventory/warehouses/next-code");
+      return res.data?.code ?? "";
+    },
+    staleTime: 0,
+    gcTime: 0,
   });
 };
 
@@ -244,6 +257,13 @@ export const useInventory = (params?: InventoryProductsParams) => {
         IN: "إضافة مخزون",
         OUT: "صرف مخزون",
         ADJUSTMENT: "تسوية جرد",
+        PURCHASE_RECEIPT: "استلام شراء",
+        PRODUCTION_OUTPUT: "إنتاج",
+        RETURN_TO_STOCK: "إعادة مخزون",
+        SALES_SHIPMENT: "شحن بيع",
+        PRODUCTION_CONSUMPTION: "استهلاك إنتاجي",
+        DAMAGE_LOSS: "تلف/خسارة",
+        WAREHOUSE_TRANSFER: "تحويل بين مخازن",
       };
 
       return await apiClient.post("/inventory/stock/adjust", {
@@ -265,11 +285,12 @@ export const useInventory = (params?: InventoryProductsParams) => {
 
   const createWarehouse = useMutation({
     mutationFn: async (payload: WarehouseInput) => {
-      return await apiClient.post("/inventory/warehouses", {
+      const res = await apiClient.post<{ code: string }>("/inventory/warehouses", {
         name: payload.name,
         code: payload.code,
         address: payload.address,
       });
+      return res.data;
     },
     onSuccess: () => {
       invalidateAll();
@@ -277,6 +298,19 @@ export const useInventory = (params?: InventoryProductsParams) => {
     },
     onError: (error: unknown) => {
       toast.error(extractMessage(error, "فشل إضافة المخزن"));
+    },
+  });
+
+  const deleteWarehouse = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiClient.delete(`/inventory/warehouses/${id}`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success("تم حذف المخزن بنجاح");
+    },
+    onError: (error: unknown) => {
+      toast.error(extractMessage(error, "فشل حذف المخزن"));
     },
   });
 
@@ -289,5 +323,6 @@ export const useInventory = (params?: InventoryProductsParams) => {
     deleteItem,
     adjustStock,
     createWarehouse,
+    deleteWarehouse,
   };
 };

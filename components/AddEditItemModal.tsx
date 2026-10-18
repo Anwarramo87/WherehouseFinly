@@ -130,7 +130,6 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
             <label className="block text-sm font-bold text-slate-700 mb-1">كود الصنف (SKU) <span className="text-rose-500">*</span></label>
             <p className="text-[11px] text-slate-400 mb-2">رمز فريد للصنف، ويُستخدم في التوريد والباركود.</p>
             <input
-              required
               value={form.sku}
               onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono disabled:opacity-60"
