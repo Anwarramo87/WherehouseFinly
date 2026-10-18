@@ -181,11 +181,21 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
 
       let employeesData: Employee[] = resolveEmployees(response.data);
 
-      const pagination = response.data?.pagination;
+      // Backend returns flat pagination: { data, total, page, limit, totalPages }
+      // (no nested `pagination` object). Older code checked only
+      // `response.data?.pagination?.pages`, so fetchAll silently stopped after
+      // page 1 — and the "next employee code" was computed from a partial list,
+      // re-suggesting an already-used code.
+      const raw = response.data as Record<string, unknown>;
+      const nested = (raw?.pagination ?? {}) as Record<string, unknown>;
+      const totalPages = Number(
+        nested?.pages ?? nested?.totalPages ?? raw?.totalPages ?? raw?.pages ?? 1,
+      );
+      const total = Number((nested as { total?: unknown })?.total ?? raw?.total ?? employeesData.length);
 
-      if (fetchAll && !options?.page && pagination?.pages && pagination.pages > firstPage) {
+      if (fetchAll && !options?.page && Number.isFinite(totalPages) && totalPages > firstPage) {
         const pagePromises: Promise<Employee[]>[] = [];
-        for (let page = firstPage + 1; page <= pagination.pages; page += 1) {
+        for (let page = firstPage + 1; page <= totalPages; page += 1) {
           pagePromises.push(
             requestEmployees(page).then((pageResponse) => resolveEmployees(pageResponse.data)),
           );
@@ -193,6 +203,18 @@ export const useEmployees = (options?: UseEmployeesOptions) => {
         const pageResults = await Promise.all(pagePromises);
         for (const pageEmployees of pageResults) {
           employeesData = employeesData.concat(pageEmployees);
+        }
+        // Safety net: if the server clamped limit (max 200) or pages miscounted,
+        // keep fetching until we hold `total` rows or a page comes back short.
+        let guard = 0;
+        let nextPage = totalPages + 1;
+        while (employeesData.length < total && guard < 10) {
+          guard += 1;
+          const extra = await requestEmployees(nextPage).then((r) => resolveEmployees(r.data));
+          if (!extra.length) break;
+          employeesData = employeesData.concat(extra);
+          if (extra.length < safeLimit) break;
+          nextPage += 1;
         }
       }
 

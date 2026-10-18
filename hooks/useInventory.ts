@@ -31,11 +31,22 @@ const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   onHand: Number(product.totalQuantity ?? 0),
   reserved: Number(product.totalReserved ?? 0),
   status: product.status,
+  productType: product.productType,
 });
 
 const extractMessage = (error: unknown, fallback: string) => {
   const err = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
   return err?.response?.data?.error?.message || err?.response?.data?.message || fallback;
+};
+
+/**
+ * Prices are optional. An empty field must be sent as `undefined` (omitted) so the
+ * backend applies its own default instead of receiving NaN or a misleading zero.
+ */
+const toOptionalNumber = (value: number | string | null | undefined): number | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 /** Columns the API will sort on. Mirrors the whitelist in the backend DTO. */
@@ -155,15 +166,16 @@ export const useInventory = (params?: InventoryProductsParams) => {
         sku: payload.sku,
         name: payload.name,
         category: payload.category,
-        unitPrice: Number(payload.unitPrice),
-        costPrice: Number(payload.costPrice),
+        unitPrice: toOptionalNumber(payload.unitPrice),
+        costPrice: toOptionalNumber(payload.costPrice),
         profitPercent:
           payload.profitPercent !== undefined && payload.profitPercent !== null && payload.profitPercent !== ""
             ? Number(payload.profitPercent)
             : undefined,
-        reorderLevel: Number(payload.reorderLevel),
+        reorderLevel: toOptionalNumber(payload.reorderLevel),
         unit: payload.unit,
         photo: payload.photo || undefined,
+        productType: payload.productType,
       });
     },
     onSuccess: () => {
@@ -181,15 +193,16 @@ export const useInventory = (params?: InventoryProductsParams) => {
         sku: data.sku,
         name: data.name,
         category: data.category,
-        unitPrice: data.unitPrice !== undefined ? Number(data.unitPrice) : undefined,
-        costPrice: data.costPrice !== undefined ? Number(data.costPrice) : undefined,
+        unitPrice: data.unitPrice !== undefined ? toOptionalNumber(data.unitPrice) : undefined,
+        costPrice: data.costPrice !== undefined ? toOptionalNumber(data.costPrice) : undefined,
         profitPercent:
           data.profitPercent !== undefined && data.profitPercent !== null && data.profitPercent !== ""
             ? Number(data.profitPercent)
             : undefined,
-        reorderLevel: data.reorderLevel !== undefined ? Number(data.reorderLevel) : undefined,
+        reorderLevel: data.reorderLevel !== undefined ? toOptionalNumber(data.reorderLevel) : undefined,
         unit: data.unit,
         photo: data.photo !== undefined ? data.photo : undefined,
+        productType: data.productType,
       });
     },
     onSuccess: () => {

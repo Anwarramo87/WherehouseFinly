@@ -135,12 +135,6 @@ export default function AddEmployeeModal({
 }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mobileError, setMobileError] = useState("");
-  const [idError] = useState(() => {
-    if (!initialData && existingIds.includes(nextSuggestedId)) {
-      return "كود الموظف هذا مُستَخدم مسبقاً. لن يتم حفظ الموظف بهذا الكود.";
-    }
-    return "";
-  });
   const [roleError, setRoleError] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
 
@@ -200,6 +194,15 @@ export default function AddEmployeeModal({
   );
 
   const [formData, setFormData] = useState(() => buildFormState(initialData));
+
+  // Live (not mount-once) duplicate check: the suggested id can go stale
+  // between "open modal" and "save" (another admin adds someone, or the list
+  // was partial), and the old `useState(() => ...)` froze the error forever —
+  // even after the user picked a free code.
+  const idError =
+    !initialData && existingIds.includes((formData?.employeeId ?? "").trim())
+      ? "كود الموظف هذا مُستَخدم مسبقاً. غيّره أو اضغط زر التحديث بجانب الحقل."
+      : "";
 
   useEffect(() => {
     if (isOpen) {
@@ -442,21 +445,62 @@ export default function AddEmployeeModal({
                 <label className="block text-sm font-bold text-[#C89355] mb-2">
                   كود الموظف (ID)
                 </label>
-                <input
-                  type="text"
-                  placeholder="مثال: EMP001"
-                  required
-                  pattern="^EMP[0-9]{3,}$"
-                  readOnly
-                  className={`w-full p-4 bg-[#1a2530]/80 border rounded-xl focus:ring-2 outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 cursor-not-allowed ${
-                    idError
-                      ? "border-rose-500 focus:ring-rose-500/30 focus:border-rose-500"
-                      : "border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]"
-                  }`}
-                  dir="ltr"
-                  value={formData.employeeId}
-                  onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                />
+                {/* Editable + refresh: the auto-suggestion is best-effort (the
+                    list can be partial/stale when the modal opens), so a
+                    duplicate must never trap the user — they can type a free
+                    code or regenerate one. Read-only inputs also skip native
+                    validation, which hid format errors. */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="مثال: EMP001"
+                    required
+                    pattern="^EMP[0-9]{3,}$"
+                    title="EMP متبوعاً بثلاثة أرقام على الأقل (مثال: EMP001)"
+                    className={`w-full p-4 bg-[#1a2530]/80 border rounded-xl focus:ring-2 outline-none transition-all text-left font-mono font-bold text-white shadow-inner placeholder:text-slate-500 ${
+                      idError
+                        ? "border-rose-500 focus:ring-rose-500/30 focus:border-rose-500"
+                        : "border-[#263544] focus:ring-[#C89355]/30 focus:border-[#C89355]"
+                    }`}
+                    dir="ltr"
+                    value={formData.employeeId}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        employeeId: e.target.value.toUpperCase().replace(/\s+/g, ""),
+                      })
+                    }
+                  />
+                  {!initialData && (
+                    <button
+                      type="button"
+                      title="اقتراح كود جديد غير مستخدم"
+                      onClick={() => {
+                        const taken = new Set(existingIds.map((id) => String(id).trim()));
+                        let max = 0;
+                        for (const id of taken) {
+                          const m = String(id).match(/^EMP(\d+)$/i);
+                          if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (Number.isFinite(n) && n > max) max = n;
+                          }
+                        }
+                        let next = max + 1;
+                        let candidate = `EMP${String(next).padStart(5, "0")}`;
+                        let guard = 0;
+                        while (taken.has(candidate) && guard < 10000) {
+                          next += 1;
+                          candidate = `EMP${String(next).padStart(5, "0")}`;
+                          guard += 1;
+                        }
+                        setFormData({ ...formData, employeeId: candidate });
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-lg border border-[#C89355]/40 bg-[#1a2530] px-2.5 py-1.5 text-xs font-black text-[#C89355] transition-colors hover:bg-[#C89355]/15 active:scale-95"
+                    >
+                      ↻ جديد
+                    </button>
+                  )}
+                </div>
                 {idError && <p className="text-xs text-rose-400 font-bold mt-1.5">{idError}</p>}
               </div>
 

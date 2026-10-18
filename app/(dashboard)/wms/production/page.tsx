@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Factory, Plus, Play, CheckCircle2, Clock, BarChart3,
   Package, Layers, AlertTriangle, ChevronDown, ChevronUp, X,
@@ -115,8 +115,8 @@ export default function ProductionPage() {
               const sm = STATUS[order.status] ?? { label: order.status, tone: "slate" as const };
               const isExpanded = expandedId === order.id;
               return (
-                <>
-                  <tr key={order.id} className="bg-white/50 hover:bg-white/80 [&>td]:px-4 [&>td]:py-3">
+                <Fragment key={order.id}>
+                  <tr className="bg-white/50 hover:bg-white/80 [&>td]:px-4 [&>td]:py-3">
                     <td className="font-black text-[#263544] font-mono text-sm">{order.orderNumber}</td>
                     <td>
                       <p className="font-bold text-[#263544]">{order.productSku}</p>
@@ -179,13 +179,13 @@ export default function ProductionPage() {
                     </td>
                   </tr>
                   {isExpanded && order.status === "COMPLETED" && (
-                    <tr key={`${order.id}-detail`} className="bg-slate-50/50">
+                    <tr className="bg-slate-50/50">
                       <td colSpan={8} className="px-6 py-4">
                         <OrderCostBreakdown order={order} />
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableFrame>

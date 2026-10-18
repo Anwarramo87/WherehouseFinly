@@ -333,7 +333,7 @@ const isMounted = typeof document !== "undefined";
             periodEnd,
             employeeId: currentEmployeeId,
           }, { signal: controller.signal }),
-          apiClient.get('/salaries', { signal: controller.signal }),
+          apiClient.get('/salary', { signal: controller.signal }),
           fetchAllAttendanceRecords(currentEmployeeId, periodStart, periodEnd, controller.signal),
           apiClient.get('/leaves', {
             params: { startDate: periodStart, endDate: periodEnd },

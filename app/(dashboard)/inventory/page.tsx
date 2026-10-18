@@ -2,28 +2,25 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Plus, Search, Edit, ArrowRightLeft, Package2, AlertTriangle, Boxes, Upload, Download, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search, Edit, ArrowRightLeft, Package2, AlertTriangle, Boxes, Upload, ChevronDown, Info, Loader2 } from "lucide-react";
 import {
   useInventory,
   useCategories,
   useInventoryStats,
-  useWarehouses,
   type ProductSortField,
   type SortDirection,
 } from "@/hooks/useInventory";
 import SortableHeader from "@/components/inventory/SortableHeader";
 import TablePagination from "@/components/inventory/TablePagination";
 import StockCell, { StockBadge, stockStateOf, type StockState } from "@/components/inventory/StockCell";
-import { InventoryItem, InventoryItemInput, AdjustStockInput } from "@/types/inventory";
+import { InventoryItem, InventoryItemInput } from "@/types/inventory";
 import { toast } from "react-hot-toast";
 import apiClient from "@/lib/api-client";
 import InventoryPageShell from "@/components/inventory/InventoryPageShell";
 import { SkeletonTable } from "@/components/inventory/movement-meta";
 
 const AddEditItemModal = dynamic(() => import("@/components/AddEditItemModal"), {
-  loading: () => null,
-});
-const AdjustStockModal = dynamic(() => import("@/components/AdjustStockModal"), {
   loading: () => null,
 });
 const ProductPreviewModal = dynamic(() => import("@/components/inventory/ProductPreviewModal"), {
@@ -80,13 +77,12 @@ export default function InventoryPage() {
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [stockFilter, setStockFilter] = useState<StockState | "all">("all");
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isBulkPending, setIsBulkPending] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data, isLoading, isFetching, createItem, updateItem, adjustStock, refetch } = useInventory({
+  const { data, isLoading, isFetching, createItem, updateItem, refetch } = useInventory({
     page,
     limit,
     search: search.trim() || undefined,
@@ -112,9 +108,6 @@ export default function InventoryPage() {
 
   const categoriesQuery = useCategories();
   const statsQuery = useInventoryStats();
-  const warehousesQuery = useWarehouses();
-
-  const warehouses = useMemo(() => warehousesQuery.data || [], [warehousesQuery.data]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -172,7 +165,7 @@ export default function InventoryPage() {
     return <span className="px-4 py-1.5 rounded-xl text-[11px] font-black bg-[#1a2530] text-[#C89355] border border-[#C89355]/30 shadow-sm flex items-center gap-1.5 w-fit mx-auto"><Package2 size={14}/> مخزون جيد</span>;
   };
 
-  const pending = isBulkPending || createItem.isPending || updateItem.isPending || adjustStock.isPending;
+  const pending = isBulkPending || createItem.isPending || updateItem.isPending;
 
   const extractMessage = (error: unknown, fallback: string) => {
     const err = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
@@ -358,20 +351,11 @@ export default function InventoryPage() {
     });
   };
 
-  const handleAdjustStock = (input: AdjustStockInput) => {
-    adjustStock.mutate(input, {
-      onSuccess: () => {
-        setIsStockModalOpen(false);
-        setSelectedItem(null);
-      },
-    });
-  };
-
   return (
     <>
       <InventoryPageShell
-        title="مركز إدارة المخزون"
-        subtitle="إدارة الأصناف وحالة المخزون وتنبيهات النقص عبر لوحة تشغيل احترافية."
+        title="الأصناف والمخزون"
+        subtitle="إدارة الأصناف والأسعار وحدود إعادة الطلب. الكميات المعروضة هنا للقراءة فقط، وتتغيّر عبر التوريد أو التصنيع أو البيع أو الجرد."
         actions={
           <>
             <button
@@ -395,35 +379,37 @@ export default function InventoryPage() {
               className="hidden"
             />
 
-          <button
-            onClick={() => importInputRef.current?.click()}
-            disabled={pending}
-            className="relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl border-2 border-white bg-white/80 backdrop-blur-md text-[#263544] font-black text-sm hover:bg-white hover:border-[#C89355]/30 disabled:opacity-60 transition-all shadow-sm active:scale-95 group/btn"
-          >
-            <div className="absolute inset-1 rounded-xl border border-dashed border-[#263544]/10 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/30" />
-            <Upload size={16} className="text-[#C89355] group-hover/btn:-translate-y-1 transition-transform relative z-10" />
-            <span className="relative z-10">استيراد CSV</span>
-          </button>
+            <details className="relative group/csv">
+              <summary className="relative overflow-hidden list-none [&::-webkit-details-marker]:hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl border-2 border-white bg-white/80 backdrop-blur-md text-[#263544] font-black text-sm hover:bg-white hover:border-[#C89355]/30 transition-all shadow-sm active:scale-95 cursor-pointer select-none">
+                <Upload size={16} className="text-[#C89355]" />
+                <span>البيانات (CSV)</span>
+                <ChevronDown size={16} className="text-[#C89355] group-open/csv:rotate-180 transition-transform" />
+              </summary>
 
-          <button
-            onClick={handleExportCsv}
-            disabled={isLoading || items.length === 0}
-            className="relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#1a2530] hover:bg-[#263544] text-[#C89355] font-black text-sm shadow-[0_10px_20px_rgba(38,53,68,0.4)] disabled:opacity-60 transition-all active:scale-95 border border-[#C89355]/40 group/btn"
-          >
-            <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/50" />
-            <Download size={16} className="group-hover/btn:-translate-y-1 transition-transform relative z-10" />
-            <span className="relative z-10">تصدير CSV</span>
-          </button>
-
-          <button
-            onClick={handleDownloadCsvTemplate}
-            disabled={pending}
-            className="relative overflow-hidden inline-flex items-center gap-2 px-5 py-3 rounded-2xl border border-white/80 bg-[#C89355]/10 text-[#263544] font-black text-sm hover:bg-[#C89355]/20 disabled:opacity-60 transition-all shadow-sm active:scale-95 group/btn"
-          >
-            <div className="absolute inset-1 rounded-xl border border-dashed border-[#C89355]/30 pointer-events-none transition-colors group-hover/btn:border-[#C89355]/50" />
-            <Download size={16} className="text-[#C89355] group-hover/btn:-translate-y-1 transition-transform relative z-10" />
-            <span className="relative z-10">تحميل قالب CSV</span>
-          </button>
+              <div className="absolute left-0 top-full mt-2 z-40 w-60 rounded-2xl border border-white/90 bg-white/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(38,53,68,0.18)] p-2 flex flex-col gap-1">
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={pending}
+                  className="w-full text-right rounded-xl px-3 py-2.5 text-sm font-black text-[#263544] hover:bg-[#C89355]/10 disabled:opacity-50 transition-colors"
+                >
+                  استيراد أصناف من ملف
+                </button>
+                <button
+                  onClick={handleExportCsv}
+                  disabled={isLoading || items.length === 0}
+                  className="w-full text-right rounded-xl px-3 py-2.5 text-sm font-black text-[#263544] hover:bg-[#C89355]/10 disabled:opacity-50 transition-colors"
+                >
+                  تصدير الأصناف المعروضة
+                </button>
+                <button
+                  onClick={handleDownloadCsvTemplate}
+                  disabled={pending}
+                  className="w-full text-right rounded-xl px-3 py-2.5 text-sm font-black text-[#263544] hover:bg-[#C89355]/10 disabled:opacity-50 transition-colors"
+                >
+                  تحميل قالب الاستيراد
+                </button>
+              </div>
+            </details>
         </>
       }
     >
@@ -544,6 +530,15 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      <div className="mb-6 flex flex-wrap items-start gap-3 rounded-2xl border border-[#C89355]/30 bg-[#C89355]/10 px-5 py-4 text-right">
+        <Info size={18} className="text-[#8a5f26] shrink-0 mt-0.5" />
+        <p className="flex-1 min-w-60 text-xs font-bold text-[#263544]/80 leading-relaxed">
+          الكميات هنا للقراءة فقط ولا تُعدَّل من هذه الصفحة. يزداد المخزون عبر استلام المواد الخام من أمر الشراء،
+          أو إتمام أمر التصنيع للمنتجات الجاهزة والنصف مصنّعة، وينقص عبر فاتورة البيع.
+          ولتسوية فروقات الجرد الفعلي استخدم <Link href="/inventory/counts" className="font-black text-[#8a5f26] underline underline-offset-2 hover:text-[#1a2530]">الجرد الدوري</Link>.
+        </p>
+      </div>
+
       <div className="relative bg-white/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(38,53,68,0.08)] border-2 border-white/90 overflow-hidden group/table">
         <div className="absolute inset-1.5 rounded-[2.2rem] border border-dashed border-[#C89355]/30 pointer-events-none z-0 transition-colors group-hover/table:border-[#C89355]/50" />
         {isLoading ? (
@@ -555,9 +550,10 @@ export default function InventoryPage() {
               <tr>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الصورة</th>
                 <SortableHeader label="اسم الصنف" field="name" activeField={sortBy} direction={sortDir} onSort={handleSort} />
-                <SortableHeader label="SKU / الباركود" field="sku" activeField={sortBy} direction={sortDir} onSort={handleSort} />
+                <SortableHeader label="كود الصنف (SKU)" field="sku" activeField={sortBy} direction={sortDir} onSort={handleSort} />
                 <SortableHeader label="الفئة" field="category" activeField={sortBy} direction={sortDir} onSort={handleSort} />
-                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الرصيد المتاح</th>
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">نوع الصنف</th>
+                <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center" title="للقراءة فقط — تتحدّث من التوريد والتصنيع والبيع">الكمية المتاحة</th>
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">حالة المخزون</th>
                 <SortableHeader label="سعر البيع" field="unitPrice" activeField={sortBy} direction={sortDir} onSort={handleSort} />
                 <th className="p-5 text-[#263544] font-black text-xs uppercase tracking-wider text-center">الربح %</th>
@@ -568,7 +564,7 @@ export default function InventoryPage() {
             <tbody className="divide-y divide-white/40">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-16">
+                  <td colSpan={11} className="p-16">
                     <div className="flex flex-col items-center gap-3 text-center">
                       <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#C89355]/30 bg-[#1a2530]">
                         <Package2 size={26} className="text-[#C89355]" />
@@ -652,6 +648,20 @@ export default function InventoryPage() {
                     </span>
                   </td>
                   <td className="p-4 text-xs font-black text-[#263544]/80 text-center">{item.category}</td>
+                  <td className="p-4 text-center">
+                    {item.productType === 'RAW_MATERIAL' && (
+                      <span className="inline-block rounded-md bg-amber-50 text-amber-700 px-2 py-1 text-[10px] font-black">مادة خام</span>
+                    )}
+                    {item.productType === 'SEMI_FINISHED' && (
+                      <span className="inline-block rounded-md bg-blue-50 text-blue-700 px-2 py-1 text-[10px] font-black">نصف مصنّع</span>
+                    )}
+                    {item.productType === 'FINISHED' && (
+                      <span className="inline-block rounded-md bg-emerald-50 text-emerald-700 px-2 py-1 text-[10px] font-black">جاهز</span>
+                    )}
+                    {!item.productType && (
+                      <span className="inline-block rounded-md bg-slate-100 text-slate-500 px-2 py-1 text-[10px] font-black">—</span>
+                    )}
+                  </td>
                   <td className="p-4"><StockCell item={item} /></td>
                   <td className="p-4 text-center"><StockBadge item={item} /></td>
                   <td className="p-4 text-center text-sm font-black text-[#263544] tabular-nums whitespace-nowrap">
@@ -694,17 +704,6 @@ export default function InventoryPage() {
                         title="تعديل الصنف"
                       >
                         <Edit size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setIsStockModalOpen(true);
-                        }}
-                        className="p-2.5 text-[#263544] hover:bg-white hover:text-[#C89355] rounded-xl transition-all hover:scale-110 shadow-sm border border-transparent hover:border-[#C89355]/30"
-                        title="حركة مخزون"
-                      >
-                        <ArrowRightLeft size={16} />
                       </button>
                     </div>
                   </td>
@@ -779,21 +778,6 @@ export default function InventoryPage() {
         />
       ) : null}
 
-      {isStockModalOpen ? (
-        <AdjustStockModal
-          key={`${isStockModalOpen}-${selectedItem?.id ?? "new"}`}
-          isOpen={isStockModalOpen}
-          onClose={() => {
-            setIsStockModalOpen(false);
-            setSelectedItem(null);
-          }}
-          item={selectedItem}
-          isPending={adjustStock.isPending}
-          onSave={handleAdjustStock}
-          locations={["MAIN", ...warehouses.map((w) => w.name)]}
-        />
-      ) : null}
-
       {previewItem ? (
         <ProductPreviewModal
           item={previewItem}
@@ -802,11 +786,6 @@ export default function InventoryPage() {
             setSelectedItem(previewItem);
             setPreviewItem(null);
             setIsItemModalOpen(true);
-          }}
-          onAdjust={() => {
-            setSelectedItem(previewItem);
-            setPreviewItem(null);
-            setIsStockModalOpen(true);
           }}
         />
       ) : null}

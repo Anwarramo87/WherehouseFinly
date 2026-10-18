@@ -10,7 +10,7 @@ import {
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
   ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory,
-  Palette, Package, DollarSign, RotateCcw, FileText, MapPin
+  Palette, Package, DollarSign, RotateCcw, FileText, MapPin, Archive, AlertTriangle, ChartBar
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -56,11 +56,9 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  // A representative's entire workspace lives here. Each section is its own
-  // repOnly item so a rep's sidebar mirrors the workspace pages and nothing
-  // else (every other route is an admin endpoint that 403s for them). The
-  // root item is flagged exact so it clears itself once the rep drills into
-  // a section.
+  // ─────────────────────────────────────────────────────────────
+  // مساحة المندوب (Rep Workspace) - منفصلة تماماً عن الإدارة
+  // ─────────────────────────────────────────────────────────────
   { name: 'مساحة المندوب', icon: LayoutDashboard, href: '/representatives/workspace', repOnly: true, exact: true },
   { name: 'مخزوني', icon: Package, href: '/representatives/workspace/stock', repOnly: true },
   { name: 'توزيعاتي', icon: ShoppingCart, href: '/representatives/workspace/sales', repOnly: true },
@@ -68,10 +66,25 @@ const menuItems: MenuItem[] = [
   { name: 'مرتجعاتي', icon: RotateCcw, href: '/representatives/workspace/returns', repOnly: true },
   { name: 'التسوية', icon: FileText, href: '/representatives/workspace/settlement', repOnly: true },
   { name: 'خطي ومحلاتي', icon: MapPin, href: '/representatives/workspace/route', repOnly: true },
-  { name: 'الرئيسية: إحصائيات', icon: LayoutDashboard, href: '/home' },
-  { name: 'إدارة الموظفين', icon: Users, href: '/employees', permissions: ['view_employees'] },
-  { name: 'المستقيلون', icon: UserMinus, href: '/resigned', permissions: ['view_employees'] },
-  { name: 'سجل الحضور', icon: ClipboardList, href: '/attendance', permissions: ['view_attendance'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // الرئيسية (Dashboard)
+  // ─────────────────────────────────────────────────────────────
+  { name: 'الرئيسية', icon: LayoutDashboard, href: '/home' },
+
+  // ─────────────────────────────────────────────────────────────
+  // الموارد البشرية (HR)
+  // ─────────────────────────────────────────────────────────────
+  {
+    name: 'الموارد البشرية',
+    icon: Users,
+    permissions: ['view_employees'],
+    subItems: [
+      { name: 'إدارة الموظفين', href: '/employees' },
+      { name: 'المستقيلون', href: '/resigned' },
+      { name: 'سجل الحضور', href: '/attendance' },
+    ]
+  },
   {
     name: 'الرواتب',
     icon: Wallet,
@@ -84,21 +97,29 @@ const menuItems: MenuItem[] = [
       { name: 'تقارير الرواتب', href: '/salaries/payroll' },
     ]
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // المواد والمستودعات (Inventory & Warehouses)
+  // ─────────────────────────────────────────────────────────────
   {
-    name: 'مخزن الشغل',
-    icon: Box,
+    name: 'المواد والمستودعات',
+    icon: Archive,
     permissions: ['view_inventory'],
     subItems: [
-      { name: 'الأصناف', href: '/inventory' },
+      { name: 'الأصناف والمواد', href: '/inventory' },
+      { name: 'حركة المخزون', href: '/inventory/movements' },
+      { name: 'المستودعات', href: '/inventory/warehouses' },
       { name: 'الدفعات والصلاحية', href: '/inventory/batches' },
       { name: 'لوحة الصلاحية', href: '/inventory/expiry' },
-      { name: 'حركات المخزون', href: '/inventory/movements' },
-      { name: 'المخازن', href: '/inventory/warehouses' },
       { name: 'المواقع والخانات', href: '/inventory/locations' },
       { name: 'الجرد الدوري', href: '/inventory/counts' },
       { name: 'فحص الجودة', href: '/inventory/quality' },
     ]
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // المشتريات (Purchasing)
+  // ─────────────────────────────────────────────────────────────
   {
     name: 'المشتريات',
     icon: ShoppingCart,
@@ -108,35 +129,37 @@ const menuItems: MenuItem[] = [
       { name: 'فواتير الشراء', href: '/purchasing/invoices' },
     ]
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // الإنتاج (Manufacturing)
+  // ─────────────────────────────────────────────────────────────
+  {
+    name: 'الإنتاج',
+    icon: Factory,
+    permissions: ['view_inventory'],
+    subItems: [
+      { name: 'مكونات المنتجات', href: '/wms/production/bom' },
+      { name: 'أوامر الإنتاج', href: '/wms/production' },
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // المبيعات (Sales)
+  // ─────────────────────────────────────────────────────────────
   {
     name: 'المبيعات',
     icon: Wallet,
     permissions: ['view_sales'],
     subItems: [
-      { name: 'طلبات البيع', href: '/sales' },
-      { name: 'فواتير البيع', href: '/sales/invoices' },
+      { name: 'أوامر البيع', href: '/sales' },
+      { name: 'الفواتير والدفعات', href: '/sales/invoices' },
       { name: 'التسعير والضرائب', href: '/sales/pricing' },
     ]
   },
-  {
-    name: 'التجهيز والشحن',
-    icon: Truck,
-    permissions: ['view_sales'],
-    subItems: [
-      { name: 'جولات الالتقاط', href: '/fulfillment' },
-      { name: 'الشحنات', href: '/fulfillment/shipments' },
-    ]
-  },
-  { name: 'مؤشرات المخزن', icon: BarChart3, href: '/wms/analytics', permissions: ['view_inventory'] },
-  {
-    name: 'الإنتاج والتصنيع',
-    icon: Factory,
-    permissions: ['view_inventory'],
-    subItems: [
-      { name: 'أوامر الإنتاج', href: '/wms/production' },
-      { name: 'قوائم المواد (BOM)', href: '/wms/production/bom' },
-    ],
-  },
+
+  // ─────────────────────────────────────────────────────────────
+  // المندوبون (Representatives) - إدارة فقط
+  // ─────────────────────────────────────────────────────────────
   {
     name: 'المندوبون',
     icon: Users,
@@ -147,15 +170,41 @@ const menuItems: MenuItem[] = [
       { name: 'مساحة المندوب', href: '/representatives/workspace' },
     ],
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // النقل (Transportation)
+  // ─────────────────────────────────────────────────────────────
+  { name: 'النقل', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // التقارير (Reports)
+  // ─────────────────────────────────────────────────────────────
+  { name: 'التقارير', icon: ChartBar, href: '/wms/analytics', permissions: ['view_inventory'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // الإعدادات (Settings)
+  // ─────────────────────────────────────────────────────────────
+  {
+    name: 'الإعدادات',
+    icon: Settings,
+    permissions: ['manage_users'],
+    subItems: [
+      { name: 'إعدادات النظام', href: '/settings' },
+      { name: 'الربط والتكامل', href: '/settings/integrations' },
+      { name: 'سلة المهملات', href: '/trash' },
+      { name: 'استيراد البيانات', href: '/importData' },
+      { name: 'الملفات', href: '/files' },
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // إعدادات WMS (منفصلة للمستودعات المتقدمة)
+  // ─────────────────────────────────────────────────────────────
   { name: 'إعداد WMS', icon: Settings, href: '/wms/setup', permissions: ['view_inventory'] },
-  { name: 'الربط والتكامل', icon: Plug, href: '/settings/integrations', permissions: ['manage_users'] },
-  { name: 'الباص', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
-  { name: 'استيراد البيانات', icon: FileInput, href: '/importData', permissions: ['run_imports'] },
-  { name: 'الملفات', icon: FolderOpen, href: '/files', permissions: ['run_imports'] },
-  { name: 'سلة المهملات', icon: Trash2, href: '/trash', permissions: ['manage_trash'] },
-  { name: 'الإعدادات', icon: Settings, href: '/settings', permissions: ['manage_users'] },
-  // Overseer-only; filtered in by role below rather than by a permission, so no
-  // amount of role editing puts it in a factory admin's menu.
+
+  // ─────────────────────────────────────────────────────────────
+  // المشرف العام (SuperAdmin) فقط
+  // ─────────────────────────────────────────────────────────────
   { name: 'التخصيص', icon: Palette, href: '/admin/customization', superAdminOnly: true },
   { name: 'المصانع', icon: Building2, href: '/admin/factories', superAdminOnly: true },
   { name: 'جميع الموظفين', icon: Users, href: '/admin/employees', superAdminOnly: true },
@@ -419,8 +468,8 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
           </div>
         </div>
         <div className={`overflow-hidden transition-all duration-300 ease-out flex flex-col justify-center ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-full opacity-100'}`}>
-          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">KU&M</h1>
-          <p className="text-[9px] font-black text-[#C89355] uppercase tracking-[0.4em] mt-1 border-b border-[#C89355]/20 w-fit pb-1">J E A N S</p>
+          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">كنوز الطبيعة</h1>
+          <p className="text-[9px] font-black text-[#C89355] uppercase tracking-[0.4em] mt-1 border-b border-[#C89355]/20 w-fit pb-1"></p>
         </div>
       </div>
 

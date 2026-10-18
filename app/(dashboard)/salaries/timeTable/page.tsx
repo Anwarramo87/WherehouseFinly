@@ -166,15 +166,13 @@ export default function TimeTablePage() {
   const [skipFridays, setSkipFridays] = useState(true);
 
   const [isAddingDay, setIsAddingDay] = useState(false);
+  const [addDayProgress, setAddDayProgress] = useState({ done: 0, total: 0, failed: 0 });
 
   const buildTimestamp = (date: string, hhmm: string) => {
-    const localDateTime = new Date(`${date}T${hhmm}:00`);
-    const offsetMinutes = -localDateTime.getTimezoneOffset();
-    const sign = offsetMinutes >= 0 ? "+" : "-";
-    const absOffset = Math.abs(offsetMinutes);
-    const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, "0");
-    const offsetMins = String(absOffset % 60).padStart(2, "0");
-    return `${date}T${hhmm}:00${sign}${offsetHours}:${offsetMins}`;
+    // نبني الـ timestamp بتوقيت المصنع UTC+3 ثابت — بغض النظر عن توقيت المتصفح.
+    // الـ backend يحسب كل شيء (scheduledEnd، التأخير، الخروج المبكر) بـ UTC+3.
+    // إذا استخدمنا timezone المتصفح (مثلاً UTC+2) ينتج فارق 60 دقيقة يُحتسب خروجاً مبكراً.
+    return `${date}T${hhmm}:00+03:00`;
   };
 
   const handleAddDaySubmit = async () => {
@@ -190,6 +188,7 @@ export default function TimeTablePage() {
     }
 
     setIsAddingDay(true);
+    setAddDayProgress({ done: 0, total: 0, failed: 0 });
 
     const dates: string[] = [];
     const current = new Date(start);
@@ -202,41 +201,53 @@ export default function TimeTablePage() {
       current.setDate(current.getDate() + 1);
     }
 
-    const CONCURRENCY_LIMIT = 6;
+    // ── الخطوة 1: حذف السجلات القديمة الناقصة (IN بدون OUT) للفترة ──
+    // السبب: الـ backend يرفض IN→IN أو OUT→OUT متتالي < 30 دقيقة.
+    // السجلات القديمة الناقصة تمنع إضافة سجلات جديدة صحيحة لنفس الأيام.
+    try {
+      const existing = await apiClient.get(
+        `/attendance/employee/${addDayEmployeeId}/period`,
+        { params: { startDate: addDayStartDate, endDate: addDayEndDate } },
+      );
+      const existingRecords: Array<{ id: string }> = Array.isArray(existing.data)
+        ? existing.data
+        : (existing.data?.records ?? existing.data?.data ?? []);
+      // نحذف كل السجلات الموجودة للفترة بشكل تسلسلي
+      for (const rec of existingRecords) {
+        if (rec?.id) {
+          await apiClient.delete(`/attendance/${rec.id}`).catch(() => {/* تجاهل فشل الحذف الفردي */});
+        }
+      }
+    } catch {
+      // إذا فشل جلب السجلات القديمة، نكمل بدون حذف
+    }
+
+    // ── الخطوة 2: نبني بصمات الفترة (IN ثم OUT لكل يوم) ونرسلها دفعة واحدة ──
+    // الإرسال التسلسلي السابق كان يُنشئ ~52 طلباً في الشهر فيبطئ التسجيل بشدة.
     let addedCount = 0;
     let failedCount = 0;
+    setAddDayProgress({ done: 0, total: dates.length, failed: 0 });
 
-    for (let i = 0; i < dates.length; i += CONCURRENCY_LIMIT) {
-      const batch = dates.slice(i, i + CONCURRENCY_LIMIT);
-      const batchPromises = batch.map(async (dateStr) => {
-        const checkInTs = buildTimestamp(dateStr, addDayCheckIn);
-        const checkOutTs = buildTimestamp(dateStr, addDayCheckOut);
-        try {
-          await Promise.all([
-            apiClient.post("/attendance", {
-              employeeId: addDayEmployeeId,
-              timestamp: checkInTs,
-              type: "IN",
-              source: "manual",
-            }),
-            apiClient.post("/attendance", {
-              employeeId: addDayEmployeeId,
-              timestamp: checkOutTs,
-              type: "OUT",
-              source: "manual",
-            }),
-          ]);
-          return 1;
-        } catch {
-          return 0;
-        }
-      });
-      const results = await Promise.all(batchPromises);
-      for (const r of results) {
-        if (r === 1) addedCount++;
-        else failedCount++;
-      }
+    const bulkRecords = dates.flatMap((dateStr) => {
+      const checkInTs = buildTimestamp(dateStr, addDayCheckIn);
+      const checkOutTs = buildTimestamp(dateStr, addDayCheckOut);
+      return [
+        { employeeId: addDayEmployeeId, timestamp: checkInTs, type: "IN" as const, source: "manual" },
+        { employeeId: addDayEmployeeId, timestamp: checkOutTs, type: "OUT" as const, source: "manual" },
+      ];
+    });
+
+    try {
+      const res = await apiClient.post("/attendance/bulk", { records: bulkRecords });
+      const payload = res.data ?? {};
+      // يعيد الباك إند عدد البصمات المُدرجة فعلياً (بصمتان = يوم دوام واحد).
+      const createdRecords = Number(payload.created ?? 0);
+      addedCount = Math.round(createdRecords / 2);
+      failedCount = Math.max(0, dates.length - addedCount);
+    } catch {
+      failedCount = dates.length;
     }
+    setAddDayProgress({ done: dates.length, total: dates.length, failed: failedCount });
 
     await queryClient.invalidateQueries({ queryKey: ["attendance"], exact: false });
     await queryClient.invalidateQueries({ queryKey: ["attendance-deductions"], exact: false });
@@ -252,14 +263,15 @@ export default function TimeTablePage() {
     setIsAddDayOpen(false);
   };
 
-  const openAddDayModal = (employeeId: string, employeeName: string) => {
+  const openAddDayModal = (employeeId: string, employeeName: string, scheduledStart?: string, scheduledEnd?: string) => {
     setAddDayEmployeeId(employeeId);
     setAddDayEmployeeName(employeeName);
     // افتراضي: من اليوم الأول لآخر يوم في الشهر المختار
     setAddDayStartDate(periodStart || "");
     setAddDayEndDate(periodEnd || "");
-    setAddDayCheckIn("08:00");
-    setAddDayCheckOut("16:00");
+    // نأخذ وقت الدخول والخروج من جدول الموظف — وليس 08:00/16:00 ثابتاً
+    setAddDayCheckIn(scheduledStart || "08:00");
+    setAddDayCheckOut(scheduledEnd || "16:00");
     setSkipFridays(true);
     setIsAddDayOpen(true);
   };
@@ -598,6 +610,9 @@ export default function TimeTablePage() {
         actualWorkDays,
         totalDelayMinutes,
         totalEarlyLeaveMinutes,
+        // تمرير عدّاد أيام IN-بلا-OUT من calculate-deductions إلى الخلية
+        // (يُعرض كتفسير داخل "خروج مبكر / ناقص").
+        missingCheckoutDays: autoInput?.missingCheckoutDays ?? 0,
         totalOvertimeMinutes,
         totalOvertimeDays: totalOvertimeWeekendMinutes,
         grossSalary: effectiveGross,
@@ -930,10 +945,19 @@ export default function TimeTablePage() {
                         {record.totalEarlyLeaveMinutes > 0 ? (
                           <span
                             className="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-100 text-xs font-bold px-3 py-1 rounded-full"
-                            title="تم استبعاد الإجازات الساعية المعتمدة تلقائياً"
+                            title={
+                              (record as { missingCheckoutDays?: number }).missingCheckoutDays
+                                ? `منها ${(record as { missingCheckoutDays?: number }).missingCheckoutDays} يوم بلا بصمة خروج (IN فقط) — كل يوم يُحتسب كامل الدوام ناقصاً. راجع سجل الحضور اليومي وأضف بصمات الخروج الناقصة.`
+                                : "تم استبعاد الإجازات الساعية المعتمدة تلقائياً"
+                            }
                           >
                             <AlertTriangle size={13} />
                             {record.totalEarlyLeaveMinutes} دقيقة
+                            {(record as { missingCheckoutDays?: number }).missingCheckoutDays ? (
+                              <span className="text-[10px] font-black">
+                                (بصمة خروج ناقصة ×{(record as { missingCheckoutDays?: number }).missingCheckoutDays})
+                              </span>
+                            ) : null}
                           </span>
                         ) : (
                           <span className="text-gray-400 font-medium">-</span>
@@ -985,7 +1009,7 @@ export default function TimeTablePage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => openAddDayModal(record.employeeId, record.name)}
+                            onClick={() => openAddDayModal(record.employeeId, record.name, record.scheduledStart, record.scheduledEnd)}
                             className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all hover:scale-110 active:scale-95"
                             title="إضافة يوم دوام"
                           >
@@ -1128,6 +1152,29 @@ export default function TimeTablePage() {
                   />
                   <span className="text-xs font-bold text-slate-600">تجاوز يوم الجمعة</span>
                 </label>
+
+                {/* معلومة عدد الأيام + تحذير إذا كانت هناك سجلات مسبقة */}
+                {addDayStartDate && addDayEndDate && (() => {
+                  const s = new Date(addDayStartDate);
+                  const e = new Date(addDayEndDate);
+                  if (s > e) return null;
+                  let count = 0;
+                  const cur = new Date(s);
+                  while (cur <= e) {
+                    if (!(skipFridays && cur.getDay() === 5)) count++;
+                    cur.setDate(cur.getDate() + 1);
+                  }
+                  return (
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex flex-col gap-1">
+                      <p className="text-xs font-black text-emerald-700">
+                        سيتم تسجيل <span className="font-mono">{count} يوم</span> — دخول ثم خروج لكل يوم بالترتيب
+                      </p>
+                      <p className="text-[11px] text-emerald-600 font-bold">
+                        ✓ أي سجلات قديمة ناقصة للفترة ستُحذف تلقائياً قبل إعادة التسجيل
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -1136,7 +1183,22 @@ export default function TimeTablePage() {
                   disabled={isAddingDay}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {isAddingDay ? "جاري الحفظ..." : "حفظ"}
+                  {isAddingDay ? (
+                    <span className="flex flex-col items-center gap-1">
+                      <span className="flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin" />
+                        {addDayProgress.done}/{addDayProgress.total} يوم...
+                      </span>
+                      {addDayProgress.total > 0 && (
+                        <span className="w-full bg-emerald-800 rounded-full h-1 overflow-hidden block">
+                          <span
+                            className="bg-white h-1 rounded-full block transition-all duration-300"
+                            style={{ width: `${Math.round((addDayProgress.done / addDayProgress.total) * 100)}%` }}
+                          />
+                        </span>
+                      )}
+                    </span>
+                  ) : "حفظ"}
                 </button>
                 <button
                   onClick={() => setIsAddDayOpen(false)}

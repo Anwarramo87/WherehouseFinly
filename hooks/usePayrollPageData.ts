@@ -332,7 +332,9 @@ export function usePayrollPageData(month: string) {
         employeePenalties.reduce((sum, p) => sum + toNumber(p.amount), 0);
 
       const totalDeductionsAmount = variableDeductions + insuranceAmount;
-      const netPay = earnedSalary + variableEarnings - totalDeductionsAmount;
+      const netPayRaw = earnedSalary + variableEarnings - totalDeductionsAmount;
+      // سياسة حصر الراتب السالب عند صفر (floor = 0) — مطابقة للباك إند
+      const netPay = netPayRaw < 0 ? 0 : netPayRaw;
       const netPayRounded = Math.ceil(netPay / 1000) * 1000;
       const roundingDifference = netPayRounded - netPay;
 
@@ -495,7 +497,9 @@ export function usePayrollPageData(month: string) {
       if (hasManualInput && previewRow) {
         earnedSalary = previewRow.earnedSalary;
         const localGross = earnedSalary + totalBonuses;
-        const localNet = localGross - totalDeductions;
+        const localNetRaw = localGross - totalDeductions;
+        // سياسة حصر الراتب السالب عند صفر (floor = 0) — مطابقة للباك إند
+        const localNet = localNetRaw < 0 ? 0 : localNetRaw;
         const localNetRounded = Math.ceil(localNet / 1000) * 1000;
         return {
           employeeId,

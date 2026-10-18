@@ -343,6 +343,77 @@ export const usePurchaseOrders = (params?: Record<string, unknown>) =>
     placeholderData: keepPreviousData,
   });
 
+export interface PurchaseOrderLineInput {
+  sku: string;
+  quantity: number;
+  unitCost: number;
+}
+
+export interface CreatePurchaseOrderInput {
+  supplierId: string;
+  orderDate?: string;
+  expectedDate?: string;
+  items: PurchaseOrderLineInput[];
+}
+
+export interface ReceiveGoodsLineInput {
+  purchaseOrderItemId: string;
+  quantity: number;
+  location: string;
+}
+
+export interface ReceiveGoodsInput {
+  orderId: string;
+  items: ReceiveGoodsLineInput[];
+  notes?: string;
+  receiptNumber?: string;
+}
+
+/** Creates a draft purchase order for the raw materials you buy from a supplier. */
+export const useCreatePurchaseOrder = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreatePurchaseOrderInput) =>
+      (await apiClient.post("/purchasing/purchase-orders", payload)).data,
+    onSuccess: () => {
+      toast.success("تم إنشاء أمر الشراء");
+      void qc.invalidateQueries({ queryKey: queryKeys.purchasing.all });
+    },
+    onError: (error) => toast.error(message(error, "فشل إنشاء أمر الشراء")),
+  });
+};
+
+/** Moves the order between draft → sent → received / cancelled. */
+export const useChangePurchaseOrderStatus = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) =>
+      (await apiClient.put(`/purchasing/purchase-orders/${orderId}/status`, { status })).data,
+    onSuccess: () => {
+      toast.success("تم تحديث حالة أمر الشراء");
+      void qc.invalidateQueries({ queryKey: queryKeys.purchasing.all });
+    },
+    onError: (error) => toast.error(message(error, "فشل تحديث الحالة")),
+  });
+};
+
+/** Receives goods into stock — this is what actually puts the purchased raw material in the warehouse. */
+export const useReceivePurchaseOrder = () => {
+  const qc = useQueryClient();
+  const invalidateStock = useInvalidateStock();
+  return useMutation({
+    mutationFn: async ({ orderId, ...payload }: ReceiveGoodsInput) =>
+      (await apiClient.post(`/purchasing/purchase-orders/${orderId}/receive`, payload)).data,
+    onSuccess: () => {
+      toast.success("تم استلام المواد وتحديث المخزون");
+      void qc.invalidateQueries({ queryKey: queryKeys.purchasing.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.inventory.all });
+      invalidateStock();
+    },
+    onError: (error) => toast.error(message(error, "فشل استلام المواد")),
+  });
+};
+
 const usePurchaseInvoiceMutation = <TPayload,>(
   request: (payload: TPayload) => Promise<unknown>,
   successText: string,

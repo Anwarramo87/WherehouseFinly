@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import {
   AlertTriangle,
-  ArrowRightLeft,
   Coins,
   Edit,
   Hash,
@@ -21,7 +20,6 @@ interface ProductPreviewModalProps {
   item: InventoryItem | null;
   onClose: () => void;
   onEdit: () => void;
-  onAdjust: () => void;
 }
 
 const toNumber = (value: number | undefined) => Number(value ?? 0);
@@ -30,7 +28,6 @@ export default function ProductPreviewModal({
   item,
   onClose,
   onEdit,
-  onAdjust,
 }: ProductPreviewModalProps) {
   const progress = useMemo(() => {
     if (!item) return 0;
@@ -111,7 +108,7 @@ export default function ProductPreviewModal({
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-black text-slate-500 flex items-center gap-2">
                 <PackageCheck size={14} className="text-emerald-600" />
-                الكمية المتاحة
+                الكمية المتاحة (للقراءة فقط)
               </span>
               <span className="text-2xl font-black text-[#263544]">
                 {Number(item.quantity || 0).toLocaleString()}{" "}
@@ -134,6 +131,9 @@ export default function ProductPreviewModal({
                   <AlertTriangle size={12} /> يجب إعادة الطلب
                 </span>
               ) : null}
+            </p>
+            <p className="mt-2 text-[10px] font-bold text-slate-400 leading-relaxed">
+              تتغيّر الكمية عبر توريد المواد (/purchasing)، أو إتمام التصنيع، أو البيع، أو الجرد الدوري — وليست من هذه الصفحة.
             </p>
           </div>
 
@@ -175,20 +175,12 @@ export default function ProductPreviewModal({
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={onEdit}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1a2530] text-[#C89355] font-black text-sm hover:bg-[#263544] transition-all active:scale-95 border border-[#C89355]/40"
-            >
-              <Edit size={16} /> تعديل الصنف
-            </button>
-            <button
-              onClick={onAdjust}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#C89355] text-[#1a2530] font-black text-sm hover:bg-[#d9a56b] transition-all active:scale-95"
-            >
-              <ArrowRightLeft size={16} /> حركة مخزون
-            </button>
-          </div>
+          <button
+            onClick={onEdit}
+            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1a2530] text-[#C89355] font-black text-sm hover:bg-[#263544] transition-all active:scale-95 border border-[#C89355]/40"
+          >
+            <Edit size={16} /> تعديل الصنف
+          </button>
         </div>
       </div>
     </div>

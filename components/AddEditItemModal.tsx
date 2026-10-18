@@ -24,6 +24,7 @@ const defaultForm: InventoryItemInput = {
   reorderLevel: "10",
   unit: "قطعة",
   photo: null,
+  productType: "FINISHED",
 };
 
 export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = false, initialData }: AddEditItemModalProps) {
@@ -39,6 +40,7 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
         reorderLevel: initialData.reorderLevel?.toString() || "10",
         unit: initialData.unit || "قطعة",
         photo: initialData.photo ?? null,
+        productType: initialData.productType || "FINISHED",
       };
     }
     return defaultForm;
@@ -112,16 +114,9 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
             onSave(form, customFieldValues);
           }}
         >
-          <div className="md:col-span-2">
-            <PhotoUploadField
-              value={form.photo}
-              onChange={(photo) => setForm((p) => ({ ...p, photo }))}
-              label="صورة الصنف"
-            />
-          </div>
-
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">اسم الصنف</label>
+            <label className="block text-sm font-bold text-slate-700 mb-1">اسم الصنف <span className="text-rose-500">*</span></label>
+            <p className="text-[11px] text-slate-400 mb-2">الاسم الظاهر في كل الصفحات والتقارير.</p>
             <input
               required
               value={form.name}
@@ -132,19 +127,38 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">SKU / الباركود</label>
+            <label className="block text-sm font-bold text-slate-700 mb-1">كود الصنف (SKU) <span className="text-rose-500">*</span></label>
+            <p className="text-[11px] text-slate-400 mb-2">رمز فريد للصنف، ويُستخدم في التوريد والباركود.</p>
             <input
               required
               value={form.sku}
               onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono disabled:opacity-60"
               placeholder="LAB-GLV-001"
               disabled={Boolean(initialData?.id)}
             />
+            {initialData?.id ? (
+              <p className="text-[11px] text-slate-400 mt-1">لا يمكن تغيير الكود بعد الإنشاء.</p>
+            ) : null}
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">الفئة</label>
+            <label className="block text-sm font-bold text-slate-700 mb-1">نوع الصنف <span className="text-rose-500">*</span></label>
+            <p className="text-[11px] text-slate-400 mb-2">يحدّد كيف تُدار الكمية: خام عبر التوريد، جاهز عبر التصنيع.</p>
+            <select
+              value={form.productType}
+              onChange={(e) => setForm((p) => ({ ...p, productType: e.target.value as 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED' }))}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="RAW_MATERIAL">مادة خام</option>
+              <option value="SEMI_FINISHED">منتج نصف مصنّع</option>
+              <option value="FINISHED">منتج جاهز</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">الفئة <span className="text-rose-500">*</span></label>
+            <p className="text-[11px] text-slate-400 mb-2">تجميع الصنف تحت عائلة واحدة للبحث والتقارير.</p>
             <input
               required
               value={form.category}
@@ -155,7 +169,8 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">الوحدة</label>
+            <label className="block text-sm font-bold text-slate-700 mb-1">وحدة القياس <span className="text-rose-500">*</span></label>
+            <p className="text-[11px] text-slate-400 mb-2">الوحدة التي تُعدّ بها الكميات عند التوريد والبيع.</p>
             <select
               value={form.unit}
               onChange={(e) => setForm((p) => ({ ...p, unit: e.target.value }))}
@@ -171,11 +186,12 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
 
           <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-black text-slate-800">التسعير والربح</h3>
+              <h3 className="text-sm font-black text-slate-800">التسعير والربح <span className="text-slate-400 font-bold">(اختياري)</span></h3>
               <span className="text-[11px] font-bold text-slate-400">بالليرة السورية (ل.س)</span>
             </div>
             <p className="text-[11px] text-slate-500 mb-4">
-              أدخل التكلفة ثم نسبة الربح — يُحسب سعر البيع تلقائيًا (أو أدخل سعر البيع ليُحسب الربح).
+              كل حقول التسعير اختيارية. يمكنك تركها فارغة عند تعريف المادة الخام، ثم إدخال سعر الشراء لاحقًا في أمر الشراء أو الفاتورة.
+              عند إدخال التكلفة ونسبة الربح يُحسب سعر البيع تلقائيًا (أو أدخل سعر البيع ليُحسب الربح).
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -183,7 +199,6 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
                 <label className="block text-xs font-black text-slate-600 mb-1.5">سعر التكلفة (ل.س)</label>
                 <input
                   type="number"
-                  required
                   min={0}
                   value={form.costPrice}
                   onChange={(e) => handleCostChange(e.target.value)}
@@ -245,25 +260,46 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">حد إعادة الطلب</label>
-            <input
-              type="number"
-              required
-              min={0}
-              value={form.reorderLevel}
-              onChange={(e) => setForm((p) => ({ ...p, reorderLevel: e.target.value }))}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
+          <details className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/60 group/details">
+            <summary className="cursor-pointer select-none list-none p-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-800">معلومات إضافية</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">صورة الصنف، حد إعادة الطلب، والحقول المخصّصة — اختيارية.</p>
+              </div>
+              <span className="text-[11px] font-black text-[#C89355] group-open/details:hidden">إظهار</span>
+              <span className="text-[11px] font-black text-[#C89355] hidden group-open/details:inline">إخفاء</span>
+            </summary>
 
-          <div className="md:col-span-2">
-            <EntityCustomFieldsForm
-              entity="product"
-              recordId={initialData?.id ?? null}
-              onChange={setCustomFieldValues}
-            />
-          </div>
+            <div className="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-5 text-right border-t border-slate-200/70 pt-5">
+              <div className="md:col-span-2">
+                <PhotoUploadField
+                  value={form.photo}
+                  onChange={(photo) => setForm((p) => ({ ...p, photo }))}
+                  label="صورة الصنف"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">حد إعادة الطلب</label>
+                <p className="text-[11px] text-slate-400 mb-2">عندما تنخفض الكمية إلى هذا الحد يظهر تنبيه نقص.</p>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.reorderLevel}
+                  onChange={(e) => setForm((p) => ({ ...p, reorderLevel: e.target.value }))}
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <EntityCustomFieldsForm
+                  entity="product"
+                  recordId={initialData?.id ?? null}
+                  onChange={setCustomFieldValues}
+                />
+              </div>
+            </div>
+          </details>
 
           <div className="md:col-span-2 pt-4 border-t border-slate-100 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all active:scale-95">

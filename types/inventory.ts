@@ -20,6 +20,8 @@ export interface InventoryItem {
   reserved?: number;
   /** active | inactive */
   status?: string;
+  /** نوع المنتج: مادة خام، نصف مصنّع، منتج نهائي */
+  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
 }
 
 export interface ProductEnriched {
@@ -40,6 +42,7 @@ export interface ProductEnriched {
   totalQuantity: number;
   totalReserved: number;
   totalAvailable: number;
+  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
 }
 
 export interface PaginatedResult<T> {
@@ -90,12 +93,13 @@ export interface InventoryItemInput {
   sku: string;
   name: string;
   category: string;
-  unitPrice: number | string;
-  costPrice: number | string;
+  unitPrice?: number | string;
+  costPrice?: number | string;
   profitPercent?: number | string;
   reorderLevel: number | string;
   unit?: string;
   photo?: string | null;
+  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
 }
 
 export interface AdjustStockInput {

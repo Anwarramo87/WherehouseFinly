@@ -37,6 +37,12 @@ export interface AttendanceDeductionBreakdown {
   // خصم الخروج المبكر / الدوام الناقص
   earlyLeaveDeduction: number;
 
+  // أيام فيها بصمة دخول (IN) بدون بصمة خروج (OUT) في نفس التاريخ.
+  // كل يوم منها يُحتسب كامل نافذة الدوام (480 دقيقة لدوام 08:00–16:00) ضمن
+  // earlyLeaveMinutes — وهذا ما يفسّر صفاً يقرأ "26 يوم دوام، 0 غياب" مع راتب
+  // ناقص. حقل تشخيصي فقط. optional حتى لا يكسر عقود API القديمة / الكاش.
+  missingCheckoutDays?: number;
+
   // الإجمالي = غياب + تأخير + خروج مبكر/دوام ناقص
   totalAttendanceDeduction: number;
 

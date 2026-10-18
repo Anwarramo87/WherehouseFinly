@@ -176,7 +176,12 @@ async function handler(request: NextRequest) {
   const primaryUrl = buildTargetUrl(PRIMARY_BACKEND_URL);
   // Use a short timeout for the deployed backend so fallback to local is fast.
   // Long-running endpoints skip this — they need the full timeout even on Railway.
-  const primaryTimeoutMs = isLongRunning ? LONG_RUNNING_TIMEOUT_MS : DEPLOYED_TIMEOUT_MS;
+  // When PRIMARY is already local (PRIMARY === FALLBACK, the .env.local dev
+  // setup) there IS no fallback — a short DEPLOYED_TIMEOUT_MS here just aborts
+  // a healthy-but-slow (Neon cold-start, 15-20s) backend with a 502. Use the
+  // full timeout in that case.
+  const primaryIsLocal = PRIMARY_BACKEND_URL === FALLBACK_BACKEND_URL;
+  const primaryTimeoutMs = isLongRunning || primaryIsLocal ? timeoutMs : DEPLOYED_TIMEOUT_MS;
 
   try {
     const upstream = await fetchWithTimeout(primaryUrl, primaryTimeoutMs);
