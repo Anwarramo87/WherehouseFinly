@@ -76,6 +76,7 @@ export default function InventoryPage() {
   const [sortBy, setSortBy] = useState<ProductSortField | undefined>(undefined);
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [stockFilter, setStockFilter] = useState<StockState | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "RAW_MATERIAL" | "SEMI_FINISHED" | "FINISHED">("all");
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -137,9 +138,20 @@ export default function InventoryPage() {
     return c;
   }, [allItems]);
 
+  const typeCounts = useMemo(() => ({
+    all: allItems.length,
+    RAW_MATERIAL: allItems.filter((i) => i.productType === "RAW_MATERIAL").length,
+    SEMI_FINISHED: allItems.filter((i) => i.productType === "SEMI_FINISHED").length,
+    FINISHED: allItems.filter((i) => i.productType === "FINISHED").length,
+  }), [allItems]);
+
   const items = useMemo(
-    () => (stockFilter === "all" ? allItems : allItems.filter((i) => stockStateOf(i) === stockFilter)),
-    [allItems, stockFilter],
+    () => {
+      let result = stockFilter === "all" ? allItems : allItems.filter((i) => stockStateOf(i) === stockFilter);
+      if (typeFilter !== "all") result = result.filter((i) => i.productType === typeFilter);
+      return result;
+    },
+    [allItems, stockFilter, typeFilter],
   );
 
   const categories = useMemo(() => {
@@ -312,9 +324,16 @@ export default function InventoryPage() {
   const handleSaveItem = (payload: InventoryItemInput, customFields: Record<string, unknown> = {}) => {
     const { profitPercent, ...rest } = payload;
     const body: InventoryItemInput = { ...rest };
-    const profitValue = Number(profitPercent);
-    if (profitPercent !== undefined && profitPercent !== null && profitPercent !== "" && Number.isFinite(profitValue)) {
-      body.profitPercent = profitValue;
+    // Only finished products are sold — strip pricing fields for raw/semi-finished
+    const isFinishedProduct = payload.productType === "FINISHED";
+    if (!isFinishedProduct) {
+      delete body.unitPrice;
+      body.profitPercent = undefined;
+    } else {
+      const profitValue = Number(profitPercent);
+      if (profitPercent !== undefined && profitPercent !== null && profitPercent !== "" && Number.isFinite(profitValue)) {
+        body.profitPercent = profitValue;
+      }
     }
 
     const runAfterSave = async (createdOrUpdatedId: string) => {
@@ -516,6 +535,33 @@ export default function InventoryPage() {
                 key={key}
                 type="button"
                 onClick={() => setStockFilter(key)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C89355]/60
+                  ${active ? "bg-[#1a2530] text-[#C89355] shadow-md" : `bg-white/70 ${tone} hover:bg-white`}`}
+              >
+                {label}
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] tabular-nums ${active ? "bg-white/15" : "bg-[#263544]/8"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2 border-t border-white/70 pt-3">
+          <span className="text-[11px] font-black uppercase tracking-wider text-[#263544]/50">نوع الصنف</span>
+          {([
+            ["all", "الكل", typeCounts.all, "text-[#263544]"],
+            ["RAW_MATERIAL", "مواد خام", typeCounts.RAW_MATERIAL, "text-amber-800"],
+            ["SEMI_FINISHED", "نصف نهائي", typeCounts.SEMI_FINISHED, "text-blue-800"],
+            ["FINISHED", "نهائي", typeCounts.FINISHED, "text-emerald-800"],
+          ] as const).map(([key, label, count, tone]) => {
+            const active = typeFilter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setTypeFilter(key); setPage(1); }}
                 aria-pressed={active}
                 className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C89355]/60
                   ${active ? "bg-[#1a2530] text-[#C89355] shadow-md" : `bg-white/70 ${tone} hover:bg-white`}`}

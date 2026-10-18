@@ -244,7 +244,7 @@ export default function EmployeesPage() {
     });
   }, [visibleEmployees, searchTerm, selectedDept]);
 
-  // تجميع الموظفين حسب المعمل/القسم — كل معمل بطاقة قابلة للطي فيها موظفيها
+  // تجميع الموظفين حسب القسم — كل قسم بطاقة قابلة للطي فيها موظفيها
   const groupedByDept = useMemo(() => {
     const groups = new Map<string, Employee[]>();
     for (const emp of filteredEmployees) {

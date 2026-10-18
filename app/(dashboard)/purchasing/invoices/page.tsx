@@ -35,10 +35,20 @@ import {
   usePostPurchaseInvoice,
   usePurchaseInvoice,
   usePurchaseInvoices,
+  usePurchaseOrders,
   useSuppliers,
 } from "@/hooks/useWms";
 import { toNum } from "@/types/wms";
 import { toast } from "react-hot-toast";
+
+interface PurchaseOrderRow {
+  id: string;
+  poNumber: string;
+  supplierId: string;
+  status: string;
+  supplier?: { name: string };
+  items?: Array<{ id: string; sku: string; quantity: number; receivedQuantity: number; unitCost: string }>;
+}
 
 interface DraftLine {
   sku: string;
@@ -543,6 +553,34 @@ const PAYMENT_LABELS: Record<string, string> = {
 function CreateInvoiceModal({ onClose }: { onClose: () => void }) {
   const { data: suppliers } = useSuppliers();
   const create = useCreatePurchaseInvoice();
+  const { data: ordersData } = usePurchaseOrders({ limit: 100, status: "sent" });
+  const { data: receivedOrdersData } = usePurchaseOrders({ limit: 100, status: "received" });
+
+  // Merge sent + received orders that have items
+  const linkableOrders = useMemo(() => {
+    const sent = (ordersData?.data ?? []) as unknown as PurchaseOrderRow[];
+    const received = (receivedOrdersData?.data ?? []) as unknown as PurchaseOrderRow[];
+    return [...sent, ...received].filter((o) => (o.items ?? []).length > 0);
+  }, [ordersData, receivedOrdersData]);
+
+  const [linkedOrderId, setLinkedOrderId] = useState("");
+
+  const handleLinkOrder = (orderId: string) => {
+    setLinkedOrderId(orderId);
+    if (!orderId) return;
+    const order = linkableOrders.find((o) => o.id === orderId);
+    if (!order) return;
+    // Auto-fill supplier
+    if (order.supplierId) setSupplierId(order.supplierId);
+    // Auto-fill lines from PO items
+    const poLines: DraftLine[] = (order.items ?? []).map((item) => ({
+      ...emptyLine(),
+      sku: item.sku,
+      quantity: item.quantity,
+      unitCost: Number(item.unitCost),
+    }));
+    if (poLines.length > 0) setLines(poLines);
+  };
 
   const [supplierId, setSupplierId] = useState("");
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
@@ -605,6 +643,33 @@ function CreateInvoiceModal({ onClose }: { onClose: () => void }) {
             onClose();
           }}
         >
+          {/* ── ربط بأمر شراء (اختياري) ── */}
+          {linkableOrders.length > 0 && (
+            <div className="mb-5 p-4 rounded-2xl border-2 border-dashed border-[#C89355]/40 bg-[#C89355]/5">
+              <p className="text-xs font-black text-[#8a5f2a] mb-2 flex items-center gap-1.5">
+                <Truck size={14} />
+                ربط بأمر شراء — تُملأ البنود تلقائياً (اختياري)
+              </p>
+              <select
+                value={linkedOrderId}
+                onChange={(e) => handleLinkOrder(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">— اختر أمر شراء —</option>
+                {linkableOrders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.poNumber} — {o.supplier?.name ?? "مورد غير محدد"} ({o.status === "sent" ? "مُرسَل" : "مُستلَم"})
+                  </option>
+                ))}
+              </select>
+              {linkedOrderId && (
+                <p className="text-[11px] font-bold text-[#8a5f2a] mt-1.5">
+                  ✓ تم تعبئة البنود من الأمر — يمكنك تعديل الكميات والأسعار قبل الحفظ
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Field label="المورد">
               <select

@@ -10,7 +10,7 @@ import {
   ChevronDown, LogOut, Shield,
   UserMinus, X, ChevronsRight, Trash2,
   ShoppingCart, Truck, BarChart3, Plug, Building2, Database, FolderOpen, Factory,
-  Palette, Package, DollarSign, RotateCcw, FileText, MapPin, Archive, AlertTriangle, ChartBar
+  Palette, Package, DollarSign, RotateCcw, FileText, MapPin, Archive, AlertTriangle, ChartBar, Boxes
 } from 'lucide-react';
 
 import { useAuthStore } from '@/stores/auth-store';
@@ -45,6 +45,9 @@ interface MenuItem {
    * related permission (e.g. view_sales) must not see the reps console.
    */
   adminOnly?: boolean;
+  /** When true, the item renders as disabled with a "قريباً" badge — the route
+   * exists but the feature is not yet ready for use. */
+  comingSoon?: boolean;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   href?: string;
   /** When true, the item is highlighted only when the pathname equals href
@@ -99,23 +102,14 @@ const menuItems: MenuItem[] = [
   },
 
   // ─────────────────────────────────────────────────────────────
-  // المواد والمستودعات (Inventory & Warehouses)
+  // الأصناف (مفتوح)
   // ─────────────────────────────────────────────────────────────
-  {
-    name: 'المواد والمستودعات',
-    icon: Archive,
-    permissions: ['view_inventory'],
-    subItems: [
-      { name: 'الأصناف والمواد', href: '/inventory' },
-      { name: 'حركة المخزون', href: '/inventory/movements' },
-      { name: 'المستودعات', href: '/inventory/warehouses' },
-      { name: 'الدفعات والصلاحية', href: '/inventory/batches' },
-      { name: 'لوحة الصلاحية', href: '/inventory/expiry' },
-      { name: 'المواقع والخانات', href: '/inventory/locations' },
-      { name: 'الجرد الدوري', href: '/inventory/counts' },
-      { name: 'فحص الجودة', href: '/inventory/quality' },
-    ]
-  },
+  { name: 'الأصناف والمواد', icon: Archive, href: '/inventory', permissions: ['view_inventory'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // الجرد الدوري (مفتوح)
+  // ─────────────────────────────────────────────────────────────
+  { name: 'الجرد الدوري', icon: ClipboardList, href: '/inventory/counts', permissions: ['view_inventory'] },
 
   // ─────────────────────────────────────────────────────────────
   // المشتريات (Purchasing)
@@ -468,7 +462,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
           </div>
         </div>
         <div className={`overflow-hidden transition-all duration-300 ease-out flex flex-col justify-center ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-full opacity-100'}`}>
-          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">كنوز الطبيعة</h1>
+          <h1 className="text-3xl font-serif font-black text-white tracking-widest leading-none drop-shadow-md">Km&S</h1>
           <p className="text-[9px] font-black text-[#C89355] uppercase tracking-[0.4em] mt-1 border-b border-[#C89355]/20 w-fit pb-1"></p>
         </div>
       </div>
@@ -488,7 +482,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
               {/* التلميح الذكي */}
               {isCollapsed && (
                 <div className="absolute top-1/2 -translate-y-1/2 left-0 -translate-x-[calc(100%+12px)] bg-[#C89355] text-[#1a2530] text-xs font-black px-3 py-2 rounded-lg shadow-xl opacity-0 invisible group-hover/nav:opacity-100 group-hover/nav:visible transition-all duration-300 z-50 whitespace-nowrap before:absolute before:top-1/2 before:-translate-y-1/2 before:-right-1 before:border-4 before:border-transparent before:border-l-[#C89355]">
-                  {item.name}
+                  {item.name}{item.comingSoon ? ' — قريباً' : ''}
                 </div>
               )}
 
@@ -561,6 +555,23 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
                   )}
                 </>
               ) : (
+                item.comingSoon ? (
+                  // ── Coming Soon — disabled, non-navigable ──
+                  <div
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-xl opacity-50 cursor-not-allowed select-none"
+                    title="هذه الوحدة ستكون متاحة قريباً"
+                  >
+                    <div className="p-2 rounded-xl bg-[#263544] text-slate-500 border border-transparent flex items-center justify-center relative">
+                      <item.icon size={20} strokeWidth={2} className="relative z-10" />
+                    </div>
+                    {!isCollapsed && (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-sm font-medium text-slate-500 truncate">{item.name}</span>
+                        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest bg-[#C89355]/20 text-[#C89355]/70 px-1.5 py-0.5 rounded-md">قريباً</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
                 <Link
                   href={item.href || '#'}
                   onMouseEnter={() => {
@@ -593,6 +604,7 @@ export default function Sidebar({ isCollapsed = false, onClose, toggleCollapse }
                     </span>
                   )}
                 </Link>
+                )
               )}
             </div>
           );

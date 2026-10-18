@@ -15,7 +15,7 @@ export default function DeptGroup({ name, emps, open, salaryMap, salaryOf, onTog
             <Building2 size={20} className="text-[#C89355]" />
           </span>
           <span>
-            <span className="block text-lg font-black text-[#263544]">معمل {name}</span>
+            <span className="block text-lg font-black text-[#263544]">قسم {name}</span>
             <span className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
               <Users size={13} className="text-[#C89355]" />{emps.length} {emps.length === 1 ? "موظف" : "موظفين"}
             </span>

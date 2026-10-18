@@ -51,6 +51,8 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
     setCustomFieldValues({});
   }, [initialData?.id, isOpen]);
 
+  const isFinished = form.productType === "FINISHED";
+
   const cost = Number(form.costPrice || 0);
   const price = Number(form.unitPrice || 0);
 
@@ -65,7 +67,7 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
     setForm((p) => ({
       ...p,
       costPrice: value,
-      profitPercent: computeProfit(costValue, Number(p.unitPrice || 0)),
+      profitPercent: isFinished ? computeProfit(costValue, Number(p.unitPrice || 0)) : "",
     }));
   };
 
@@ -73,7 +75,7 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
     setForm((p) => ({
       ...p,
       unitPrice: value,
-      profitPercent: computeProfit(Number(p.costPrice || 0), Number(value || 0)),
+      profitPercent: isFinished ? computeProfit(Number(p.costPrice || 0), Number(value || 0)) : "",
     }));
   };
 
@@ -185,15 +187,22 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
 
           <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-black text-slate-800">التسعير والربح <span className="text-slate-400 font-bold">(اختياري)</span></h3>
+              <h3 className="text-sm font-black text-slate-800">
+                {isFinished ? (
+                  <>التسعير والربح <span className="text-slate-400 font-bold">(اختياري)</span></>
+                ) : (
+                  <>سعر التكلفة <span className="text-slate-400 font-bold">(اختياري)</span></>
+                )}
+              </h3>
               <span className="text-[11px] font-bold text-slate-400">بالليرة السورية (ل.س)</span>
             </div>
             <p className="text-[11px] text-slate-500 mb-4">
-              كل حقول التسعير اختيارية. يمكنك تركها فارغة عند تعريف المادة الخام، ثم إدخال سعر الشراء لاحقًا في أمر الشراء أو الفاتورة.
-              عند إدخال التكلفة ونسبة الربح يُحسب سعر البيع تلقائيًا (أو أدخل سعر البيع ليُحسب الربح).
+              {isFinished
+                ? "عند إدخال التكلفة ونسبة الربح يُحسب سعر البيع تلقائيًا، أو أدخل سعر البيع ليُحسب الربح."
+                : "سعر الشراء يُحدَّد في أمر الشراء أو الفاتورة — يمكنك تركه فارغاً هنا."}
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${isFinished ? "md:grid-cols-3" : "md:grid-cols-1 max-w-xs"}`}>
               <div>
                 <label className="block text-xs font-black text-slate-600 mb-1.5">سعر التكلفة (ل.س)</label>
                 <input
@@ -205,58 +214,66 @@ export default function AddEditItemModal({ isOpen, onClose, onSave, isPending = 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-slate-600 mb-1.5">نسبة الربح % (على التكلفة)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.1"
-                  value={form.profitPercent}
-                  onChange={(e) => handleProfitChange(e.target.value)}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#C89355] outline-none font-bold"
-                  placeholder="مثال: 25"
-                />
-              </div>
+              {isFinished && (
+                <>
+                  <div>
+                    <label className="block text-xs font-black text-slate-600 mb-1.5">نسبة الربح % (على التكلفة)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={form.profitPercent}
+                      onChange={(e) => handleProfitChange(e.target.value)}
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#C89355] outline-none font-bold"
+                      placeholder="مثال: 25"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-black text-slate-600 mb-1.5">سعر البيع (ل.س)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={form.unitPrice}
-                  onChange={(e) => handlePriceChange(e.target.value)}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#C89355] outline-none font-bold"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-600 mb-1.5">سعر البيع (ل.س)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.unitPrice}
+                      onChange={(e) => handlePriceChange(e.target.value)}
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#C89355] outline-none font-bold"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl bg-white border border-emerald-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-[11px] font-black text-emerald-700">الربح لكل وحدة</span>
-                <span className="text-sm font-black text-emerald-700 tabular-nums">
-                  {Number.isFinite(unitProfit) ? unitProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) : 0} ل.س
-                </span>
-              </div>
-              <div className="rounded-xl bg-white border border-emerald-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-[11px] font-black text-emerald-700">الهامش %</span>
-                <span className="text-sm font-black text-emerald-700 tabular-nums">
-                  {margin.toFixed(1)}%
-                </span>
-              </div>
-              <div className="rounded-xl bg-white border border-slate-200 px-4 py-3 flex items-center justify-between">
-                <span className="text-[11px] font-black text-slate-500">غطاء التكلفة</span>
-                <span className="text-sm font-black text-slate-700 tabular-nums">
-                  {cost > 0 ? (price / cost).toFixed(2) : "—"}×
-                </span>
-              </div>
-            </div>
+            {isFinished && (
+              <>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-white border border-emerald-100 px-4 py-3 flex items-center justify-between">
+                    <span className="text-[11px] font-black text-emerald-700">الربح لكل وحدة</span>
+                    <span className="text-sm font-black text-emerald-700 tabular-nums">
+                      {Number.isFinite(unitProfit) ? unitProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) : 0} ل.س
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white border border-emerald-100 px-4 py-3 flex items-center justify-between">
+                    <span className="text-[11px] font-black text-emerald-700">الهامش %</span>
+                    <span className="text-sm font-black text-emerald-700 tabular-nums">
+                      {margin.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white border border-slate-200 px-4 py-3 flex items-center justify-between">
+                    <span className="text-[11px] font-black text-slate-500">غطاء التكلفة</span>
+                    <span className="text-sm font-black text-slate-700 tabular-nums">
+                      {cost > 0 ? (price / cost).toFixed(2) : "—"}×
+                    </span>
+                  </div>
+                </div>
 
-            <div className="mt-3 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${margin >= 0 ? "bg-emerald-500" : "bg-rose-500"}`}
-                style={{ width: `${Math.min(100, Math.max(0, Math.abs(margin)))}%` }}
-              />
-            </div>
+                <div className="mt-3 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${margin >= 0 ? "bg-emerald-500" : "bg-rose-500"}`}
+                    style={{ width: `${Math.min(100, Math.max(0, Math.abs(margin)))}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <details className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/60 group/details">
