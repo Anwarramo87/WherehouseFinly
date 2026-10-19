@@ -1,3 +1,17 @@
+export type InventoryProductType = "RAW_MATERIAL" | "SEMI_FINISHED" | "FINISHED";
+
+export const INVENTORY_PRODUCT_TYPES: ReadonlyArray<{
+  value: InventoryProductType;
+  label: string;
+}> = [
+  { value: "RAW_MATERIAL", label: "مادة خام" },
+  { value: "SEMI_FINISHED", label: "منتج نصف مُصنّع" },
+  { value: "FINISHED", label: "منتج نهائي" },
+];
+
+export const isInventoryProductType = (value: string): value is InventoryProductType =>
+  INVENTORY_PRODUCT_TYPES.some((type) => type.value === value);
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -21,7 +35,12 @@ export interface InventoryItem {
   /** active | inactive */
   status?: string;
   /** نوع المنتج: مادة خام، نصف مصنّع، منتج نهائي */
-  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
+  productType?: InventoryProductType;
+  size?: string;
+  feature?: string;
+  color?: string;
+  barcode?: string;
+  description?: string;
 }
 
 export interface ProductEnriched {
@@ -42,7 +61,12 @@ export interface ProductEnriched {
   totalQuantity: number;
   totalReserved: number;
   totalAvailable: number;
-  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
+  productType?: InventoryProductType;
+  size?: string;
+  feature?: string;
+  color?: string;
+  barcode?: string;
+  description?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -103,7 +127,12 @@ export interface InventoryItemInput {
   reorderLevel: number | string;
   unit?: string;
   photo?: string | null;
-  productType?: 'RAW_MATERIAL' | 'SEMI_FINISHED' | 'FINISHED';
+  productType?: InventoryProductType;
+  size?: string;
+  feature?: string;
+  color?: string;
+  barcode?: string;
+  description?: string;
 }
 
 export interface AdjustStockInput {
@@ -152,7 +181,7 @@ export interface CreateCategoryInput {
 
 export interface ProductInput {
   name: string;
-  productType?: string;
+  productType?: InventoryProductType;
   sku?: string;
   size?: string;
   color?: string;

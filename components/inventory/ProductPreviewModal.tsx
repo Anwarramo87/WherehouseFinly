@@ -20,6 +20,7 @@ interface ProductPreviewModalProps {
   item: InventoryItem | null;
   onClose: () => void;
   onEdit: () => void;
+  onAdjust?: () => void;
 }
 
 const toNumber = (value: number | undefined) => Number(value ?? 0);
@@ -28,6 +29,7 @@ export default function ProductPreviewModal({
   item,
   onClose,
   onEdit,
+  onAdjust,
 }: ProductPreviewModalProps) {
   const progress = useMemo(() => {
     if (!item) return 0;
@@ -175,12 +177,22 @@ export default function ProductPreviewModal({
           </div>
 
           {/* Actions */}
-          <button
-            onClick={onEdit}
-            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1a2530] text-[#C89355] font-black text-sm hover:bg-[#263544] transition-all active:scale-95 border border-[#C89355]/40"
-          >
-            <Edit size={16} /> تعديل الصنف
-          </button>
+          <div className={onAdjust ? "grid grid-cols-2 gap-3" : ""}>
+            <button
+              onClick={onEdit}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1a2530] text-[#C89355] font-black text-sm hover:bg-[#263544] transition-all active:scale-95 border border-[#C89355]/40"
+            >
+              <Edit size={16} /> تعديل الصنف
+            </button>
+            {onAdjust ? (
+              <button
+                onClick={onAdjust}
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-[#263544] font-black text-sm hover:bg-slate-50 transition-all active:scale-95 border border-slate-200"
+              >
+                <PackageCheck size={16} /> تعديل المخزون
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

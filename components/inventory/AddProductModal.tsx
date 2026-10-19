@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Save, X, Sparkles, Package, Hash, Palette, Ruler } from "lucide-react";
-import { ProductInput, CATEGORY_TYPES } from "@/types/inventory";
+import {
+  INVENTORY_PRODUCT_TYPES,
+  isInventoryProductType,
+  ProductInput,
+} from "@/types/inventory";
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { toast } from "react-hot-toast";
 
@@ -150,14 +154,17 @@ export default function AddProductModal({
                   <label className={labelClass}>نوع المنتج</label>
                   <select
                     value={form.productType || "FINISHED"}
-                    onChange={(e) => setForm((p) => ({ ...p, productType: e.target.value }))}
+                    onChange={(e) => {
+                      const productType = e.target.value;
+                      if (isInventoryProductType(productType)) {
+                        setForm((p) => ({ ...p, productType }));
+                      }
+                    }}
                     className={`${commonInputClass} cursor-pointer appearance-none`}
                   >
-                    <option value="FINISHED">منتج نهائي</option>
-                    <option value="SEMI_FINISHED">نصف مصنّع</option>
-                    {CATEGORY_TYPES.filter((ct) => ct.id !== "OTHER").map((ct) => (
-                      <option key={ct.id} value={ct.name}>
-                        {ct.label}
+                    {INVENTORY_PRODUCT_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
                       </option>
                     ))}
                   </select>

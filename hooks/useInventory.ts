@@ -34,6 +34,11 @@ const toInventoryItem = (product: ProductEnriched): InventoryItem => ({
   reserved: Number(product.totalReserved ?? 0),
   status: product.status,
   productType: product.productType,
+  size: product.size,
+  feature: product.feature,
+  color: product.color,
+  barcode: product.barcode,
+  description: product.description,
 });
 
 const extractMessage = (error: unknown, fallback: string) => {
@@ -71,6 +76,7 @@ type InventoryProductsParams = {
   category?: string;
   status?: string;
   productType?: string;
+  location?: string;
   sortBy?: ProductSortField;
   sortDir?: SortDirection;
 };

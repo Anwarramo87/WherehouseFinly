@@ -564,29 +564,30 @@ function CreateInvoiceModal({ onClose }: { onClose: () => void }) {
   }, [ordersData, receivedOrdersData]);
 
   const [linkedOrderId, setLinkedOrderId] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState("");
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
 
   const handleLinkOrder = (orderId: string) => {
     setLinkedOrderId(orderId);
     if (!orderId) return;
     const order = linkableOrders.find((o) => o.id === orderId);
     if (!order) return;
-    // Auto-fill supplier
     if (order.supplierId) setSupplierId(order.supplierId);
-    // Auto-fill lines from PO items
+    const isReceived = order.status === "received";
     const poLines: DraftLine[] = (order.items ?? []).map((item) => ({
       ...emptyLine(),
       sku: item.sku,
-      quantity: item.quantity,
+      // For received orders use actual received qty; for sent orders use ordered qty
+      quantity: isReceived
+        ? (item.receivedQuantity > 0 ? item.receivedQuantity : item.quantity)
+        : item.quantity,
       unitCost: Number(item.unitCost),
     }));
     if (poLines.length > 0) setLines(poLines);
   };
-
-  const [supplierId, setSupplierId] = useState("");
-  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate, setDueDate] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
 
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -662,11 +663,31 @@ function CreateInvoiceModal({ onClose }: { onClose: () => void }) {
                   </option>
                 ))}
               </select>
-              {linkedOrderId && (
-                <p className="text-[11px] font-bold text-[#8a5f2a] mt-1.5">
-                  ✓ تم تعبئة البنود من الأمر — يمكنك تعديل الكميات والأسعار قبل الحفظ
-                </p>
-              )}
+              {linkedOrderId && (() => {
+                const order = linkableOrders.find((o) => o.id === linkedOrderId);
+                if (!order) return null;
+                const isReceived = order.status === "received";
+                const shortages = (order.items ?? []).filter(
+                  (i) => isReceived && i.receivedQuantity < i.quantity
+                );
+                return (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[11px] font-bold text-emerald-700">
+                      ✓ تم تعبئة البنود — الكميات من {isReceived ? "الاستلام الفعلي" : "الأمر المطلوب"} — يمكنك التعديل قبل الحفظ
+                    </p>
+                    {shortages.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                        <p className="text-[11px] font-black text-amber-700 mb-1">تنبيه — بنود وصلت ناقصة:</p>
+                        {shortages.map((i) => (
+                          <p key={i.sku} className="text-[11px] font-bold text-amber-600">
+                            • {i.sku}: طُلب {i.quantity} — وصل {i.receivedQuantity} (ناقص {i.quantity - i.receivedQuantity})
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

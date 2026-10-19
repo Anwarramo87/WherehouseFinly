@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Save, X, Sparkles, Package, Hash, Palette, Ruler, ArrowLeft, ArrowRight } from "lucide-react";
-import { InventoryItemInput, CATEGORY_TYPES } from "@/types/inventory";
+import {
+  INVENTORY_PRODUCT_TYPES,
+  InventoryItemInput,
+  isInventoryProductType,
+} from "@/types/inventory";
 import PhotoUploadField from "@/components/PhotoUploadField";
 import EntityCustomFieldsForm from "@/components/EntityCustomFieldsForm";
 import { toast } from "react-hot-toast";
@@ -267,12 +271,17 @@ export default function AddRawMaterialModal({
                       <label className={labelClass}>نوع المادة</label>
                       <select
                         value={form.productType || "RAW_MATERIAL"}
-                        onChange={(e) => setForm((p) => ({ ...p, productType: e.target.value }))}
+                        onChange={(e) => {
+                          const productType = e.target.value;
+                          if (isInventoryProductType(productType)) {
+                            setForm((p) => ({ ...p, productType }));
+                          }
+                        }}
                         className={`${commonInputClass} cursor-pointer appearance-none`}
                       >
-                        {CATEGORY_TYPES.filter((ct) => ct.id !== "OTHER").map((ct) => (
-                          <option key={ct.id} value={ct.name}>
-                            {ct.label}
+                        {INVENTORY_PRODUCT_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
                           </option>
                         ))}
                       </select>

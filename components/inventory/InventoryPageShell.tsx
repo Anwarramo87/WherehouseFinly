@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, Package2, History, Warehouse as WarehouseIcon, Layers, ClipboardCheck, ShieldAlert, BookOpen, MapPin, ClipboardList, ShieldCheck, Boxes } from "lucide-react";
+import { Sparkles, Package2, ClipboardList } from "lucide-react";
 
 interface TabItem {
   name: string;
@@ -12,17 +12,8 @@ interface TabItem {
 }
 
 const TABS: TabItem[] = [
-  { name: "المخازن", href: "/inventory/warehouses", icon: WarehouseIcon },
-  { name: "المواد الخام", href: "/inventory/raw-materials", icon: Boxes },
-  { name: "المنتجات النهائية", href: "/inventory/products", icon: Package2 },
-  { name: "حركات المخزون", href: "/inventory/movements", icon: History },
-  { name: "جرد المخزون", href: "/inventory/take", icon: ClipboardCheck },
-  { name: "الدفعات والصلاحية", href: "/inventory/batches", icon: Layers },
-  { name: "لوحة الصلاحية", href: "/inventory/expiry", icon: ShieldAlert },
-  { name: "دفتر الأستاذ", href: "/inventory/ledger", icon: BookOpen },
-  { name: "المواقع والخانات", href: "/inventory/locations", icon: MapPin },
+  { name: "الأصناف والمواد", href: "/inventory", icon: Package2 },
   { name: "الجرد الدوري", href: "/inventory/counts", icon: ClipboardList },
-  { name: "فحص الجودة", href: "/inventory/quality", icon: ShieldCheck },
 ];
 
 interface InventoryPageShellProps {
@@ -67,8 +58,7 @@ export default function InventoryPageShell({ title, subtitle, actions, children 
 
         <div className="flex flex-wrap items-center gap-2 mb-8 overflow-x-auto custom-scrollbar pb-2 -mx-2 px-2">
           {TABS.map((tab) => {
-            const isActive = pathname === tab.href ||
-              (tab.href !== "/inventory/raw-materials" && tab.href !== "/inventory/products" && pathname.startsWith(tab.href));
+            const isActive = pathname === tab.href;
             return (
               <Link
                 key={tab.href}
