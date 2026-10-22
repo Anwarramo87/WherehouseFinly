@@ -5,19 +5,49 @@
 
 export const STANDARD_WORK_DAYS = 26;
 export const HOURS_PER_DAY = 8;
-/** معامل أجر يوم الجمعة: كل دقيقة فعلية × 1.5 */
-export const WEEKEND_MULTIPLIER = 1.5;
+
+/**
+ * معامل أجر يوم العطلة (الجمعة والسبت): كل دقيقة عمل فعلية تُدفع بمعدل
+ * دقيقتين (2.0×).
+ *
+ * must match the backend's `WEEKEND_MULTIPLIER` in
+ * `src/common/constants/payroll.constants.ts` — the frontend preview and the
+ * payroll run have to price the same minutes the same way.
+ */
+export const WEEKEND_MULTIPLIER = 2.0;
+
+/**
+ * الجمعة والسبت عطلة في المصنع.
+ *
+ * القاعدة التي تتبعها المحرك كله:
+ *  • اليوم العطلة لا يُحسب ضمن "أيام الحضور" — فلا تأخير ولا مغادرة مبكرة
+ *    ولا خصم غياب عليه.
+ *  • إذا اشتغل الموظف فيوم العطلة، تُدفع دقائق العمل الفعلية فيه كأجر
+ *    إضافي بمعامل 2.0×، ولا تُحسب كيوم عمل عادي أبداً (وإلا احتُسبت
+ *    مرتين: مرة كأجر إضافي ومرة كأجر يوم عادي).
+ */
+export const WEEKEND_DAY_OF_WEEK = [5, 6] as const;
+
+/** هل هذا التاريخ يوم عطلة (الجمعة أو السبت)؟ */
+export const isWeekendDateKey = (dateKey: string): boolean => {
+  const dow = new Date(`${dateKey}T00:00:00Z`).getUTCDay();
+  return (WEEKEND_DAY_OF_WEEK as readonly number[]).includes(dow);
+};
+
+/** هل هذا التاريخ يوم عطلة (الجمعة أو السبت)؟ */
+export const isWeekendDate = (date: Date): boolean =>
+  (WEEKEND_DAY_OF_WEEK as readonly number[]).includes(date.getDay());
 
 /**
  * حساب الراتب المستحق — نفس الصيغة المستخدمة في صفحة TimeTable بالضبط
  * الصيغة:
  *   (grossSalary / STANDARD_WORK_DAYS) * paidDays
  *   + إضافي عادي (دقائق × 1.5×)
- *   + دقائق الجمعة (دقائق فعلية × 1.5×)
+ *   + دقائق العطلة (دقائق فعلية × 2.0×)
  *   - خصم التأخير (دقائق × 1.5×)
  *   - خصم الخروج المبكر (دقائق × 1.0×)
  *
- * overtimeWeekendDays الآن = دقائق الجمعة الفعلية (ليس عدد الأيام)
+ * overtimeWeekendDays الآن = دقائق العطلة الفعلية (الجمعة والسبت) وليس عدد الأيام.
  */
 export const calcEarnedSalary = (
   grossSalary: number,
@@ -38,7 +68,7 @@ export const calcEarnedSalary = (
   const lateDeduction = lateMinutes * minuteRate * 1.5;
   const earlyLeaveDeduction = earlyLeaveMinutes * minuteRate;
   const overtimePay = overtimeMinutes * minuteRate * 1.5;
-  // overtimeWeekendDays = دقائق الجمعة الفعلية × 1.5
+  // overtimeWeekendDays = دقائق العطلة الفعلية (الجمعة والسبت) × 2.0
   const weekendOvertimePay = overtimeWeekendDays * minuteRate * WEEKEND_MULTIPLIER;
   return Math.max(
     0,
@@ -52,7 +82,7 @@ export const calcEarnedSalary = (
  * - workedMinutes  → أجر كامل (معدل الساعة).
  * - sickRemainderMinutes → أجر بنصف المعدل (باقي يوم إجازة مرضية جزئية).
  * - أيام الإجازة الكاملة (sickLeaveDays/paidLeaveDays) تُضاف كأيام كاملة.
- * - overtimeWeekendDays = دقائق الجمعة الفعلية (من الباك إند) × 1.5×
+ * - overtimeWeekendDays = دقائق العطلة الفعلية (الجمعة والسبت، من الباك إند) × 2.0×
  * - manualOverrides: تعديلات زر "تعديل المجاميع" اليدوية — عند تمريرها
  *   تُشتق أيام العمل المدفوعة من المجاميع اليدوية مباشرةً، فينعكس أي تعديل
  *   (زيادة/إنقاص/تصفير) فوراً على الراتب المحسوب.
@@ -125,7 +155,7 @@ export const calcEarnedSalaryHourly = (
   const fullSickPay = dailyRate * effSickDays * 0.5;
   const paidLeavePay = dailyRate * effPaidDays;
   const overtimePay = minuteRate * effOvertime * 1.5;
-  // overtimeWeekendDays = دقائق الجمعة الفعلية × 1.5
+  // overtimeWeekendDays = دقائق العطلة الفعلية (الجمعة والسبت) × 2.0
   const weekendOvertimePay = minuteRate * effWeekendOt * WEEKEND_MULTIPLIER;
   const lateDeduction = minuteRate * effLate * 1.5;
   const earlyLeaveDeduction = minuteRate * effEarly;

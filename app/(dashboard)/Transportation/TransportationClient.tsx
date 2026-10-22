@@ -27,6 +27,12 @@ export interface Passenger {
   employeeStatus?: string;
 }
 
+/**
+ * أيام العمل في الشهر المستخدمة في احتساب التكلفة الشهرية للباص.
+ * must match the backend's default (`transportation.service.ts`).
+ */
+const WORKING_DAYS_PER_MONTH = 26;
+
 export interface BusData {
   id: string;
   driverName: string;
@@ -35,6 +41,8 @@ export interface BusData {
   route: string;
   capacity: number;
   totalCost: number;
+  /** التكلفة اليومية للباص — الأساس في احتساب التكلفة الشهرية */
+  dailyCost?: number;
   companyDeductionPct: number;
   employeeDeductionPct: number;
   status?: string;
@@ -62,6 +70,7 @@ function normalizeBusDetails(details: BusDetailsResponse): BusData {
     route: details.route,
     capacity: details.capacity,
     totalCost: details.totalCost,
+    dailyCost: details.dailyCost,
     companyDeductionPct: details.companyDeductionPct,
     employeeDeductionPct: details.employeeDeductionPct,
     status: details.status,
@@ -191,15 +200,29 @@ export default function TransportationClient() {
   };
 
   // Global Pooling Logic — compute from buses directly (available immediately)
+  //
+  // This must mirror the backend's `activeFleetNetCost` EXACTLY, or the card
+  // shows a different number than the payroll charges:
+  //
+  //   monthlyCost = dailyCost × workingDays
+  //   netCost     = monthlyCost − (monthlyCost × companyDeductionPct/100)
+  //   baseShare   = Σ netCost ÷ subscriberCount
+  //
+  // The company's own contribution comes off FIRST, then what is left is
+  // shared equally — a rider on the cheap bus pays the same as a rider on the
+  // expensive one, because they share one pool.
   const { totalFleetCost, totalSubscribers, baseShare } = useMemo(() => {
     let totalCost = 0;
     let totalSubs = 0;
     let netCost = 0;
 
     safeBuses.forEach((bus) => {
-      totalCost += Number(bus.totalCost) || 0;
+      if (bus.status && bus.status !== 'active') return;
+      const monthlyCost =
+        (Number(bus.dailyCost) || 0) * WORKING_DAYS_PER_MONTH;
+      totalCost += monthlyCost;
       totalSubs += bus.activePassengers ?? 0;
-      netCost += (Number(bus.totalCost) || 0) * (1 - (Number(bus.companyDeductionPct) || 0) / 100);
+      netCost += monthlyCost * (1 - (Number(bus.companyDeductionPct) || 0) / 100);
     });
 
     const share = totalSubs > 0 ? Number((netCost / totalSubs).toFixed(2)) : 0;
@@ -211,57 +234,20 @@ export default function TransportationClient() {
     };
   }, [safeBuses]);
 
-  // Prorated current-month bus deduction for a passenger, matching the payroll
-  // calculation (baseShare / 26 working days × actual remaining working days).
-  // If the passenger left this month, prorate from subscriptionDate to terminationDate.
-  const proratedBusShare = (subscriptionDate?: string, terminationDate?: string, status?: string): number => {
-    if (!subscriptionDate || baseShare <= 0) return baseShare;
-    const sub = new Date(subscriptionDate);
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const subYear = sub.getFullYear();
-    const subMonth = sub.getMonth();
-    // subscription in a future month → 0; past month → full share
-    if (subYear > y || (subYear === y && subMonth > m)) return 0;
-
-    // Determine end point: terminationDate if departed this month, otherwise end of month
-    let endDay: number;
-    if (terminationDate && status === 'inactive') {
-      const term = new Date(terminationDate);
-      const termYear = term.getFullYear();
-      const termMonth = term.getMonth();
-      if (termYear === y && termMonth === m) {
-        // Left this month — prorate up to termination day
-        endDay = term.getDate();
-      } else if (termYear < y || (termYear === y && termMonth < m)) {
-        // Left in a past month — no deduction
-        return 0;
-      } else {
-        endDay = new Date(y, m + 1, 0).getDate();
-      }
-    } else {
-      endDay = new Date(y, m + 1, 0).getDate();
-    }
-
-    if (subYear < y || (subYear === y && subMonth < m)) {
-      // Subscription in past month — full month from day 1
-      let workingDays = 0;
-      for (let d = 1; d <= endDay; d++) {
-        const dow = new Date(y, m, d).getDay();
-        if (dow !== 5 && dow !== 6) workingDays++;
-      }
-      return Math.round((baseShare / 26) * Math.min(26, workingDays) * 100) / 100;
-    }
-
-    // subscription in current month — count from sub day to endDay
-    let workingDays = 0;
-    for (let d = sub.getDate(); d <= endDay; d++) {
-      const dow = new Date(y, m, d).getDay();
-      if (dow !== 5 && dow !== 6) workingDays++;
-    }
-    return Math.round((baseShare / 26) * Math.min(26, workingDays) * 100) / 100;
-  };
+  /**
+   * The bus deduction for a passenger.
+   *
+   * There is NO proration here, and that is deliberate. The subscription is a
+   * MONTHLY commitment: the cost is spread equally across everyone who
+   * subscribed, and it does not shrink because someone resigned mid-month,
+   * arrived late, or rode a bus that did not run one day. Otherwise the
+   * factory carries the cost of a half-finished month.
+   *
+   * The backend computes the same figure from the live fleet cost and the
+   * live subscriber count, so a re-run of the payroll produces the same
+   * number rather than a doubled one.
+   */
+  const busShare = (): number => baseShare;
 
   const handleDeleteBus = async (busId: string, route: string) => {
     if (
@@ -663,7 +649,7 @@ export default function TransportationClient() {
                                     </td>
                                     <td className="p-3 text-center">
                                       <span className="inline-block bg-[#C89355]/10 text-[#C89355] font-black font-mono text-xs px-2.5 py-1 rounded-lg border border-[#C89355]/20">
-                                        {baseShare > 0 ? proratedBusShare(p.subscriptionDate, p.terminationDate, p.status).toLocaleString() : "—"}
+                                        {baseShare > 0 ? busShare().toLocaleString() : "—"}
                                         {baseShare > 0 && <span className="text-[9px] mr-1 opacity-70">ل.س</span>}
                                       </span>
                                     </td>

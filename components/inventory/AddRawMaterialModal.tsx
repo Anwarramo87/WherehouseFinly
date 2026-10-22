@@ -360,20 +360,6 @@ export default function AddRawMaterialModal({
 
                     <div>
                       <label className={`${labelClass} flex items-center gap-1.5`}>
-                        <Hash size={14} className="text-[#C89355]" />
-                        الباركود <span className="text-xs font-bold text-slate-400">(اختياري)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.barcode || ""}
-                        onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
-                        placeholder="باركود المنتج"
-                        className={`${commonInputClass} font-mono`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`${labelClass} flex items-center gap-1.5`}>
                         <Ruler size={14} className="text-[#C89355]" />
                         الحجم / القياس
                       </label>

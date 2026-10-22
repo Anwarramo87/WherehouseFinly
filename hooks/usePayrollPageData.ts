@@ -15,6 +15,7 @@ import { toNumber } from "@/lib/number-utils";
 import {
   calcEarnedSalaryHourly,
   calcLateMinutes,
+  isWeekendDateKey,
   STANDARD_WORK_DAYS,
   HOURS_PER_DAY,
 } from "@/lib/payroll-calc";
@@ -141,7 +142,8 @@ export function usePayrollPageData(month: string) {
     const empById = new Map(employees.map((e) => [e.employeeId, e]));
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
-      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
+      // الجمعة والسبت عطلة: لا خصم تأخير عليها.
+      if (isWeekendDateKey(dr.date)) continue;
       const emp = empById.get(dr.employeeId);
       const scheduledStart = emp?.scheduledStart || "08:00";
       const gracePeriod =
@@ -159,7 +161,9 @@ export function usePayrollPageData(month: string) {
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
-      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
+      // الجمعة والسبت عطلة: لا تُحسب ضمن أيام الحضور. عملها يُدفع كأجر
+      // إضافي في مكان آخر، ولا تُحسب كيوم عمل عادي.
+      if (isWeekendDateKey(dr.date)) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
     return map;

@@ -31,7 +31,7 @@ import type { Bonus } from "@/types/bonus";
 import type { Advance } from "@/types/advance";
 import type { AttendanceDeductionBreakdown } from "@/types/attendance-deduction";
 import type { Employee } from "@/types/employee";
-import { calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "@/lib/payroll-calc";
+import { calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY, isWeekendDateKey } from "@/lib/payroll-calc";
 
 interface AggregatedPayroll {
   employeeId: string;
@@ -274,7 +274,8 @@ export default function VouchersClient() {
     const dailyRecords = monthlyAttendanceData?.dailyRecords || [];
     for (const dr of dailyRecords) {
       if (!dr.checkIn) continue;
-      if (new Date(`${dr.date}T00:00:00Z`).getUTCDay() === 5) continue;
+      // الجمعة والسبت عطلة — لا تُحسب ضمن أيام الحضور.
+      if (isWeekendDateKey(dr.date)) continue;
       map.set(dr.employeeId, (map.get(dr.employeeId) ?? 0) + 1);
     }
     return map;

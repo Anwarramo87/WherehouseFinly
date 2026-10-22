@@ -47,6 +47,13 @@ export const queryKeys = {
   buses: {
     all: ["buses"] as const,
     detail: (busId: string) => [...queryKeys.buses.all, "detail", busId] as const,
+    // The fleet summary card: totals plus one line per bus.
+    summary: () => [...queryKeys.buses.all, "summary"] as const,
+    // The factory's transportation settings: daily cost and working days.
+    settings: () => [...queryKeys.buses.all, "settings"] as const,
+    // The daily attendance record of one bus over a period.
+    attendance: (busId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.buses.all, "attendance", busId, params] as const,
   },
   discounts: {
     all: ["discounts"] as const,
@@ -193,6 +200,18 @@ export const queryKeys = {
       [...queryKeys.manufacturing.all, "orders", params] as const,
     order: (id: string) => [...queryKeys.manufacturing.all, "order", id] as const,
     summary: () => [...queryKeys.manufacturing.all, "summary"] as const,
+    // Production batches, stages and sub-warehouses
+    dashboard: () => [...queryKeys.manufacturing.all, "dashboard"] as const,
+    batches: (params?: Record<string, unknown>) =>
+      [...queryKeys.manufacturing.all, "batches", params] as const,
+    batch: (id: string) => [...queryKeys.manufacturing.all, "batch", id] as const,
+    warehouses: () => [...queryKeys.manufacturing.all, "warehouses"] as const,
+    warehouseBalances: (warehouseId?: string) =>
+      [...queryKeys.manufacturing.all, "warehouse-balances", warehouseId ?? "all"] as const,
+    transfers: (params?: Record<string, unknown>) =>
+      [...queryKeys.manufacturing.all, "transfers", params] as const,
+    costReport: (id: string) =>
+      [...queryKeys.manufacturing.all, "cost-report", id] as const,
   },
   representatives: {
     all: ["representatives"] as const,

@@ -119,7 +119,7 @@ const menuItems: MenuItem[] = [
     icon: ShoppingCart,
     permissions: ['view_purchasing'],
     subItems: [
-      { name: 'أوامر الشراء', href: '/purchasing' },
+      { name: 'فاتورة شراء', href: '/purchasing' },
       { name: 'فواتير الشراء', href: '/purchasing/invoices' },
     ]
   },
@@ -130,10 +130,12 @@ const menuItems: MenuItem[] = [
   {
     name: 'الإنتاج',
     icon: Factory,
-    permissions: ['view_inventory'],
+    permissions: ['view_production', 'view_inventory'],
     subItems: [
       { name: 'مكونات المنتجات', href: '/wms/production/bom' },
       { name: 'أوامر الإنتاج', href: '/wms/production' },
+      { name: 'لوحة الإنتاج', href: '/wms/production/stages' },
+      { name: 'مستودعات الإنتاج', href: '/wms/production/warehouses' },
     ]
   },
 
@@ -168,7 +170,15 @@ const menuItems: MenuItem[] = [
   // ─────────────────────────────────────────────────────────────
   // النقل (Transportation)
   // ─────────────────────────────────────────────────────────────
-  { name: 'النقل', icon: Bus, href: '/Transportation', permissions: ['view_employees'] },
+  {
+    name: 'النقل',
+    icon: Bus,
+    permissions: ['view_transportation', 'view_employees'],
+    subItems: [
+      { name: 'الباصات', href: '/Transportation' },
+      { name: 'حضور الباص اليومي', href: '/Transportation/attendance' },
+    ]
+  },
 
   // ─────────────────────────────────────────────────────────────
   // التقارير (Reports)

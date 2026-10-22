@@ -70,12 +70,12 @@ export default function PurchasingPage() {
     <WmsPageShell
       group="purchasing"
       title="المشتريات"
-      subtitle="الموردون وأوامر الشراء ومتابعة الاستلام — ومنها تُنشأ فواتير الشراء."
+      subtitle="الموردون وفاتورة الشراء ومتابعة الاستلام — ومنها تُنشأ فواتير الشراء."
       actions={
         <div className="flex gap-2">
           {(
             [
-              { key: "orders", label: "أوامر الشراء", icon: ShoppingCart },
+              { key: "orders", label: "فاتورة شراء", icon: ShoppingCart },
               { key: "suppliers", label: "الموردون", icon: Users },
             ] as const
           ).map((t) => (
@@ -95,14 +95,14 @@ export default function PurchasingPage() {
           {tab === "orders" && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus size={15} />
-              أمر شراء جديد
+              فاتورة شراء جديدة
             </Button>
           )}
         </div>
       }
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat label="أوامر الشراء" value={fmtInt(orders?.total)} icon={<ShoppingCart size={16} />} />
+        <Stat label="فاتورة شراء" value={fmtInt(orders?.total)} icon={<ShoppingCart size={16} />} />
         <Stat
           label="بانتظار الاستلام"
           value={fmtInt(rows.filter((o) => o.status === "sent").length)}
@@ -119,7 +119,7 @@ export default function PurchasingPage() {
 
       {tab === "orders" ? (
         <Panel
-          title="أوامر الشراء"
+          title="فاتورة شراء"
           icon={<ShoppingCart size={20} />}
           actions={
             <select
@@ -210,8 +210,8 @@ export default function PurchasingPage() {
             </TableFrame>
           )}
           <p className="px-6 py-4 text-[11px] font-bold text-[#263544]/50 bg-white/30 border-t border-white/70">
-            لتحويل أمر شراء إلى فاتورة، افتح تبويب «فواتير الشراء» — الفاتورة تُملأ تلقائياً بالكميات
-            المستلمة فعلياً لا بالمطلوبة.
+            لتحويل فاتورة الشراء إلى قيد محاسبي، افتح تبويب «فواتير الشراء» — الفاتورة تُملأ تلقائياً
+            بالكميات المستلمة فعلياً لا بالمطلوبة.
           </p>
         </Panel>
       ) : (
@@ -433,7 +433,7 @@ function CreatePurchaseOrderModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-[2rem] w-full max-w-3xl p-6 my-8">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-black text-[#263544] flex items-center gap-2">
-            <ShoppingCart size={20} className="text-[#C89355]" /> أمر شراء جديد
+            <ShoppingCart size={20} className="text-[#C89355]" /> فاتورة شراء جديدة
           </h2>
           <button onClick={onClose} className="text-[#263544]/40 hover:text-[#263544]">
             <X size={20} />

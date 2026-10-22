@@ -22,6 +22,10 @@ import {
   Factory,
   ListOrdered,
   Settings2,
+  Workflow,
+  Bus,
+  CalendarDays,
+  ArrowLeftRight,
 } from "lucide-react";
 
 interface TabItem {
@@ -49,7 +53,7 @@ export const TAB_GROUPS: Record<string, TabItem[]> = {
     { name: "فحص الجودة", href: "/inventory/quality", icon: ShieldCheck },
   ],
   purchasing: [
-    { name: "أوامر الشراء", href: "/purchasing", icon: ShoppingCart },
+    { name: "فاتورة شراء", href: "/purchasing", icon: ShoppingCart },
     { name: "فواتير الشراء", href: "/purchasing/invoices", icon: ReceiptText },
   ],
   sales: [
@@ -63,9 +67,18 @@ export const TAB_GROUPS: Record<string, TabItem[]> = {
   ],
   analytics: [{ name: "مؤشرات الأداء", href: "/wms/analytics", icon: BarChart3 }],
   integrations: [{ name: "الربط والتكامل", href: "/settings/integrations", icon: Plug }],
+  hr: [
+    { name: "الباصات", href: "/Transportation", icon: Bus },
+    { name: "حضور الباص اليومي", href: "/Transportation/attendance", icon: CalendarDays },
+  ],
+  accounting: [
+    { name: "أسعار الصرف", href: "/accounting/exchange-rates", icon: ArrowLeftRight },
+  ],
   production: [
     { name: "أوامر الإنتاج", href: "/wms/production", icon: ListOrdered },
+    { name: "لوحة الإنتاج", href: "/wms/production/stages", icon: Workflow },
     { name: "قوائم المواد (BOM)", href: "/wms/production/bom", icon: Layers },
+    { name: "مستودعات الإنتاج", href: "/wms/production/warehouses", icon: WarehouseIcon },
   ],
   wmsSetup: [
     { name: "إعداد WMS", href: "/wms/setup", icon: Settings2 },

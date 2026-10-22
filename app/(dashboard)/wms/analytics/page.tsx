@@ -327,7 +327,7 @@ export default function WmsAnalyticsPage() {
                 head={
                   <>
                     <th>المورد</th>
-                    <th>أوامر الشراء</th>
+                    <th>فاتورة شراء</th>
                     <th>الإنفاق</th>
                     <th>التسليم في الموعد</th>
                     <th>نسبة التوريد الكامل</th>

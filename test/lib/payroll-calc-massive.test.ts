@@ -31,7 +31,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { calcEarnedSalary, calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY } from "@/lib/payroll-calc";
+import { calcEarnedSalary, calcEarnedSalaryHourly, STANDARD_WORK_DAYS, HOURS_PER_DAY, WEEKEND_MULTIPLIER } from "@/lib/payroll-calc";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -134,8 +134,10 @@ describe("calcEarnedSalary — day-based model", () => {
   });
 
   // ── 9. Friday / weekend overtime ─────────────────────────────────────────
-  it("9 | Friday overtime 120 min → salary + 120 × minuteRate × 1.5", () => {
-    const expected = r2(SALARY + 120 * minuteRate * 1.5);
+  // The weekend multiplier is 2.0×: work on Friday or Saturday is paid
+  // double, and it is never counted as an ordinary working day as well.
+  it("9 | Weekend overtime 120 min → salary + 120 × minuteRate × 2.0", () => {
+    const expected = r2(SALARY + 120 * minuteRate * WEEKEND_MULTIPLIER);
     const result = calcEarnedSalary(SALARY, 26, 0, 0, 0, 0, 120);
     expect(r2(result)).toBe(expected);
   });
@@ -195,8 +197,10 @@ describe("calcEarnedSalary — day-based model", () => {
   });
 
   // ── 18. Both overtime types in same month ────────────────────────────────
-  it("18 | Regular OT 60 min + Friday OT 60 min → both add × 1.5", () => {
-    const expected = r2(SALARY + 60 * minuteRate * 1.5 + 60 * minuteRate * 1.5);
+  it("18 | Regular OT 60 min (×1.5) + weekend OT 60 min (×2.0)", () => {
+    const expected = r2(
+      SALARY + 60 * minuteRate * 1.5 + 60 * minuteRate * WEEKEND_MULTIPLIER,
+    );
     const result = calcEarnedSalary(SALARY, 26, 0, 0, 0, 60, 60);
     expect(r2(result)).toBe(expected);
   });
@@ -304,9 +308,9 @@ describe("calcEarnedSalaryHourly — hourly model", () => {
     expect(r2(result)).toBe(HOURLY_SALARY);
   });
 
-  // ── H11. Friday overtime in hourly model ─────────────────────────────────
-  it("H11 | Friday overtime 120 min → salary + 120 × minuteRate × 1.5", () => {
-    const expected = r2(HOURLY_SALARY + 120 * hMinuteRate * 1.5);
+  // ── H11. Weekend overtime in hourly model ────────────────────────────────
+  it("H11 | Weekend overtime 120 min → salary + 120 × minuteRate × 2.0", () => {
+    const expected = r2(HOURLY_SALARY + 120 * hMinuteRate * WEEKEND_MULTIPLIER);
     const result = calcEarnedSalaryHourly(HOURLY_SALARY, WORK_DAYS, HOURS, maxMinutes, 0, 0, 0, 0, 0, 0, 120);
     expect(r2(result)).toBe(expected);
   });
@@ -368,9 +372,9 @@ describe("Mathematical equation component verification", () => {
     expect(r2(result)).toBe(r2(S + pay));
   });
 
-  it("weekendOvertimePay = weekendMinutes × minuteRate × 1.5", () => {
+  it("weekendOvertimePay = weekendMinutes × minuteRate × 2.0", () => {
     const wMin = 60;
-    const pay = wMin * mr * 1.5;
+    const pay = wMin * mr * WEEKEND_MULTIPLIER;
     const result = calcEarnedSalary(S, 26, 0, 0, 0, 0, wMin);
     expect(r2(result)).toBe(r2(S + pay));
   });
@@ -387,7 +391,7 @@ describe("Mathematical equation component verification", () => {
     const expected = r2(
       dr * paidDays
       + otMin * mr * 1.5
-      + wkMin * mr * 1.5
+      + wkMin * mr * WEEKEND_MULTIPLIER
       - lateMin * mr * 1.5
       - earlyMin * mr
     );

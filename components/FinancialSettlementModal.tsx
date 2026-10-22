@@ -163,12 +163,13 @@ const summarizeAttendance = (
     if (daily.ins.length === 0) return;
 
     const firstIn = [...daily.ins].sort()[0];
-    const lastOut = [...daily.outs].sort().at(-1);
+    const lastOut = [...daily.outs].at(-1);
     const weekDay = new Date(`${dateKey}T00:00:00Z`).getUTCDay();
 
-    // Friday is paid only as actual worked minutes at 1.5x. It is not a normal
-    // workday, so no late, early-leave, or absence calculation applies.
-    if (weekDay === 5) {
+    // الجمعة والسبت عطلة: لا تُحسب ضمن أيام الحضور، ولا يُطبَّق عليها خصم
+    // تأخير أو مغادرة مبكرة أو غياب. إن اشتغل الموظف فيها، تُدفع دقائق
+    // العمل الفعلية كأجر إضافي بمعامل 2.0× — ولا تُحسب كيوم عمل عادي أبداً.
+    if (weekDay === 5 || weekDay === 6) {
       if (firstIn && lastOut) {
         const inMinutes = toMinutes(toHHmm(firstIn));
         const outMinutes = toMinutes(toHHmm(lastOut));

@@ -14,6 +14,16 @@ export interface BusResponse {
   driverName: string;
   driverPhone: string;
   totalCost: number;
+  /** التكلفة اليومية للباص — الأساس في احتساب التكلفة الشهرية */
+  dailyCost?: number;
+  /** التكلفة الشهرية المحسوبة (تكلفة يومية × أيام العمل) */
+  monthlyCost?: number;
+  /** مساهمة المعمل في تكلفة هذا الباص */
+  companyDeduction?: number;
+  /** صافي التكلفة بعد حسم مساهمة المعمل */
+  netCost?: number;
+  /** الحصة الفردية لكل مشترك (متساوية بين كل المشتركين) */
+  perEmployeeShare?: number;
   companyDeductionPct: number;
   employeeDeductionPct: number;
   capacity: number;
@@ -194,6 +204,127 @@ export function useTransportation() {
     addPassenger,
     removePassenger,
   };
+}
+
+/**
+ * The fleet summary card: totals plus one line per bus, so nothing is merged
+ * away and the user can always see which bus produced which number.
+ */
+export interface TransportationSummary {
+  totalBuses: number;
+  activeBuses: number;
+  totalPassengers: number;
+  totalMonthlyCost: number;
+  totalCompanyDeduction: number;
+  totalNetCost: number;
+  totalDeducted: number;
+  defaultDailyCost: number;
+  workingDaysPerMonth: number;
+  buses: Array<
+    BusResponse & {
+      dailyCost: number;
+      monthlyCost: number;
+      companyDeduction: number;
+      netCost: number;
+      perEmployeeShare: number;
+    }
+  >;
+}
+
+export function useTransportationSummary() {
+  return useQuery({
+    queryKey: queryKeys.buses.summary(),
+    queryFn: async () => {
+      const res = await apiClient.get<TransportationSummary>("/transportation/summary");
+      return res.data;
+    },
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
+  });
+}
+
+/** The per-factory transportation settings: the daily cost and the work days. */
+export interface TransportationSettings {
+  defaultDailyCost: number;
+  workingDaysPerMonth: number;
+}
+
+export function useTransportationSettings() {
+  return useQuery({
+    queryKey: queryKeys.buses.settings(),
+    queryFn: async () => {
+      const res = await apiClient.get<TransportationSettings>("/transportation/settings");
+      return res.data;
+    },
+    staleTime: QUERY_STALE_TIME.RELAXED,
+    gcTime: QUERY_GC_TIME.RELAXED,
+  });
+}
+
+/** One day of attendance for one bus. */
+export interface BusAttendanceRecord {
+  id: string;
+  busId: string;
+  attendDate: string;
+  attended: boolean;
+  notes: string | null;
+  recordedBy: string | null;
+  createdAt: string;
+}
+
+export function useBusAttendance(
+  busId: string | null,
+  params: { from?: string; to?: string } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.buses.attendance(busId ?? "", params),
+    queryFn: async () => {
+      const res = await apiClient.get<{
+        data: BusAttendanceRecord[];
+        summary: { recordedDays: number; attendedDays: number; absentDays: number };
+      }>(`/transportation/buses/${busId}/attendance`, { params });
+      return res.data;
+    },
+    enabled: !!busId,
+    staleTime: QUERY_STALE_TIME.FAST,
+    gcTime: QUERY_GC_TIME.STANDARD,
+  });
+}
+
+/**
+ * Records one day of attendance.
+ *
+ * The server UPDATES the row when the same day is recorded again rather than
+ * adding a second one, so a re-submission never turns into "attended twice".
+ */
+export function useRecordBusAttendance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      busId: string;
+      attendDate: string;
+      attended: boolean;
+      notes?: string;
+    }) => {
+      const res = await apiClient.post(
+        `/transportation/buses/${input.busId}/attendance`,
+        {
+          attendDate: input.attendDate,
+          attended: input.attended,
+          notes: input.notes,
+        },
+      );
+      return res.data;
+    },
+    onSuccess: async (data: { updated?: boolean }) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.buses.all });
+      toast.success(data?.updated ? "تم تحديث تسجيل اليوم" : "تم تسجيل الحضور");
+    },
+    onError: (error: unknown) => {
+      toast.error(normalizeError(error, "تعذّر تسجيل الحضور"));
+    },
+  });
 }
 
 export default useTransportation;
